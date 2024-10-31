@@ -4,7 +4,7 @@ harmonic bond is formed. Every particle can form bonds with 2 atoms (not just
 one like in liquid.py). Bond angles are set to 180 degrees, with a weak force.
 
 Run using
-python chain.py > traj.gro
+python chain.py > traj.xyz
 
-Visualize using
-vmd traj.gro
+Visualize using Pymol
+pymol traj.xyz vis.pml

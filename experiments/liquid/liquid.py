@@ -22,7 +22,7 @@ end_time = 250.0 * picoseconds
 bond_length = 0.25 # nm
 bond_force = 100.0
 bond_cutoff = 0.4 # nm, below this threshold a bond is formed
-n_particles = 150
+n_particles = 50
 
 # bond force and integrator choices
 def gen_force():
@@ -151,36 +151,16 @@ def simulate():
 
 def print_frame(file, state, bonded):
     positions = state.getPositions()
-
     natoms = len(positions)
-    time = state.getTime() * 1000.0  # fs to ps.
-
+    time = state.getTime() * 1000.0
+    file.write(f"{natoms}\n")
     # Write the title. Reference a Polvo song.
-    print(f"Bend or Break, t={time.value_in_unit(picoseconds):.1f}", file=file)
-    # Write the number of atoms in the system.
-    print(f"{natoms}", file=file)
-
+    file.write(f"Bend or Break, t={time.value_in_unit(picoseconds):.1f}\n")
     for i, pos in enumerate(positions):
-        # Write the atom line. Modulo with box size to display position within pbc
-        name = "NONBD"
-        elem = "A"
-        velx = 1.0  # hack to color in vmd based on vel... TODO fix
-        if bonded[i] != -1:
-            name = "BONDD"
-            velx = 0.0
-        print(
-            f"{i:5}{name:>5}{elem:5}{i:5}{(pos.x % size):8.3f}{(pos.y % size):8.3f}{(pos.z % size):8.3f}{velx:8.4f}{0.:8.4f}{0.:8.4f}",
-            file=file,
-        )
-
-    # Write the box vectors.
-    v1, v2, v3 = (v.value_in_unit(nanometers) for v in state.getPeriodicBoxVectors())
-    # v1(x) v2(y) v3(z) v1(y) v1(z) v2(x) v2(z) v3(x) v3(y)
-    print(
-        f"{v1[0]:.4f} {v2[1]:.4f} {v3[2]:.4f} {v1[1]:.4f} {v1[2]:.4f} {v2[0]:.4f} {v2[2]:.4f} {v3[0]:.4f} {v3[1]:.4f}",
-        file=file,
-    )
-
+        name = "C"
+        if bonded[i] == -1:
+            name = "N"
+        file.write(f"{name} {pos.x % size} {pos.y % size} {pos.z % size}\n")
 
 if __name__ == "__main__":
     random.seed()

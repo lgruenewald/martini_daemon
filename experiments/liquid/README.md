@@ -3,7 +3,7 @@ bonds in the system, but if two particles come within a cutoff distance, a
 harmonic bond is formed.
 
 Run using
-python liquid.py > traj.gro
+python liquid.py > traj.xyz
 
-Visualize using
-vmd traj.gro
+Visualize using Pymol
+pymol traj.xyz vis.pml

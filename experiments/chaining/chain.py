@@ -9,7 +9,8 @@ import random
 import math
 
 # input config
-steps_per_frame = 100
+steps_per_frame = 100  # do frames (= bond calculations) every n steps
+writes_per_frame = 10  # write every n frames
 mass = 10.0
 charge = 0.0
 sigma = 0.1  # nm
@@ -112,8 +113,12 @@ def simulate():
     # if two bonds are fulfilled, it is removed from the reactive list by setting the id to -1
     reactive = [] # TODO: linked list is a better data structure for this
     n_reactive = 0
+
+    rmap = [] # just for visualization, number of neighbors for every atom
+    
     for i in range(n_particles):
         reactive.append([i, -1])
+        rmap.append(0)
         n_reactive += 1
 
     def make_bond(i0, i1):
@@ -123,7 +128,9 @@ def simulate():
     time = context.getTime()
 
     print("Start.", file=stderr)
+    frame_count = 0
     while time < end_time:
+        frame_count += 1
         state = context.getState(getPositions=True)
         pos = state.getPositions()
         # bonding algorithm
@@ -146,6 +153,8 @@ def simulate():
                 dist = pdist(pos[id_this], pos[id_new], size)
                 if dist < bond_cutoff:
                     make_bond(id_this, id_new)
+                    rmap[id_this] += 1
+                    rmap[id_new] += 1
                     if id_neighbor == -1:
                         reactive[id_this][1] = id_new
                     else:
@@ -168,7 +177,8 @@ def simulate():
                 
 
         # writing output
-        print_frame(stdout, state)
+        if frame_count % writes_per_frame == 0:
+            print_frame(stdout, state, rmap)
         time = state.getTime()
         
         # n fully bonded
@@ -182,34 +192,26 @@ def simulate():
     print("\nDone.", file=stderr)
 
 
-def print_frame(file, state):
+def print_frame(file, state, rmap):
     positions = state.getPositions()
-
     natoms = len(positions)
-    time = state.getTime() * 1000.0  # fs to ps.
-
+    time = state.getTime() * 1000.0
+    file.write(f"{natoms}\n")
     # Write the title. Reference a Polvo song.
-    print(f"Bend or Break, t={time.value_in_unit(picoseconds):.1f}", file=file)
-    # Write the number of atoms in the system.
-    print(f"{natoms}", file=file)
-
+    file.write(f"Bend or Break, t={time.value_in_unit(picoseconds):.1f}\n")
     for i, pos in enumerate(positions):
-        # Write the atom line. Modulo with box size to display position within pbc
-        name = "DUMMY"
-        elem = "A"
-        velx = 0.0
-        print(
-            f"{i:5}{name:>5}{elem:5}{i:5}{(pos.x % size):8.3f}{(pos.y % size):8.3f}{(pos.z % size):8.3f}{velx:8.4f}{0.:8.4f}{0.:8.4f}",
-            file=file,
-        )
+        name = "C"
+        if rmap[i] == 1:
+            name = "N"
+        elif rmap[i] == 2:
+            name = "B"
+        elif rmap[i] == 0:
+            pass
+        else:
+            # this should never happen
+            stderr.write("Error: Unknown rmap value, not 0, 1 or 2\n")
+        file.write(f"{name} {pos.x % size} {pos.y % size} {pos.z % size}\n")
 
-    # Write the box vectors.
-    v1, v2, v3 = (v.value_in_unit(nanometers) for v in state.getPeriodicBoxVectors())
-    # v1(x) v2(y) v3(z) v1(y) v1(z) v2(x) v2(z) v3(x) v3(y)
-    print(
-        f"{v1[0]:.4f} {v2[1]:.4f} {v3[2]:.4f} {v1[1]:.4f} {v1[2]:.4f} {v2[0]:.4f} {v2[2]:.4f} {v3[0]:.4f} {v3[1]:.4f}",
-        file=file,
-    )
 
 
 if __name__ == "__main__":
