@@ -7,10 +7,11 @@ from openmm.unit import *
 from sys import stderr, stdout
 import random
 import math
+import numpy as np
+import time
 
 # input config
-steps_per_frame = 100  # do frames (= bond calculations) every n steps
-writes_per_frame = 10  # write every n frames
+steps_per_frame = 250  # do frames (= bond calculations) every n steps
 mass = 10.0
 charge = 0.0
 sigma = 0.1  # nm
@@ -26,17 +27,21 @@ bond_cutoff = 1.0 # nm, below this threshold a bond is formed
 n_particles = 150
 
 bond_angle = math.pi # 180 degrees
-angle_force = 10.0
+angle_force = 100.0
 
 # bond force and integrator choices
 def gen_force():
-    return HarmonicBondForce()
+    f = HarmonicBondForce()
+    f.setUsesPeriodicBoundaryConditions(True)
+    return f
 
 def add_force(force, id0, id1):
     force.addBond(id0, id1, bond_length, bond_force)
 
 def gen_angle_force():
-    return HarmonicAngleForce()
+    f = HarmonicAngleForce()
+    f.setUsesPeriodicBoundaryConditions(True)
+    return f
 
 def add_angle(force, id0, id1, id2):
     force.addAngle(id1, id0, id2, bond_angle, angle_force)
@@ -45,36 +50,16 @@ def get_integrator():
     return LangevinMiddleIntegrator(temperature, friction, step_size)    
 #    return VerletIntegrator(step_size)
 
-def rand_vec3(min, max):
-    # generates a random Vec3 within the sim box
-
-    return Vec3(random.uniform(min, max),
-                random.uniform(min, max),
-                random.uniform(min, max))
-
-def pdiff(x1, x2, size):
-    # periodic boundary adjusted difference between two floats
-    # based on https://github.com/openmm/openmm/blob/master/platforms/reference/src/SimTKReference/ReferenceForce.cpp periodicDifference
-
-    diff = x1 - x2
-    base = math.floor(diff / size + 0.5) * size
-    return diff - base
-
 def pdist(v1, v2, size):
     # periodic boundary adjusted difference between two Vec3
     # based on https://github.com/openmm/openmm/blob/master/platforms/reference/src/SimTKReference/ReferenceForce.cpp getDeltaRPeriodic
 
-    diff = Vec3(
-        pdiff(v1.x, v2.x, size),
-        pdiff(v1.y, v2.y, size),
-        pdiff(v1.z, v2.z, size)
-    )
+    diff = v1 - v2
+    base = np.floor(diff / size + 0.5) * size
+    return np.sqrt(np.dot(diff-base, diff-base))
 
-    return math.sqrt(diff.x ** 2 + diff.y ** 2 + diff.z ** 2)
-
-assert(pdiff(1., 2., 5.) - 1. < 0.00001)
-assert(pdiff(1., 4., 5.) - 2. < 0.00001)
-assert(pdist(Vec3(0.,0.,1.), Vec3(1.,0.,0.), 5.) - math.sqrt(2) < 0.00001)
+assert(np.abs(pdist(np.array([0.,0.,1.]), np.array([0.,0.,4.]), 5.) - 2.) < 0.00001)
+assert(np.abs(pdist(np.array([0.,0.,1.]), np.array([1.,0.,0.]), 5.) - np.sqrt(2)) < 0.00001)
 
 def simulate():
 
@@ -89,110 +74,95 @@ def simulate():
     integrator = get_integrator()
 
     # particles setup
-    initial_positions = []  # list of Vec3, nm
     for i in range(n_particles):
         system.addParticle(mass)
         nonbond.addParticle(charge, sigma, epsilon)
-        initial_positions.append(rand_vec3(0., size))
-    
 
     # context setup
     context = Context(system, integrator)
     context.setPeriodicBoxVectors(
         Vec3(size, 0.0, 0.0), Vec3(0.0, size, 0.0), Vec3(0.0, 0.0, size)
     )
-    context.setPositions(initial_positions)
+    context.setPositions(np.random.rand(n_particles, 3) * size)
     context.setVelocitiesToTemperature(temperature)
 
     LocalEnergyMinimizer.minimize(context, 10, 100)
     
     # bonding setup
-    # list of reactive sites
-    # of the form (id, neighbor_id)
-    # if neighbor_id is 0 then it's not bonded yet
-    # if two bonds are fulfilled, it is removed from the reactive list by setting the id to -1
-    reactive = [] # TODO: linked list is a better data structure for this
-    n_reactive = 0
-
-    rmap = [] # just for visualization, number of neighbors for every atom
-    
-    for i in range(n_particles):
-        reactive.append([i, -1])
-        rmap.append(0)
-        n_reactive += 1
-
+    # -1 -> not bonded
+    # id of neighbor -> bonded to neighbor
+    # -2 -> bonded to two neighbors
+    active = np.repeat(-1, n_particles)
+ 
     def make_bond(i0, i1):
         add_force(bonds, i0, i1)
+        if (active[i0] == -1):
+            active[i0] = i1
+        else:
+            add_angle(angles, i0, active[i0], i1)
+            active[i0] = -2
+        if (active[i1] == -1):
+            active[i1] = i0
+        else:
+            add_angle(angles, i1, active[i1], i0)
+            active[i1] = -2
 
     # simulation
-    time = context.getTime()
+    sim_time = context.getTime()
 
     print("Start.", file=stderr)
     frame_count = 0
-    while time < end_time:
+
+    start_real_time = time.time_ns()
+    
+    while sim_time < end_time:
         frame_count += 1
         state = context.getState(getPositions=True)
-        pos = state.getPositions()
+        sim_time = state.getTime()
+        pos = state.getPositions(asNumpy=True).value_in_unit(nanometers)
         # bonding algorithm
         state_changes = False
-        for i in range(n_reactive):
-            id_this = reactive[i][0]
-            if id_this == -1:
+        for i in range(len(active)):
+            if active[i] == -2:
                 continue
-            id_neighbor = reactive[i][1]
-            for j in range(n_reactive):
-                id_new = reactive[j][0]
-                if id_new == -1:
+            neighbor = active[i]
+            for j in range(i):
+                if active[j] == -2:
                     continue
-                id_new_neighbor = reactive[j][1]
-                if id_this == id_new or id_neighbor == id_new or \
-                        (id_neighbor >= 0 and id_neighbor == id_new_neighbor):
+                new_neighbor = active[j]
+                if i == j or neighbor == j or \
+                        (neighbor >= 0 and neighbor == new_neighbor):
                     # no self reactions, no neighbor reactions, no neighbors neighbor reactions
                     continue
                 
-                dist = pdist(pos[id_this], pos[id_new], size)
+                dist = pdist(pos[i], pos[j], size)
                 if dist < bond_cutoff:
-                    make_bond(id_this, id_new)
-                    rmap[id_this] += 1
-                    rmap[id_new] += 1
-                    if id_neighbor == -1:
-                        reactive[id_this][1] = id_new
-                    else:
-                        reactive[id_this][0] = -1
-                        add_angle(angles, id_this, id_neighbor, id_new)
-                        n_reactive -= 1
-                    if id_new_neighbor == -1:
-                        reactive[id_new][1] = id_this
-                    else:
-                        reactive[id_new][0] = -1
-                        add_angle(angles, id_new, id_this, id_new_neighbor)
-                        n_reactive -= 1
+                    make_bond(i, j)
                     state_changes = True
                     break
         
-
         if state_changes:
             context.reinitialize(preserveState=True)
             
-                
-
         # writing output
-        if frame_count % writes_per_frame == 0:
-            print_frame(stdout, state, rmap)
-        time = state.getTime()
-        
+        print_frame(stdout, state, active)
+    
         # n fully bonded
-        n_bonded = n_particles - n_reactive
-        perc = 100. * time / end_time
-        perc_bonded = 100. * n_bonded / n_particles
-        stderr.write(f"\rTime: {time.value_in_unit(picoseconds):.1f} fs ({perc:.1f}%)\t\tBonded: {n_bonded} ({perc_bonded:.1f}%)")
+        n_free = np.count_nonzero(active == -1)
+        n_full = np.count_nonzero(active == -2)
+        n_edge = np.count_nonzero(active >= 0)
+        perc = 100. * sim_time / end_time
+
+        stderr.write(f"\rTime: {sim_time.value_in_unit(picoseconds):.1f} fs ({perc:.1f}%)\tParticles free: {n_free} edge: {n_edge} full: {n_full}\033[K")
         integrator.step(steps_per_frame)
 
 
-    print("\nDone.", file=stderr)
+    end_real_time = time.time_ns()
+    real_time_ms = (end_real_time - start_real_time) / 1000000
+    print(f"\nDone. {frame_count} frames and {frame_count * steps_per_frame} steps in {real_time_ms:.0f} ms.", file=stderr)
 
 
-def print_frame(file, state, rmap):
+def print_frame(file, state, active):
     positions = state.getPositions()
     natoms = len(positions)
     time = state.getTime() * 1000.0
@@ -200,19 +170,14 @@ def print_frame(file, state, rmap):
     # Write the title. Reference a Polvo song.
     file.write(f"Bend or Break, t={time.value_in_unit(picoseconds):.1f}\n")
     for i, pos in enumerate(positions):
-        name = "C"
-        if rmap[i] == 1:
-            name = "N"
-        elif rmap[i] == 2:
+        name = "N"
+        if active[i] == -1:
+            # free
+            name = "C"
+        elif active[i] == -2:
+            # completely bonded
             name = "B"
-        elif rmap[i] == 0:
-            pass
-        else:
-            # this should never happen
-            stderr.write("Error: Unknown rmap value, not 0, 1 or 2\n")
         file.write(f"{name} {pos.x % size} {pos.y % size} {pos.z % size}\n")
-
-
 
 if __name__ == "__main__":
     random.seed()
