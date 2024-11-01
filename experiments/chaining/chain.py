@@ -12,23 +12,23 @@ import numba as nb
 import time
 
 # input config, TODO unhardcode, unglobal
-steps_per_frame = 250  # do frames (= bond calculations) every n steps
+steps_per_frame = 1000  # do frames (= bond calculations) every n steps
 mass = 10.0
 charge = 0.0
-sigma = 0.1  # nm
+sigma = 1.  # nm
 epsilon = 1.  # kJ
 temperature = 300 * kelvin
 friction = 10 / picosecond
 step_size = 0.005 * picosecond
-size = 15.  # nm, period box
-end_time = 2000.0 * picosecond
+size = 10.  # nm, period box
+end_time = 5000.0 * picosecond
 bond_length = 0.25  # nm
-bond_force = 100.0
-bond_cutoff = 1.0  # nm, below this threshold a bond is formed
-n_particles = 150
+bond_force = 1000.0
+bond_cutoff = 0.35  # nm, below this threshold a bond is formed
+n_particles = 250
 
-bond_angle = math.pi
-angle_force = 100.0
+bond_angle = 2 / 3 * math.pi
+angle_force = 1000.0
 
 
 # Interface with openmm - moved here so bond and angle forces, integrators can
@@ -94,28 +94,29 @@ assert (np.abs(pdist(np.array([0., 0., 1.]), np.array([1., 0., 0.]), 5.) -
 @nb.jit
 def detection_algorithm(active, pos):
     # returns a list of pair of bonds to be formed
+    # limitation: only one reaction per active atom per step
+    n_atoms = len(active)
+    # if mask is set to 1, no longer considered for reactions in this step
+    mask = np.repeat(0, n_atoms)
     to_be_formed = []
-    for i in range(len(active)):
-        if active[i] == -2:
+    for i in range(n_atoms):
+        if active[i] == -2 or mask[i] == 1:
             continue
         neighbor = active[i]
-        dists = [(pdist(pos[i], pos[j], size)
-                 if new_neighbor != -2 and j != i and j != neighbor and
-                 (neighbor < 0 or neighbor != new_neighbor)
-                 else 0.)
-                 for j, new_neighbor in enumerate(active)]
+        # only up to i, to prevent double count and self reactions
         for j in range(i):
-            if active[j] == -2:
+            # skip fully bonded or ones already bonding in this step
+            if active[j] == -2 or mask[j] == 1:
                 continue
             new_neighbor = active[j]
-            if i == j or neighbor == j or \
-                    (neighbor >= 0 and neighbor == new_neighbor):
-                # no self reactions, no neighbor reactions,
-                # no neighbors neighbor reactions
+            # no neighbor reactions, no neighbors-neighbor
+            if neighbor == j or (neighbor >= 0 and neighbor == new_neighbor):
                 continue
-            dist = dists[j]
+            dist = pdist(pos[i], pos[j], size)
             if dist < bond_cutoff:
                 to_be_formed.append((i, j))
+                mask[i] = 1
+                mask[j] = 1
                 break
 
     return to_be_formed
@@ -131,7 +132,6 @@ def detection_modification(bonds, angles, active, pos):
 
 
 def simulate():
-
     # context pre-setup, except particles
     system = mm.System()
     nonbond = mm.NonbondedForce()
@@ -205,7 +205,6 @@ def print_frame(file, state, active):
     natoms = len(positions)
     time = state.getTime() * 1000.0
     file.write(f"{natoms}\n")
-    # Write the title. Reference a Polvo song.
     file.write(f"Bend or Break, t={time.value_in_unit(picosecond):.1f}\n")
     for i, pos in enumerate(positions):
         name = "N"
@@ -221,3 +220,4 @@ def print_frame(file, state, active):
 if __name__ == "__main__":
     random.seed()
     simulate()
+    
