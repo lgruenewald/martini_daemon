@@ -1,0 +1,16 @@
+; TLDR: a single file that includes everything to be parsed
+
+; reactive topology
+
+; import all functional group definitions
+
+#include "phenylthiol.fgroup"
+
+; import all product definitions
+
+#include "disulfide.fitp"
+
+; import all reaction definitions
+#include "disulfide.rx"
+
+

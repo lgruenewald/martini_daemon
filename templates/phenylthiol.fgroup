@@ -1,0 +1,71 @@
+; TLDR: ADDITIONAL INFO TO MAP REACTIVE GROUPS FROM T to T*
+
+; .fgroup
+; Functional group definitions
+; refers to abstract functional groups, so a functional group alone
+; defines what type of reactivity it can do
+
+; the main goal of these files is to manage how molecules with functional
+; groups are loaded into memory
+
+; this is a work in progress, the comments are based on imagination
+
+; A "functional group"
+[ fgroup ]
+phthiol
+
+; atoms involved in the functional group
+; rid is how they are numbered in reaction templates
+; role is whether it is "init", "norm" or "edge"
+
+; init is the initiator atom, used for distance cutoffs in templates
+; norm are atoms part of the functional group
+; edge are atoms not part of the functional group
+
+; there must be exactly one initiator atom per functional group
+
+; edge atoms can be used for reaction condition constraints
+; or to create or destroy angles/dihedrals with, as long as they 
+; aren't a center atom in the angles/dihedrals created/destroyed
+
+; bonds involving edge atoms, angles centered on edge atoms or dihedrals
+; centered on edge atoms can be assumed to not be modified during reactions
+
+; bonds only involving only init or norm atoms, angles centered on init or norm
+; atoms and dihedrals centered on init or norm atoms exclusively should
+; be listed as "reactive" forces in this example ritp, to load them in
+; memory in an order consistent for the same functional group, regardless
+; of what itp is used.
+
+; any atoms bonded to any init or norm atom in any form (any shared angle,
+; bond, dihedral) should be included as an edge atom at least
+
+[ atoms ]
+; rid role
+   1  init
+   2  edge
+   3  edge
+   4  edge
+
+; internally, T* should construct a list of *reactive forces*:
+; list of all bonds involving only init or norm atoms
+; list of all angles centered on init or norm atoms
+; list of all dihedrals centered exclusively on init or norm atoms
+; (so edge-init-norm-edge belongs here but edge-init-edge-norm 
+; for example doesn't)
+; all these bonds will be deleted when a reaction happens and need to
+; be replaced from the product itp
+
+; Input molecules (input topologies) might contain molecules that have this
+; functional group, list which ones and map the id's to rid's. Have some
+; sanity checks that they are mapped correctly - match types, atom names too
+; title keyword is fmap.molname
+[ fmap ]
+BDT
+[ atoms ]
+; rid    id(in itp)    type   name
+   1         1          TC6    S1
+   2         2          TC6    S2
+   3         3          TC5    C3
+   4         4          TC5    C4
+; can have multiple fmap's to have multiple possible itp's with the same fg
