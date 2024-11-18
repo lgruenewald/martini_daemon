@@ -12,7 +12,7 @@
 
 ; A "functional group"
 [ fgroup ]
-phthiol
+MOLNAME
 
 ; atoms involved in the functional group
 ; rid is how they are numbered in reaction templates
@@ -43,9 +43,16 @@ phthiol
 [ atoms ]
 ; rid role
    1  init
+#ifdef EDGE
    2  edge
    3  edge
    4  edge
+#else
+   ; just a test of #ifdefs
+   2 norm
+   3 norm
+   4 norm
+#endif
 
 ; internally, T* should construct a list of *reactive forces*:
 ; list of all bonds involving only init or norm atoms

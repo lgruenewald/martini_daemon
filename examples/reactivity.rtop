@@ -2,13 +2,16 @@
 
 ; reactive topology
 
+#define MOLNAME phthiol
+#define EDGE 1
+
 ; import all functional group definitions
+#include "disulfide.fitp"
 
 #include "phenylthiol.fgroup"
 
 ; import all product definitions
 
-#include "disulfide.fitp"
 
 ; import all reaction definitions
 #include "disulfide.rx"

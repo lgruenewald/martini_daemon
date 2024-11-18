@@ -4,6 +4,7 @@
 import re
 import sys
 from dataclasses import dataclass
+from enum import Enum
 
 
 @dataclass
@@ -139,7 +140,7 @@ class TopParser:
             elif ch == "\"":
                 while cur < len(line) and (ch := advance()) != "\"":
                     pass
-                make_token("string")
+                make_token("word")
                 tokens[-1].content = tokens[-1].content.strip("\"")
             elif ch.isdigit() or \
                     (ch in "+-") and peek().isdigit():
@@ -152,6 +153,18 @@ class TopParser:
                     tokens[-1].content = int(t)
             elif ch in ["_", "#"] or ch.isalpha():
                 make_token_re(word, "macro" if ch == "#" else "word")
+                val = self._defines.get(tokens[-1].content)
+                if val is not None:
+                    match val:
+                        case int():
+                            tokens[-1].type = "int"
+                        case float():
+                            tokens[-1].type = "float"
+                        case str():
+                            tokens[-1].type = "word"
+                        case _:
+                            self.error("Unknown DEFINE type, can't replace")
+                    tokens[-1].content = val
             elif ch == ";":
                 break
             else:
@@ -166,6 +179,9 @@ class TopParser:
         self._included[path] = True
         oldpath = self._path
         self._path = path
+        IfstackElem = Enum("IfstackElem", ["DoBranch", "SkipBranch",
+                                           "SkippedIf", "Root"])
+        ifstack = [IfstackElem.Root]  # per file
         with open(path, "r") as fhandle:
             cumulative = []
             for i, line in enumerate(fhandle):
@@ -182,10 +198,78 @@ class TopParser:
                     tokens = cumulative + tokens
                     cumulative = []
 
+                ifstack_top = ifstack[-1]
+                # handle if/else logic before other lines
+                if tokens[0].type == "macro":
+                    match tokens[0].content:
+                        case "#ifdef":
+                            if len(tokens) != 2:
+                                self.error("#ifdef takes one argument")
+                                continue
+                            if ifstack_top in {IfstackElem.DoBranch,
+                                               IfstackElem.Root}:
+                                if tokens[1].type in {"int", "float"} and \
+                                        tokens[1].content > 0:
+                                    ifstack.append(IfstackElem.DoBranch)
+                                else:
+                                    ifstack.append(IfstackElem.SkipBranch)
+                            else:
+                                ifstack.append(IfstackElem.SkippedIf)
+                            continue
+
+                        case "#ifndef":
+                            if len(tokens) != 2:
+                                self.error("#ifndef takes one argument")
+                                continue
+                            if ifstack_top in {IfstackElem.DoBranch,
+                                               IfstackElem.Root}:
+                                if tokens[1].type in {"int", "float"} and \
+                                        tokens[1].content > 0:
+                                    ifstack.append(IfstackElem.SkipBranch)
+                                else:
+                                    ifstack.append(IfstackElem.DoBranch)
+                            else:
+                                ifstack.append(IfstackElem.SkippedIf)
+                            continue
+                        case "#else":
+                            if len(tokens) != 1:
+                                self.error("#else takes no argument")
+                            if ifstack_top == IfstackElem.DoBranch:
+                                ifstack[-1] = IfstackElem.SkipBranch
+                            elif ifstack_top == IfstackElem.SkipBranch:
+                                ifstack[-1] = IfstackElem.DoBranch
+                            elif ifstack_top == IfstackElem.Root:
+                                self.error("#else unmatched")
+                            continue
+                        case "#endif":
+                            if len(tokens) != 1:
+                                self.error("#endif takes no argument")
+                            if ifstack_top == IfstackElem.Root:
+                                self.error("#endif unmatched")
+                                continue
+                            ifstack.pop()
+                            continue
+                        case "#end":
+                            self.error("Please use #endif")
+                            continue
+                        case "#include":
+                            pass
+                        case "#define":
+                            pass
+                        case "#undef":
+                            pass
+                        case _:
+                            # still error at unknown macros
+                            self.error("Unknown " + tokens[0].content)
+                if ifstack_top in {IfstackElem.SkipBranch,
+                                   IfstackElem.SkippedIf}:
+                    continue
+
                 # directives
                 if tokens[0].content == "[":
                     if len(tokens) != 3:
                         self.error("Invalid directive: wrong len(tokens)")
+                        continue
                     if tokens[2].content != "]":
                         self.error("Invalid directive: no ]")
                     self._directive(tokens[1].content, tokens[1])
@@ -196,11 +280,32 @@ class TopParser:
                                 self.error("#include should have 1 argument")
                             path = tokens[1].content
                             self._parse(path)
+                            # TODO #include <filename> with include paths
+                        case "#define":
+                            if not (len(tokens) in {2, 3}) or \
+                                    tokens[1].type != "word":
+                                self.error("#define takes one word argument")
+                                self.error("or 1 word arg and 1 any arg")
+                                continue
+                            key = tokens[1].content
+                            val = 1
+                            if len(tokens) == 3:
+                                val = tokens[2].content
+                            self._defines[key] = val
+                        case "#undef":
+                            if len(tokens) != 2 or tokens[1].type != "word":
+                                self.error("#undef takes one word argument")
+                                continue
+                            key = tokens[1].content
+                            if self._defines.get(key):
+                                self._defines.pop(key)
                         case _:
                             self.error("Unknown " + tokens[0].content)
                 # data
                 else:
                     self._data(tokens, line)
+        if len(ifstack) > 1:
+            self.error("Unmatched #ifdef or #ifndef")
         self._path = oldpath
 
     def parse(self, path, defines={}):

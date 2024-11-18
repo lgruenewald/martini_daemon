@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # python class that groups together all the template information
 
-from top_parser import TopParser, DirectiveList, Directive, Token
+from top_parser import TopParser
 from dataclasses import dataclass
 import sys
-from pprint import pprint
+
 
 @dataclass
 class FuncAtom:

@@ -4,8 +4,8 @@
 [ reaction ]
 ; breaks conventions of config files a little
 name = thiol_dimerization
-r1 = phthiol 
-r2 = phthiol ; must bimolecular right now
+r1 = MOLNAME
+r2 = MOLNAME ; must bimolecular right now
 p1 = DIM ; only one product right now
 distance_max = 1.5 ; nm, distance cutoff
 

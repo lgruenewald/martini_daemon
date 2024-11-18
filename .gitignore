@@ -1,3 +1,4 @@
 *.gro
 *.xyz
 *.xtc
+**/__pycache__/
