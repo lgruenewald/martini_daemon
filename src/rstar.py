@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # python class that groups together all the template information
+# TODO update this
 
-from top_parser import TopParser
+from parser import TopParser
 from dataclasses import dataclass
 import sys
 

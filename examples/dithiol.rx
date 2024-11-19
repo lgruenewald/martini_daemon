@@ -1,0 +1,9 @@
+[ reaction ]
+name = thiol_dimerization
+r1 = MOLNAME
+r2 = MOLNAME
+p1 = DIM
+distance_max = 1.5 ; nm, distance cutoff
+
+[ constraints ]
+; todo: angle, reaction rate, etc constraints

@@ -1,0 +1,8 @@
+
+#include "phenylthiol.frag"
+#include "dithiol.rx"
+#include "dithiol.itp"
+
+
+;#include "BDT.itp"
+;#include "martini..."
