@@ -6,6 +6,7 @@ import sys
 from dataclasses import dataclass
 from enum import Enum
 from collections import OrderedDict
+import os
 
 
 @dataclass
@@ -132,6 +133,8 @@ class TopParser:
                     content = int(content)
                 elif longest_type == "string":
                     content = content.strip('"')
+                elif longest_type == "bracket_string":
+                    content = content.strip("<>")
                 # #define value replacements (only for word tokens)
                 while longest_type == "word":
                     val = self._defines.get(content)
@@ -274,9 +277,23 @@ class TopParser:
                         case "#include":
                             if len(tokens) != 2:
                                 self.error("#include should have 1 argument")
-                            path = tokens[1].content
-                            self._parse(path)
-                            # TODO #include <filename> with include paths
+                            if tokens[1].type not in {"string",
+                                                      "bracket_string"}:
+                                self.error("#include argument should be inside"
+                                           "quotations or <>")
+                            name = tokens[1].content
+                            search_dirs = [os.path.dirname(path),
+                                           self._include_dir,
+                                           "/"]
+                            found = False
+                            for dir in search_dirs:
+                                newpath = os.path.join(dir, name)
+                                if os.path.isfile(newpath):
+                                    self._parse(newpath)
+                                    found = True
+                                    break
+                            if not found:
+                                self.error(f"File not found: {name}")
                         case "#define":
                             if not (len(tokens) in {2, 3}) or \
                                     tokens[1].type != "word":

@@ -60,12 +60,14 @@ class MolFragment:
         Adds it for both the i->j and j->i directions
         Bounds checks and adds empty lists as needed"""
 
+        if i == j:
+            raise ValueError(f"add_exclusion({i}, {j}) where i==j was called.")
         bigger = max(i, j)
         if bigger >= len(self.atoms):
             raise ValueError(f"{bigger} is out of bounds. "
-                             "Particle count in MolFragment: {len(self.atoms)}"
-                             ", while add_exclusion({i}, {j}) was called.")
-        while len(self.exclusions) - 1 > bigger:
+                             f"Particle count in MolFragment: {len(self.atoms)}"
+                             f", while add_exclusion({i}, {j}) was called.")
+        while len(self.exclusions) <= bigger:
             self.exclusions.append([])
 
         # this is a slow algorithm, but simple
@@ -74,11 +76,13 @@ class MolFragment:
             if j in self.exclusions[i]:
                 # should never happen actually if this algorithm behaves as
                 # i expect it to
-                raise AssertionError("ij desynced")
+                raise AssertionError(f"ij desynced, {j} "
+                                     f"already in self.exclusions[{i}]")
             self.exclusions[i].append(j)
 
         if j not in self.exclusions[i]:
-            raise AssertionError("ij desynced")
+            raise AssertionError(f"ij desynced, {j} not in "
+                                 f"self.exclusions[{i}]")
 
 
 @dataclass
@@ -132,3 +136,10 @@ class TopStar():
     frag_fragments: list[FragFragment]
     mol_fragments: list[MolFragment]
     reaction_list: list[ReactionTemplate]
+
+    def __init__(self):
+        self.frag_list = []
+        self.defrag_list = []
+        self.frag_fragments = []
+        self.mol_fragments = []
+        self.reaction_list = []

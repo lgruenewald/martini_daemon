@@ -14,6 +14,39 @@ import os
 import distutils
 
 
+def _get_default_gromacs_include_dir():
+    """Find the location where gromacs #include files are referenced from, by
+    searching for (1) gromacs environment variables, (2) for the gromacs binary
+    'pdb2gmx' or 'gmx' in the PATH, or (3) just using the default gromacs
+    install location, /usr/local/gromacs/share/gromacs/top
+
+    Directly taken from openmm GromacsTopParser
+    https://github.com/openmm/openmm/blob/master/wrappers/python/openmm/app/gromacstopfile.py
+    """
+    if "GMXDATA" in os.environ:
+        return os.path.join(os.environ["GMXDATA"], "top")
+    if "GMXBIN" in os.environ:
+        return os.path.abspath(
+            os.path.join(os.environ["GMXBIN"], "..", "share", "gromacs", "top")
+        )
+
+    pdb2gmx_path = distutils.spawn.find_executable("pdb2gmx")
+    if pdb2gmx_path is not None:
+        return os.path.abspath(
+            os.path.join(os.path.dirname(pdb2gmx_path), "..", "share",
+                         "gromacs", "top")
+        )
+    else:
+        gmx_path = distutils.spawn.find_executable("gmx")
+        if gmx_path is not None:
+            return os.path.abspath(
+                os.path.join(os.path.dirname(gmx_path), "..", "share",
+                             "gromacs", "top")
+            )
+
+    return "/usr/local/gromacs/share/gromacs/top"
+
+
 class DaemonTopFile():
     """Parses a Martini Top file for Gromacs and generates T*, sys and top
     from it. Also parses .frag and .rx files included in the .top file.
@@ -24,7 +57,7 @@ class DaemonTopFile():
         Load a .top file for martini daemon
         """
         # field init
-        self.topology = TopStar([], [], [], [], [])
+        self.topology = TopStar()
         self.molecules = []  # convert this to use TopStar()
 
         # TODO include_dir stuff
@@ -36,7 +69,7 @@ class DaemonTopFile():
 
         # add all handlers
         def TODO(tokens):
-            print("Handler not implemented yet")
+            print("Handler not implemented yet.", tokens[0])
 
         p.add_level("defaults", TODO)
 
@@ -65,7 +98,7 @@ class DaemonTopFile():
             return self.topology.mol_fragments[-1]
 
         def process_atoms(tokens):
-            id = unwrap(tokens, 0, "int")
+            id = unwrap(tokens, 0, "int") - 1
             type = unwrap(tokens, 1, "word")
             resnum = unwrap(tokens, 2, "int")
             resname = unwrap(tokens, 3, "word")
@@ -74,7 +107,7 @@ class DaemonTopFile():
             charge = unwrap(tokens, 6, "float", 0.)
             mass = unwrap(tokens, 7, "float", -1.)
             # TODO fix use of special value -1 for "default mass"
-            atom_index = len(last_molecule(tokens).atoms) + 1
+            atom_index = len(last_molecule(tokens).atoms)
             if id != atom_index:
                 error_at_token("Bad atom ID, are they out of order?"
                                f" got id {id} but expected {atom_index}",
@@ -86,9 +119,9 @@ class DaemonTopFile():
         p.add_level("atoms", process_atoms)
 
         def process_bonds(tokens):
-            i = unwrap(tokens, 0, "int")
-            j = unwrap(tokens, 1, "int")
-            type = unwrap(tokens, 2, "type")
+            i = unwrap(tokens, 0, "int") - 1
+            j = unwrap(tokens, 1, "int") - 1
+            type = unwrap(tokens, 2, "int")
             if type != 1 and type != 6:
                 # 1 is "bond", 6 is "harmonic potential"
                 error_at_token("Unsupported  bond function type", tokens[0])
@@ -103,9 +136,9 @@ class DaemonTopFile():
         p.add_level("bonds", process_bonds)
 
         def process_angles(tokens):
-            i = unwrap(tokens, 0, "int")
-            j = unwrap(tokens, 1, "int")
-            k = unwrap(tokens, 2, "int")
+            i = unwrap(tokens, 0, "int") - 1
+            j = unwrap(tokens, 1, "int") - 1
+            k = unwrap(tokens, 2, "int") - 1
             type = unwrap(tokens, 3, "int")
             theta = unwrap(tokens, 4, "float", -1.)
             force = unwrap(tokens, 5, "float", -1.)
@@ -122,10 +155,10 @@ class DaemonTopFile():
         p.add_level("angles", process_angles)
 
         def process_dihedrals(tokens):
-            i = unwrap(tokens, 0, "int")
-            j = unwrap(tokens, 1, "int")
-            k = unwrap(tokens, 2, "int")
-            l = unwrap(tokens, 3, "int")
+            i = unwrap(tokens, 0, "int") - 1
+            j = unwrap(tokens, 1, "int") - 1
+            k = unwrap(tokens, 2, "int") - 1
+            l = unwrap(tokens, 3, "int") - 1
             type = unwrap(tokens, 4, "int")
             theta = unwrap(tokens, 5, "float", -1.)
             force = unwrap(tokens, 6, "float", -1.)
@@ -148,18 +181,18 @@ class DaemonTopFile():
         p.add_level("dihedrals", process_dihedrals)
 
         def process_exclusions(tokens):
-            i = unwrap(tokens, 0, "int")
-            j = unwrap(tokens, 1, "int")
+            i = unwrap(tokens, 0, "int") - 1
+            j = unwrap(tokens, 1, "int") - 1
             last_molecule(tokens).add_exclusion(i, j)
-            for i in range(2, len(tokens)):
-                c = unwrap(tokens, i, "int")
+            for k in range(2, len(tokens)):
+                c = unwrap(tokens, k, "int") - 1
                 last_molecule(tokens).add_exclusion(i, c)
 
         p.add_level("exclusions", process_exclusions)
 
         def process_constraints(tokens):
-            i = unwrap(tokens, 0, "int")
-            j = unwrap(tokens, 1, "int")
+            i = unwrap(tokens, 0, "int") - 1
+            j = unwrap(tokens, 1, "int") - 1
             type = unwrap(tokens, 2, "int")
             length = unwrap(tokens, 3, "float")
             if type == 1 or type == 2:
@@ -205,34 +238,3 @@ if __name__ == "__main__":
         print(molfrag)
 
 
-def _get_default_gromacs_include_dir():
-    """Find the location where gromacs #include files are referenced from, by
-    searching for (1) gromacs environment variables, (2) for the gromacs binary
-    'pdb2gmx' or 'gmx' in the PATH, or (3) just using the default gromacs
-    install location, /usr/local/gromacs/share/gromacs/top
-
-    Directly taken from openmm GromacsTopParser
-    https://github.com/openmm/openmm/blob/master/wrappers/python/openmm/app/gromacstopfile.py
-    """
-    if "GMXDATA" in os.environ:
-        return os.path.join(os.environ["GMXDATA"], "top")
-    if "GMXBIN" in os.environ:
-        return os.path.abspath(
-            os.path.join(os.environ["GMXBIN"], "..", "share", "gromacs", "top")
-        )
-
-    pdb2gmx_path = distutils.spawn.find_executable("pdb2gmx")
-    if pdb2gmx_path is not None:
-        return os.path.abspath(
-            os.path.join(os.path.dirname(pdb2gmx_path), "..", "share",
-                         "gromacs", "top")
-        )
-    else:
-        gmx_path = distutils.spawn.find_executable("gmx")
-        if gmx_path is not None:
-            return os.path.abspath(
-                os.path.join(os.path.dirname(gmx_path), "..", "share",
-                             "gromacs", "top")
-            )
-
-    return "/usr/local/gromacs/share/gromacs/top"
