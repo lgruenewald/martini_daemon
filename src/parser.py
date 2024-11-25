@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-# generic topology-like file parser
+# Martini Topology + fragments and reaction templates parser
 
 import re
 import sys
 from dataclasses import dataclass
 from enum import Enum
+from collections import OrderedDict
 
 
 @dataclass
@@ -15,53 +16,37 @@ class Token:
     line: int
 
 
-@dataclass
-class Directive:
-    name: str
-    token: Token
-    data: list[list[Token]]
-    lines: list[str]
+def error_at_token(message, token):
+    raise ValueError(f"{message} [at line {token.line} of {token.path}]")
 
 
-@dataclass
-class DirectiveList:
-    dirs: list[Directive]
-    current: int = 0
-
-    def prevdir(self):
-        return self.dirs[self.current-1]
-
-    def peek(self):
-        if self.current < len(self.dirs):
-            return self.dirs[self.current].name
+def unwrap(tokens, index, type, default=None):
+    if len(tokens) <= index:
+        if default is None:
+            raise ValueError(f"Not enough tokens in file {tokens[0].path} line"
+                             f" {tokens[0].line}")
         else:
-            return ""
-
-    def peek_token(self):
-        if self.current < len(self.dirs):
-            return self.dirs[self.current].token
-        else:
-            return Token("", "", "", 0)
-
-    def match(self, name):
-        if (self.peek() == name):
-            self.advance()
-            return True
-        else:
-            return False
-
-    def advance(self):
-        name = self.peek()
-        if self.peek() != "":
-            self.current += 1
-        return name
-
-    def error(self, message, token: Token):
-        print(message)
-        print("In file ", token.path, " at line ", token.line + 1)
+            return default
+    if tokens[index].type != type:
+        if tokens[index].type == "int" and type == "float":
+            # the only implicit conversion we do is int -> float
+            return float(tokens[index].content)
+        raise ValueError(f"Token {tokens[index].content} expected {type} "
+                         f"got {tokens[index].type} in file {tokens[0].path}"
+                         f" line {tokens[0].line}")
+    return tokens[index].content
 
 
 class TopParser:
+    """A parser for gromacs topology file-like config files
+
+    Usage:
+    p = TopParser()
+    p.add_level(name, handler)
+    ok, dirs = p.parse(path_to_top, defines={})
+    if ok:
+        # do stuff with dirs
+    """
 
     # line number for reporting errors
     _linenum = 0
@@ -73,106 +58,109 @@ class TopParser:
     _included = {}
     # which DEFINES were defined
     _defines = {}
+    # current level similar to how openmm parses top files
+    _current_level = ""
+    # TODO potential improvement: validate the nesting of levels to see if the
+    # structure makes sense. It wouldn't change behavior on correct top files
+    # but would enhance error messages on incorrect top files
 
-    _directives = []
-
-    def __init__(self):
-        pass
-
-    def _directive(self, directive, token):
-        self._directives.append(Directive(directive, token, [], []))
-
-    def _data(self, tokens, line):
-        # tokens - list of tokens, already tokenized and converted to number
-        # line - raw string of the whole line, as in the file
-        # cindex - how many data lines were there before in this directive
-        if len(self._directives) == 0:
-            self.error("Data line outside of directives")
-            return
-        self._directives[-1].data.append(tokens)
-        self._directives[-1].lines.append(line.strip())
+    # list of functions to call with data lines in each level
+    _levels = {}
 
     def error(self, message):
-        print("Parse error: ", message)
-        print("In file ", self._path, "at line ", self._linenum + 1)
+        print("PARSE ERROR")
+        print(f" {message}")
+        print(f" In file {self._path} at line {self._linenum + 1}")
         self._haderror = True
 
     def _tokenize(self, line):
-        start = 0
-        cur = 0
-        tokens = []
+        """Splits a line up into a list of tokens. Similar to separating by
+        whitespace, but more intelligent, and aware of things like ; comments.
+        Also returns the type of tokens, and auto converts to int/float.
+        """
 
-        def advance():
-            nonlocal cur
-            cur += 1
-            if cur <= len(line):
-                return line[cur-1]
-            else:
-                return "\0"
+        # token patterns and their types
+        patterns = OrderedDict()
+        patterns["int"] = re.compile("[-+]?[0-9]+")
+        patterns["float"] = re.compile("[-+]?[0-9]+(\\.[0-9]*)?"
+                                       "([eE][-+]?[0-9]+)?")
+        patterns["key"] = re.compile("[a-zA-Z0-9_]+:")
+        patterns["word"] = re.compile("[a-zA-Z0-9_]+")
+        patterns["macro"] = re.compile("#[a-zA-Z0-9_]+")
+        patterns["string"] = re.compile('"[^"]*"')
+        patterns["symbol"] = re.compile(r"[\[\]:=]")
 
-        def peek():
-            if cur < len(line):
-                return line[cur]
-            else:
-                return "\0"
-
-        def make_token(type):
-            tok = Token(line[start:cur], type, self._path, self._linenum)
-            tokens.append(tok)
-
-        def make_token_re(regex, type):
-            nonlocal start, cur
-            match = regex.search(line, start)
-            if match is None:
-                self.error("Internal error: bad regex")
-                return
-            start, cur = match.span()
-            make_token(type)
-
-        number = re.compile("[-+]?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?")
-        word = re.compile("[#a-zA-Z_][a-zA-Z0-9_]*")
+        cur = 0  # current position in the line
+        tokens = []  # list of tokens built up so far
 
         while cur < len(line):
-            ch = advance()
-            start = cur-1
-            if ch in [" ", "\t", "\r", "\n"]:
-                pass
-            elif ch == "\"":
-                while cur < len(line) and (ch := advance()) != "\"":
-                    pass
-                make_token("word")
-                tokens[-1].content = tokens[-1].content.strip("\"")
-            elif ch.isdigit() or \
-                    (ch in "+-") and peek().isdigit():
-                make_token_re(number, "int")
-                t = tokens[-1].content
-                if "." in t or "e" in t or "E" in t:
-                    tokens[-1].content = float(t)
-                    tokens[-1].type = "float"
-                else:
-                    tokens[-1].content = int(t)
-            elif ch in ["_", "#"] or ch.isalpha():
-                make_token_re(word, "macro" if ch == "#" else "word")
-                val = self._defines.get(tokens[-1].content)
-                if val is not None:
+            ch = line[cur]
+            if ch in " \t\r\n":
+                cur += 1  # ignore whitespace
+            elif ch == ";":
+                break  # ignore comments (until end of line)
+            else:
+                # find the right pattern
+                # the one that matches the most characters
+                # is considered the right pattern
+                # if multiple match the equal length, the first to match
+                # (according to the order in patterns) will be the one
+                longest_type = None
+                longest_span = 0
+                for type, pat in patterns.items():
+                    match = pat.match(line, cur)
+                    if match is None:
+                        continue
+                    start, end = match.span()
+                    # only longest matches than previously possible should
+                    # overwrite matches that came earlier
+                    if end - start > longest_span:
+                        longest_span = end - start
+                        longest_type = type
+                # no matching token
+                if longest_type is None:
+                    self.error("Unexpected character " + ch)
+                    cur += 1
+                    continue
+                content = line[cur:cur + longest_span]
+                # processing of content -> convert to numbers, remove quotes
+                if longest_type == "float":
+                    content = float(content)
+                elif longest_type == "int":
+                    content = int(content)
+                elif longest_type == "string":
+                    content = content.strip('"')
+                    longest_type = "word"
+                # #define value replacements (only for word tokens)
+                while longest_type == "word":
+                    val = self._defines.get(content)
+                    # todo more elegant preservation of types
+                    if val is None:
+                        break
                     match val:
                         case int():
-                            tokens[-1].type = "int"
+                            longest_type = "int"
                         case float():
-                            tokens[-1].type = "float"
+                            longest_type = "float"
                         case str():
-                            tokens[-1].type = "word"
+                            longest_type = "word"
                         case _:
                             self.error("Unknown DEFINE type, can't replace")
-                    tokens[-1].content = val
-            elif ch == ";":
-                break
-            else:
-                make_token("symbol")
+                    content = val
+                # make token
+                tok = Token(content, longest_type,
+                            self._path, self._linenum)
+                tokens.append(tok)
+                cur += longest_span
 
         return tokens
 
     def _parse(self, path):
+        """Parses path, adding new data lines or directives to the accumulated
+        list of directives so far.
+        """
+
+        # stuff for #includes and the #ifdef stack
         if path in self._included:
             self.error("Double inclusion of " + path)
             return
@@ -181,25 +169,28 @@ class TopParser:
         self._path = path
         IfstackElem = Enum("IfstackElem", ["DoBranch", "SkipBranch",
                                            "SkippedIf", "Root"])
-        ifstack = [IfstackElem.Root]  # per file
+        ifstack = [IfstackElem.Root]  # ifstack is per file
         with open(path, "r") as fhandle:
             cumulative = []
             for i, line in enumerate(fhandle):
                 self._linenum = i
                 tokens = self._tokenize(line)
-                if len(tokens) == 0:
-                    continue
-
                 # handle ignoring line endings
-                if tokens[-1].content == "\\":
+                if len(tokens) > 0 and tokens[-1].content == "\\":
                     cumulative += tokens[:-1]
                     continue
                 elif len(cumulative) > 0:
                     tokens = cumulative + tokens
                     cumulative = []
 
+                # empty lines ignored
+                # ignored only after checking for \ -- means that empty lines
+                # also need \ to keep continuing one long line
+                if len(tokens) == 0:
+                    continue
+
                 ifstack_top = ifstack[-1]
-                # handle if/else logic before other lines
+                # handle if/else logic before other things
                 if tokens[0].type == "macro":
                     match tokens[0].content:
                         case "#ifdef":
@@ -252,6 +243,8 @@ class TopParser:
                         case "#end":
                             self.error("Please use #endif")
                             continue
+                        # must list all other macro words here
+                        # so that it doesn't error
                         case "#include":
                             pass
                         case "#define":
@@ -259,20 +252,22 @@ class TopParser:
                         case "#undef":
                             pass
                         case _:
-                            # still error at unknown macros
+                            # error at unknown macros
                             self.error("Unknown " + tokens[0].content)
                 if ifstack_top in {IfstackElem.SkipBranch,
                                    IfstackElem.SkippedIf}:
                     continue
 
-                # directives
                 if tokens[0].content == "[":
+                    # directives
                     if len(tokens) != 3:
                         self.error("Invalid directive: wrong len(tokens)")
                         continue
                     if tokens[2].content != "]":
                         self.error("Invalid directive: no ]")
-                    self._directive(tokens[1].content, tokens[1])
+                    self._current_level = tokens[1].content
+                    if self._levels.get(self._current_level) is None:
+                        self.error(f"Unknown directive: {self._current_level}")
                 elif tokens[0].type == "macro":
                     match tokens[0].content:
                         case "#include":
@@ -290,6 +285,10 @@ class TopParser:
                             key = tokens[1].content
                             val = 1
                             if len(tokens) == 3:
+                                if tokens[2].type not in \
+                                        {"word", "int", "float"}:
+                                    self.error("Can only #define numbers "
+                                               "and words")
                                 val = tokens[2].content
                             self._defines[key] = val
                         case "#undef":
@@ -301,19 +300,34 @@ class TopParser:
                                 self._defines.pop(key)
                         case _:
                             self.error("Unknown " + tokens[0].content)
-                # data
                 else:
-                    self._data(tokens, line)
+                    # data lines
+                    if self._current_level == "":
+                        self.error("Data line outside of directives")
+                        continue
+                    handler = self._levels.get(self._current_level)
+                    if handler is None:
+                        self.error(f"Data line in unknown directive "
+                                   f"{self._current_level}")
+                        continue
+                    handler(tokens)
         if len(ifstack) > 1:
             self.error("Unmatched #ifdef or #ifndef")
         self._path = oldpath
 
     def parse(self, path, defines={}):
+        """The main interface for using a TopParser class
+        """
         self._linenum = 0
         self._path = path
         self._defines = defines
         self._parse(path)
-        return not self._haderror, DirectiveList(self._directives)
+        return not self._haderror
+
+    def add_level(self, name, handler):
+        """Add a new level to this TopParser
+        """
+        self._levels[name] = handler
 
 
 if __name__ == "__main__":
