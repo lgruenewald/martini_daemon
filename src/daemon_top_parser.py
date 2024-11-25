@@ -8,8 +8,10 @@ Also parses fragment types and reaction templates to construct R*
 """
 
 from parser import TopParser, error_at_token, unwrap
-from topology import Topology, MolFragment
+from tstar import TopStar, MolFragment
 import sys
+import os
+import distutils
 
 
 class DaemonTopFile():
@@ -22,10 +24,12 @@ class DaemonTopFile():
         Load a .top file for martini daemon
         """
         # field init
-        self.topology = Topology([], [], [])
+        self.topology = TopStar([], [], [], [], [])
         self.molecules = []  # convert this to use TopStar()
 
         # TODO include_dir stuff
+        if include_dir is None:
+            include_dir = _get_default_gromacs_include_dir()
 
         # make parser
         p = TopParser()
@@ -38,6 +42,10 @@ class DaemonTopFile():
 
         def process_moltype(tokens):
             name = unwrap(tokens, 0, "word")
+            nrexcl = unwrap(tokens, 1, "int")
+            if nrexcl != 1:
+                error_at_token("nrexcl is not 1, only nrexcl=1 is implemented",
+                               tokens[1])
             mol_fragment = MolFragment(name, True, [], [], [],
                                        [], [], [], [])
             self.topology.mol_fragments.append(mol_fragment)
@@ -87,6 +95,10 @@ class DaemonTopFile():
             length = unwrap(tokens, 3, "float", -1.)
             force = unwrap(tokens, 4, "float", -1.)
             last_molecule(tokens).harmonic_bonds.append((i, j, length, force))
+            if type != 6:
+                # type 6 does not generate exclusions
+                # nrexcl other than 1 is not supported
+                last_molecule(tokens).add_exclusion(i, j)
 
         p.add_level("bonds", process_bonds)
 
@@ -138,10 +150,10 @@ class DaemonTopFile():
         def process_exclusions(tokens):
             i = unwrap(tokens, 0, "int")
             j = unwrap(tokens, 1, "int")
-            last_molecule(tokens).exclusions.append([i, j])
+            last_molecule(tokens).add_exclusion(i, j)
             for i in range(2, len(tokens)):
                 c = unwrap(tokens, i, "int")
-                last_molecule(tokens).exclusions[-1].append(c)
+                last_molecule(tokens).add_exclusion(i, c)
 
         p.add_level("exclusions", process_exclusions)
 
@@ -150,13 +162,16 @@ class DaemonTopFile():
             j = unwrap(tokens, 1, "int")
             type = unwrap(tokens, 2, "int")
             length = unwrap(tokens, 3, "float")
-            if type == 1:
+            if type == 1 or type == 2:
                 last_molecule(tokens).constraints.append((i, j, length))
+                if type == 1:
+                    # type 2 doesn't generate exclusions
+                    last_molecule(tokens).add_exclusion(i, j)
             else:
-                # TODO this type doesn't generate exclusions
                 error_at_token("Unsupported constraint type", tokens[0])
 
         p.add_level("constraints", process_constraints)
+
         p.add_level("pairs", TODO)
         p.add_level("cmap", TODO)
         p.add_level("atomtypes", TODO)
@@ -172,7 +187,7 @@ class DaemonTopFile():
         p.add_level("virtual_sitesn", TODO)
 
         # run parser
-        p.parse(file, defines)
+        p.parse(file, include_dir, defines)
 
 
 if __name__ == "__main__":
@@ -189,3 +204,35 @@ if __name__ == "__main__":
     for molfrag in daemontop.topology.mol_fragments:
         print(molfrag)
 
+
+def _get_default_gromacs_include_dir():
+    """Find the location where gromacs #include files are referenced from, by
+    searching for (1) gromacs environment variables, (2) for the gromacs binary
+    'pdb2gmx' or 'gmx' in the PATH, or (3) just using the default gromacs
+    install location, /usr/local/gromacs/share/gromacs/top
+
+    Directly taken from openmm GromacsTopParser
+    https://github.com/openmm/openmm/blob/master/wrappers/python/openmm/app/gromacstopfile.py
+    """
+    if "GMXDATA" in os.environ:
+        return os.path.join(os.environ["GMXDATA"], "top")
+    if "GMXBIN" in os.environ:
+        return os.path.abspath(
+            os.path.join(os.environ["GMXBIN"], "..", "share", "gromacs", "top")
+        )
+
+    pdb2gmx_path = distutils.spawn.find_executable("pdb2gmx")
+    if pdb2gmx_path is not None:
+        return os.path.abspath(
+            os.path.join(os.path.dirname(pdb2gmx_path), "..", "share",
+                         "gromacs", "top")
+        )
+    else:
+        gmx_path = distutils.spawn.find_executable("gmx")
+        if gmx_path is not None:
+            return os.path.abspath(
+                os.path.join(os.path.dirname(gmx_path), "..", "share",
+                             "gromacs", "top")
+            )
+
+    return "/usr/local/gromacs/share/gromacs/top"

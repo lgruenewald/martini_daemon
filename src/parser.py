@@ -49,20 +49,21 @@ class TopParser:
     """
 
     # line number for reporting errors
-    _linenum = 0
+    _linenum: int
     # current file being parsed
-    _path = ""
+    _path: str
     # was there an error at any point?
-    _haderror = False
+    _haderror: bool
     # which files were #included
     _included = {}
     # which DEFINES were defined
     _defines = {}
     # current level similar to how openmm parses top files
-    _current_level = ""
+    _current_level: str
     # TODO potential improvement: validate the nesting of levels to see if the
     # structure makes sense. It wouldn't change behavior on correct top files
     # but would enhance error messages on incorrect top files
+    _include_dir: str
 
     # list of functions to call with data lines in each level
     _levels = {}
@@ -88,6 +89,7 @@ class TopParser:
         patterns["word"] = re.compile("[a-zA-Z0-9_]+")
         patterns["macro"] = re.compile("#[a-zA-Z0-9_]+")
         patterns["string"] = re.compile('"[^"]*"')
+        patterns["bracket_string"] = re.compile("<[^>]*>")
         patterns["symbol"] = re.compile(r"[\[\]:=]")
 
         cur = 0  # current position in the line
@@ -130,7 +132,6 @@ class TopParser:
                     content = int(content)
                 elif longest_type == "string":
                     content = content.strip('"')
-                    longest_type = "word"
                 # #define value replacements (only for word tokens)
                 while longest_type == "word":
                     val = self._defines.get(content)
@@ -315,12 +316,14 @@ class TopParser:
             self.error("Unmatched #ifdef or #ifndef")
         self._path = oldpath
 
-    def parse(self, path, defines={}):
+    def parse(self, path, include_dir, defines={}):
         """The main interface for using a TopParser class
         """
         self._linenum = 0
         self._path = path
         self._defines = defines
+        self._include_dir = include_dir
+        self._haderror = False
         self._parse(path)
         return not self._haderror
 
