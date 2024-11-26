@@ -53,6 +53,7 @@ class AngleList():
         self._harmonic_angle_list.append(
             (i, j, k, theta, force)
         )
+        return len(self._harmonic_angle_list) - 1
 
 
 class ProperDihedralList():
@@ -72,6 +73,7 @@ class ProperDihedralList():
         self._dihedral_list.append(
             (i, j, k, l, theta, force, multiplicity)
         )
+        return len(self._dihedral_list) - 1
 
 
 class ExclusionList():
@@ -87,6 +89,7 @@ class ExclusionList():
 
     def add(self, i, j):
         self._exclusion_list.append((i, j))
+        return len(self._exclusion_list) - 1
 
 
 class ConstraintList():
@@ -103,6 +106,7 @@ class ConstraintList():
     def add(self, i, j, length):
         """Adds a constraint to the list, returns its constraint_id"""
         self._constraint_list.append((i, j, length))
+        return len(self._constraint_list) - 1
 
 
 class ImproperDihedralList():
@@ -123,6 +127,7 @@ class ImproperDihedralList():
         self._dihedral_list.append(
             (i, j, k, l, theta, force)
         )
+        return len(self._dihedral_list) - 1
 
 
 class SysStar():

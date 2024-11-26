@@ -175,6 +175,7 @@ class TopStar():
                              " not a mol fragment type."
                              f" It is: {frag}")
         inst = Fragment(frag_name)
+        self.frag_list.append(inst)
         # particles
         index0 = self.system.particles.len()
         for atom in frag.atoms:
@@ -210,7 +211,7 @@ class TopStar():
         for i, excl in enumerate(frag.exclusions):
             for j in excl:
                 e = self.system.exclusions.add(i + index0, j + index0)
-                inst.impropers.append(e)
+                inst.exclusions.append(e)
         # constraints
         for cons in frag.constraints:
             i, j, length = cons
