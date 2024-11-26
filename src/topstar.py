@@ -177,43 +177,43 @@ class TopStar():
         inst = Fragment(frag_name)
         self.frag_list.append(inst)
         # particles
-        index0 = self.system.particles.len()
+        index0 = self.system.len_particles()
         for atom in frag.atoms:
             type, resnum, resname, atomname, chargegr, charge, mass = \
                 atom
             # TODO if mass is -1 use a default
-            p = self.system.particles.add(atomname, type, charge, mass)
+            p = self.system.add_particle(atomname, type, charge, mass)
             inst.particles.append(p)
         # bonds
         for bond in frag.harmonic_bonds:
             i, j, length, force = bond
-            b = self.system.bonds.add(index0 + i, index0 + j, length, force)
+            b = self.system.add_bond(index0 + i, index0 + j, length, force)
             inst.bonds.append(b)
         # angles
         for angle in frag.harmonic_angles:
             i, j, k, theta, force = angle
-            a = self.system.angles.add(i + index0, j + index0, k + index0,
+            a = self.system.add_angle(i + index0, j + index0, k + index0,
                                        theta, force)
             inst.angles.append(a)
         # proper dihedrals
         for dih in frag.proper_dihedrals:
             i, j, k, l, theta, force, mult = dih
-            d = self.system.dihedrals.add(i + index0, j + index0, k + index0,
+            d = self.system.add_proper_dihedral(i + index0, j + index0, k + index0,
                                           l + index0, theta, force, mult)
             inst.dihedrals.append(d)
         # improper dihedrals
         for imp in frag.improper_dihedrals:
             i, j, k, l, theta, force = imp
-            d = self.system.impropers.add(i + index0, j + index0, k + index0,
+            d = self.system.add_improper_dihedral(i + index0, j + index0, k + index0,
                                           l + index0, theta, force)
             inst.impropers.append(d)
         # exclusions
         for i, excl in enumerate(frag.exclusions):
             for j in excl:
-                e = self.system.exclusions.add(i + index0, j + index0)
+                e = self.system.add_exclusion(i + index0, j + index0)
                 inst.exclusions.append(e)
         # constraints
         for cons in frag.constraints:
             i, j, length = cons
-            c = self.system.constraints.add(i + index0, j + index0, length)
+            c = self.system.add_constraint(i + index0, j + index0, length)
             inst.constraints.append(c)
