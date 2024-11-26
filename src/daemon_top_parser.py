@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 
 """
-Refactored https://github.com/maccallumlab/martini_openmm/ into a more modular
+A more modular
 parser that constructs S* and T* rather than openmm's internal objects
-
-Also parses fragment types and reaction templates to construct R*
 """
 
-from parser import TopParser, error_at_token, unwrap
-from tstar import TopStar, MolFragment
+from parser import TopParser, unwrap
+from topstar import TopStar, MolFragment
+from sysstar import SysStar
 import sys
 import os
 import distutils
@@ -47,180 +46,178 @@ def _get_default_gromacs_include_dir():
     return "/usr/local/gromacs/share/gromacs/top"
 
 
-class DaemonTopFile():
+def DaemonTopFile(file, include_dir=None, defines={}):
     """Parses a Martini Top file for Gromacs and generates T*, sys and top
     from it. Also parses .frag and .rx files included in the .top file.
     """
+    # field init
+    system = SysStar()
+    topology = TopStar(system)
 
-    def __init__(self, file, include_dir=None, defines={}):
-        """
-        Load a .top file for martini daemon
-        """
-        # field init
-        self.topology = TopStar()
-        self.molecules = []  # convert this to use TopStar()
+    if include_dir is None:
+        include_dir = _get_default_gromacs_include_dir()
 
-        # TODO include_dir stuff
-        if include_dir is None:
-            include_dir = _get_default_gromacs_include_dir()
+    # make parser
+    p = TopParser()
 
-        # make parser
-        p = TopParser()
+    # add all handlers
+    def TODO(tokens):
+        print("Handler not implemented yet.", tokens[0])
 
-        # add all handlers
-        def TODO(tokens):
-            print("Handler not implemented yet.", tokens[0])
+    p.add_level("defaults", TODO)
 
-        p.add_level("defaults", TODO)
+    def process_system(tokens):
+        pass
+    p.add_level("system", process_system)
 
-        def process_moltype(tokens):
-            name = unwrap(tokens, 0, "word")
-            nrexcl = unwrap(tokens, 1, "int")
-            if nrexcl != 1:
-                error_at_token("nrexcl is not 1, only nrexcl=1 is implemented",
-                               tokens[1])
-            mol_fragment = MolFragment(name, True, [], [], [],
-                                       [], [], [], [])
-            self.topology.mol_fragments.append(mol_fragment)
+    def process_moltype(tokens):
+        name = unwrap(tokens, 0, "word")
+        nrexcl = unwrap(tokens, 1, "int")
+        if nrexcl != 1:
+            raise ValueError("nrexcl is not 1, only nrexcl=1 is implemented")
+        topology.new_mol_fragment(name)
 
-        p.add_level("moleculetype", process_moltype)
+    p.add_level("moleculetype", process_moltype)
 
-        def process_molecule(tokens):
-            name = unwrap(tokens, 0, "word")
-            count = unwrap(tokens, 1, "int")
-            self.molecules.append((name, count))
+    def process_molecule(tokens):
+        name = unwrap(tokens, 0, "word")
+        count = unwrap(tokens, 1, "int")
+        for i in range(count):
+            topology.instantiate(name)
 
-        p.add_level("molecules", process_molecule)
+    p.add_level("molecules", process_molecule)
 
-        def last_molecule(tokens):
-            if len(self.topology.mol_fragments) == 0:
-                error_at_token("No [ moleculetype ] given", tokens[0])
-            return self.topology.mol_fragments[-1]
+    def last_molecule(tokens):
+        if len(topology.mol_fragments) == 0:
+            raise ValueError("No [ moleculetype ] given")
+        return topology.mol_fragments[-1]
 
-        def process_atoms(tokens):
-            id = unwrap(tokens, 0, "int") - 1
-            type = unwrap(tokens, 1, "word")
-            resnum = unwrap(tokens, 2, "int")
-            resname = unwrap(tokens, 3, "word")
-            atomname = unwrap(tokens, 4, "word")
-            charge_group_num = unwrap(tokens, 5, "int")
-            charge = unwrap(tokens, 6, "float", 0.)
-            mass = unwrap(tokens, 7, "float", -1.)
-            # TODO fix use of special value -1 for "default mass"
-            atom_index = len(last_molecule(tokens).atoms)
-            if id != atom_index:
-                error_at_token("Bad atom ID, are they out of order?"
-                               f" got id {id} but expected {atom_index}",
-                               tokens[0])
-            last_molecule(tokens).atoms.append((type, resnum, resname,
-                                                atomname, charge_group_num,
-                                                charge, mass))
+    def process_atoms(tokens):
+        id = unwrap(tokens, 0, "int") - 1
+        type = unwrap(tokens, 1, "word")
+        resnum = unwrap(tokens, 2, "int")
+        resname = unwrap(tokens, 3, "word")
+        atomname = unwrap(tokens, 4, "word")
+        charge_group_num = unwrap(tokens, 5, "int")
+        charge = unwrap(tokens, 6, "float", 0.)
+        mass = unwrap(tokens, 7, "float", -1.)
+        # TODO fix use of special value -1 for "default mass"
+        atom_index = len(last_molecule(tokens).atoms)
+        if id != atom_index:
+            raise ValueError("Bad atom ID, are they out of order?"
+                             f" got id {id} but expected {atom_index}")
+        last_molecule(tokens).atoms.append((type, resnum, resname,
+                                            atomname, charge_group_num,
+                                            charge, mass))
 
-        p.add_level("atoms", process_atoms)
+    p.add_level("atoms", process_atoms)
 
-        def process_bonds(tokens):
-            i = unwrap(tokens, 0, "int") - 1
-            j = unwrap(tokens, 1, "int") - 1
-            type = unwrap(tokens, 2, "int")
-            if type != 1 and type != 6:
-                # 1 is "bond", 6 is "harmonic potential"
-                error_at_token("Unsupported  bond function type", tokens[0])
-            length = unwrap(tokens, 3, "float", -1.)
-            force = unwrap(tokens, 4, "float", -1.)
-            last_molecule(tokens).harmonic_bonds.append((i, j, length, force))
-            if type != 6:
-                # type 6 does not generate exclusions
-                # nrexcl other than 1 is not supported
-                last_molecule(tokens).add_exclusion(i, j)
-
-        p.add_level("bonds", process_bonds)
-
-        def process_angles(tokens):
-            i = unwrap(tokens, 0, "int") - 1
-            j = unwrap(tokens, 1, "int") - 1
-            k = unwrap(tokens, 2, "int") - 1
-            type = unwrap(tokens, 3, "int")
-            theta = unwrap(tokens, 4, "float", -1.)
-            force = unwrap(tokens, 5, "float", -1.)
-            if type == 1:
-                # harmonic
-                last_molecule(tokens).harmonic_angles.append((i, j, k,
-                                                             theta, force))
-            else:
-                # TODO 2 is g96 angle
-                # 10 is restricted angle, they are also supported by
-                # martini_openmm
-                error_at_token("Unsupported angle function type", tokens[0])
-
-        p.add_level("angles", process_angles)
-
-        def process_dihedrals(tokens):
-            i = unwrap(tokens, 0, "int") - 1
-            j = unwrap(tokens, 1, "int") - 1
-            k = unwrap(tokens, 2, "int") - 1
-            l = unwrap(tokens, 3, "int") - 1
-            type = unwrap(tokens, 4, "int")
-            theta = unwrap(tokens, 5, "float", -1.)
-            force = unwrap(tokens, 6, "float", -1.)
-            multiplicity = unwrap(tokens, 7, "int", 1)
-            if type == 1:
-                # proper dihedral
-                last_molecule(tokens).proper_dihedrals.append(
-                    (i, j, k, l, theta, force, multiplicity)
-                )
-            elif type == 2:
-                # improper
-                last_molecule(tokens).improper_dihedrals.append(
-                    (i, j, k, l, theta, force)
-                )
-            else:
-                # TODO 2, 3, 4, 5, 9 and 11 should also supported by
-                # martini_openmm
-                error_at_token("Unsupported dihedral function type", tokens[0])
-
-        p.add_level("dihedrals", process_dihedrals)
-
-        def process_exclusions(tokens):
-            i = unwrap(tokens, 0, "int") - 1
-            j = unwrap(tokens, 1, "int") - 1
+    def process_bonds(tokens):
+        i = unwrap(tokens, 0, "int") - 1
+        j = unwrap(tokens, 1, "int") - 1
+        type = unwrap(tokens, 2, "int")
+        if type != 1 and type != 6:
+            # 1 is "bond", 6 is "harmonic potential"
+            raise ValueError("Unsupported  bond function type")
+        length = unwrap(tokens, 3, "float", -1.)
+        force = unwrap(tokens, 4, "float", -1.)
+        last_molecule(tokens).harmonic_bonds.append((i, j, length, force))
+        if type != 6:
+            # type 6 does not generate exclusions
+            # nrexcl other than 1 is not supported
             last_molecule(tokens).add_exclusion(i, j)
-            for k in range(2, len(tokens)):
-                c = unwrap(tokens, k, "int") - 1
-                last_molecule(tokens).add_exclusion(i, c)
 
-        p.add_level("exclusions", process_exclusions)
+    p.add_level("bonds", process_bonds)
 
-        def process_constraints(tokens):
-            i = unwrap(tokens, 0, "int") - 1
-            j = unwrap(tokens, 1, "int") - 1
-            type = unwrap(tokens, 2, "int")
-            length = unwrap(tokens, 3, "float")
-            if type == 1 or type == 2:
-                last_molecule(tokens).constraints.append((i, j, length))
-                if type == 1:
-                    # type 2 doesn't generate exclusions
-                    last_molecule(tokens).add_exclusion(i, j)
-            else:
-                error_at_token("Unsupported constraint type", tokens[0])
+    def process_angles(tokens):
+        i = unwrap(tokens, 0, "int") - 1
+        j = unwrap(tokens, 1, "int") - 1
+        k = unwrap(tokens, 2, "int") - 1
+        type = unwrap(tokens, 3, "int")
+        theta = unwrap(tokens, 4, "float", -1.)
+        force = unwrap(tokens, 5, "float", -1.)
+        if type == 1:
+            # harmonic
+            last_molecule(tokens).harmonic_angles.append((i, j, k,
+                                                         theta, force))
+        else:
+            # TODO 2 is g96 angle
+            # 10 is restricted angle, they are also supported by
+            # martini_openmm
+            raise ValueError("Unsupported angle function type")
 
-        p.add_level("constraints", process_constraints)
+    p.add_level("angles", process_angles)
 
-        p.add_level("pairs", TODO)
-        p.add_level("cmap", TODO)
-        p.add_level("atomtypes", TODO)
-        p.add_level("bondtypes", TODO)
-        p.add_level("angletypes", TODO)
-        p.add_level("dihedraltypes", TODO)
-        p.add_level("implicit_genborn_params", TODO)
-        p.add_level("pairtypes", TODO)
-        p.add_level("cmaptypes", TODO)
-        p.add_level("nonbond_params", TODO)
-        p.add_level("virtual_sites2", TODO)
-        p.add_level("virtual_sites3", TODO)
-        p.add_level("virtual_sitesn", TODO)
+    def process_dihedrals(tokens):
+        i = unwrap(tokens, 0, "int") - 1
+        j = unwrap(tokens, 1, "int") - 1
+        k = unwrap(tokens, 2, "int") - 1
+        l = unwrap(tokens, 3, "int") - 1
+        type = unwrap(tokens, 4, "int")
+        theta = unwrap(tokens, 5, "float", -1.)
+        force = unwrap(tokens, 6, "float", -1.)
+        multiplicity = unwrap(tokens, 7, "int", 1)
+        if type == 1:
+            # proper dihedral
+            last_molecule(tokens).proper_dihedrals.append(
+                (i, j, k, l, theta, force, multiplicity)
+            )
+        elif type == 2:
+            # improper
+            last_molecule(tokens).improper_dihedrals.append(
+                (i, j, k, l, theta, force)
+            )
+        else:
+            # TODO 2, 3, 4, 5, 9 and 11 should also supported by
+            # martini_openmm
+            raise ValueError("Unsupported dihedral function type")
 
-        # run parser
-        p.parse(file, include_dir, defines)
+    p.add_level("dihedrals", process_dihedrals)
+
+    def process_exclusions(tokens):
+        i = unwrap(tokens, 0, "int") - 1
+        j = unwrap(tokens, 1, "int") - 1
+        last_molecule(tokens).add_exclusion(i, j)
+        for k in range(2, len(tokens)):
+            c = unwrap(tokens, k, "int") - 1
+            last_molecule(tokens).add_exclusion(i, c)
+
+    p.add_level("exclusions", process_exclusions)
+
+    def process_constraints(tokens):
+        i = unwrap(tokens, 0, "int") - 1
+        j = unwrap(tokens, 1, "int") - 1
+        type = unwrap(tokens, 2, "int")
+        length = unwrap(tokens, 3, "float")
+        if type == 1 or type == 2:
+            last_molecule(tokens).constraints.append((i, j, length))
+            if type == 1:
+                # type 2 doesn't generate exclusions
+                last_molecule(tokens).add_exclusion(i, j)
+        else:
+            raise ValueError("Unsupported constraint type")
+
+    p.add_level("constraints", process_constraints)
+
+    p.add_level("pairs", TODO)
+    p.add_level("cmap", TODO)
+    p.add_level("atomtypes", TODO)
+    p.add_level("bondtypes", TODO)
+    p.add_level("angletypes", TODO)
+    p.add_level("dihedraltypes", TODO)
+    p.add_level("implicit_genborn_params", TODO)
+    p.add_level("pairtypes", TODO)
+    p.add_level("cmaptypes", TODO)
+    p.add_level("nonbond_params", TODO)
+    p.add_level("virtual_sites2", TODO)
+    p.add_level("virtual_sites3", TODO)
+    p.add_level("virtual_sitesn", TODO)
+
+    # run parser
+    ok = p.parse(file, include_dir, defines)
+    if not ok:
+        raise ValueError("Parsing error")
+    return (system, topology)
 
 
 if __name__ == "__main__":
@@ -231,10 +228,12 @@ if __name__ == "__main__":
         quit(1)
     path = argv[1]
 
-    daemontop = DaemonTopFile(path)
-    print("DUMP OF CREATED Topology, T* and System")
-    print("==== Topology / Molecule Fragment Types ====")
-    for molfrag in daemontop.topology.mol_fragments:
+    sys, top = DaemonTopFile(path)
+    print("==== TopStar / Molecule Fragment Types ====")
+    for molfrag in top.mol_fragments:
         print(molfrag)
-
-
+    print("==== TopStar / Fragments ====")
+    for frag in top.frag_list:
+        print(frag)
+    print("==== SysStar dump ====")
+    sys.dump()

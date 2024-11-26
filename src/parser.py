@@ -17,24 +17,18 @@ class Token:
     line: int
 
 
-def error_at_token(message, token):
-    raise ValueError(f"{message} [at line {token.line} of {token.path}]")
-
-
 def unwrap(tokens, index, type, default=None):
     if len(tokens) <= index:
         if default is None:
-            raise ValueError(f"Not enough tokens in file {tokens[0].path} line"
-                             f" {tokens[0].line}")
+            raise ValueError(f"Not enough tokens, expect token index {index}")
         else:
             return default
     if tokens[index].type != type:
         if tokens[index].type == "int" and type == "float":
             # the only implicit conversion we do is int -> float
             return float(tokens[index].content)
-        raise ValueError(f"Token {tokens[index].content} expected {type} "
-                         f"got {tokens[index].type} in file {tokens[0].path}"
-                         f" line {tokens[0].line}")
+        raise ValueError(f"Token {tokens[index].content}: expected {type} "
+                         f"but received {tokens[index].type} instead")
     return tokens[index].content
 
 
@@ -68,9 +62,11 @@ class TopParser:
 
     # list of functions to call with data lines in each level
     _levels = {}
+    # list of directives we already complained about
+    _complained_directives = {}
 
     def error(self, message):
-        print("PARSE ERROR")
+        print("\033[1;91mParser error\033[0m")
         print(f" {message}")
         print(f" In file {self._path} at line {self._linenum + 1}")
         self._haderror = True
@@ -91,7 +87,7 @@ class TopParser:
         patterns["macro"] = re.compile("#[a-zA-Z0-9_]+")
         patterns["string"] = re.compile('"[^"]*"')
         patterns["bracket_string"] = re.compile("<[^>]*>")
-        patterns["symbol"] = re.compile(r"[\[\]:=]")
+        patterns["symbol"] = re.compile(r"[\[\]:='.?!]")
 
         cur = 0  # current position in the line
         tokens = []  # list of tokens built up so far
@@ -160,7 +156,7 @@ class TopParser:
         return tokens
 
     def _parse(self, path):
-        """Parses path, adding new data lines or directives to the accumulated
+        """Parses path, adding new data linespython add lines to stack trace or directives to the accumulated
         list of directives so far.
         """
 
@@ -271,7 +267,11 @@ class TopParser:
                         self.error("Invalid directive: no ]")
                     self._current_level = tokens[1].content
                     if self._levels.get(self._current_level) is None:
-                        self.error(f"Unknown directive: {self._current_level}")
+                        if self._complained_directives.get(self._current_level):
+                            self._haderror = True
+                        else:
+                            self.error(f"Unknown directive: {self._current_level}")
+                            self._complained_directives[self._current_level] = True
                 elif tokens[0].type == "macro":
                     match tokens[0].content:
                         case "#include":
@@ -283,8 +283,7 @@ class TopParser:
                                            "quotations or <>")
                             name = tokens[1].content
                             search_dirs = [os.path.dirname(path),
-                                           self._include_dir,
-                                           "/"]
+                                           self._include_dir]
                             found = False
                             for dir in search_dirs:
                                 newpath = os.path.join(dir, name)
@@ -293,6 +292,7 @@ class TopParser:
                                     found = True
                                     break
                             if not found:
+                                print(tokens)
                                 self.error(f"File not found: {name}")
                         case "#define":
                             if not (len(tokens) in {2, 3}) or \
@@ -325,10 +325,19 @@ class TopParser:
                         continue
                     handler = self._levels.get(self._current_level)
                     if handler is None:
-                        self.error(f"Data line in unknown directive "
-                                   f"{self._current_level}")
+                        if self._complained_directives.get(self._current_level):
+                            self._haderror = True
+                        else:
+                            self.error(f"Data line in unknown directive "
+                                       f"{self._current_level}")
+                            self._complained_directives[self._current_level] = True
                         continue
-                    handler(tokens)
+                    try:
+                        handler(tokens)
+                    except Exception as e:
+                        print("\033[1;91mCallback error\033[0m")
+                        print(f"In file {path} at line {self._linenum}")
+                        raise e
         if len(ifstack) > 1:
             self.error("Unmatched #ifdef or #ifndef")
         self._path = oldpath
@@ -341,6 +350,7 @@ class TopParser:
         self._defines = defines
         self._include_dir = include_dir
         self._haderror = False
+        self._complained_directives = {}
         self._parse(path)
         return not self._haderror
 

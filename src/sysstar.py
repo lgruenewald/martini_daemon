@@ -4,17 +4,21 @@
 class ParticleList():
     """All particles in the system
     indices are called part_id
-    values are (part_name: string, part_type: string
+    values are (part_name: string, part_type: string, charge: float,
+    mass: float)
     """
     _part_list: list[(str, str)]
 
     def __init__(self):
         self._part_list = []
 
-    def add(self, part_name, part_type):
+    def add(self, part_name, part_type, charge, mass):
         """Adds a particle to the list, and returns its part_id"""
-        self._part_list.append((part_name, part_type))
+        self._part_list.append((part_name, part_type, charge, mass))
         return len(self._part_list) - 1
+
+    def len(self):
+        return len(self._part_list)
 
 
 class BondList():
@@ -121,7 +125,7 @@ class ImproperDihedralList():
         )
 
 
-class DaemonSystem():
+class SysStar():
     def __init__(self):
         self.particles = ParticleList()
         self.bonds = BondList()
@@ -130,3 +134,12 @@ class DaemonSystem():
         self.impropers = ImproperDihedralList()
         self.exclusions = ExclusionList()
         self.constraints = ConstraintList()
+
+    def dump(self):
+        print("Particles:", self.particles._part_list)
+        print("Bonds:", self.bonds._harmonic_bond_list)
+        print("Angles:", self.angles._harmonic_angle_list)
+        print("Dihedrals:", self.dihedrals._dihedral_list)
+        print("Impropers:", self.impropers._dihedral_list)
+        print("Exclusions:", self.exclusions._exclusion_list)
+        print("Constraints:", self.constraints._constraint_list)

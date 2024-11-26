@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-tstar.py
+topstar.py
 
 TLDR: - topology is a list of fragment types, reaction templates and fragments
       - fragments are a group of atoms and their internal interactions
@@ -25,7 +25,7 @@ topology is an object that contains the following information:
     - "defrag list" - backmapping of particles to fragments that contain them
 """
 from dataclasses import dataclass
-
+from sysstar import SysStar
 
 @dataclass
 class FragFragment:
@@ -94,6 +94,7 @@ class ReactionTemplate:
     distance_max: float
 
 
+@dataclass
 class Fragment():
     """Helper class for building and storing fragment information
     fragment name is used for its type
@@ -106,6 +107,7 @@ class Fragment():
     """
 
     name: str
+    particles: list[int]
     bonds: list[int]
     angles: list[int]
     dihedrals: list[int]
@@ -115,6 +117,7 @@ class Fragment():
 
     def __init__(self, name):
         self.name = name
+        self.particles = []
         self.bonds = []
         self.angles = []
         self.dihedrals = []
@@ -135,11 +138,81 @@ class TopStar():
     # Formerly DaemonTopology:
     frag_fragments: list[FragFragment]
     mol_fragments: list[MolFragment]
+    type_lookup: dict[str, FragFragment | MolFragment]
     reaction_list: list[ReactionTemplate]
 
-    def __init__(self):
+    system: SysStar
+
+    def __init__(self, system):
         self.frag_list = []
         self.defrag_list = []
         self.frag_fragments = []
         self.mol_fragments = []
         self.reaction_list = []
+        self.type_lookup = {}
+        self.system = system
+
+    def new_mol_fragment(self, name: str):
+        if self.type_lookup.get(name):
+            raise ValueError(f"Second definition of fragment type {name}")
+        mol_fragment = MolFragment(name, True, [], [], [], [], [], [], [])
+        self.mol_fragments.append(mol_fragment)
+        self.type_lookup[name] = mol_fragment
+
+    def instantiate(self, frag_name):
+        """Takes a name of a mol fragment, creates new particles for it in
+        the system and the corresponding interactions as well.
+
+        Later, when developing the D/M algorithm a modified version of this
+        should be created for reusing existing particles.
+        """
+
+        frag = self.type_lookup.get(frag_name)  # frag type
+        if frag is None:
+            raise ValueError(f"Can't find mol {frag_name}")
+        elif not isinstance(frag, MolFragment):
+            raise ValueError(f"Attempt to instantiate {frag_name}, but it's"
+                             " not a mol fragment type."
+                             f" It is: {frag}")
+        inst = Fragment(frag_name)
+        # particles
+        index0 = self.system.particles.len()
+        for atom in frag.atoms:
+            type, resnum, resname, atomname, chargegr, charge, mass = \
+                atom
+            # TODO if mass is -1 use a default
+            p = self.system.particles.add(atomname, type, charge, mass)
+            inst.particles.append(p)
+        # bonds
+        for bond in frag.harmonic_bonds:
+            i, j, length, force = bond
+            b = self.system.bonds.add(index0 + i, index0 + j, length, force)
+            inst.bonds.append(b)
+        # angles
+        for angle in frag.harmonic_angles:
+            i, j, k, theta, force = angle
+            a = self.system.angles.add(i + index0, j + index0, k + index0,
+                                       theta, force)
+            inst.angles.append(a)
+        # proper dihedrals
+        for dih in frag.proper_dihedrals:
+            i, j, k, l, theta, force, mult = dih
+            d = self.system.dihedrals.add(i + index0, j + index0, k + index0,
+                                          l + index0, theta, force, mult)
+            inst.dihedrals.append(d)
+        # improper dihedrals
+        for imp in frag.improper_dihedrals:
+            i, j, k, l, theta, force = imp
+            d = self.system.impropers.add(i + index0, j + index0, k + index0,
+                                          l + index0, theta, force)
+            inst.impropers.append(d)
+        # exclusions
+        for i, excl in enumerate(frag.exclusions):
+            for j in excl:
+                e = self.system.exclusions.add(i + index0, j + index0)
+                inst.impropers.append(e)
+        # constraints
+        for cons in frag.constraints:
+            i, j, length = cons
+            c = self.system.constraints.add(i + index0, j + index0, length)
+            inst.constraints.append(c)

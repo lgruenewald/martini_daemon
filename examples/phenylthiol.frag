@@ -1,7 +1,7 @@
 [ frag ]
 mol: BDT
 name: thiol
-[ atoms ]
+[ fragatoms ]
 ; id(in frag) id(in itp)    type   name  is_edge
    1              1          TC6    S1     0
    2              2          TC6    S2     0
