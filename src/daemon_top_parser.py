@@ -62,7 +62,18 @@ def DaemonTopFile(file, include_dir=None, defines={}):
 
     # add all handlers
     def TODO(tokens):
-        print("Handler not implemented yet.", tokens[0])
+        raise ValueError("Handler not implemented yet")
+
+    def process_defaults(tokens):
+        nb_type = unwrap(tokens, 0, "int")
+        if nb_type != 1:
+            raise ValueError(f"Unsupported non-bonded type: {nb_type}")
+        combination_rule = unwrap(tokens, 1, "int")
+        if combination_rule != 2:
+            raise ValueError("Unsupported combination rule: "
+                             f"{combination_rule}")
+        if len(tokens) > 2:
+            raise ValueError("Too many fields in [ defaults ] directive")
 
     p.add_level("defaults", TODO)
 
@@ -99,9 +110,8 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         resname = unwrap(tokens, 3, "word")
         atomname = unwrap(tokens, 4, "word")
         charge_group_num = unwrap(tokens, 5, "int")
-        charge = unwrap(tokens, 6, "float", 0.)
-        mass = unwrap(tokens, 7, "float", -1.)
-        # TODO fix use of special value -1 for "default mass"
+        charge = unwrap(tokens, 6, "float", None)
+        mass = unwrap(tokens, 7, "float", None)
         atom_index = len(last_molecule(tokens).atoms)
         if id != atom_index:
             raise ValueError("Bad atom ID, are they out of order?"
@@ -119,8 +129,8 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         if type != 1 and type != 6:
             # 1 is "bond", 6 is "harmonic potential"
             raise ValueError("Unsupported  bond function type")
-        length = unwrap(tokens, 3, "float", -1.)
-        force = unwrap(tokens, 4, "float", -1.)
+        length = unwrap(tokens, 3, "float", None)
+        force = unwrap(tokens, 4, "float", None)
         last_molecule(tokens).harmonic_bonds.append((i, j, length, force))
         if type != 6:
             # type 6 does not generate exclusions
@@ -201,14 +211,42 @@ def DaemonTopFile(file, include_dir=None, defines={}):
 
     p.add_level("pairs", TODO)
     p.add_level("cmap", TODO)
-    p.add_level("atomtypes", TODO)
+
+    def process_atomtypes(tokens):
+        if len(tokens) != 6:
+            raise ValueError("Only atomtypes lines formatted as type, m, q,"
+                             "particle_type, V, W are supported.")
+        type = unwrap(tokens, 0, "word")
+        mass = unwrap(tokens, 1, "float")
+        charge = unwrap(tokens, 2, "float")
+        particle_type = unwrap(tokens, 3, "word")
+        if particle_type != "A":
+            raise ValueError("Only A particle type expected in [atomtypes]")
+        V = unwrap(tokens, 4, "float")
+        W = unwrap(tokens, 5, "float")
+        if V != 0.0 or W != 0.0:
+            raise ValueError("Only zero V and W are expected in [atomtypes]")
+        system.add_atom_type(type, mass, charge)
+
+    p.add_level("atomtypes", process_atomtypes)
     p.add_level("bondtypes", TODO)
     p.add_level("angletypes", TODO)
     p.add_level("dihedraltypes", TODO)
     p.add_level("implicit_genborn_params", TODO)
     p.add_level("pairtypes", TODO)
     p.add_level("cmaptypes", TODO)
-    p.add_level("nonbond_params", TODO)
+
+    def process_nonbond_params(tokens):
+        type1 = unwrap(tokens, 0, "word")
+        type2 = unwrap(tokens, 1, "word")
+        funct = unwrap(tokens, 2, "int")
+        if funct != 1:
+            raise ValueError("Only LJ (V/W) non bond params accepted")
+        V = unwrap(tokens, 3, "float")
+        W = unwrap(tokens, 4, "float")
+        system.add_nb_type(type1, type2, V, W)
+
+    p.add_level("nonbond_params", process_nonbond_params)
     p.add_level("virtual_sites2", TODO)
     p.add_level("virtual_sites3", TODO)
     p.add_level("virtual_sitesn", TODO)

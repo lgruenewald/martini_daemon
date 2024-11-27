@@ -17,9 +17,10 @@ class Token:
     line: int
 
 
-def unwrap(tokens, index, type, default=None):
+def unwrap(tokens, index, type, default="default placeholder"):
     if len(tokens) <= index:
-        if default is None:
+        if default == "default placeholder":
+            # hack so "None" can also be used as a default value
             raise ValueError(f"Not enough tokens, expect token index {index}")
         else:
             return default

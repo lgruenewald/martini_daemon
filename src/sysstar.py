@@ -3,6 +3,7 @@
 import openmm as mm
 from openmm.unit import nanometer
 import math
+from collections import OrderedDict
 
 class SysStar():
 
@@ -22,14 +23,40 @@ class SysStar():
     values are (part_name: string, part_type: string, charge: float,
     mass: float)"""
     _part_list: list[(str, str)]
+    _used_atom_types: OrderedDict[str, int]
+    context_initialized: bool
 
     def add_particle(self, part_name, part_type, charge, mass):
         """Adds a particle to the list, and returns its part_id"""
+        defaults = self._atom_types.get(part_type)
+        if defaults is None:
+            raise ValueError("Attempt to add particle with unknown atom type"
+                             f"Particle name: {part_name}. "
+                             f"Particle type: {part_type}.")
+        dcharge, dmass = defaults
+        charge = charge or dcharge
+        mass = mass or dmass
         self._part_list.append((part_name, part_type, charge, mass))
         self._system.addParticle(mass)
-        # TODO nb force details
-        # TODO mass and such lookups from atom types
+        part_type_id = self.use_atom_type(part_type)
+        self._nb_force.addParticle([part_type_id, charge])
         return len(self._part_list) - 1
+
+    def use_atom_type(self, part_type):
+        """Add new atom types that might not exist in the first place.
+        TODO: call this for every atom type that shows up in reaction products.
+
+        It is not a problem to call this with atom types already present.
+
+        Returns the atom type index
+        """
+        id = self._used_atom_types.get(part_type)
+        if id is None:
+            if self.context_initialized:
+                raise Exception("use_atom_type call after context initialized")
+            id = len(self._used_atom_types)
+            self._used_atom_types[part_type] = id
+        return id
 
     def len_particles(self):
         return len(self._part_list)
@@ -41,6 +68,8 @@ class SysStar():
 
     def add_bond(self, part_id_i, part_id_j, length, force):
         """Adds a bond to the list, returns its bond_id"""
+        if length is None or force is None:
+            raise NotImplementedError("TODO length and strength for bonds must be specified for now")
         self._harmonic_bond_list.append((part_id_i, part_id_j, length, force))
         self._bond_force.addBond(part_id_i, part_id_j, length, force)
         return len(self._bond_list) - 1
@@ -116,15 +145,39 @@ class SysStar():
                                                  (theta_rad, force))
         return len(self._improper_dihedral_list) - 1
 
+    """Atom types to look up default charges and default masses
+    values are atom_type: string, (mass: float, charge: float)
+    """
+    _atom_types: dict[str, (float, float)]
+
+    def add_atom_type(self, type, mass, charge):
+        self._atom_types[type] = (mass, charge)
+
+#    _bond_types: list  # TODO
+#    _angle_types: list  # TODO
+#    _dihedral_types: list  # TODO
+
+    """Non bonded parameters are for building the C6/C12 table
+    values are (type1: string, type2: string), (V: float, W: float)
+    """
+    _nb_types: dict[(str, str), (float, float)]
+
+    def add_nb_type(self, type1, type2, V, W):
+        self._nb_types[(type1, type2)] = (V, W)
+
     def __init__(self):
         self._system = mm.System()
         self._part_list = []
+        self._used_atom_types = {}
         self._harmonic_bond_list = []
         self._harmonic_angle_list = []
         self._proper_dihedral_list = []
         self._exclusion_list = []
         self._constraint_list = []
         self._improper_dihedral_list = []
+        self._atom_types = OrderedDict()
+        self.context_initialized = False
+        self._nb_types = {}
         self.epsilon_r = 15.0  # TODO unhardcode
         self.nonbonded_cutoff = 1.1 * nanometer
         self.nonbonded_cutoff
@@ -151,7 +204,6 @@ class SysStar():
         self._system.addForce(self._nb_force)
 
         # TODO tabulated nb force params
-        # TODO self exclusion stuff
 
         self._bond_force = mm.HarmonicBondForce()
         self._system.addForce(self._bond_force)
@@ -173,7 +225,37 @@ class SysStar():
 
         # TODO CMAPTorsionForce
 
-    def init_context(self, integrator, periodicBoxVectors):
+    def build_context(self, integrator, periodicBoxVectors):
+        """After build_context the following things should not happen:
+        - Adding new *_types to _atom_types, _nb_types etc.
+        - Using new atom types (through new particles with new
+        types or calling use_atom_type) -- call use_atom_type for every type
+        that will eventually be needed first
+        """
+        # Finish setup
+        self.context_initialized = True
+        # add LJ parameters to the system
+        Vs = []
+        Ws = []
+        # i,j => type index; t1,t2 => type names
+        n = len(self._used_atom_types)
+        for i, t1 in self._used_atom_types.items():
+            for j, t2 in self._used_atom_types.items():
+                nb_params = self._nb_types[(t1, t2)] or\
+                            self._nb_types[(t2, t1)]
+                if nb_params is None:
+                    raise ValueError(f"Couldn't find LJ params for {t1}; {t2}")
+                V, W = nb_params
+                Vs.append(V)
+                Ws.append(W)
+        self._nb_force.addTabulatedFunction(
+            "C6", mm.Discrete2DFunction(n, n, Vs)
+        )
+        self._nb_force.addTabulatedFunction(
+            "C12", mm.Discrete2DFunction(n, n, Ws)
+        )
+
+        # Build context
         self._context = mm.Context(self.system, integrator)
         self._context.setPeriodicBoxVectors(periodicBoxVectors)
         # === API TODOs to parallel openmm.app's Simulation ===
