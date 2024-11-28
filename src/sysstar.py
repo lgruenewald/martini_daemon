@@ -306,6 +306,11 @@ class SysStar():
                                       forces=True, energy=True,
                                       enforcePeriodicBox=True)
 
+    def apply_constraints(self):
+        if not self.context_initialized:
+            raise Exception("Initialize the context first")
+        self._context.applyConstraints(tol=1e-5)
+
     _xtc: mmapp.XTCFile = None
 
     def set_xtc_path(self, path):
