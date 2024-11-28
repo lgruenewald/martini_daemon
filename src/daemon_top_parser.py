@@ -75,7 +75,7 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         if len(tokens) > 2:
             raise ValueError("Too many fields in [ defaults ] directive")
 
-    p.add_level("defaults", TODO)
+    p.add_level("defaults", process_defaults)
 
     def process_system(tokens):
         pass
@@ -226,7 +226,7 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         W = unwrap(tokens, 5, "float")
         if V != 0.0 or W != 0.0:
             raise ValueError("Only zero V and W are expected in [atomtypes]")
-        system.add_atom_type(type, mass, charge)
+        system.add_atom_type(type, charge, mass)
 
     p.add_level("atomtypes", process_atomtypes)
     p.add_level("bondtypes", TODO)

@@ -1,9 +1,10 @@
 
+#include "martini_subset.itp"
+#include "BDT.itp"
+
 ;#include "phenylthiol.frag"
 ;#include "dithiol.rx"
 #include "dithiol.itp"
-#include "BDT.itp"
-;#include "martini..."
 
 [ system ]
 Two BDTs close by

@@ -210,8 +210,9 @@ class TopStar():
         # exclusions
         for i, excl in enumerate(frag.exclusions):
             for j in excl:
-                e = self.system.add_exclusion(i + index0, j + index0)
-                inst.exclusions.append(e)
+                if i < j:
+                    e = self.system.add_exclusion(i + index0, j + index0)
+                    inst.exclusions.append(e)
         # constraints
         for cons in frag.constraints:
             i, j, length = cons

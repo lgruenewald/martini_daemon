@@ -1,0 +1,12 @@
+#include "martini_subset.itp"
+
+[ system ]
+; name
+NACL and WAT
+
+[ molecules ]
+; name  number
+NA 8
+CL 8
+W 388
+

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
 import openmm as mm
-from openmm.unit import nanometer
+import openmm.app as mmapp
+from openmm.unit import nanometer, picosecond
 import math
+import utils
 from collections import OrderedDict
 
 class SysStar():
@@ -72,7 +74,7 @@ class SysStar():
             raise NotImplementedError("TODO length and strength for bonds must be specified for now")
         self._harmonic_bond_list.append((part_id_i, part_id_j, length, force))
         self._bond_force.addBond(part_id_i, part_id_j, length, force)
-        return len(self._bond_list) - 1
+        return len(self._harmonic_bond_list) - 1
 
     """All the angles in the system
     indices are called angle_id
@@ -113,6 +115,7 @@ class SysStar():
 
     def add_exclusion(self, i, j):
         self._exclusion_list.append((i, j))
+        self._nb_force.addExclusion(i, j)
         return len(self._exclusion_list) - 1
 
     """All the constraints in the system
@@ -124,6 +127,7 @@ class SysStar():
     def add_constraint(self, i, j, length):
         """Adds a constraint to the list, returns its constraint_id"""
         self._constraint_list.append((i, j, length))
+        self._system.addConstraint(i, j, length)
         return len(self._constraint_list) - 1
 
     """All the improper dihedrals in the system
@@ -150,8 +154,8 @@ class SysStar():
     """
     _atom_types: dict[str, (float, float)]
 
-    def add_atom_type(self, type, mass, charge):
-        self._atom_types[type] = (mass, charge)
+    def add_atom_type(self, type, charge, mass):
+        self._atom_types[type] = (charge, mass)
 
 #    _bond_types: list  # TODO
 #    _angle_types: list  # TODO
@@ -164,6 +168,9 @@ class SysStar():
 
     def add_nb_type(self, type1, type2, V, W):
         self._nb_types[(type1, type2)] = (V, W)
+
+    _context: mm.Context
+    _integrator: mm.Integrator
 
     def __init__(self):
         self._system = mm.System()
@@ -186,8 +193,8 @@ class SysStar():
         # Non bonded force
         self._nb_force = mm.CustomNonbondedForce(
             "step(rcut-r)*(LJ - corr + ES);"
-            "LJ = (C12(type1, type2) / r^12 - C6(type1, type2) / r^6);"
-            "corr = (C12(type1, type2) / rcut^12 - C6(type1, type2) / rcut^6);"
+            "LJ = (W(type1, type2) / r^12 - V(type1, type2) / r^6);"
+            "corr = (W(type1, type2) / rcut^12 - V(type1, type2) / rcut^6);"
             "ES = f/epsilon_r*q1*q2 * (1/r + krf * r^2 - crf);"
             "crf = 1 / rcut + krf * rcut^2;"
             "krf = 1 / (2 * rcut^3);"
@@ -234,34 +241,111 @@ class SysStar():
         """
         # Finish setup
         self.context_initialized = True
+        self._integrator = integrator
         # add LJ parameters to the system
         Vs = []
         Ws = []
         # i,j => type index; t1,t2 => type names
         n = len(self._used_atom_types)
-        for i, t1 in self._used_atom_types.items():
-            for j, t2 in self._used_atom_types.items():
-                nb_params = self._nb_types[(t1, t2)] or\
-                            self._nb_types[(t2, t1)]
+        for t1, i in self._used_atom_types.items():
+            for t2, j in self._used_atom_types.items():
+                nb_params = self._nb_types.get((t1, t2)) or\
+                            self._nb_types.get((t2, t1))
                 if nb_params is None:
                     raise ValueError(f"Couldn't find LJ params for {t1}; {t2}")
                 V, W = nb_params
                 Vs.append(V)
                 Ws.append(W)
         self._nb_force.addTabulatedFunction(
-            "C6", mm.Discrete2DFunction(n, n, Vs)
+            "V", mm.Discrete2DFunction(n, n, Vs)
         )
         self._nb_force.addTabulatedFunction(
-            "C12", mm.Discrete2DFunction(n, n, Ws)
+            "W", mm.Discrete2DFunction(n, n, Ws)
         )
 
         # Build context
-        self._context = mm.Context(self.system, integrator)
-        self._context.setPeriodicBoxVectors(periodicBoxVectors)
-        # === API TODOs to parallel openmm.app's Simulation ===
-        # TODO positions, initial velocity, energy minimizations, couplings
-        # TODO stepping the simulation forward
-        # TODO reporters, getState checkpoints, ...
+        self._periodic_box = periodicBoxVectors
+        self._system.setDefaultPeriodicBoxVectors(*periodicBoxVectors)
+        self._context = mm.Context(self._system, integrator)
+        self._context.setPeriodicBoxVectors(*periodicBoxVectors)
+
+    def set_positions(self, positions):
+        if not self.context_initialized:
+            raise Exception("Initialize the context first")
+        self._context.setPositions(positions)
+
+    def generate_velocities(self, temp):
+        if not self.context_initialized:
+            raise Exception("Initialize the context first")
+        self._context.setVelocitiesToTemperature(temp)
+
+    def minimize_energy(self, tolerance=10, max_steps=0):
+        # 0 max_steps => until converged
+        if not self.context_initialized:
+            raise Exception("Initialize the context first")
+        mm.LocalEnergyMinimizer.minimize(self._context, tolerance, max_steps)
+
+    def add_force(self, force):
+        if self.context_initialized:
+            raise Exception("Add forces before initializing the context")
+        self._system.addForce(force)
+
+    def do_steps(self, steps):
+        if not self.context_initialized:
+            raise Exception("Initialize the context first")
+        self._integrator.step(steps)
+        if self._xtc is not None:
+            self._xtc.interval = steps
+            pos = self.get_state().getPositions()
+            self._xtc.writeModel(pos)
+
+    def get_state(self):
+        if not self.context_initialized:
+            raise Exception("Initialize the context first")
+        return self._context.getState(positions=True, velocities=True,
+                                      forces=True, energy=True,
+                                      enforcePeriodicBox=True)
+
+    _xtc: mmapp.XTCFile = None
+
+    def set_xtc_path(self, path):
+        if not self.context_initialized:
+            raise Exception("Initialize the context first")
+        utils.backup_try(path)
+        mmtopol = mmapp.Topology()
+        mmtopol._numAtoms = self.len_particles()
+        mmtopol._periodicBoxVectors = self._periodic_box
+        timestep = self._integrator.getStepSize()
+        self._xtc = mmapp.XTCFile(path, mmtopol, timestep)
+
+    def write_gro(self, path):
+        if not self.context_initialized:
+            raise Exception("Initialize the context first")
+        utils.backup_try(path)
+        state = self.get_state()
+        pos = state.getPositions()
+        vel = state.getVelocities()
+        natoms = len(pos)
+        time = state.getTime()
+        with open(path, "w") as file:
+            file.write(f"t={time.value_in_unit(picosecond):.1f} ps\n")
+            file.write(f"{natoms}\n")
+            for i in range(natoms):
+                cpos = pos[i]
+                cvel = vel[i]
+                atom_name = self._part_list[i][0]
+                atom_index = i + 1
+                # TODO resname, resid
+                file.write(f"{atom_index:5}{atom_name:5}{atom_name:>5}"
+                           f"{atom_index:5}{cpos.x:8.3f}{cpos.y:8.3f}"
+                           f"{cpos.z:8.3f}{cvel.x:8.4f}{cvel.y:8.4f}"
+                           f"{cvel.z:8.4f}\n")
+            v1, v2, v3 = (v.value_in_unit(nanometer)
+                          for v in state.getPeriodicBoxVectors())
+            file.write(
+                f"{v1[0]:.4f} {v2[1]:.4f} {v3[2]:.4f} {v1[1]:.4f} {v1[2]:.4f} "
+                f"{v2[0]:.4f} {v2[2]:.4f} {v3[0]:.4f} {v3[1]:.4f}\n"
+            )
 
     def dump(self):
         print("Particles:", self._part_list)
@@ -271,3 +355,18 @@ class SysStar():
         print("Impropers:", self._improper_dihedral_list)
         print("Exclusions:", self._exclusion_list)
         print("Constraints:", self._constraint_list)
+        print("Used atom types: ", self._used_atom_types)
+        Vs = []
+        Ws = []
+        # i,j => type index; t1,t2 => type names
+        for t1, i in self._used_atom_types.items():
+            for t2, j in self._used_atom_types.items():
+                nb_params = self._nb_types.get((t1, t2)) or\
+                            self._nb_types.get((t2, t1))
+                if nb_params is None:
+                    raise ValueError(f"Couldn't find LJ params for {t1}; {t2}")
+                V, W = nb_params
+                Vs.append(V)
+                Ws.append(W)
+        print("nb params V", Vs)
+        print("nb params W", Ws)
