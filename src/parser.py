@@ -51,9 +51,9 @@ class TopParser:
     # was there an error at any point?
     _haderror: bool
     # which files were #included
-    _included = {}
+    _included: dict[str, bool]
     # which DEFINES were defined
-    _defines = {}
+    _defines: dict
     # current level similar to how openmm parses top files
     _current_level: str
     # TODO potential improvement: validate the nesting of levels to see if the
@@ -62,9 +62,26 @@ class TopParser:
     _include_dir: str
 
     # list of functions to call with data lines in each level
-    _levels = {}
+    _levels: dict
     # list of directives we already complained about
-    _complained_directives = {}
+    _complained_directives: dict
+
+    def __init__(self):
+        self._complained_directives = {}
+        self._levels = {}
+
+    def parse(self, path, include_dir, defines={}):
+        """The main interface for using a TopParser class
+        """
+        self._linenum = 0
+        self._path = path
+        self._haderror = False
+        self._defines = defines
+        self._include_dir = include_dir
+        self._complained_directives = {}
+        self._included = {}
+        self._parse(path)
+        return not self._haderror
 
     def error(self, message):
         print("\033[1;91mParser error\033[0m")
@@ -342,18 +359,6 @@ class TopParser:
         if len(ifstack) > 1:
             self.error("Unmatched #ifdef or #ifndef")
         self._path = oldpath
-
-    def parse(self, path, include_dir, defines={}):
-        """The main interface for using a TopParser class
-        """
-        self._linenum = 0
-        self._path = path
-        self._defines = defines
-        self._include_dir = include_dir
-        self._haderror = False
-        self._complained_directives = {}
-        self._parse(path)
-        return not self._haderror
 
     def add_level(self, name, handler):
         """Add a new level to this TopParser

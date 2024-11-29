@@ -12,9 +12,7 @@ class SysStar():
     _system: mm.System
     _context: mm.Context
     _nb_force: mm.Force
-    _es_self_excl_force: mm.Force
-    _es_except_force: mm.Force
-    _lj_except_force: mm.Force
+    _es_self_correction_force: mm.Force
     _harmonic_angle_force: mm.Force
     _bond_force: mm.Force
     _proper_dihedral_force: mm.Force
@@ -42,7 +40,12 @@ class SysStar():
         self._system.addParticle(mass)
         part_type_id = self.use_atom_type(part_type)
         self._nb_force.addParticle([part_type_id, charge])
-        return len(self._part_list) - 1
+        i = len(self._part_list) - 1
+        if charge != 0:
+            # self term in reaction field correction
+            # TODO map this part_id -> index so charges can be changed reliably
+            self._es_self_correction_force.addBond(i, i, [0.5 * charge ** 2])
+        return i
 
     def use_atom_type(self, part_type):
         """Add new atom types that might not exist in the first place.
@@ -230,6 +233,18 @@ class SysStar():
         self._improper_dihedral_force.addPerTorsionParameter("k")
         self._system.addForce(self._improper_dihedral_force)
 
+        self._es_self_correction_force = mm.CustomBondForce(
+            f"step(rcut-r) * ES;"
+            f"ES = f*q_product/epsilon_r * (krf * r^2 - crf);"
+            f"crf = 1 / rcut + krf * rcut^2;"
+            f"krf = 1 / (2 * rcut^3);"
+            f"epsilon_r = {self.epsilon_r};"
+            f"f = 138.935458;"
+            f"rcut={self.nonbonded_cutoff.value_in_unit(nanometer)};"
+        )
+        self._es_self_correction_force.addPerBondParameter("q_product")
+        self._system.addForce(self._es_self_correction_force)
+
         # TODO CMAPTorsionForce
 
     def build_context(self, integrator, periodicBoxVectors):
@@ -243,8 +258,9 @@ class SysStar():
         self.context_initialized = True
         self._integrator = integrator
         # add LJ parameters to the system
-        Vs = []
-        Ws = []
+        C6 = []
+        C12 = []
+        # TODO fixme why are they sometimes called V,W or C6,C12
         # i,j => type index; t1,t2 => type names
         n = len(self._used_atom_types)
         for t1, i in self._used_atom_types.items():
@@ -254,13 +270,15 @@ class SysStar():
                 if nb_params is None:
                     raise ValueError(f"Couldn't find LJ params for {t1}; {t2}")
                 V, W = nb_params
-                Vs.append(V)
-                Ws.append(W)
+                c6 = 4 * W * (V ** 6)
+                c12 = 4 * W * (V ** 12)
+                C6.append(c6)
+                C12.append(c12)
         self._nb_force.addTabulatedFunction(
-            "V", mm.Discrete2DFunction(n, n, Vs)
+            "V", mm.Discrete2DFunction(n, n, C6)
         )
         self._nb_force.addTabulatedFunction(
-            "W", mm.Discrete2DFunction(n, n, Ws)
+            "W", mm.Discrete2DFunction(n, n, C12)
         )
 
         # Build context

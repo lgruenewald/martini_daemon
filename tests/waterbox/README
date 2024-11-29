@@ -1,0 +1,2 @@
+This test tests a simple waterbox with only water beads (so only a LJ fluid).
+It only tests LJ non bonded forces within a single type of molecule.

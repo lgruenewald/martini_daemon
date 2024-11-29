@@ -1,0 +1,4 @@
+This test contains an equilibrated box that contains a mixture of BZTF and CLPR
+These two small molecules itp's were picked from the set of small molecules
+because they contain harmonic angles, improper dihedrals, extra exclusions
+and more complex systems of bonds and constraints.

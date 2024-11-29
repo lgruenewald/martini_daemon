@@ -1,0 +1,5 @@
+This test contains an equilibrated solvent box containing a mixture of
+different one bead solvents (W, ACN, DCE, CLF, TCM, MEO, ETO, IPO),
+two bead solvents with a bond (OCT, HEX, DMSO) and benzene (a three bead
+solvent with three restraints forming a triangle). It tests LJ with multiple
+LJ types, simple harmonic bonds and simple triangle restraints.
