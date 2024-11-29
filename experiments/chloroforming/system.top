@@ -1,0 +1,10 @@
+#include "martini_subset.itp"
+
+[ system ]
+; name
+WATER 
+
+[ molecules ]
+; name  number
+W 400
+
