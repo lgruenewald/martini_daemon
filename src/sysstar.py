@@ -398,6 +398,7 @@ class SysStar():
             )
 
     def dump(self):
+        print("==== SysStar Dump ====")
         print("Particles:", self._part_list)
         print("Bonds:", self._harmonic_bond_list)
         print("Angles:", self._harmonic_angle_list)

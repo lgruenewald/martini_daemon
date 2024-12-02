@@ -27,6 +27,7 @@ topology is an object that contains the following information:
 from dataclasses import dataclass
 from sysstar import SysStar
 
+
 @dataclass
 class FragFragment:
     name: str
@@ -129,21 +130,34 @@ class Fragment():
 
 
 class TopStar():
+    # === Live molecule/fragment information ===
     # T* fragment and defrag list
     frag_list: list[Fragment]
     # for every part_id have a list of fragments it is in
-    # type: list[list[(frag_id, in_fragment_id)]]
+    # type: list[list[(frag_id, in_fragment_id, is_edge)]]
     # this list has to be at least 1 long per particle, and the first element
     # should always be the reference to the complete fragment
-    defrag_list: list[list[(int, int)]]
+    defrag_list: list[list[(int, int, bool)]]
 
-    # Formerly DaemonTopology:
-    # TODO? do we even need lists of frag_fragments and mol_fragments?
-    frag_fragments: list[FragFragment]
-    mol_fragments: list[MolFragment]
+    # === Fragment Types ===
+    # type name -> list of subfrag names
     subfrag_map: dict[str, list[str]]
+
+    # type name -> type
     type_lookup: dict[str, FragFragment | MolFragment]
+
+    # === Reaction templates ===
     reaction_list: list[ReactionTemplate]
+
+    # which reactant types is there a reaction template DEFINED
+    is_reacting: set[str]
+
+    # which reactant types were INSTANTIATED
+    # Built up during instantiate. TODO also add from all possible
+    # reaction products
+    used_reactant_types: set[str]
+
+    reactive_pairs: dict[(str, str), ReactionTemplate]
 
     system: SysStar
 
@@ -155,25 +169,31 @@ class TopStar():
         self.reaction_list = []
         self.type_lookup = {}
         self.subfrag_map = {}
+        self.is_reacting = set()
+        self.used_reactant_types = set()
+        self.reactive_pairs = {}
         self.system = system
 
     def new_mol_fragment(self, name: str):
         if self.type_lookup.get(name):
             raise ValueError(f"Second definition of fragment type {name}")
         mol_fragment = MolFragment(name, True, [], [], [], [], [], [], [])
-        self.mol_fragments.append(mol_fragment)
         self.type_lookup[name] = mol_fragment
 
     def new_frag_fragment(self, name: str, parent: str):
         if self.type_lookup.get(name):
             raise ValueError(f"Redefinition of fragment type {name}")
         frag_fragment = FragFragment(name, parent, [])
-        self.frag_fragments.append(frag_fragment)
         self.type_lookup[name] = frag_fragment
         if self.subfrag_map.get(parent):
             self.subfrag_map[parent].append(name)
         else:
             self.subfrag_map[parent] = [name]
+
+    def new_reaction(self, reaction: ReactionTemplate):
+        self.reaction_list.append(reaction)
+        self.is_reacting.add(reaction.r1)
+        self.is_reacting.add(reaction.r2)
 
     def instantiate_subfrag(self, subfrag, inst):
         """Instantiates a subfragment subfrag, with forces in S* as seen in
@@ -288,6 +308,9 @@ class TopStar():
                 if i not in all_indices or j not in all_indices:
                     raise ValueError("Dangling constraint")
                 subinst.constraints.append(cid)
+
+        if subfrag in self.is_reacting:
+            self.used_reactant_types.add(subfrag)
         # subfrags can contain further subfrags
         self.instantiate_subfrags(subfrag, subinst)
 
@@ -305,7 +328,7 @@ class TopStar():
         the system and the corresponding interactions as well.
         Recursively instantiates all subfragments too.
 
-        Later, when developing the D/M algorithm a modified version of this
+        TODO Later, when developing the D/M algorithm a modified version of this
         should be created for reusing existing particles.
         """
 
@@ -364,4 +387,59 @@ class TopStar():
             c = self.system.add_constraint(i + index0, j + index0, length)
             inst.constraints.append(c)
 
+        if frag_name in self.is_reacting:
+            self.used_reactant_types.add(frag_name)
+
         self.instantiate_subfrags(frag_name, inst)
+
+    def build_reaction_matrix(self):
+        """TLDR: give all the information to the D/M algorithm that's needed
+        for a quick detection of possible reactions
+
+        Builds a 2D table of all reaction types.
+        The columns/rows are initiator atom types.
+        The values are cutoff distances.
+        0.0 means no reaction possible.
+        Negative means reaction occurs above the distance. (TODO)
+
+        TODO: also consider reactive products as possible reactants
+        TODO: also return a list of atom types involved in all possible products
+        TODO: currently reactive products are not supported
+        TODO: currently multiple reactions for the same atom pair are not
+            supported
+
+        Right now implemented:
+        returns a dict[(str, str), ReactionTemplate] and list[Fragment]
+        which is the minimum reactions and fragments that can theoretically
+        occur from the INITIAL molecules
+        """
+
+        # check which reactions are possible
+        possible_reactions_reactant_types = {}
+        actually_used = set()
+        for rx in self.reaction_list:
+            if rx.r1 in self.used_reactant_types and \
+                    rx.r2 in self.used_reactant_types:
+                actually_used.add(rx.r1)
+                actually_used.add(rx.r2)
+                possible_reactions_reactant_types[(rx.r1, rx.r2)] = rx
+                possible_reactions_reactant_types[(rx.r2, rx.r1)] = rx
+        self.used_reactant_types = actually_used
+
+        initiators: list[Fragment] = []
+        for frag in self.frag_list:
+            if frag.name in actually_used:
+                initiators.append(frag)
+
+        return possible_reactions_reactant_types, initiators
+
+    def dump(self):
+        print("==== TopStar / Fragment Types ====")
+        for k, molfrag in self.type_lookup.items():
+            print(k, molfrag)
+        print("==== TopStar / ReactionTemplates ====")
+        for rx in self.reaction_list:
+            print(rx)
+        print("==== TopStar / Fragments ====")
+        for frag in self.frag_list:
+            print(frag)

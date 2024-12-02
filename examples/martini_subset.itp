@@ -356609,11 +356609,11 @@ U  24.0 0.000 A 0.0 0.0
 
 ;;;;;; BENZENE
 
-[moleculetype]
+[ moleculetype ]
 ; molname       nrexcl
   BENZ            1
 
-[atoms]
+[ atoms ]
 ; id    type    resnr   residu  atom    cgnr    charge
   1   TC5   1     BENZ  R1    1     0 
   2   TC5   1     BENZ  R2    2     0 

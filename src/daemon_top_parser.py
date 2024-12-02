@@ -84,12 +84,16 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         pass
     p.add_level("system", process_system)
 
+    _last_molecule = None
+
     def process_moltype(tokens):
+        nonlocal _last_molecule
         name = unwrap(tokens, 0, "word")
         nrexcl = unwrap(tokens, 1, "int")
         if nrexcl != 1:
             raise ValueError("nrexcl is not 1, only nrexcl=1 is implemented")
         topology.new_mol_fragment(name)
+        _last_molecule = name
 
     p.add_level("moleculetype", process_moltype)
 
@@ -101,10 +105,10 @@ def DaemonTopFile(file, include_dir=None, defines={}):
 
     p.add_level("molecules", process_molecule)
 
-    def last_molecule(tokens):
-        if len(topology.mol_fragments) == 0:
+    def last_molecule():
+        if last_molecule is None:
             raise ValueError("No [ moleculetype ] given")
-        return topology.mol_fragments[-1]
+        return topology.type_lookup[_last_molecule]
 
     def process_atoms(tokens):
         id = unwrap(tokens, 0, "int") - 1
@@ -115,11 +119,11 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         charge_group_num = unwrap(tokens, 5, "int")
         charge = unwrap(tokens, 6, "float", None)
         mass = unwrap(tokens, 7, "float", None)
-        atom_index = len(last_molecule(tokens).atoms)
+        atom_index = len(last_molecule().atoms)
         if id != atom_index:
             raise ValueError("Bad atom ID, are they out of order?"
                              f" got id {id} but expected {atom_index}")
-        last_molecule(tokens).atoms.append((type, resnum, resname,
+        last_molecule().atoms.append((type, resnum, resname,
                                             atomname, charge_group_num,
                                             charge, mass))
 
@@ -134,11 +138,11 @@ def DaemonTopFile(file, include_dir=None, defines={}):
             raise ValueError("Unsupported  bond function type")
         length = unwrap(tokens, 3, "float", None)
         force = unwrap(tokens, 4, "float", None)
-        last_molecule(tokens).harmonic_bonds.append((i, j, length, force))
+        last_molecule().harmonic_bonds.append((i, j, length, force))
         if type != 6:
             # type 6 does not generate exclusions
             # nrexcl other than 1 is not supported
-            last_molecule(tokens).add_exclusion(i, j)
+            last_molecule().add_exclusion(i, j)
 
     p.add_level("bonds", process_bonds)
 
@@ -151,8 +155,7 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         force = unwrap(tokens, 5, "float", -1.)
         if type == 1:
             # harmonic
-            last_molecule(tokens).harmonic_angles.append((i, j, k,
-                                                         theta, force))
+            last_molecule().harmonic_angles.append((i, j, k, theta, force))
         else:
             # TODO 2 is g96 angle
             # 10 is restricted angle, they are also supported by
@@ -172,12 +175,12 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         multiplicity = unwrap(tokens, 7, "int", 1)
         if type == 1:
             # proper dihedral
-            last_molecule(tokens).proper_dihedrals.append(
+            last_molecule().proper_dihedrals.append(
                 (i, j, k, l, theta, force, multiplicity)
             )
         elif type == 2:
             # improper
-            last_molecule(tokens).improper_dihedrals.append(
+            last_molecule().improper_dihedrals.append(
                 (i, j, k, l, theta, force)
             )
         else:
@@ -190,10 +193,10 @@ def DaemonTopFile(file, include_dir=None, defines={}):
     def process_exclusions(tokens):
         i = unwrap(tokens, 0, "int") - 1
         j = unwrap(tokens, 1, "int") - 1
-        last_molecule(tokens).add_exclusion(i, j)
+        last_molecule().add_exclusion(i, j)
         for k in range(2, len(tokens)):
             c = unwrap(tokens, k, "int") - 1
-            last_molecule(tokens).add_exclusion(i, c)
+            last_molecule().add_exclusion(i, c)
 
     p.add_level("exclusions", process_exclusions)
 
@@ -203,10 +206,10 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         type = unwrap(tokens, 2, "int")
         length = unwrap(tokens, 3, "float")
         if type == 1 or type == 2:
-            last_molecule(tokens).constraints.append((i, j, length))
+            last_molecule().constraints.append((i, j, length))
             if type == 1:
                 # type 2 doesn't generate exclusions
-                last_molecule(tokens).add_exclusion(i, j)
+                last_molecule().add_exclusion(i, j)
         else:
             raise ValueError("Unsupported constraint type")
 
@@ -255,7 +258,15 @@ def DaemonTopFile(file, include_dir=None, defines={}):
     p.add_level("virtual_sitesn", TODO)
 
     # custom additions: rx and frag
+    _last_frag = None
+
+    def last_frag():
+        if _last_frag is None:
+            raise ValueError("define a [ frag ] first")
+        return topology.type_lookup[_last_frag]
+
     def process_frag(tokens):
+        nonlocal _last_frag
         name = None
         mol = None
         for i in range(len(tokens)):
@@ -271,11 +282,7 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         if name is None or mol is None:
             raise ValueError("name and mol must be defined in [ frag ]")
         topology.new_frag_fragment(name, mol)
-
-    def last_frag():
-        if len(topology.frag_fragments) == 0:
-            raise ValueError("define a [ frag ] first")
-        return topology.frag_fragments[-1]
+        _last_frag = name
 
     p.add_level("frag", process_frag)
 
@@ -291,7 +298,14 @@ def DaemonTopFile(file, include_dir=None, defines={}):
 
     # FIXME this is terrible, the current callback architecture is really
     # unsuitable for this
-    last_reaction = None
+    last_reaction: ReactionTemplate = None
+
+    def is_complete():
+        return (
+            last_reaction is not None and last_reaction.r1 is not None and
+            last_reaction.r2 is not None and last_reaction.p1 is not None and
+            last_reaction.distance_max is not None
+        )
 
     def process_reaction(tokens):
         nonlocal last_reaction
@@ -299,8 +313,9 @@ def DaemonTopFile(file, include_dir=None, defines={}):
             key, value = unwrap(tokens, i, "pair")
             match key:
                 case "name":
-                    last_reaction = ReactionTemplate(value, "", "", "", 0.0)
-                    topology.reaction_list.append(last_reaction)
+                    if last_reaction is not None and not is_complete():
+                        raise ValueError(f"unfinished reaction {last_reaction.name}")
+                    last_reaction = ReactionTemplate(value, None, None, None, None)
                 case "r1":
                     last_reaction.r1 = value
                 case "r2":
@@ -309,6 +324,9 @@ def DaemonTopFile(file, include_dir=None, defines={}):
                     last_reaction.p1 = value
                 case "distance_max":
                     last_reaction.distance_max = value
+            if is_complete():
+                topology.new_reaction(last_reaction)
+                last_reaction = None
 
     p.add_level("reaction", process_reaction)
 
@@ -317,10 +335,8 @@ def DaemonTopFile(file, include_dir=None, defines={}):
     if not ok:
         raise ValueError("Parsing error")
 
-    # validate reactions (this wouldn't be neccessary with a better parsing)
-    for rx in topology.reaction_list:
-        if rx.r1 == "" or rx.r2 == "" or rx.p1 == "" or rx.distance_max == 0.0:
-            raise ValueError(f"Unfinished reaction definition {rx.name}")
+    if last_reaction is not None and not is_complete():
+        raise ValueError(f"unfinished reaction {last_reaction.name}")
 
     return (system, topology)
 
@@ -334,11 +350,5 @@ if __name__ == "__main__":
     path = argv[1]
 
     sys, top = DaemonTopFile(path)
-    print("==== TopStar / Molecule Fragment Types ====")
-    for molfrag in top.mol_fragments:
-        print(molfrag)
-    print("==== TopStar / Fragments ====")
-    for frag in top.frag_list:
-        print(frag)
-    print("==== SysStar dump ====")
     sys.dump()
+    top.dump()

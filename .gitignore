@@ -2,3 +2,4 @@
 *.xyz
 *.xtc
 **/__pycache__/
+\#*
