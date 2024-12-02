@@ -2,9 +2,11 @@
 #include "martini_subset.itp"
 #include "BDT.itp"
 
-;#include "phenylthiol.frag"
-;#include "dithiol.rx"
+#ifdef DAEMON
+#include "phenylthiol.frag"
+#include "dithiol.rx"
 #include "dithiol.itp"
+#endif
 
 [ system ]
 Two BDTs close by

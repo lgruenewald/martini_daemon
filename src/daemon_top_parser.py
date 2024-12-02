@@ -6,7 +6,7 @@ parser that constructs S* and T* rather than openmm's internal objects
 """
 
 from parser import TopParser, unwrap
-from topstar import TopStar, MolFragment
+from topstar import TopStar, ReactionTemplate
 from sysstar import SysStar
 import sys
 import os
@@ -56,6 +56,9 @@ def DaemonTopFile(file, include_dir=None, defines={}):
 
     if include_dir is None:
         include_dir = _get_default_gromacs_include_dir()
+
+    # so .top files stay backwards compatible
+    defines["DAEMON"] = 1
 
     # make parser
     p = TopParser()
@@ -251,10 +254,74 @@ def DaemonTopFile(file, include_dir=None, defines={}):
     p.add_level("virtual_sites3", TODO)
     p.add_level("virtual_sitesn", TODO)
 
+    # custom additions: rx and frag
+    def process_frag(tokens):
+        name = None
+        mol = None
+        for i in range(len(tokens)):
+            key, value = unwrap(tokens, i, "pair")
+            match key:
+                case "name":
+                    name = value
+                case "mol":
+                    mol = value
+                case _:
+                    raise ValueError(f"Unexpected key {key}, "
+                                     "expected 'name' or 'mol'")
+        if name is None or mol is None:
+            raise ValueError("name and mol must be defined in [ frag ]")
+        topology.new_frag_fragment(name, mol)
+
+    def last_frag():
+        if len(topology.frag_fragments) == 0:
+            raise ValueError("define a [ frag ] first")
+        return topology.frag_fragments[-1]
+
+    p.add_level("frag", process_frag)
+
+    def process_fragatoms(tokens):
+        frag_id = unwrap(tokens, 0, "int") - 1
+        parent_id = unwrap(tokens, 1, "int") - 1
+        type = unwrap(tokens, 2, "word")
+        name = unwrap(tokens, 3, "word")
+        is_edge = unwrap(tokens, 4, "int") != 0
+        last_frag().atoms.append((frag_id, parent_id, type, name, is_edge))
+
+    p.add_level("fragatoms", process_fragatoms)
+
+    # FIXME this is terrible, the current callback architecture is really
+    # unsuitable for this
+    last_reaction = None
+
+    def process_reaction(tokens):
+        nonlocal last_reaction
+        for i in range(len(tokens)):
+            key, value = unwrap(tokens, i, "pair")
+            match key:
+                case "name":
+                    last_reaction = ReactionTemplate(value, "", "", "", 0.0)
+                    topology.reaction_list.append(last_reaction)
+                case "r1":
+                    last_reaction.r1 = value
+                case "r2":
+                    last_reaction.r2 = value
+                case "p1":
+                    last_reaction.p1 = value
+                case "distance_max":
+                    last_reaction.distance_max = value
+
+    p.add_level("reaction", process_reaction)
+
     # run parser
     ok = p.parse(file, include_dir, defines)
     if not ok:
         raise ValueError("Parsing error")
+
+    # validate reactions (this wouldn't be neccessary with a better parsing)
+    for rx in topology.reaction_list:
+        if rx.r1 == "" or rx.r2 == "" or rx.p1 == "" or rx.distance_max == 0.0:
+            raise ValueError(f"Unfinished reaction definition {rx.name}")
+
     return (system, topology)
 
 

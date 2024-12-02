@@ -47,6 +47,10 @@ class SysStar():
             self._es_self_correction_force.addBond(i, i, [0.5 * charge ** 2])
         return i
 
+    def get_particle_name_type(self, i):
+        name, type, _, _ = self._part_list[i]
+        return name, type
+
     def use_atom_type(self, part_type):
         """Add new atom types that might not exist in the first place.
         TODO: call this for every atom type that shows up in reaction products.
@@ -79,6 +83,10 @@ class SysStar():
         self._bond_force.addBond(part_id_i, part_id_j, length, force)
         return len(self._harmonic_bond_list) - 1
 
+    def get_bond_members(self, bond_id):
+        i, j, _, _ = self._harmonic_bond_list[bond_id]
+        return (i, j)
+
     """All the angles in the system
     indices are called angle_id
     values are (i: part_id, j: part_id, k: part_id, theta: float, force: float)
@@ -93,6 +101,10 @@ class SysStar():
         theta_rad = theta * math.pi / 180
         self._harmonic_angle_force.addAngle(i, j, k, theta_rad, force)
         return len(self._harmonic_angle_list) - 1
+
+    def get_angle_members(self, angle_id):
+        i, j, k, _, _ = self._harmonic_angle_list[angle_id]
+        return (i, j, k)
 
     """All the proper dihedrals in the system
     indices are called proper_dihedral_id
@@ -110,6 +122,10 @@ class SysStar():
                                                theta_rad, force)
         return len(self._proper_dihedral_list) - 1
 
+    def get_proper_dihedral_members(self, dih_id):
+        i, j, k, l, _, _, _ = self._proper_dihedral_list[dih_id]
+        return (i, j, k, l)
+
     """All the exclusions in the system
     indices are caled excl_id
     values are (i: part_id, j: part_id)
@@ -120,6 +136,9 @@ class SysStar():
         self._exclusion_list.append((i, j))
         self._nb_force.addExclusion(i, j)
         return len(self._exclusion_list) - 1
+
+    def get_exclusion_members(self, excl_id):
+        return self._exclusion_list[excl_id]
 
     """All the constraints in the system
     indices are called constraint_id
@@ -132,6 +151,10 @@ class SysStar():
         self._constraint_list.append((i, j, length))
         self._system.addConstraint(i, j, length)
         return len(self._constraint_list) - 1
+
+    def get_constraint_members(self, constraint_id):
+        i, j, _ = self._constraint_list[constraint_id]
+        return (i, j)
 
     """All the improper dihedrals in the system
     indices are called improper_dihedral_id
@@ -151,6 +174,10 @@ class SysStar():
         self._improper_dihedral_force.addTorsion(i, j, k, l,
                                                  (theta_rad, force))
         return len(self._improper_dihedral_list) - 1
+
+    def get_improper_members(self, dih_id):
+        i, j, k, l, _, _ = self._improper_dihedral_list[dih_id]
+        return (i, j, k, l)
 
     """Atom types to look up default charges and default masses
     values are atom_type: string, (mass: float, charge: float)

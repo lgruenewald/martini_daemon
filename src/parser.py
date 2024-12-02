@@ -105,10 +105,12 @@ class TopParser:
         patterns["macro"] = re.compile("#[a-zA-Z0-9_]+")
         patterns["string"] = re.compile('"[^"]*"')
         patterns["bracket_string"] = re.compile("<[^>]*>")
-        patterns["symbol"] = re.compile(r"[\[\]:='.?!]")
+        patterns["key"] = re.compile(r"[a-zA-Z0-9_]+\s*:")
+        patterns["symbol"] = re.compile(r"[\[\]:='.?!+-]")
 
         cur = 0  # current position in the line
         tokens = []  # list of tokens built up so far
+        key = None  # FIXME this is also horrible
 
         while cur < len(line):
             ch = line[cur]
@@ -149,6 +151,12 @@ class TopParser:
                     content = content.strip('"')
                 elif longest_type == "bracket_string":
                     content = content.strip("<>")
+                elif longest_type == "key":
+                    if key is not None:
+                        raise ValueError("Double key")
+                    key = content.strip(": \t")
+                    cur += longest_span
+                    continue
                 # #define value replacements (only for word tokens)
                 while longest_type == "word":
                     val = self._defines.get(content)
@@ -165,6 +173,10 @@ class TopParser:
                         case _:
                             self.error("Unknown DEFINE type, can't replace")
                     content = val
+                if key is not None:
+                    content = (key, content)
+                    longest_type = "pair"
+                    key = None
                 # make token
                 tok = Token(content, longest_type,
                             self._path, self._linenum)

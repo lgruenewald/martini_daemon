@@ -29,8 +29,8 @@ from sysstar import SysStar
 
 @dataclass
 class FragFragment:
+    name: str
     mol: str
-    mame: str
     # list[(in_frag_id, in_itp_id, type, name, is_edge)]
     atoms: list[(int, int, str, str, bool)]
 
@@ -114,6 +114,7 @@ class Fragment():
     impropers: list[int]
     exclusions: list[int]
     constraints: list[int]
+    edge: list[bool]
 
     def __init__(self, name):
         self.name = name
@@ -124,6 +125,7 @@ class Fragment():
         self.impropers = []
         self.exclusions = []
         self.constraints = []
+        self.edge = []
 
 
 class TopStar():
@@ -136,8 +138,10 @@ class TopStar():
     defrag_list: list[list[(int, int)]]
 
     # Formerly DaemonTopology:
+    # TODO? do we even need lists of frag_fragments and mol_fragments?
     frag_fragments: list[FragFragment]
     mol_fragments: list[MolFragment]
+    subfrag_map: dict[str, list[str]]
     type_lookup: dict[str, FragFragment | MolFragment]
     reaction_list: list[ReactionTemplate]
 
@@ -150,6 +154,7 @@ class TopStar():
         self.mol_fragments = []
         self.reaction_list = []
         self.type_lookup = {}
+        self.subfrag_map = {}
         self.system = system
 
     def new_mol_fragment(self, name: str):
@@ -159,9 +164,146 @@ class TopStar():
         self.mol_fragments.append(mol_fragment)
         self.type_lookup[name] = mol_fragment
 
+    def new_frag_fragment(self, name: str, parent: str):
+        if self.type_lookup.get(name):
+            raise ValueError(f"Redefinition of fragment type {name}")
+        frag_fragment = FragFragment(name, parent, [])
+        self.frag_fragments.append(frag_fragment)
+        self.type_lookup[name] = frag_fragment
+        if self.subfrag_map.get(parent):
+            self.subfrag_map[parent].append(name)
+        else:
+            self.subfrag_map[parent] = [name]
+
+    def instantiate_subfrag(self, subfrag, inst):
+        """Instantiates a subfragment subfrag, with forces in S* as seen in
+        inst."""
+        frag: FragFragment = self.type_lookup.get(subfrag)
+        if frag is None:
+            raise ValueError(f"Can't find frag {subfrag}")
+        elif not isinstance(frag, FragFragment):
+            raise ValueError(f"Attempt to recursively instantiate {subfrag}, "
+                             "but it's not a frag fragment type."
+                             f"It is: {subfrag}")
+        subinst = Fragment(subfrag)
+        self.frag_list.append(subinst)
+        normal_indices = set()
+        edge_indices = set()
+        all_indices = set()
+        # particles
+        for i, atom in enumerate(frag.atoms):
+            # remapping of parent_id's to frag_id's
+            frag_id, parent_id, type, name, is_edge = atom
+            # frag_id's must be in order
+            if frag_id != i:
+                raise ValueError("Atom IDs in [ fragatoms ] should be ordered")
+            # parent_id must be i range
+            if parent_id < 0 or parent_id >= len(inst.particles):
+                raise ValueError("Parent particle ID out of range")
+            part_index = inst.particles[parent_id]
+            # name and type must match S*
+            sname, stype = self.system.get_particle_name_type(part_index)
+            if sname != name or stype != type:
+                raise ValueError("During subfrag instantiation name/type "
+                                 f"doesn't match. Expected name {sname} "
+                                 f"type {stype}. Got name {name} type {type}.")
+            # can only add non edge if it's not an edge in parent
+            if not is_edge and inst.edge[parent_id]:
+                raise ValueError("Attempt to add non-edge atom in subfrag "
+                                 "from an edge atom in parent.")
+            # build up these sets that are used for constructing the forces
+            # prevent double inclusion of the same atom
+            if part_index in all_indices:
+                raise ValueError("Double inclusion of atom in subfrag")
+            all_indices.add(part_index)
+            if is_edge:
+                edge_indices.add(part_index)
+            else:
+                normal_indices.add(part_index)
+            # build up subinst
+            subinst.particles.append(part_index)
+            subinst.edge.append(is_edge)
+        # the indices sets must be non overlapping
+        if len(normal_indices & edge_indices) != 0:
+            print("normal indices: ", normal_indices)
+            print("edge: ", edge_indices)
+            print("all: ", all_indices)
+            raise AssertionError("Normal and edge atoms must not overlap")
+        if len(all_indices) != len(normal_indices | edge_indices):
+            print("normal indices: ", normal_indices)
+            print("edge: ", edge_indices)
+            print("all: ", all_indices)
+            raise AssertionError("All indices must equal normal | edge")
+        # bonds get added if at least one normal atom participates in them
+        # bonds to be added must be between atoms inside the subfrag
+        # TODO: better error messages for dangling stuff
+        # through either analysis of subfrags before instantiation
+        # or here through dumping more info
+        for bond_id in inst.bonds:
+            i, j = self.system.get_bond_members(bond_id)
+            if i in normal_indices or j in normal_indices:
+                # bond required
+                if i not in all_indices or j not in all_indices:
+                    raise ValueError("Dangling bond")
+                subinst.bonds.append(bond_id)
+        # angles get added if the central atom is a normal atom
+        # all atoms in such angles must contain only atoms in the subfrag
+        for angle_id in inst.angles:
+            i, j, k = self.system.get_angle_members(angle_id)
+            if j in normal_indices:
+                if i not in all_indices or k not in all_indices:
+                    raise ValueError("Dangling angle")
+                subinst.angles.append(angle_id)
+        # dihedrals get added if one of the central atoms is a normal atom
+        # all atoms participating must be in the subfrag
+        for dih_id in inst.dihedrals:
+            i, j, k, l = self.system.get_proper_dihedral_members(dih_id)
+            if j not in normal_indices and k not in normal_indices:
+                continue
+            if i not in all_indices or j not in all_indices or \
+                    k not in all_indices or l not in all_indices:
+                raise ValueError("Dangling dihedral")
+            subinst.dihedrals.append(dih_id)
+        # improper dihedrals get added if any of the atoms is a normal atom
+        # all atoms participating must be in the subfrag
+        for dih_id in inst.impropers:
+            i, j, k, l = self.system.get_improper_members(dih_id)
+            if i in normal_indices or j in normal_indices or \
+                    k in normal_indices or l in normal_indices:
+                if i not in all_indices or j not in all_indices or \
+                        k not in all_indices or l not in all_indices:
+                    raise ValueError("Dangling improper dihedral")
+                subinst.impropers.append(dih_id)
+        # exclusions, constaints get added if any of the atoms is a normal atom
+        # all atoms participating must be in the subfrag
+        for excl_id in inst.exclusions:
+            i, j = self.system.get_exclusion_members(excl_id)
+            if i in normal_indices or j in normal_indices:
+                if i not in all_indices or j not in all_indices:
+                    raise ValueError("Dangling exclusion")
+                subinst.exclusions.append(excl_id)
+        for cid in inst.constraints:
+            i, j = self.system.get_constraint_members(cid)
+            if i in normal_indices or j in normal_indices:
+                if i not in all_indices or j not in all_indices:
+                    raise ValueError("Dangling constraint")
+                subinst.constraints.append(cid)
+        # subfrags can contain further subfrags
+        self.instantiate_subfrags(subfrag, subinst)
+
+    def instantiate_subfrags(self, frag_name, inst):
+        """Instantiates all subfrags of frag_name.
+        inst is a Fragment instance that contains the reference to all forces
+        in S*."""
+        subfrags = self.subfrag_map.get(frag_name)
+        if subfrags is not None:
+            for subfrag in subfrags:
+                self.instantiate_subfrag(subfrag, inst)
+
     def instantiate(self, frag_name):
         """Takes a name of a mol fragment, creates new particles for it in
         the system and the corresponding interactions as well.
+        Recursively instantiates all subfragments too.
 
         Later, when developing the D/M algorithm a modified version of this
         should be created for reusing existing particles.
@@ -179,11 +321,10 @@ class TopStar():
         # particles
         index0 = self.system.len_particles()
         for atom in frag.atoms:
-            type, resnum, resname, atomname, chargegr, charge, mass = \
-                atom
-            # TODO if mass is -1 use a default
+            type, resnum, resname, atomname, chargegr, charge, mass = atom
             p = self.system.add_particle(atomname, type, charge, mass)
             inst.particles.append(p)
+            inst.edge.append(False)
         # bonds
         for bond in frag.harmonic_bonds:
             i, j, length, force = bond
@@ -192,20 +333,24 @@ class TopStar():
         # angles
         for angle in frag.harmonic_angles:
             i, j, k, theta, force = angle
-            a = self.system.add_angle(i + index0, j + index0, k + index0,
-                                       theta, force)
+            a = self.system.add_angle(
+                i + index0, j + index0, k + index0, theta, force
+            )
             inst.angles.append(a)
         # proper dihedrals
         for dih in frag.proper_dihedrals:
             i, j, k, l, theta, force, mult = dih
-            d = self.system.add_proper_dihedral(i + index0, j + index0, k + index0,
-                                          l + index0, theta, force, mult)
+            d = self.system.add_proper_dihedral(
+                i + index0, j + index0, k + index0, l + index0,
+                theta, force, mult
+            )
             inst.dihedrals.append(d)
         # improper dihedrals
         for imp in frag.improper_dihedrals:
             i, j, k, l, theta, force = imp
-            d = self.system.add_improper_dihedral(i + index0, j + index0, k + index0,
-                                          l + index0, theta, force)
+            d = self.system.add_improper_dihedral(
+                i + index0, j + index0, k + index0, l + index0, theta, force
+            )
             inst.impropers.append(d)
         # exclusions
         for i, excl in enumerate(frag.exclusions):
@@ -218,3 +363,5 @@ class TopStar():
             i, j, length = cons
             c = self.system.add_constraint(i + index0, j + index0, length)
             inst.constraints.append(c)
+
+        self.instantiate_subfrags(frag_name, inst)

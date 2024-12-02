@@ -1,9 +1,9 @@
 [ reaction ]
-name = thiol_dimerization
-r1 = thiol
-r2 = thiol
-p1 = DIM
-distance_max = 1.5 ; nm, distance cutoff
+name: thiol_dimerization
+r1: thiol
+r2: thiol
+p1: DIM
+distance_max: 1.5 ; nm, distance cutoff
 
-[ constraints ]
+; [ constraints ]
 ; todo: angle, reaction rate, etc constraints
