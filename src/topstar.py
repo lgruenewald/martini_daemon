@@ -206,6 +206,7 @@ class TopStar():
                              "but it's not a frag fragment type."
                              f"It is: {subfrag}")
         subinst = Fragment(subfrag)
+        subinst_id = len(self.frag_list)
         self.frag_list.append(subinst)
         normal_indices = set()
         edge_indices = set()
@@ -243,6 +244,8 @@ class TopStar():
             # build up subinst
             subinst.particles.append(part_index)
             subinst.edge.append(is_edge)
+            # frag_id, in_frag_id, is_edge
+            self.defrag_list[part_index].append((subinst_id, i, is_edge))
         # the indices sets must be non overlapping
         if len(normal_indices & edge_indices) != 0:
             print("normal indices: ", normal_indices)
@@ -324,12 +327,24 @@ class TopStar():
                 self.instantiate_subfrag(subfrag, inst)
 
     def instantiate(self, frag_name):
+        frag = self.type_lookup.get(frag_name)  # frag type
+        if frag is None:
+            raise ValueError(f"Can't find mol {frag_name}")
+        elif not isinstance(frag, MolFragment):
+            raise ValueError(f"Attempt to instantiate {frag_name}, but it's"
+                             " not a mol fragment type."
+                             f" It is: {frag}")
+        parts = []
+        for in_frag_id, atom in enumerate(frag.atoms):
+            type, resnum, resname, atomname, chargegr, charge, mass = atom
+            p = self.system.add_particle(atomname, type, charge, mass)
+            parts.append(p)
+        self.instantiate_over_existing(frag_name, parts)
+
+    def instantiate_over_existing(self, frag_name, particles):
         """Takes a name of a mol fragment, creates new particles for it in
         the system and the corresponding interactions as well.
         Recursively instantiates all subfragments too.
-
-        TODO Later, when developing the D/M algorithm a modified version of this
-        should be created for reusing existing particles.
         """
 
         frag = self.type_lookup.get(frag_name)  # frag type
@@ -341,30 +356,30 @@ class TopStar():
                              f" It is: {frag}")
         inst = Fragment(frag_name)
         self.frag_list.append(inst)
+        inst_id = len(self.frag_list) - 1
         # particles
-        index0 = self.system.len_particles()
-        for atom in frag.atoms:
-            type, resnum, resname, atomname, chargegr, charge, mass = atom
-            p = self.system.add_particle(atomname, type, charge, mass)
-            inst.particles.append(p)
+        for in_frag_id, part_id in enumerate(particles):
+            inst.particles.append(part_id)
+            # frag_id, in_frag_id, is_edge
+            self.defrag_list.append([(inst_id, in_frag_id, False)])
             inst.edge.append(False)
         # bonds
         for bond in frag.harmonic_bonds:
             i, j, length, force = bond
-            b = self.system.add_bond(index0 + i, index0 + j, length, force)
+            b = self.system.add_bond(particles[i], particles[j], length, force)
             inst.bonds.append(b)
         # angles
         for angle in frag.harmonic_angles:
             i, j, k, theta, force = angle
             a = self.system.add_angle(
-                i + index0, j + index0, k + index0, theta, force
+                particles[i], particles[j], particles[k], theta, force
             )
             inst.angles.append(a)
         # proper dihedrals
         for dih in frag.proper_dihedrals:
             i, j, k, l, theta, force, mult = dih
             d = self.system.add_proper_dihedral(
-                i + index0, j + index0, k + index0, l + index0,
+                particles[i], particles[j], particles[k], particles[l],
                 theta, force, mult
             )
             inst.dihedrals.append(d)
@@ -372,25 +387,68 @@ class TopStar():
         for imp in frag.improper_dihedrals:
             i, j, k, l, theta, force = imp
             d = self.system.add_improper_dihedral(
-                i + index0, j + index0, k + index0, l + index0, theta, force
+                particles[i], particles[j], particles[k], particles[l],
+                theta, force
             )
             inst.impropers.append(d)
         # exclusions
         for i, excl in enumerate(frag.exclusions):
             for j in excl:
                 if i < j:
-                    e = self.system.add_exclusion(i + index0, j + index0)
+                    e = self.system.add_exclusion(particles[i], particles[j])
                     inst.exclusions.append(e)
         # constraints
         for cons in frag.constraints:
             i, j, length = cons
-            c = self.system.add_constraint(i + index0, j + index0, length)
+            c = self.system.add_constraint(particles[i], particles[j], length)
             inst.constraints.append(c)
 
         if frag_name in self.is_reacting:
             self.used_reactant_types.add(frag_name)
 
         self.instantiate_subfrags(frag_name, inst)
+
+    def destroy_fragment(self, frag: Fragment):
+        """args:
+        frag: Fragment
+        """
+        # 1. remove overlapping fragments
+        # get the list of fragments to remove
+        to_remove = set()
+        for part in frag.particles:
+            defrag = self.defrag_list[part]
+            for frag_id, in_frag_id, is_edge in defrag:
+                if not is_edge:
+                    to_remove.add(frag_id)
+
+        # remove those fragments FIXME some awful code
+        for frag_id in to_remove:
+            cfrag = self.frag_list[frag_id]
+            self.frag_list[frag_id] = None
+            for part in cfrag.particles:
+                i = 0
+                while i < len(self.defrag_list[part]):
+                    cfrag_id, _, _ = self.defrag_list[part][i]
+                    if cfrag_id == frag_id:
+                        del self.defrag_list[part][i]
+                    else:
+                        i += 1
+        # TODO combine these into a single loop and avoid creating None's
+        # by using hashtables
+
+        # 2. remove forces in fragment
+        for bond in frag.bonds:
+            self.system.remove_bond(bond)
+        for angle in frag.angles:
+            self.system.remove_angle(angle)
+        for dih in frag.dihedrals:
+            self.system.remove_proper_dihedral(dih)
+        for dih in frag.impropers:
+            self.system.remove_improper(dih)
+        for excl in frag.exclusions:
+            self.system.remove_exclusion(excl)
+        for con in frag.constraints:
+            self.system.remove_constraint(con)
 
     def build_reaction_matrix(self):
         """TLDR: give all the information to the D/M algorithm that's needed
@@ -425,13 +483,17 @@ class TopStar():
                 possible_reactions_reactant_types[(rx.r1, rx.r2)] = rx
                 possible_reactions_reactant_types[(rx.r2, rx.r1)] = rx
         self.used_reactant_types = actually_used
+        return possible_reactions_reactant_types
 
+    def get_initiator_list(self):
         initiators: list[Fragment] = []
         for frag in self.frag_list:
-            if frag.name in actually_used:
+            if frag is None:
+                continue
+            if frag.name in self.used_reactant_types:
                 initiators.append(frag)
 
-        return possible_reactions_reactant_types, initiators
+        return initiators
 
     def dump(self):
         print("==== TopStar / Fragment Types ====")

@@ -9,7 +9,7 @@ from topstar import TopStar, ReactionTemplate, Fragment
 import sys
 import openmm as mm
 from openmm.app import GromacsGroFile
-from openmm.unit import femtosecond
+from openmm.unit import femtosecond, nanometer
 import utils
 
 
@@ -28,7 +28,8 @@ class DaemonSimulation():
 
         # FIXME: choice of coupling options etc
 #        self.system.add_force(mm.MonteCarloBarostat(p, T))
-        self.reaction_matrix, self.initiator_list = self.top.build_reaction_matrix()
+        self.reaction_matrix = self.top.build_reaction_matrix()
+        self.initiator_list = self.top.get_initiator_list()
 
         self.system.build_context(mm.LangevinIntegrator(T, 1.0, dt),
                                   self.gro.getPeriodicBoxVectors())
@@ -44,29 +45,47 @@ class DaemonSimulation():
         self.system.do_steps(1000)
 
         state = self.system.get_state()
-        pos = state.getPositions()
+        pos = state.getPositions(asNumpy=True).value_in_unit(nanometer)
         box = state.getPeriodicBoxVectors()[0].x
 
+        pairs = []
+        skip = set()
+        # FIXME this skip system does not handle overlapping reactive fragments
         # Detection algorithm
         for i, frag1 in enumerate(self.initiator_list):
+            if frag1 is None:
+                continue
             for j, frag2 in enumerate(self.initiator_list):
+                if frag2 is None:
+                    continue
                 if j >= i:
                     continue
-                rx = self.reaction_matrix.get((i, j))
+                if i in skip or j in skip:
+                    continue
+                rx = self.reaction_matrix.get((frag1.name, frag2.name))
                 if rx is not None:
                     init1 = frag1.particles[0]
                     init2 = frag2.particles[0]
-                    dist = utils.pdist(pos[init1], pos[init2], box)
-                    if dist < rx.max_distance:
-                        print("Within cutoff distance!")
+                    dist = utils.pdist(pos[init1], pos[init2], float(box))
+                    if dist < rx.distance_max:
+                        skip.add(i)
+                        skip.add(j)
+                        pairs.append((frag1, frag2, rx))
 
+        if len(pairs) == 0:
+            return
         # Modification algorithm
+        for pair in pairs:
+            frag1, frag2, rx = pair
+            self.top.destroy_fragment(frag1)
+            self.top.destroy_fragment(frag2)
+            particles = frag1.particles + frag2.particles
+            self.top.instantiate_over_existing(rx.p1, particles)
+            print("Modification algo ran")
 
-        # TODO destroy fragments that overlap
-        # TODO destroy forces inside fragment
-        # TODO instantiate product
-        # TODO update initiator list
-        # TODO reinitialize context
+        # reinitialize context, initator list
+        self.initiator_list = self.top.get_initiator_list()
+        self.system.reinitialize()
 
     def dump(self):
         self.system.dump()
@@ -86,6 +105,6 @@ if __name__ == "__main__":
     gro_path = argv[2]
 
     sim = DaemonSimulation(top_path, gro_path)
-    for i in range(10):
+    for i in range(100):
         sim.step()
     sim.dump()

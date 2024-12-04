@@ -11,12 +11,19 @@ class SysStar():
 
     _system: mm.System
     _context: mm.Context
-    _nb_force: mm.Force
-    _es_self_correction_force: mm.Force
-    _harmonic_angle_force: mm.Force
-    _bond_force: mm.Force
-    _proper_dihedral_force: mm.Force
-    _improper_dihedral_force: mm.Force
+    _nb_force: mm.Force = None
+    _nb_force_rebuild = False
+    _es_self_correction_force: mm.Force = None
+    _es_self_correction_force_rebuild = False
+    _harmonic_angle_force: mm.Force = None
+    _harmonic_angle_rebuild = False
+    _bond_force: mm.Force = None
+    _bond_rebuild = False
+    _proper_dihedral_force: mm.Force = None
+    _proper_dihedral_rebuild = False
+    _improper_dihedral_force: mm.Force = None
+    _improper_dihedral_rebuild = False
+    _forces_list: list[mm.Force]  # to keep track of indices
 
     """All particles in the system
     indices are called part_id
@@ -87,6 +94,10 @@ class SysStar():
         i, j, _, _ = self._harmonic_bond_list[bond_id]
         return (i, j)
 
+    def remove_bond(self, bond_id):
+        self._bond_rebuild = True
+        self._harmonic_bond_list[bond_id] = None
+
     """All the angles in the system
     indices are called angle_id
     values are (i: part_id, j: part_id, k: part_id, theta: float, force: float)
@@ -105,6 +116,10 @@ class SysStar():
     def get_angle_members(self, angle_id):
         i, j, k, _, _ = self._harmonic_angle_list[angle_id]
         return (i, j, k)
+
+    def remove_angle(self, angle_id):
+        self._harmonic_angle_rebuild = True
+        self._harmonic_angle_list[angle_id] = None
 
     """All the proper dihedrals in the system
     indices are called proper_dihedral_id
@@ -126,6 +141,10 @@ class SysStar():
         i, j, k, l, _, _, _ = self._proper_dihedral_list[dih_id]
         return (i, j, k, l)
 
+    def remove_proper_dihedral(self, dih_id):
+        self._proper_dihedral_rebuild = True
+        self._proper_dihedral_list[dih_id] = None
+
     """All the exclusions in the system
     indices are caled excl_id
     values are (i: part_id, j: part_id)
@@ -139,6 +158,10 @@ class SysStar():
 
     def get_exclusion_members(self, excl_id):
         return self._exclusion_list[excl_id]
+
+    def remove_exclusion(self, excl_id):
+        self._nb_force_rebuild = True
+        self._exclusion_list[excl_id] = None
 
     """All the constraints in the system
     indices are called constraint_id
@@ -155,6 +178,11 @@ class SysStar():
     def get_constraint_members(self, constraint_id):
         i, j, _ = self._constraint_list[constraint_id]
         return (i, j)
+
+    def remove_constraint(self, constraint_id):
+        self._system.removeConstraint(constraint_id)
+        # TODO does this mangle the IDs of constraints that come after?
+        self._constraint_list[constraint_id] = None
 
     """All the improper dihedrals in the system
     indices are called improper_dihedral_id
@@ -178,6 +206,10 @@ class SysStar():
     def get_improper_members(self, dih_id):
         i, j, k, l, _, _ = self._improper_dihedral_list[dih_id]
         return (i, j, k, l)
+
+    def remove_improper(self, dih_id):
+        self._improper_dihedral_rebuild = True
+        self._improper_dihedral_list[dih_id] = None
 
     """Atom types to look up default charges and default masses
     values are atom_type: string, (mass: float, charge: float)
@@ -239,17 +271,21 @@ class SysStar():
         self._nb_force.setCutoffDistance(self.nonbonded_cutoff
                                          .value_in_unit(nanometer))
         self._system.addForce(self._nb_force)
+        self._forces_list.append(self._nb_force)
 
         # TODO tabulated nb force params
 
         self._bond_force = mm.HarmonicBondForce()
         self._system.addForce(self._bond_force)
+        self._forces_list.append(self._bond_force)
 
         self._harmonic_angle_force = mm.HarmonicAngleForce()
         self._system.addForce(self._harmonic_angle_force)
+        self._forces_list.append(self._harmonic_angle_force)
 
         self._proper_dihedral_force = mm.PeriodicTorsionForce()
         self._system.addForce(self._proper_dihedral_force)
+        self._forces_list.append(self._proper_dihedral_force)
 
         self._improper_dihedral_force = mm.CustomTorsionForce(
             "0.5*k*(thetap-theta0)^2; thetap = "
@@ -259,6 +295,7 @@ class SysStar():
         self._improper_dihedral_force.addPerTorsionParameter("theta0")
         self._improper_dihedral_force.addPerTorsionParameter("k")
         self._system.addForce(self._improper_dihedral_force)
+        self._forces.append(self._improper_dihedral_force)
 
         self._es_self_correction_force = mm.CustomBondForce(
             f"step(rcut-r) * ES;"
@@ -271,6 +308,7 @@ class SysStar():
         )
         self._es_self_correction_force.addPerBondParameter("q_product")
         self._system.addForce(self._es_self_correction_force)
+        self._forces.append(self._es_self_correction_force)
 
         # TODO CMAPTorsionForce
 
@@ -313,6 +351,11 @@ class SysStar():
         self._system.setDefaultPeriodicBoxVectors(*periodicBoxVectors)
         self._context = mm.Context(self._system, integrator)
         self._context.setPeriodicBoxVectors(*periodicBoxVectors)
+
+    def reinitialize(self):
+        if not self.context_initialized:
+            raise Exception("Initialize the context first")
+        self._context.reinitialize(preserveState=True)
 
     def set_positions(self, positions):
         if not self.context_initialized:
