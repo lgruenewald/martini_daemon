@@ -3,7 +3,7 @@ name: thiol_dimerization
 r1: thiol
 r2: thiol
 p1: DIM
-distance_max: 1.5 ; nm, distance cutoff
+distance_max: 0.75 ; nm, distance cutoff
 
 ; [ constraints ]
 ; todo: angle, reaction rate, etc constraints

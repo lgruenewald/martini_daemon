@@ -26,6 +26,7 @@ topology is an object that contains the following information:
 """
 from dataclasses import dataclass
 from sysstar import SysStar
+import sys
 
 
 @dataclass
@@ -116,8 +117,9 @@ class Fragment():
     exclusions: list[int]
     constraints: list[int]
     edge: list[bool]
+    frag_id: int
 
-    def __init__(self, name):
+    def __init__(self, name, id):
         self.name = name
         self.particles = []
         self.bonds = []
@@ -127,6 +129,7 @@ class Fragment():
         self.exclusions = []
         self.constraints = []
         self.edge = []
+        self.frag_id = id
 
 
 class TopStar():
@@ -205,8 +208,8 @@ class TopStar():
             raise ValueError(f"Attempt to recursively instantiate {subfrag}, "
                              "but it's not a frag fragment type."
                              f"It is: {subfrag}")
-        subinst = Fragment(subfrag)
         subinst_id = len(self.frag_list)
+        subinst = Fragment(subfrag, subinst_id)
         self.frag_list.append(subinst)
         normal_indices = set()
         edge_indices = set()
@@ -354,9 +357,9 @@ class TopStar():
             raise ValueError(f"Attempt to instantiate {frag_name}, but it's"
                              " not a mol fragment type."
                              f" It is: {frag}")
-        inst = Fragment(frag_name)
+        inst_id = len(self.frag_list)
+        inst = Fragment(frag_name, inst_id)
         self.frag_list.append(inst)
-        inst_id = len(self.frag_list) - 1
         # particles
         for in_frag_id, part_id in enumerate(particles):
             inst.particles.append(part_id)
@@ -420,6 +423,8 @@ class TopStar():
             for frag_id, in_frag_id, is_edge in defrag:
                 if not is_edge:
                     to_remove.add(frag_id)
+        # always remove self too, even if the initiator atom is an edge atom
+        to_remove.add(frag.frag_id)
 
         # remove those fragments FIXME some awful code
         for frag_id in to_remove:
@@ -433,6 +438,7 @@ class TopStar():
                         del self.defrag_list[part][i]
                     else:
                         i += 1
+
         # TODO combine these into a single loop and avoid creating None's
         # by using hashtables
 
@@ -498,7 +504,8 @@ class TopStar():
     def dump(self):
         print("==== TopStar / Fragment Types ====")
         for k, molfrag in self.type_lookup.items():
-            print(k, molfrag)
+            sys.stdout.write(f"{k} ")
+        sys.stdout.write("\n")
         print("==== TopStar / ReactionTemplates ====")
         for rx in self.reaction_list:
             print(rx)

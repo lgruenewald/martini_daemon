@@ -76,12 +76,16 @@ class DaemonSimulation():
             return
         # Modification algorithm
         for pair in pairs:
+            print("pair", pair)
             frag1, frag2, rx = pair
             self.top.destroy_fragment(frag1)
             self.top.destroy_fragment(frag2)
             particles = frag1.particles + frag2.particles
             self.top.instantiate_over_existing(rx.p1, particles)
-            print("Modification algo ran")
+
+        print("Modification algo ran")
+        self.system.dump()
+        self.top.dump()
 
         # reinitialize context, initator list
         self.initiator_list = self.top.get_initiator_list()
@@ -107,4 +111,3 @@ if __name__ == "__main__":
     sim = DaemonSimulation(top_path, gro_path)
     for i in range(100):
         sim.step()
-    sim.dump()
