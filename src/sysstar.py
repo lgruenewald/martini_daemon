@@ -367,7 +367,6 @@ class SysStar():
             self._system.addForce(force)
         self.context_initialized = True
         self._integrator = integrator
-        self.add_force(mm.CMMotionRemover())
         self.build_nb_force()
         self.build_es_self_correction_force()
         self.build_bond_force()

@@ -75,13 +75,9 @@ class DaemonSimulation():
         if len(pairs) == 0:
             return
         # Modification algorithm
-        for pair in pairs:
-            print("pair", pair)
-            frag1, frag2, rx = pair
-            self.top.destroy_fragment(frag1)
-            self.top.destroy_fragment(frag2)
-            particles = frag1.particles + frag2.particles
-            self.top.instantiate_over_existing(rx.p1, particles)
+        for frag1, frag2, rx in pairs:
+            # TODO constraint checking here
+            self.top.modification(frag1, frag2, rx.p1)
 
         print("Modification algo ran")
         self.system.dump()
@@ -90,11 +86,6 @@ class DaemonSimulation():
         # reinitialize context, initator list
         self.initiator_list = self.top.get_initiator_list()
         self.system.reinitialize()
-
-    def dump(self):
-        self.system.dump()
-        self.top.dump()
-        self.system.write_gro("dump.gro")
 
 
 if __name__ == "__main__":
@@ -111,3 +102,4 @@ if __name__ == "__main__":
     sim = DaemonSimulation(top_path, gro_path)
     for i in range(100):
         sim.step()
+    sim.system.write_gro("final.gro")

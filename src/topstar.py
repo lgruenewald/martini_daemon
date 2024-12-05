@@ -152,15 +152,9 @@ class TopStar():
     # === Reaction templates ===
     reaction_list: list[ReactionTemplate]
 
-    # which reactant types is there a reaction template DEFINED
-    is_reacting: set[str]
-
-    # which reactant types were INSTANTIATED
-    # Built up during instantiate. TODO also add from all possible
-    # reaction products
-    used_reactant_types: set[str]
-
     reactive_pairs: dict[(str, str), ReactionTemplate]
+
+    reactive_types: set[str]
 
     system: SysStar
 
@@ -172,9 +166,8 @@ class TopStar():
         self.reaction_list = []
         self.type_lookup = {}
         self.subfrag_map = {}
-        self.is_reacting = set()
-        self.used_reactant_types = set()
         self.reactive_pairs = {}
+        self.reactive_types = set()
         self.system = system
 
     def new_mol_fragment(self, name: str):
@@ -195,8 +188,10 @@ class TopStar():
 
     def new_reaction(self, reaction: ReactionTemplate):
         self.reaction_list.append(reaction)
-        self.is_reacting.add(reaction.r1)
-        self.is_reacting.add(reaction.r2)
+        self.reactive_pairs[(reaction.r1, reaction.r2)] = reaction
+        self.reactive_pairs[(reaction.r2, reaction.r1)] = reaction
+        self.reactive_types.add(reaction.r1)
+        self.reactive_types.add(reaction.r2)
 
     def instantiate_subfrag(self, subfrag, inst):
         """Instantiates a subfragment subfrag, with forces in S* as seen in
@@ -315,8 +310,6 @@ class TopStar():
                     raise ValueError("Dangling constraint")
                 subinst.constraints.append(cid)
 
-        if subfrag in self.is_reacting:
-            self.used_reactant_types.add(subfrag)
         # subfrags can contain further subfrags
         self.instantiate_subfrags(subfrag, subinst)
 
@@ -342,7 +335,7 @@ class TopStar():
             type, resnum, resname, atomname, chargegr, charge, mass = atom
             p = self.system.add_particle(atomname, type, charge, mass)
             parts.append(p)
-        self.instantiate_over_existing(frag_name, parts)
+        return self.instantiate_over_existing(frag_name, parts)
 
     def instantiate_over_existing(self, frag_name, particles):
         """Takes a name of a mol fragment, creates new particles for it in
@@ -406,41 +399,33 @@ class TopStar():
             c = self.system.add_constraint(particles[i], particles[j], length)
             inst.constraints.append(c)
 
-        if frag_name in self.is_reacting:
-            self.used_reactant_types.add(frag_name)
-
         self.instantiate_subfrags(frag_name, inst)
+        return inst
 
     def destroy_fragment(self, frag: Fragment):
         """args:
         frag: Fragment
+
+        returns: the root molecule fragment from underneath
         """
+        # 0. save the molecule fragment
+        molfrag_id, _, _ = self.defrag_list[frag.particles[0]][0]
+        molfrag = self.frag_list[molfrag_id]
+
         # 1. remove overlapping fragments
         # get the list of fragments to remove
-        to_remove = set()
         for part in frag.particles:
             defrag = self.defrag_list[part]
-            for frag_id, in_frag_id, is_edge in defrag:
-                if not is_edge:
-                    to_remove.add(frag_id)
-        # always remove self too, even if the initiator atom is an edge atom
-        to_remove.add(frag.frag_id)
-
-        # remove those fragments FIXME some awful code
-        for frag_id in to_remove:
-            cfrag = self.frag_list[frag_id]
-            self.frag_list[frag_id] = None
-            for part in cfrag.particles:
-                i = 0
-                while i < len(self.defrag_list[part]):
-                    cfrag_id, _, _ = self.defrag_list[part][i]
-                    if cfrag_id == frag_id:
-                        del self.defrag_list[part][i]
-                    else:
-                        i += 1
-
-        # TODO combine these into a single loop and avoid creating None's
-        # by using hashtables
+            i = 0
+            while i < len(defrag):
+                frag_id, _, is_edge = defrag[i]
+                if not is_edge or frag_id == frag.frag_id:
+                    # remove frag and frags that contain any of the particles
+                    # as normal particles
+                    del defrag[i]
+                    self.frag_list[frag_id] = None
+                else:
+                    i += 1
 
         # 2. remove forces in fragment
         for bond in frag.bonds:
@@ -454,49 +439,152 @@ class TopStar():
         for excl in frag.exclusions:
             self.system.remove_exclusion(excl)
         for con in frag.constraints:
+            # constraints can't be removed, so this will throw an exception
             self.system.remove_constraint(con)
 
-    def build_reaction_matrix(self):
-        """TLDR: give all the information to the D/M algorithm that's needed
-        for a quick detection of possible reactions
+        # 3. return the complete fragment that contained this fragment
+        # (can be fragment itself)
+        return molfrag
 
-        Builds a 2D table of all reaction types.
-        The columns/rows are initiator atom types.
-        The values are cutoff distances.
-        0.0 means no reaction possible.
-        Negative means reaction occurs above the distance. (TODO)
+    def new_dynamic_complete_fragment(self, particles, frag1, frag2, frag_prod,
+                                      complete1, complete2):
+        # get all forces from frag_prod, complete1, complete2 but
+        # exclude those from frag1, frag2 (those were deleted from system)
+        # and add a new fragment to the list that contains particles and
+        # forces obtained that way
+        inst_id = len(self.frag_list)
+        inst = Fragment("<dyn>", inst_id)
+        self.frag_list.append(inst)
+        for i, part in enumerate(particles):
+            inst.particles.append(part)
+            inst.edge.append(False)
+            self.defrag_list[part].insert(0, (inst_id, i, False))
 
-        TODO: also consider reactive products as possible reactants
-        TODO: also return a list of atom types involved in all possible products
-        TODO: currently reactive products are not supported
-        TODO: currently multiple reactions for the same atom pair are not
-            supported
+        # multiline editing helps a lot with this, no I didn't type this out
+        # by hand FIXME this is getting painful to look at though...
+        bonds_yes = set()
+        bonds_no = set()
+        for bond in frag1.bonds:
+            bonds_no.add(bond)
+        for bond in frag2.bonds:
+            bonds_no.add(bond)
+        for bond in frag_prod.bonds:
+            bonds_yes.add(bond)
+        for bond in complete1.bonds:
+            bonds_yes.add(bond)
+        for bond in complete2.bonds:
+            bonds_yes.add(bond)
+        bonds = bonds_yes - bonds_no
+        for bond in bonds:
+            inst.bonds.append(bond)
 
-        Right now implemented:
-        returns a dict[(str, str), ReactionTemplate] and list[Fragment]
-        which is the minimum reactions and fragments that can theoretically
-        occur from the INITIAL molecules
+        angles_yes = set()
+        angles_no = set()
+        for angle in frag1.angles:
+            angles_no.add(angle)
+        for angle in frag2.angles:
+            angles_no.add(angle)
+        for angle in frag_prod.angles:
+            angles_yes.add(angle)
+        for angle in complete1.angles:
+            angles_yes.add(angle)
+        for angle in complete2.angles:
+            angles_yes.add(angle)
+        angles = angles_yes - angles_no
+        for angle in angles:
+            inst.angles.append(angle)
+
+        dihedrals_yes = set()
+        dihedrals_no = set()
+        for dihedral in frag1.dihedrals:
+            dihedrals_no.add(dihedral)
+        for dihedral in frag2.dihedrals:
+            dihedrals_no.add(dihedral)
+        for dihedral in frag_prod.dihedrals:
+            dihedrals_yes.add(dihedral)
+        for dihedral in complete1.dihedrals:
+            dihedrals_yes.add(dihedral)
+        for dihedral in complete2.dihedrals:
+            dihedrals_yes.add(dihedral)
+        dihedrals = dihedrals_yes - dihedrals_no
+        for dihedral in dihedrals:
+            inst.dihedrals.append(dihedral)
+
+        exclusions_yes = set()
+        exclusions_no = set()
+        for exclusion in frag1.exclusions:
+            exclusions_no.add(exclusion)
+        for exclusion in frag2.exclusions:
+            exclusions_no.add(exclusion)
+        for exclusion in frag_prod.exclusions:
+            exclusions_yes.add(exclusion)
+        for exclusion in complete1.exclusions:
+            exclusions_yes.add(exclusion)
+        for exclusion in complete2.exclusions:
+            exclusions_yes.add(exclusion)
+        exclusions = exclusions_yes - exclusions_no
+        for exclusion in exclusions:
+            inst.exclusions.append(exclusion)
+
+        constraints_yes = set()
+        constraints_no = set()
+        for constraint in frag1.constraints:
+            constraints_no.add(constraint)
+        for constraint in frag2.constraints:
+            constraints_no.add(constraint)
+        for constraint in frag_prod.constraints:
+            constraints_yes.add(constraint)
+        for constraint in complete1.constraints:
+            constraints_yes.add(constraint)
+        for constraint in complete2.constraints:
+            constraints_yes.add(constraint)
+        constraints = constraints_yes - constraints_no
+        for constraint in constraints:
+            inst.constraints.append(constraint)
+
+        impropers_yes = set()
+        impropers_no = set()
+        for improper in frag1.impropers:
+            impropers_no.add(improper)
+        for improper in frag2.impropers:
+            impropers_no.add(improper)
+        for improper in frag_prod.impropers:
+            impropers_yes.add(improper)
+        for improper in complete1.impropers:
+            impropers_yes.add(improper)
+        for improper in complete2.impropers:
+            impropers_yes.add(improper)
+        impropers = impropers_yes - impropers_no
+        for improper in impropers:
+            inst.impropers.append(improper)
+
+    def modification(self, frag1, frag2, product):
+        """Modification helper for the D/M algorithm
         """
+        product_particles = frag1.particles + frag2.particles
+        complete1 = self.destroy_fragment(frag1)
+        complete2 = self.destroy_fragment(frag2)
+        frag_prod = self.instantiate_over_existing(product, product_particles)
+        complete_particles = complete1.particles + complete2.particles
+        assert len(complete_particles) >= len(product_particles)
+        if len(complete_particles) > len(product_particles):
+            self.new_dynamic_complete_fragment(
+                complete_particles, frag1, frag2, frag_prod, complete1,
+                complete2
+            )
 
-        # check which reactions are possible
-        possible_reactions_reactant_types = {}
-        actually_used = set()
-        for rx in self.reaction_list:
-            if rx.r1 in self.used_reactant_types and \
-                    rx.r2 in self.used_reactant_types:
-                actually_used.add(rx.r1)
-                actually_used.add(rx.r2)
-                possible_reactions_reactant_types[(rx.r1, rx.r2)] = rx
-                possible_reactions_reactant_types[(rx.r2, rx.r1)] = rx
-        self.used_reactant_types = actually_used
-        return possible_reactions_reactant_types
+    def build_reaction_matrix(self):
+        """Returns a hash table where reactions can be looked up for 2
+        fragment names
+        """
+        return self.reactive_pairs
 
     def get_initiator_list(self):
         initiators: list[Fragment] = []
         for frag in self.frag_list:
             if frag is None:
                 continue
-            if frag.name in self.used_reactant_types:
+            if frag.name in self.reactive_types:
                 initiators.append(frag)
 
         return initiators
