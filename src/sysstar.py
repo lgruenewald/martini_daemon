@@ -88,20 +88,42 @@ class SysStar():
         self.epsilon_r = 15.0  # TODO unhardcode
         self.nonbonded_cutoff = 1.1 * nanometer
 
-    def add_particle(self, part_name, part_type, charge, mass):
-        """Adds a particle to the list, and returns its part_id"""
-        if self.context_initialized:
-            raise ValueError("Do this operation before context is initialized")
+    def get_defaults(self, part_type, charge, mass):
         defaults = self._atom_types.get(part_type)
         if defaults is None:
             raise ValueError("Attempt to add particle with unknown atom type"
                              f"Particle name: {part_name}. "
                              f"Particle type: {part_type}.")
         dcharge, dmass = defaults
-        charge = charge or dcharge
-        mass = mass or dmass
+        return (charge or dcharge, mass or dmass)
+
+    def add_particle(self, part_name, part_type, charge, mass):
+        """Adds a particle to the list, and returns its part_id"""
+        if self.context_initialized:
+            raise ValueError("Do this operation before context is initialized")
+        charge, mass = self.get_defaults(part_type, charge, mass)
         self._part_list.append((part_name, part_type, charge, mass))
         return len(self._part_list) - 1
+
+    def update_particle(self, part_id, part_name, part_type, charge, mass):
+        old_name, old_type, old_charge, old_mass = self._part_list[part_id]
+        charge, mass = self.get_defaults(part_type, charge, mass)
+        self._part_list[part_id] = (part_name, part_type, charge, mass)
+        if not self.context_initialized:
+            return
+        if old_type != part_type or old_charge != charge:
+            # Change of LJ params plus self correction force
+            part_type_id = self.use_atom_type(part_type)
+            self._nb_force.setParticleParameters(part_id, [part_type_id, charge])
+            if old_charge != charge and old_charge == 0.:
+                self._es_self_correction_force.addBond(
+                    part_id, part_id, [0.5 * charge ** 2]
+                )
+            else:
+                self._es_self_correction_force_rebuild = True
+
+        if old_mass != mass:
+            self._system.setParticleMass(part_id, mass)
 
     def build_system(self):
         self._system = mm.System()
@@ -125,6 +147,7 @@ class SysStar():
         if id is None:
             id = len(self._used_atom_types)
             self._used_atom_types[part_type] = id
+            self._nb_force_rebuild = True
         return id
 
     def len_particles(self):
@@ -180,6 +203,7 @@ class SysStar():
         self._nb_force.addTabulatedFunction(
             "W", mm.Discrete2DFunction(n, n, C12)
         )
+        self._nb_force_rebuild = False
 
     def remove_force(self, force):
         for i, f in enumerate(self._forces_list):
@@ -208,13 +232,15 @@ class SysStar():
                 self._es_self_correction_force.addBond(
                     i, i, [0.5 * charge ** 2]
                 )
+        self._es_self_correction_force_rebuild = False
 
     def add_bond(self, part_id_i, part_id_j, length, force):
         """Adds a bond to the list, returns its bond_id"""
         if length is None or force is None:
             raise NotImplementedError("TODO length and strength for bonds must be specified for now")
         self._harmonic_bond_list.append((part_id_i, part_id_j, length, force))
-        self._bond_rebuild = True
+        if self.context_initialized:
+            self._bond_force.addBond(part_id_i, part_id_j, length, force)
         return len(self._harmonic_bond_list) - 1
 
     def get_bond_members(self, bond_id):
@@ -231,13 +257,16 @@ class SysStar():
         self._forces_list.append(self._bond_force)
         for (i, j, length, k) in filter(None, self._harmonic_bond_list):
             self._bond_force.addBond(i, j, length, k)
+        self._bond_rebuild = False
 
     def add_angle(self, i, j, k, theta, force):
         """Adds an angle to the angle list, returns its angle_id"""
         self._harmonic_angle_list.append(
             (i, j, k, theta, force)
         )
-        self._harmonic_angle_rebuild = True
+        if self.context_initialized:
+            theta_rad = theta * math.pi / 180
+            self._harmonic_angle_force.addAngle(i, j, k, theta_rad, force)
         return len(self._harmonic_angle_list) - 1
 
     def get_angle_members(self, angle_id):
@@ -255,13 +284,17 @@ class SysStar():
         for (i, j, k, theta, force) in filter(None, self._harmonic_angle_list):
             theta_rad = theta * math.pi / 180
             self._harmonic_angle_force.addAngle(i, j, k, theta_rad, force)
+        self._harmonic_angle_rebuild = False
 
     def add_proper_dihedral(self, i, j, k, l, theta, force, multiplicity):
         """Adds a dihedral to the list, returns its proper_dihedral_id"""
         self._proper_dihedral_list.append(
             (i, j, k, l, theta, force, multiplicity)
         )
-        self._proper_dihedral_rebuild = True
+        if self.context_initialized:
+            theta_rad = theta * math.pi / 180
+            self._proper_dihedral_force.addTorsion(i, j, k, l, multiplicity,
+                                                   theta_rad, force)
         return len(self._proper_dihedral_list) - 1
 
     def get_proper_dihedral_members(self, dih_id):
@@ -281,10 +314,12 @@ class SysStar():
             theta_rad = theta * math.pi / 180
             self._proper_dihedral_force.addTorsion(i, j, k, l, multiplicity,
                                                    theta_rad, force)
+        self._proper_dihedral_rebuild = False
 
     def add_exclusion(self, i, j):
         self._exclusion_list.append((i, j))
-        self._nb_force_rebuild = True
+        if self.context_initialized:
+            self._nb_force.addExclusion(i, j)
         return len(self._exclusion_list) - 1
 
     def get_exclusion_members(self, excl_id):
@@ -298,8 +333,6 @@ class SysStar():
         """Adds a constraint to the list, returns its constraint_id"""
         self._constraint_list.append((i, j, length))
         if self.context_initialized:
-            # constraints can't be rebuilt right now, adding new ones is still
-            # supported. It's assumed caller will reinitialize context.
             self._system.addConstraint(i, j, length)
         return len(self._constraint_list) - 1
 
@@ -316,7 +349,11 @@ class SysStar():
         self._improper_dihedral_list.append(
             (i, j, k, l, theta, force)
         )
-        self._improper_dihedral_rebuild = True
+        if self.context_initialized:
+            theta = theta - 360 if theta > 180 else theta
+            theta_rad = theta * math.pi / 180
+            self._improper_dihedral_force.addTorsion(i, j, k, l,
+                                                     (theta_rad, force))
         return len(self._improper_dihedral_list) - 1
 
     def get_improper_members(self, dih_id):
@@ -343,6 +380,7 @@ class SysStar():
             theta_rad = theta * math.pi / 180
             self._improper_dihedral_force.addTorsion(i, j, k, l,
                                                      (theta_rad, force))
+        self._improper_dihedral_rebuild = False
 
     def add_atom_type(self, type, charge, mass):
         if self.context_initialized:
@@ -385,27 +423,21 @@ class SysStar():
         if self._bond_rebuild:
             self.remove_force(self._bond_force)
             self.build_bond_force()
-            self._bond_rebuild = False
         if self._es_self_correction_force_rebuild:
             self.remove_force(self._es_self_correction_force)
             self.build_es_self_correction_force()
-            self._es_self_correction_force_rebuild = False
         if self._harmonic_angle_rebuild:
             self.remove_force(self._harmonic_angle_force)
             self.build_angle_force()
-            self._harmonic_angle_rebuild = False
         if self._improper_dihedral_rebuild:
             self.remove_force(self._improper_dihedral_force)
             self.build_improper_dihedral_force()
-            self._improper_dihedral_rebuild = False
         if self._nb_force_rebuild:
             self.remove_force(self._nb_force)
             self.build_nb_force()
-            self._nb_force_rebuild = False
         if self._proper_dihedral_rebuild:
             self.remove_force(self._proper_dihedral_force)
             self.build_proper_dihedral_force()
-            self._proper_dihedral_rebuild = False
         self._context.reinitialize(preserveState=True)
 
     def set_positions(self, positions):

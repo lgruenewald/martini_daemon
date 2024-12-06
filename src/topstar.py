@@ -67,7 +67,7 @@ class MolFragment:
         bigger = max(i, j)
         if bigger >= len(self.atoms):
             raise ValueError(f"{bigger} is out of bounds. "
-                             f"Particle count in MolFragment: {len(self.atoms)}"
+                             f"Particle count in MolFragment:{len(self.atoms)}"
                              f", while add_exclusion({i}, {j}) was called.")
         while len(self.exclusions) <= bigger:
             self.exclusions.append([])
@@ -335,9 +335,11 @@ class TopStar():
             type, resnum, resname, atomname, chargegr, charge, mass = atom
             p = self.system.add_particle(atomname, type, charge, mass)
             parts.append(p)
+            self.defrag_list.append([])
         return self.instantiate_over_existing(frag_name, parts)
 
-    def instantiate_over_existing(self, frag_name, particles):
+    def instantiate_over_existing(
+            self, frag_name, particles, first=False, update=False):
         """Takes a name of a mol fragment, creates new particles for it in
         the system and the corresponding interactions as well.
         Recursively instantiates all subfragments too.
@@ -357,8 +359,19 @@ class TopStar():
         for in_frag_id, part_id in enumerate(particles):
             inst.particles.append(part_id)
             # frag_id, in_frag_id, is_edge
-            self.defrag_list.append([(inst_id, in_frag_id, False)])
+            if first:
+                self.defrag_list[part_id].insert(
+                    0, (inst_id, in_frag_id, False)
+                )
+            else:
+                self.defrag_list[part_id].append((inst_id, in_frag_id, False))
             inst.edge.append(False)
+            if update:
+                type, resnum, resname, atomname, chargegr, charge, mass = \
+                    frag.atoms[in_frag_id]
+                self.system.update_particle(
+                    part_id, atomname, type, charge, mass
+                )
         # bonds
         for bond in frag.harmonic_bonds:
             i, j, length, force = bond
@@ -445,6 +458,20 @@ class TopStar():
         # 3. return the complete fragment that contained this fragment
         # (can be fragment itself)
         return molfrag
+
+    def remove_fragment(self, frag: Fragment):
+        """Removes a fragment from frag_lits and defrag_list
+        """
+        for part in frag.particles:
+            defrag = self.defrag_list[part]
+            i = 0
+            while i < len(defrag):
+                frag_id, _, _ = defrag[i]
+                if frag_id == frag.frag_id:
+                    del defrag[i]
+                else:
+                    i += 1
+        self.frag_list[frag.frag_id] = None
 
     def new_dynamic_complete_fragment(self, particles, frag1, frag2, frag_prod,
                                       complete1, complete2):
@@ -564,13 +591,19 @@ class TopStar():
         product_particles = frag1.particles + frag2.particles
         complete1 = self.destroy_fragment(frag1)
         complete2 = self.destroy_fragment(frag2)
-        frag_prod = self.instantiate_over_existing(product, product_particles)
         complete_particles = complete1.particles + complete2.particles
         assert len(complete_particles) >= len(product_particles)
         if len(complete_particles) > len(product_particles):
+            frag_prod = self.instantiate_over_existing(
+                product, product_particles, update=True
+            )
             self.new_dynamic_complete_fragment(
                 complete_particles, frag1, frag2, frag_prod, complete1,
                 complete2
+            )
+        else:
+            self.instantiate_over_existing(
+                product, product_particles, first=True, update=True
             )
 
     def build_reaction_matrix(self):
