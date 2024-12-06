@@ -93,8 +93,7 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         nrexcl = unwrap(tokens, 1, "int")
         if nrexcl != 1:
             raise ValueError("nrexcl is not 1, only nrexcl=1 is implemented")
-        topology.new_mol_fragment(name)
-        _last_molecule = name
+        _last_molecule = topology.new_mol_fragment(name)
 
     p.add_level("moleculetype", process_moltype)
 
@@ -109,7 +108,7 @@ def DaemonTopFile(file, include_dir=None, defines={}):
     def last_molecule():
         if last_molecule is None:
             raise ValueError("No [ moleculetype ] given")
-        return topology.type_lookup[_last_molecule]
+        return _last_molecule
 
     def process_atoms(tokens):
         id = unwrap(tokens, 0, "int") - 1
@@ -267,7 +266,7 @@ def DaemonTopFile(file, include_dir=None, defines={}):
     def last_frag():
         if _last_frag is None:
             raise ValueError("define a [ frag ] first")
-        return topology.type_lookup[_last_frag]
+        return _last_frag
 
     def process_frag(tokens):
         nonlocal _last_frag
@@ -285,8 +284,7 @@ def DaemonTopFile(file, include_dir=None, defines={}):
                                      "expected 'name' or 'mol'")
         if name is None or mol is None:
             raise ValueError("name and mol must be defined in [ frag ]")
-        topology.new_frag_fragment(name, mol)
-        _last_frag = name
+        _last_frag = topology.new_frag_fragment(name, mol)
 
     p.add_level("frag", process_frag)
 

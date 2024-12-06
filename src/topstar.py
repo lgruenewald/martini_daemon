@@ -32,8 +32,9 @@ import sys
 
 @dataclass
 class FragFragment:
-    name: str
+    name: str  # when instantiated it has this name
     mol: str
+    name_id: str  # internally it has this name
     # list[(in_frag_id, in_itp_id, type, name, is_edge)]
     atoms: list[(int, int, str, str, bool)]
 
@@ -176,16 +177,21 @@ class TopStar():
             raise ValueError(f"Second definition of fragment type {name}")
         mol_fragment = MolFragment(name, True, [], [], [], [], [], [], [])
         self.type_lookup[name] = mol_fragment
+        return mol_fragment
 
     def new_frag_fragment(self, name: str, parent: str):
-        if self.type_lookup.get(name):
-            raise ValueError(f"Redefinition of fragment type {name}")
-        frag_fragment = FragFragment(name, parent, [])
-        self.type_lookup[name] = frag_fragment
+        name_id = name
+        i = 0
+        while self.type_lookup.get(name_id):
+            name_id = name + str(i)
+            i += 1
+        frag_fragment = FragFragment(name, parent, name_id, [])
+        self.type_lookup[name_id] = frag_fragment
         if self.subfrag_map.get(parent):
-            self.subfrag_map[parent].append(name)
+            self.subfrag_map[parent].append(name_id)
         else:
-            self.subfrag_map[parent] = [name]
+            self.subfrag_map[parent] = [name_id]
+        return frag_fragment
 
     def new_reaction(self, reaction: ReactionTemplate):
         self.reaction_list.append(reaction)
@@ -194,18 +200,21 @@ class TopStar():
         self.reactive_types.add(reaction.r1)
         self.reactive_types.add(reaction.r2)
 
-    def instantiate_subfrag(self, subfrag, inst):
+    def instantiate_subfrag(self, name_id, inst):
         """Instantiates a subfragment subfrag, with forces in S* as seen in
-        inst."""
-        frag: FragFragment = self.type_lookup.get(subfrag)
+        inst.
+
+        args: subfrag: name_id, inst: Fragment"""
+        frag: FragFragment = self.type_lookup.get(name_id)
+        name = frag.name
         if frag is None:
-            raise ValueError(f"Can't find frag {subfrag}")
+            raise ValueError(f"Can't find frag {name_id}")
         elif not isinstance(frag, FragFragment):
-            raise ValueError(f"Attempt to recursively instantiate {subfrag}, "
+            raise ValueError(f"Attempt to recursively instantiate {name_id}, "
                              "but it's not a frag fragment type."
-                             f"It is: {subfrag}")
+                             f"It is: {name_id}")
         subinst_id = len(self.frag_list)
-        subinst = Fragment(subfrag, subinst_id)
+        subinst = Fragment(name, subinst_id)
         self.frag_list.append(subinst)
         normal_indices = set()
         edge_indices = set()
@@ -312,7 +321,7 @@ class TopStar():
                 subinst.constraints.append(cid)
 
         # subfrags can contain further subfrags
-        self.instantiate_subfrags(subfrag, subinst)
+        self.instantiate_subfrags(name, subinst)
 
     def instantiate_subfrags(self, frag_name, inst):
         """Instantiates all subfrags of frag_name.
@@ -416,28 +425,34 @@ class TopStar():
         self.instantiate_subfrags(frag_name, inst)
         return inst
 
+    def get_molecule_fragment(self, frag: Fragment):
+        # 0. save the molecule fragment
+        molfrag_id, _, _ = self.defrag_list[frag.particles[0]][0]
+        return self.frag_list[molfrag_id]
+
     def destroy_fragment(self, frag: Fragment):
         """args:
         frag: Fragment
 
         returns: the root molecule fragment from underneath
         """
-        # 0. save the molecule fragment
-        molfrag_id, _, _ = self.defrag_list[frag.particles[0]][0]
-        molfrag = self.frag_list[molfrag_id]
 
         # 1. remove overlapping fragments
         # get the list of fragments to remove
-        for part in frag.particles:
+        for part_id, part in enumerate(frag.particles):
+            is_edge = frag.edge[part_id]
             defrag = self.defrag_list[part]
             i = 0
             while i < len(defrag):
-                frag_id, _, is_edge = defrag[i]
-                if not is_edge or frag_id == frag.frag_id:
-                    # remove frag and frags that contain any of the particles
-                    # as normal particles
+                other_frag_id, _, is_other_edge = defrag[i]
+                if not is_edge or not is_other_edge or \
+                        other_frag_id == frag.frag_id:
+                    # remove frag + remove other frags if the particle in frag
+                    # is not edge OR if the other frag contains it as non edge
+                    # 
+                    # allowed to stay if it's edge-edge overlap
                     del defrag[i]
-                    self.frag_list[frag_id] = None
+                    self.frag_list[other_frag_id] = None
                 else:
                     i += 1
 
@@ -455,10 +470,6 @@ class TopStar():
         for con in frag.constraints:
             # constraints can't be removed, so this will throw an exception
             self.system.remove_constraint(con)
-
-        # 3. return the complete fragment that contained this fragment
-        # (can be fragment itself)
-        return molfrag
 
     def remove_fragment(self, frag: Fragment):
         """Removes a fragment from frag_lits and defrag_list
@@ -589,22 +600,38 @@ class TopStar():
     def modification(self, frag1, frag2, product):
         """Modification helper for the D/M algorithm
         """
+        # TODO check for overlapping frag1 and frag2 and reject such reactions
+        complete1 = self.get_molecule_fragment(frag1)
+        complete2 = self.get_molecule_fragment(frag2)
         product_particles = frag1.particles + frag2.particles
-        complete1 = self.destroy_fragment(frag1)
-        complete2 = self.destroy_fragment(frag2)
-        complete_particles = complete1.particles + complete2.particles
-        assert len(complete_particles) >= len(product_particles)
-        if len(complete_particles) > len(product_particles):
+        self.destroy_fragment(frag1)
+        self.destroy_fragment(frag2)
+
+        if complete1 != complete2:
+            # bimolecular
+            complete_particles = complete1.particles + complete2.particles
+            assert len(complete_particles) >= len(product_particles)
+            if len(complete_particles) > len(product_particles):
+                frag_prod = self.instantiate_over_existing(
+                    product, product_particles, update=True
+                )
+                self.new_dynamic_complete_fragment(
+                    complete_particles, frag1, frag2, frag_prod, complete1,
+                    complete2
+                )
+            else:
+                self.instantiate_over_existing(
+                    product, product_particles, first=True, update=True
+                )
+        else:
+            # intramolecular TODO
+            complete_particles = complete1.particles
             frag_prod = self.instantiate_over_existing(
                 product, product_particles, update=True
             )
             self.new_dynamic_complete_fragment(
                 complete_particles, frag1, frag2, frag_prod, complete1,
-                complete2
-            )
-        else:
-            self.instantiate_over_existing(
-                product, product_particles, first=True, update=True
+                complete1
             )
 
     def build_reaction_matrix(self):
