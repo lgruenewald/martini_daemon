@@ -26,6 +26,7 @@ topology is an object that contains the following information:
 """
 from dataclasses import dataclass
 from sysstar import SysStar
+from fnmatch import fnmatch
 import sys
 
 
@@ -222,7 +223,7 @@ class TopStar():
             part_index = inst.particles[parent_id]
             # name and type must match S*
             sname, stype = self.system.get_particle_name_type(part_index)
-            if sname != name or stype != type:
+            if not fnmatch(sname, name) or not fnmatch(stype, type):
                 raise ValueError("During subfrag instantiation name/type "
                                  f"doesn't match. Expected name {sname} "
                                  f"type {stype}. Got name {name} type {type}.")

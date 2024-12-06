@@ -265,8 +265,7 @@ class SysStar():
             (i, j, k, theta, force)
         )
         if self.context_initialized:
-            theta_rad = theta * math.pi / 180
-            self._harmonic_angle_force.addAngle(i, j, k, theta_rad, force)
+            self._harmonic_angle_force.addAngle(i, j, k, theta, force)
         return len(self._harmonic_angle_list) - 1
 
     def get_angle_members(self, angle_id):
@@ -282,8 +281,7 @@ class SysStar():
         self._system.addForce(self._harmonic_angle_force)
         self._forces_list.append(self._harmonic_angle_force)
         for (i, j, k, theta, force) in filter(None, self._harmonic_angle_list):
-            theta_rad = theta * math.pi / 180
-            self._harmonic_angle_force.addAngle(i, j, k, theta_rad, force)
+            self._harmonic_angle_force.addAngle(i, j, k, theta, force)
         self._harmonic_angle_rebuild = False
 
     def add_proper_dihedral(self, i, j, k, l, theta, force, multiplicity):
@@ -292,9 +290,8 @@ class SysStar():
             (i, j, k, l, theta, force, multiplicity)
         )
         if self.context_initialized:
-            theta_rad = theta * math.pi / 180
             self._proper_dihedral_force.addTorsion(i, j, k, l, multiplicity,
-                                                   theta_rad, force)
+                                                   theta, force)
         return len(self._proper_dihedral_list) - 1
 
     def get_proper_dihedral_members(self, dih_id):
@@ -311,9 +308,8 @@ class SysStar():
         self._forces_list.append(self._proper_dihedral_force)
         for (i, j, k, l, theta, force, multiplicity) in \
                 filter(None, self._proper_dihedral_list):
-            theta_rad = theta * math.pi / 180
             self._proper_dihedral_force.addTorsion(i, j, k, l, multiplicity,
-                                                   theta_rad, force)
+                                                   theta, force)
         self._proper_dihedral_rebuild = False
 
     def add_exclusion(self, i, j):
@@ -350,10 +346,8 @@ class SysStar():
             (i, j, k, l, theta, force)
         )
         if self.context_initialized:
-            theta = theta - 360 if theta > 180 else theta
-            theta_rad = theta * math.pi / 180
             self._improper_dihedral_force.addTorsion(i, j, k, l,
-                                                     (theta_rad, force))
+                                                     (theta, force))
         return len(self._improper_dihedral_list) - 1
 
     def get_improper_members(self, dih_id):
@@ -376,10 +370,8 @@ class SysStar():
         self._forces_list.append(self._improper_dihedral_force)
         for (i, j, k, l, theta, force) in \
                 filter(None, self._improper_dihedral_list):
-            theta = theta - 360 if theta > 180 else theta
-            theta_rad = theta * math.pi / 180
             self._improper_dihedral_force.addTorsion(i, j, k, l,
-                                                     (theta_rad, force))
+                                                     (theta, force))
         self._improper_dihedral_rebuild = False
 
     def add_atom_type(self, type, charge, mass):

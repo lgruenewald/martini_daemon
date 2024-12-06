@@ -11,6 +11,7 @@ from sysstar import SysStar
 import sys
 import os
 import distutils
+import math
 
 
 def _get_default_gromacs_include_dir():
@@ -151,7 +152,7 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         j = unwrap(tokens, 1, "int") - 1
         k = unwrap(tokens, 2, "int") - 1
         type = unwrap(tokens, 3, "int")
-        theta = unwrap(tokens, 4, "float", -1.)
+        theta = unwrap(tokens, 4, "float", -1.) * math.pi / 180
         force = unwrap(tokens, 5, "float", -1.)
         if type == 1:
             # harmonic
@@ -175,13 +176,16 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         multiplicity = unwrap(tokens, 7, "int", 1)
         if type == 1:
             # proper dihedral
+            theta_rad = theta * math.pi / 180
             last_molecule().proper_dihedrals.append(
-                (i, j, k, l, theta, force, multiplicity)
+                (i, j, k, l, theta_rad, force, multiplicity)
             )
         elif type == 2:
             # improper
+            theta = theta - 360 if theta > 180 else theta
+            theta_rad = theta * math.pi / 180
             last_molecule().improper_dihedrals.append(
-                (i, j, k, l, theta, force)
+                (i, j, k, l, theta_rad, force)
             )
         else:
             # TODO 2, 3, 4, 5, 9 and 11 should also supported by
@@ -289,8 +293,8 @@ def DaemonTopFile(file, include_dir=None, defines={}):
     def process_fragatoms(tokens):
         frag_id = unwrap(tokens, 0, "int") - 1
         parent_id = unwrap(tokens, 1, "int") - 1
-        type = unwrap(tokens, 2, "word")
-        name = unwrap(tokens, 3, "word")
+        type = unwrap(tokens, 2, "word").replace("{", "[").replace("}", "]")
+        name = unwrap(tokens, 3, "word").replace("{", "[").replace("}", "]")
         is_edge = unwrap(tokens, 4, "int") != 0
         last_frag().atoms.append((frag_id, parent_id, type, name, is_edge))
 
