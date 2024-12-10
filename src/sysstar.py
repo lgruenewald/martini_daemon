@@ -2,10 +2,11 @@
 
 import openmm as mm
 import openmm.app as mmapp
-from openmm.unit import nanometer, picosecond
+from openmm.unit import nanometer, picosecond, md_unit_system
 import math
 import utils
 from collections import OrderedDict
+import numpy as np
 
 
 class SysStar():
@@ -471,15 +472,20 @@ class SysStar():
         self._integrator.step(steps)
         if self._xtc is not None:
             self._xtc.interval = steps
-            pos = self.get_state().getPositions()
+            pos, _ = self.get_positions()
             self._xtc.writeModel(pos)
 
-    def get_state(self):
+    def get_positions(self):
         if not self.context_initialized:
             raise Exception("Initialize the context first")
-        return self._context.getState(positions=True, velocities=True,
-                                      forces=True, energy=True,
-                                      enforcePeriodicBox=True)
+        # get the state without enforcePeriodicBox
+        # since enforcePeriodicBox really doesn't like bonds formed across
+        # boundaries
+        state = self._context.getState(positions=True)
+        box = state.getPeriodicBoxVectors()[0].x
+        pos = state.getPositions(asNumpy=True).value_in_unit(nanometer)
+        pos = np.remainder(pos, box)
+        return pos, box
 
     def apply_constraints(self):
         if not self.context_initialized:
@@ -502,9 +508,12 @@ class SysStar():
         if not self.context_initialized:
             raise Exception("Initialize the context first")
         utils.backup_try(path)
-        state = self.get_state()
-        pos = state.getPositions()
-        vel = state.getVelocities()
+        state = self._context.getState(positions=True, velocities=True)
+        box = state.getPeriodicBoxVectors()[0].x
+        pos = state.getPositions(asNumpy=True).value_in_unit(nanometer)
+        pos = np.remainder(pos, box)
+        vel = state.getVelocities(asNumpy=True).\
+            value_in_unit_system(md_unit_system)
         natoms = len(pos)
         time = state.getTime()
         with open(path, "w") as file:
@@ -517,9 +526,9 @@ class SysStar():
                 atom_index = i + 1
                 # TODO resname, resid
                 file.write(f"{atom_index:5}{atom_name:5}{atom_name:>5}"
-                           f"{atom_index:5}{cpos.x:8.3f}{cpos.y:8.3f}"
-                           f"{cpos.z:8.3f}{cvel.x:8.4f}{cvel.y:8.4f}"
-                           f"{cvel.z:8.4f}\n")
+                           f"{atom_index:5}{cpos[0]:8.3f}{cpos[1]:8.3f}"
+                           f"{cpos[2]:8.3f}{cvel[0]:8.4f}{cvel[1]:8.4f}"
+                           f"{cvel[2]:8.4f}\n")
             v1, v2, v3 = (v.value_in_unit(nanometer)
                           for v in state.getPeriodicBoxVectors())
             file.write(
@@ -528,11 +537,13 @@ class SysStar():
             )
 
     def dump(self):
-        print("==== SysStar Dump ====")
-        print("Particles:", self._part_list)
-        print("Bonds:", self._harmonic_bond_list)
-        print("Angles:", self._harmonic_angle_list)
-        print("Dihedrals:", self._proper_dihedral_list)
-        print("Impropers:", self._improper_dihedral_list)
-        print("Exclusions:", self._exclusion_list)
-        print("Constraints:", self._constraint_list)
+        utils.backup_try("sys.dump")
+        with open("sys.dump", "w") as file:
+            print("==== SysStar Dump ====", file=file)
+            print("Particles:", self._part_list, file=file)
+            print("Bonds:", self._harmonic_bond_list, file=file)
+            print("Angles:", self._harmonic_angle_list, file=file)
+            print("Dihedrals:", self._proper_dihedral_list, file=file)
+            print("Impropers:", self._improper_dihedral_list, file=file)
+            print("Exclusions:", self._exclusion_list, file=file)
+            print("Constraints:", self._constraint_list, file=file)

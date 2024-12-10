@@ -1,5 +1,16 @@
+# exclude .gro files, except in examples, tests and experiments
 *.gro
+!tests/**/*.gro
+!examples/**/*.gro
+!experiments/**/*.gro
+# exclude all xyz and xtc trajectory files
 *.xyz
 *.xtc
+# exclude all S* and T* dumps
+*.dump
+# exclude python cache
 **/__pycache__/
+# exclude backed up files
 \#*
+# exclude hidden files
+.*

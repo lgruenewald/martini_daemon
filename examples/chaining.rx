@@ -1,0 +1,91 @@
+; initiation
+; two monomers forming a dimer
+
+[ frag ]
+name: monomer mol: W
+[ fragatoms ]
+1 * * 1
+
+[ reaction ]
+name: initiation
+r1: monomer
+r2: monomer
+p1: dimer
+distance_max: 0.60
+type: simple
+
+[ moleculetype ]
+dimer 1
+[ atoms ]
+; id type resnr residue atom cgnr charge mass
+  1  *    1     w   *   1      0
+  2  *    1     w   *   1      0
+[ bonds ]
+1 2 1 0.500 1000
+
+[ frag ]
+name: tail mol: dimer
+[ fragatoms ]
+1 * * 1
+2 * * 1
+
+[ frag ]
+name: tail mol: dimer
+[ fragatoms ]
+2 * * 1
+1 * * 1
+
+; propagation
+[ reaction ]
+name: propagation
+r1: tail
+r2: monomer
+p1: tail_plus_one
+distance_max: 0.60
+type: simple
+
+[ moleculetype ]
+tail_plus_one 1
+[ atoms ]
+; tail
+  1  *    1     w   *   1      0
+; tail minus one
+  2  *    1     w   *   1      0
+; monomer / tail plus one
+  3  *    1     w   *   1      0
+[ bonds ]
+1 3 1 0.500 1000
+[ angles ]
+2 1 3 1 120.0 1000
+
+[ frag ]
+name: tail mol: tail_plus_one
+[ fragatoms ]
+3 * * 1
+1 * * 1
+
+; termination
+[ reaction ]
+name: termination
+r1: tail
+r2: tail
+p1: tail_dimer
+distance_max: 0.60
+type: poly
+
+[ moleculetype ]
+tail_dimer 1
+[ atoms ]
+; tail1
+  1  *    1     w   *   1      0
+; tail1 minus one
+  2  *    1     w   *   1      0
+; tail2
+  3  *    1     w   *   1      0
+; tail2 minus one
+  4  *    1     w   *   1      0
+[ bonds ]
+1 3 1 0.500 1000
+[ angles ]
+2 1 3 1 120.0 1000
+1 3 4 1 120.0 1000

@@ -724,13 +724,15 @@ class TopStar():
         return initiators
 
     def dump(self):
-        print("==== TopStar / Fragment Types ====")
-        for k, molfrag in self.type_lookup.items():
-            sys.stdout.write(f"{k} ")
-        sys.stdout.write("\n")
-        print("==== TopStar / ReactionTemplates ====")
-        for rx in self.reaction_list:
-            print(rx)
-        print("==== TopStar / Fragments ====")
-        for frag in self.frag_list:
-            print(frag)
+        utils.backup_try("top.dump")
+        with open("top.dump", "w") as file:
+            print("==== TopStar / Fragment Types ====", file=file)
+            for k, molfrag in self.type_lookup.items():
+                file.write(f"{k} ")
+            file.write("\n")
+            print("==== TopStar / ReactionTemplates ====", file=file)
+            for rx in self.reaction_list:
+                print(rx, file=file)
+            print("==== TopStar / Fragments ====", file=file)
+            for frag in self.frag_list:
+                print(frag, file=file)

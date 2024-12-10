@@ -31,7 +31,7 @@ class DaemonSimulation():
         self.reaction_matrix = self.top.build_reaction_matrix()
         self.initiator_list = self.top.get_initiator_list()
 
-        self.system.build_context(mm.LangevinIntegrator(T, 1.0, dt),
+        self.system.build_context(mm.LangevinIntegrator(T, 10.0, dt),
                                   self.gro.getPeriodicBoxVectors())
 
         self.system.set_positions(self.gro.getPositions(True))
@@ -40,13 +40,18 @@ class DaemonSimulation():
         # FIXME: hardcoded path
         self.system.set_xtc_path("traj.xtc")
 
+    i: int = 0
+    max_steps: int = 1000
+    reactions: int = 0
+
     def step(self):
         # FIXME: hardcoded everything
         self.system.do_steps(1000)
+        sys.stdout.write(f"\rStep {self.i+1:8} of {self.max_steps}   "
+                         f"[reactions: {self.reactions}]")
+        self.i += 1
 
-        state = self.system.get_state()
-        pos = state.getPositions(asNumpy=True).value_in_unit(nanometer)
-        box = state.getPeriodicBoxVectors()[0].x
+        pos, box = self.system.get_positions()
 
         pairs = []
         skip = set()
@@ -74,12 +79,8 @@ class DaemonSimulation():
 
         # Modification algorithm
         for frag1, frag2, rx in pairs:
-            # TODO constraint checking here
+            self.reactions += 1
             self.top.modification(frag1, frag2, rx.p1)
-
-        print("Modification algo ran")
-        self.system.dump()
-        self.top.dump()
 
         # reinitialize context, initator list
         self.initiator_list = self.top.get_initiator_list()
@@ -98,9 +99,9 @@ if __name__ == "__main__":
     gro_path = argv[2]
 
     sim = DaemonSimulation(top_path, gro_path)
-    max_steps = 1000
-    for i in range(max_steps):
+    for i in range(sim.max_steps):
         sim.step()
-        sys.stdout.write(f"\rStep {i+1} of {max_steps}          ")
     sys.stdout.write("\n")
+    sim.system.dump()
+    sim.top.dump()
     sim.system.write_gro("final.gro")

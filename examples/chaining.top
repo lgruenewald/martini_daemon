@@ -1,0 +1,11 @@
+#include "martini_subset.itp"
+#include "chaining.rx"
+
+[ system ]
+; name
+Chaining
+
+[ molecules ]
+; name  number
+W 400
+
