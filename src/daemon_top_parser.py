@@ -305,7 +305,8 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         return (
             last_reaction is not None and last_reaction.r1 is not None and
             last_reaction.r2 is not None and last_reaction.p1 is not None and
-            last_reaction.distance_max is not None
+            last_reaction.distance_max is not None and
+            last_reaction.type is not None
         )
 
     def process_reaction(tokens):
@@ -316,13 +317,15 @@ def DaemonTopFile(file, include_dir=None, defines={}):
                 case "name":
                     if last_reaction is not None and not is_complete():
                         raise ValueError(f"unfinished reaction {last_reaction.name}")
-                    last_reaction = ReactionTemplate(value, None, None, None, None)
+                    last_reaction = ReactionTemplate(value, None, None, None, None, None)
                 case "r1":
                     last_reaction.r1 = value
                 case "r2":
                     last_reaction.r2 = value
                 case "p1":
                     last_reaction.p1 = value
+                case "type":
+                    last_reaction.type = value
                 case "distance_max":
                     last_reaction.distance_max = value
             if is_complete():

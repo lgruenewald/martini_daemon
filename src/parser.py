@@ -24,13 +24,14 @@ def unwrap(tokens, index, type_filter, default="default placeholder"):
             raise ValueError(f"Not enough tokens, expect token index {index}")
         else:
             return default
-    if tokens[index].type != type_filter or \
+    if tokens[index].type != type_filter and \
             (type(type_filter) is set and
                 tokens[index].type not in type_filter):
         if tokens[index].type == "int" and type_filter == "float":
             # the only implicit conversion we do is int -> float
             return float(tokens[index].content)
-        raise ValueError(f"Token {tokens[index].content}: expected {type} "
+        raise ValueError(f"Token {tokens[index].content}: "
+                         f"expected {type_filter} "
                          f"but received {tokens[index].type} instead")
     return tokens[index].content
 

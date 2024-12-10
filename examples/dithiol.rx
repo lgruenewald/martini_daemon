@@ -16,8 +16,8 @@ DIM 1
 
 [ atoms ]
 ; id type resnr residue atom cgnr charge mass
-  1  TC6    1     BDT   TS1   1      0
-  2  TC6    1     BDT   TS1   1      0
+  1  TC6    1     BDT   TS*   1      0
+  2  TC6    1     BDT   TS*   1      0
 
 [ bonds ]
 ; i j funct length k
@@ -30,6 +30,7 @@ r1: thiol
 r2: thiol
 p1: DIM
 distance_max: 0.6 ; nm, distance cutoff
+type: poly
 
 ; [ constraints ]
 ; todo: angle, reaction rate, etc constraints

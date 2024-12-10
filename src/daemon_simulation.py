@@ -64,16 +64,14 @@ class DaemonSimulation():
                     continue
                 rx = self.reaction_matrix.get((frag1.name, frag2.name))
                 if rx is not None:
-                    init1 = frag1.particles[0]
-                    init2 = frag2.particles[0]
-                    dist = utils.pdist(pos[init1], pos[init2], float(box))
-                    if dist < rx.distance_max:
+                    if self.top.detection(frag1, frag2, rx, pos, box):
                         skip.add(i)
                         skip.add(j)
                         pairs.append((frag1, frag2, rx))
 
         if len(pairs) == 0:
             return
+
         # Modification algorithm
         for frag1, frag2, rx in pairs:
             # TODO constraint checking here
@@ -100,6 +98,9 @@ if __name__ == "__main__":
     gro_path = argv[2]
 
     sim = DaemonSimulation(top_path, gro_path)
-    for i in range(100):
+    max_steps = 1000
+    for i in range(max_steps):
         sim.step()
+        sys.stdout.write(f"\rStep {i+1} of {max_steps}          ")
+    sys.stdout.write("\n")
     sim.system.write_gro("final.gro")

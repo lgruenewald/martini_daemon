@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from sysstar import SysStar
 from fnmatch import fnmatch
 import sys
-
+import utils
 
 @dataclass
 class FragFragment:
@@ -96,6 +96,7 @@ class ReactionTemplate:
     r2: str
     p1: str
     distance_max: float
+    type: str  # one of: simple, poly, inter, intra, mono
 
 
 @dataclass
@@ -120,8 +121,9 @@ class Fragment():
     constraints: list[int]
     edge: list[bool]
     frag_id: int
+    original_parent = None
 
-    def __init__(self, name, id):
+    def __init__(self, name, id, original_parent=None):
         self.name = name
         self.particles = []
         self.bonds = []
@@ -132,6 +134,7 @@ class Fragment():
         self.constraints = []
         self.edge = []
         self.frag_id = id
+        self.original_parent = original_parent
 
 
 class TopStar():
@@ -200,7 +203,7 @@ class TopStar():
         self.reactive_types.add(reaction.r1)
         self.reactive_types.add(reaction.r2)
 
-    def instantiate_subfrag(self, name_id, inst):
+    def instantiate_subfrag(self, name_id, inst, original_parent=None):
         """Instantiates a subfragment subfrag, with forces in S* as seen in
         inst.
 
@@ -214,7 +217,7 @@ class TopStar():
                              "but it's not a frag fragment type."
                              f"It is: {name_id}")
         subinst_id = len(self.frag_list)
-        subinst = Fragment(name, subinst_id)
+        subinst = Fragment(name, subinst_id, original_parent=original_parent)
         self.frag_list.append(subinst)
         normal_indices = set()
         edge_indices = set()
@@ -320,14 +323,14 @@ class TopStar():
         # subfrags can contain further subfrags
         self.instantiate_subfrags(name, subinst)
 
-    def instantiate_subfrags(self, frag_name, inst):
+    def instantiate_subfrags(self, frag_name, inst, original_parent=None):
         """Instantiates all subfrags of frag_name.
         inst is a Fragment instance that contains the reference to all forces
         in S*."""
         subfrags = self.subfrag_map.get(frag_name)
         if subfrags is not None:
             for subfrag in subfrags:
-                self.instantiate_subfrag(subfrag, inst)
+                self.instantiate_subfrag(subfrag, inst, original_parent)
 
     def instantiate(self, frag_name):
         frag = self.type_lookup.get(frag_name)  # frag type
@@ -387,14 +390,11 @@ class TopStar():
                 # names are pattern matched rather than updated
                 # so atom names actually stay the same as in monomers
                 if not fnmatch(oldname, atomname):
-                    raise Exception("Unmatching name during instantiate")
-                # edge atoms are not updated, but they must match
-                if edge_list[in_frag_id]:
-                    if not fnmatch(oldtype, type) or charge != oldcharge or \
-                            mass != oldmass:
-                        raise Exception("Instantiate would change atom")
+                    raise Exception("Unmatching name during instantiate: "
+                                    f"was {oldname}, pattern is {atomname}")
+                # edge atoms are not updated
                 # non edge atoms get updated, no match check for type, q, m
-                else:
+                if not edge_list[in_frag_id]:
                     self.system.update_particle(
                         part_id, oldname, type, charge, mass
                     )
@@ -438,7 +438,7 @@ class TopStar():
             c = self.system.add_constraint(particles[i], particles[j], length)
             inst.constraints.append(c)
 
-        self.instantiate_subfrags(frag_name, inst)
+        self.instantiate_subfrags(frag_name, inst, original_parent=inst)
         return inst
 
     def get_molecule_fragment(self, frag: Fragment):
@@ -613,6 +613,60 @@ class TopStar():
         for improper in impropers:
             inst.impropers.append(improper)
 
+    def detection(self,
+                  frag1: Fragment,
+                  frag2: Fragment,
+                  rx: ReactionTemplate,
+                  pos,
+                  box
+                  ):
+        """Returns True if frag1 and frag2 fulfill constraints specified in rx
+
+        Returns False if they should not react
+        """
+        # simple rules check
+        if len(set(frag1.particles) & set(frag2.particles)) != 0:
+            # Overlapping fragments can never react
+            return False
+        mol1 = self.get_molecule_fragment(frag1)
+        mol2 = self.get_molecule_fragment(frag2)
+        match rx.type:
+            case "simple":
+                # simple bimolecular reaction with no additional restrictions
+                pass
+            case "poly":
+                # subfragments instantiated together (same monomer)
+                # cannot react with eachother
+                if frag1.original_parent is not None and \
+                        frag1.original_parent == frag2.original_parent:
+                    return False
+            case "inter":
+                # subfragments in the same molecule cannot react with
+                # eachother
+                if mol1 == mol2:
+                    return False
+            case "intra":
+                # subfragments only in the same molecule can react with
+                # eachother
+                if mol1 != mol2:
+                    return False
+            case "mono":
+                # there is only one fragment as reactant
+                # frag1 == frag2 must be true i guess?
+                # TODO this will take more work...
+                if frag1 != frag2:
+                    return False
+            case _:
+                raise ValueError(f"Unknown rx type {rx.type}")
+
+        init1 = frag1.particles[0]
+        init2 = frag2.particles[0]
+        # position dependent checks
+        dist = utils.pdist(pos[init1], pos[init2], float(box))
+        if dist >= rx.distance_max:
+            return False
+        return True
+
     def modification(self, frag1, frag2, product):
         """Modification helper for the D/M algorithm
         """
@@ -632,7 +686,7 @@ class TopStar():
             assert len(complete_particles) >= len(product_particles)
             if len(complete_particles) > len(product_particles):
                 frag_prod = self.instantiate_over_existing(
-                    product, product_particles, update=product_edge
+                    product, product_particles, edge_list=product_edge
                 )
                 self.new_dynamic_complete_fragment(
                     complete_particles, frag1, frag2, frag_prod, complete1,
@@ -641,12 +695,12 @@ class TopStar():
             else:
                 self.instantiate_over_existing(
                     product, product_particles, first=True,
-                    update=product_edge
+                    edge_list=product_edge
                 )
         else:
             # intramolecular TODO
             frag_prod = self.instantiate_over_existing(
-                product, product_particles, update=product_edge
+                product, product_particles, edge_list=product_edge
             )
             self.new_dynamic_complete_fragment(
                 complete1.particles, frag1, frag2, frag_prod, complete1,
