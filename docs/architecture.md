@@ -104,15 +104,18 @@ reorder, might change later). T* also should give an object that allows for
 quick lookup for pairs of fragment types to get what reaction(s) they can
 react according to.
 
+Additionally, the D algorithm should check:
+- fragments that share any atom (edge or not) should not react
+
 Updating the T* should be done following these rules:
 - all forces in the reacting fragments should be removed
 - the instantiated product fragment's particles should be 1-1 mapped to the
   two reactant fragment particles, with the same order
   - use incomplete fragment types to "reorder" if needed
   - new interactions will be added according to this order
-- all fragments that contain atoms inside the reacting fragments as normal
-  atoms will be removed from T*, as the forces inside the fragment changed,
-  making these fragments invalid.
+- the reacting fragments and all overlapping fragments will be deleted
+  - overlap is defined as the two fragments sharing an atom, where either
+  of the fragments contains this atom as a non edge atom
 - when the product fragment type represents a complete fragment, 
   it can probably be optimized to only instantiate this fragment
   otherwise, a new complete fragment should be generated as a union of all 
@@ -130,12 +133,14 @@ Updating the T* should be done following these rules:
   index files that change during the simulation, and scripts to help visualize
   things with this, or to make analysis of trajectories easier.
 
-## Hard limitations
+## Limitations
 
 - the number of particles cannot be changed during reactions
 - fragments that overlap will destroy eachother, so if there are multiple
   reactive groups that can react independently their fragments should not
   overlap, or they should be built together
+- no checking for duplicate exclusions created between two particles during
+  reactions (yet?) - this will throw an exception
 - constraints and interactions specified by the user
   should lead to forces during bond formation that don't blow up the system,
   and it's the user's responsibility to ensure this

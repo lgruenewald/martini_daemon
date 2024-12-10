@@ -17,15 +17,17 @@ class Token:
     line: int
 
 
-def unwrap(tokens, index, type, default="default placeholder"):
+def unwrap(tokens, index, type_filter, default="default placeholder"):
     if len(tokens) <= index:
         if default == "default placeholder":
             # hack so "None" can also be used as a default value
             raise ValueError(f"Not enough tokens, expect token index {index}")
         else:
             return default
-    if tokens[index].type != type:
-        if tokens[index].type == "int" and type == "float":
+    if tokens[index].type != type_filter or \
+            (type(type_filter) is set and
+                tokens[index].type not in type_filter):
+        if tokens[index].type == "int" and type_filter == "float":
             # the only implicit conversion we do is int -> float
             return float(tokens[index].content)
         raise ValueError(f"Token {tokens[index].content}: expected {type} "
@@ -101,7 +103,8 @@ class TopParser:
         patterns["float"] = re.compile("[-+]?[0-9]+(\\.[0-9]*)?"
                                        "([eE][-+]?[0-9]+)?")
         patterns["key"] = re.compile("[a-zA-Z0-9_]+:")
-        patterns["word"] = re.compile("[a-zA-Z0-9_?*{}]+")
+        patterns["word"] = re.compile("[a-zA-Z0-9_]+")
+        patterns["pattern"] = re.compile("[a-zA-Z0-9_?*{}]+")
         patterns["macro"] = re.compile("#[a-zA-Z0-9_]+")
         patterns["string"] = re.compile('"[^"]*"')
         patterns["bracket_string"] = re.compile("<[^>]*>")
@@ -151,6 +154,8 @@ class TopParser:
                     content = content.strip('"')
                 elif longest_type == "bracket_string":
                     content = content.strip("<>")
+                elif longest_type == "pattern":
+                    content = content.replace("{", "[").replace("}", "]")
                 elif longest_type == "key":
                     if key is not None:
                         raise ValueError("Double key")

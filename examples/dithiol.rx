@@ -1,3 +1,29 @@
+[ frag ]
+name: thiol mol: BDT
+[ fragatoms ]
+; parent_id     type   name  is_edge
+      1          TC6    TS*     1
+
+[ frag ]
+name: thiol mol: BDT
+[ fragatoms ]
+; parent_id     type   name  is_edge
+      2          TC6    TS*     1
+
+[ moleculetype ]
+; molname nrexcl
+DIM 1
+
+[ atoms ]
+; id type resnr residue atom cgnr charge mass
+  1  TC6    1     BDT   TS1   1      0
+  2  TC6    1     BDT   TS1   1      0
+
+[ bonds ]
+; i j funct length k
+  1 2   1   0.400  1000
+; not a physical bond length, just for prototyping
+
 [ reaction ]
 name: thiol_dimerization
 r1: thiol

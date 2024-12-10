@@ -112,10 +112,10 @@ def DaemonTopFile(file, include_dir=None, defines={}):
 
     def process_atoms(tokens):
         id = unwrap(tokens, 0, "int") - 1
-        type = unwrap(tokens, 1, "word")
+        type = unwrap(tokens, 1, {"word", "pattern"})
         resnum = unwrap(tokens, 2, "int")
         resname = unwrap(tokens, 3, "word")
-        atomname = unwrap(tokens, 4, "word")
+        atomname = unwrap(tokens, 4, {"word", "pattern"})
         charge_group_num = unwrap(tokens, 5, "int")
         charge = unwrap(tokens, 6, "float", None)
         mass = unwrap(tokens, 7, "float", None)
@@ -289,12 +289,11 @@ def DaemonTopFile(file, include_dir=None, defines={}):
     p.add_level("frag", process_frag)
 
     def process_fragatoms(tokens):
-        frag_id = unwrap(tokens, 0, "int") - 1
-        parent_id = unwrap(tokens, 1, "int") - 1
-        type = unwrap(tokens, 2, "word").replace("{", "[").replace("}", "]")
-        name = unwrap(tokens, 3, "word").replace("{", "[").replace("}", "]")
-        is_edge = unwrap(tokens, 4, "int") != 0
-        last_frag().atoms.append((frag_id, parent_id, type, name, is_edge))
+        parent_id = unwrap(tokens, 0, "int") - 1
+        type = unwrap(tokens, 1, {"word", "pattern"})
+        name = unwrap(tokens, 2, {"word", "pattern"})
+        is_edge = unwrap(tokens, 3, "int") != 0
+        last_frag().atoms.append((parent_id, type, name, is_edge))
 
     p.add_level("fragatoms", process_fragatoms)
 

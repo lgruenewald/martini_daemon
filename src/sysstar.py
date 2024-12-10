@@ -136,6 +136,10 @@ class SysStar():
         name, type, _, _ = self._part_list[i]
         return name, type
 
+    def get_particle_details(self, i):
+        """Returns the particle's name, type, charge, mass"""
+        return self._part_list[i]
+
     def use_atom_type(self, part_type):
         """Add new atom types for LJ, used in build_nb_force.
 

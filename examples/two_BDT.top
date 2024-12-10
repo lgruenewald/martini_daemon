@@ -3,9 +3,7 @@
 #include "BDT.itp"
 
 #ifdef DAEMON
-#include "phenylthiol.frag"
 #include "dithiol.rx"
-#include "dithiol.itp"
 #endif
 
 [ system ]

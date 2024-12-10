@@ -35,8 +35,8 @@ class FragFragment:
     name: str  # when instantiated it has this name
     mol: str
     name_id: str  # internally it has this name
-    # list[(in_frag_id, in_itp_id, type, name, is_edge)]
-    atoms: list[(int, int, str, str, bool)]
+    # list[(in_itp_id, type, name, is_edge)]
+    atoms: list[(int, str, str, bool)]
 
 
 @dataclass
@@ -222,10 +222,7 @@ class TopStar():
         # particles
         for i, atom in enumerate(frag.atoms):
             # remapping of parent_id's to frag_id's
-            frag_id, parent_id, type, name, is_edge = atom
-            # frag_id's must be in order
-            if frag_id != i:
-                raise ValueError("Atom IDs in [ fragatoms ] should be ordered")
+            parent_id, type, name, is_edge = atom
             # parent_id must be i range
             if parent_id < 0 or parent_id >= len(inst.particles):
                 raise ValueError("Parent particle ID out of range")
@@ -349,10 +346,16 @@ class TopStar():
         return self.instantiate_over_existing(frag_name, parts)
 
     def instantiate_over_existing(
-            self, frag_name, particles, first=False, update=False):
+            self, frag_name, particles, first=False, edge_list=False):
         """Takes a name of a mol fragment, creates new particles for it in
         the system and the corresponding interactions as well.
         Recursively instantiates all subfragments too.
+
+        first: if set to true, it will insert into the defrag list, if false
+        it will append
+
+        edge_list: if false, won't change particle types, names, etc.
+        if a list of booleans, it will change them where the booleans are False
         """
 
         frag = self.type_lookup.get(frag_name)  # frag type
@@ -376,12 +379,25 @@ class TopStar():
             else:
                 self.defrag_list[part_id].append((inst_id, in_frag_id, False))
             inst.edge.append(False)
-            if update:
+            if edge_list:
                 type, resnum, resname, atomname, chargegr, charge, mass = \
                     frag.atoms[in_frag_id]
-                self.system.update_particle(
-                    part_id, atomname, type, charge, mass
-                )
+                oldname, oldtype, oldcharge, oldmass = \
+                    self.system.get_particle_details(part_id)
+                # names are pattern matched rather than updated
+                # so atom names actually stay the same as in monomers
+                if not fnmatch(oldname, atomname):
+                    raise Exception("Unmatching name during instantiate")
+                # edge atoms are not updated, but they must match
+                if edge_list[in_frag_id]:
+                    if not fnmatch(oldtype, type) or charge != oldcharge or \
+                            mass != oldmass:
+                        raise Exception("Instantiate would change atom")
+                # non edge atoms get updated, no match check for type, q, m
+                else:
+                    self.system.update_particle(
+                        part_id, oldname, type, charge, mass
+                    )
         # bonds
         for bond in frag.harmonic_bonds:
             i, j, length, force = bond
@@ -603,7 +619,10 @@ class TopStar():
         # TODO check for overlapping frag1 and frag2 and reject such reactions
         complete1 = self.get_molecule_fragment(frag1)
         complete2 = self.get_molecule_fragment(frag2)
+        if len(set(frag1.particles) & set(frag2.particles)) != 0:
+            raise Exception("Overlapping fragments reacting")
         product_particles = frag1.particles + frag2.particles
+        product_edge = frag1.edge + frag2.edge
         self.destroy_fragment(frag1)
         self.destroy_fragment(frag2)
 
@@ -613,7 +632,7 @@ class TopStar():
             assert len(complete_particles) >= len(product_particles)
             if len(complete_particles) > len(product_particles):
                 frag_prod = self.instantiate_over_existing(
-                    product, product_particles, update=True
+                    product, product_particles, update=product_edge
                 )
                 self.new_dynamic_complete_fragment(
                     complete_particles, frag1, frag2, frag_prod, complete1,
@@ -621,16 +640,16 @@ class TopStar():
                 )
             else:
                 self.instantiate_over_existing(
-                    product, product_particles, first=True, update=True
+                    product, product_particles, first=True,
+                    update=product_edge
                 )
         else:
             # intramolecular TODO
-            complete_particles = complete1.particles
             frag_prod = self.instantiate_over_existing(
-                product, product_particles, update=True
+                product, product_particles, update=product_edge
             )
             self.new_dynamic_complete_fragment(
-                complete_particles, frag1, frag2, frag_prod, complete1,
+                complete1.particles, frag1, frag2, frag_prod, complete1,
                 complete1
             )
 
