@@ -7,5 +7,6 @@ Chaining
 
 [ molecules ]
 ; name  number
-W 400
+W 20
+WP 380
 

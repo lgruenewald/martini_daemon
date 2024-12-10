@@ -11,7 +11,7 @@ name: initiation
 r1: monomer
 r2: monomer
 p1: dimer
-distance_max: 0.60
+distance_max: 0.51
 type: simple
 
 [ moleculetype ]
@@ -21,7 +21,7 @@ dimer 1
   1  *    1     w   *   1      0
   2  *    1     w   *   1      0
 [ bonds ]
-1 2 1 0.500 1000
+1 2 1 0.200 1000
 
 [ frag ]
 name: tail mol: dimer
@@ -41,7 +41,7 @@ name: propagation
 r1: tail
 r2: monomer
 p1: tail_plus_one
-distance_max: 0.60
+distance_max: 0.51
 type: simple
 
 [ moleculetype ]
@@ -54,7 +54,7 @@ tail_plus_one 1
 ; monomer / tail plus one
   3  *    1     w   *   1      0
 [ bonds ]
-1 3 1 0.500 1000
+1 3 1 0.200 1000
 [ angles ]
 2 1 3 1 120.0 1000
 
@@ -70,7 +70,7 @@ name: termination
 r1: tail
 r2: tail
 p1: tail_dimer
-distance_max: 0.60
+distance_max: 0.51
 type: poly
 
 [ moleculetype ]
@@ -85,7 +85,7 @@ tail_dimer 1
 ; tail2 minus one
   4  *    1     w   *   1      0
 [ bonds ]
-1 3 1 0.500 1000
+1 3 1 0.200 1000
 [ angles ]
 2 1 3 1 120.0 1000
 1 3 4 1 120.0 1000

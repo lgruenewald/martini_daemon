@@ -356635,6 +356635,16 @@ U  24.0 0.000 A 0.0 0.0
 ;id     type    resnr   residu  atom    cgnr    charge
  1      W      1        W       W      1       0
 
+; Water' to mark some waters as reactive
+
+[ moleculetype ]
+; molname  	nrexcl
+  WP  	    	1
+
+[ atoms ]
+;id     type    resnr   residu  atom    cgnr    charge
+ 1      W      1        W       W      1       0
+
 ;;;;;;; DIMETHYLSULFOXIDE
 
 [ moleculetype ]
