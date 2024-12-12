@@ -138,7 +138,8 @@ def DaemonTopFile(file, include_dir=None, defines={}):
             raise ValueError("Unsupported  bond function type")
         length = unwrap(tokens, 3, "float", None)
         force = unwrap(tokens, 4, "float", None)
-        last_molecule().harmonic_bonds.append((i, j, length, force))
+        last_molecule().bonds.append((system.harmonic_bond, i, j,
+                                     [length, force]))
         if type != 6:
             # type 6 does not generate exclusions
             # nrexcl other than 1 is not supported
@@ -155,7 +156,8 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         force = unwrap(tokens, 5, "float", -1.)
         if type == 1:
             # harmonic
-            last_molecule().harmonic_angles.append((i, j, k, theta, force))
+            last_molecule().angles.append((system.harmonic_angle, i, j, k,
+                                          [theta, force]))
         else:
             # TODO 2 is g96 angle
             # 10 is restricted angle, they are also supported by
@@ -176,15 +178,17 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         if type == 1:
             # proper dihedral
             theta_rad = theta * math.pi / 180
-            last_molecule().proper_dihedrals.append(
-                (i, j, k, l, theta_rad, force, multiplicity)
+            last_molecule().dihedrals.append(
+                (system.proper_dihedral, i, j, k, l,
+                 [theta_rad, force, multiplicity])
             )
         elif type == 2:
             # improper
             theta = theta - 360 if theta > 180 else theta
             theta_rad = theta * math.pi / 180
-            last_molecule().improper_dihedrals.append(
-                (i, j, k, l, theta_rad, force)
+            last_molecule().dihedrals.append(
+                (system.improper_dihedral, i, j, k, l,
+                 [theta_rad, force])
             )
         else:
             # TODO 2, 3, 4, 5, 9 and 11 should also supported by

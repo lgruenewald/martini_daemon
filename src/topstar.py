@@ -27,8 +27,8 @@ topology is an object that contains the following information:
 from dataclasses import dataclass
 from sysstar import SysStar
 from fnmatch import fnmatch
-import sys
 import utils
+from sysstar import Force, Interaction
 
 @dataclass
 class FragFragment:
@@ -42,17 +42,14 @@ class FragFragment:
 @dataclass
 class MolFragment:
     molecule_name: str
-    complete: bool  # if true it has no edge atoms
     # atoms: type, resnum, resname, atomname, chargegr, charge, mass
     atoms: list[(str, int, str, str, int, float, float)]
-    # harmonic_bonds: i j length force
-    harmonic_bonds: list[(int, int, float, float)]
-    # harmonic_angles: i j k theta force
-    harmonic_angles: list[(int, int, int, float, float)]
-    # proper_dihedrals: i j k l theta force mult
-    proper_dihedrals: list
-    # improper_dihedrals: i j k l theta force
-    improper_dihedrals: list
+    # force i j params
+    bonds: list[(Force, int, int, list)]
+    # force i j k params
+    angles: list[(Force, int, int, int, list)]
+    # force i j k l params
+    dihedrals: list[(Force, int, int, int, int, list)]
     # exclusions: list of id's
     exclusions: list[list[int]]
     # constraints: i j length
@@ -79,7 +76,7 @@ class MolFragment:
             self.exclusions[j].append(i)
             if j in self.exclusions[i]:
                 # should never happen actually if this algorithm behaves as
-                # i expect it to
+                # I expect it to
                 raise AssertionError(f"ij desynced, {j} "
                                      f"already in self.exclusions[{i}]")
             self.exclusions[i].append(j)
@@ -113,10 +110,7 @@ class Fragment():
 
     name: str
     particles: list[int]
-    bonds: list[int]
-    angles: list[int]
-    dihedrals: list[int]
-    impropers: list[int]
+    interactions: list[Interaction]
     exclusions: list[int]
     constraints: list[int]
     edge: list[bool]
@@ -126,10 +120,7 @@ class Fragment():
     def __init__(self, name, id, original_parent=None):
         self.name = name
         self.particles = []
-        self.bonds = []
-        self.angles = []
-        self.dihedrals = []
-        self.impropers = []
+        self.interactions = []
         self.exclusions = []
         self.constraints = []
         self.edge = []
@@ -178,7 +169,7 @@ class TopStar():
     def new_mol_fragment(self, name: str):
         if self.type_lookup.get(name):
             raise ValueError(f"Second definition of fragment type {name}")
-        mol_fragment = MolFragment(name, True, [], [], [], [], [], [], [])
+        mol_fragment = MolFragment(name, [], [], [], [], [], [])
         self.type_lookup[name] = mol_fragment
         return mol_fragment
 
@@ -220,7 +211,6 @@ class TopStar():
         subinst = Fragment(name, subinst_id, original_parent=original_parent)
         self.frag_list.append(subinst)
         normal_indices = set()
-        edge_indices = set()
         all_indices = set()
         # particles
         for i, atom in enumerate(frag.atoms):
@@ -245,79 +235,33 @@ class TopStar():
             if part_index in all_indices:
                 raise ValueError("Double inclusion of atom in subfrag")
             all_indices.add(part_index)
-            if is_edge:
-                edge_indices.add(part_index)
-            else:
+            if not is_edge:
                 normal_indices.add(part_index)
             # build up subinst
             subinst.particles.append(part_index)
             subinst.edge.append(is_edge)
             # frag_id, in_frag_id, is_edge
             self.defrag_list[part_index].append((subinst_id, i, is_edge))
-        # the indices sets must be non overlapping
-        if len(normal_indices & edge_indices) != 0:
-            print("normal indices: ", normal_indices)
-            print("edge: ", edge_indices)
-            print("all: ", all_indices)
-            raise AssertionError("Normal and edge atoms must not overlap")
-        if len(all_indices) != len(normal_indices | edge_indices):
-            print("normal indices: ", normal_indices)
-            print("edge: ", edge_indices)
-            print("all: ", all_indices)
-            raise AssertionError("All indices must equal normal | edge")
-        # bonds get added if at least one normal atom participates in them
-        # bonds to be added must be between atoms inside the subfrag
-        # TODO: better error messages for dangling stuff
-        # through either analysis of subfrags before instantiation
-        # or here through dumping more info
-        for bond_id in inst.bonds:
-            i, j = self.system.get_bond_members(bond_id)
-            if i in normal_indices or j in normal_indices:
-                # bond required
-                if i not in all_indices or j not in all_indices:
-                    raise ValueError("Dangling bond")
-                subinst.bonds.append(bond_id)
-        # angles get added if the central atom is a normal atom
-        # all atoms in such angles must contain only atoms in the subfrag
-        for angle_id in inst.angles:
-            i, j, k = self.system.get_angle_members(angle_id)
-            if j in normal_indices:
-                if i not in all_indices or k not in all_indices:
-                    raise ValueError("Dangling angle")
-                subinst.angles.append(angle_id)
-        # dihedrals get added if one of the central atoms is a normal atom
-        # all atoms participating must be in the subfrag
-        for dih_id in inst.dihedrals:
-            i, j, k, l = self.system.get_proper_dihedral_members(dih_id)
-            if j not in normal_indices and k not in normal_indices:
-                continue
-            if i not in all_indices or j not in all_indices or \
-                    k not in all_indices or l not in all_indices:
-                raise ValueError("Dangling dihedral")
-            subinst.dihedrals.append(dih_id)
-        # improper dihedrals get added if any of the atoms is a normal atom
-        # all atoms participating must be in the subfrag
-        for dih_id in inst.impropers:
-            i, j, k, l = self.system.get_improper_members(dih_id)
-            if i in normal_indices or j in normal_indices or \
-                    k in normal_indices or l in normal_indices:
-                if i not in all_indices or j not in all_indices or \
-                        k not in all_indices or l not in all_indices:
-                    raise ValueError("Dangling improper dihedral")
-                subinst.impropers.append(dih_id)
-        # exclusions, constaints get added if any of the atoms is a normal atom
-        # all atoms participating must be in the subfrag
+
+        # interactions get added if all participants are normal atoms
+        for interaction in inst.interactions:
+            members = interaction.get_members()
+            include = True
+            for member in members:
+                if member not in normal_indices:
+                    include = False
+                    break
+            if include:
+                subinst.interactions.append(interaction)
+
+        # exclusions, constaints get added if both of the atoms is a normal atom
         for excl_id in inst.exclusions:
             i, j = self.system.get_exclusion_members(excl_id)
-            if i in normal_indices or j in normal_indices:
-                if i not in all_indices or j not in all_indices:
-                    raise ValueError("Dangling exclusion")
+            if i in normal_indices and j in normal_indices:
                 subinst.exclusions.append(excl_id)
         for cid in inst.constraints:
             i, j = self.system.get_constraint_members(cid)
-            if i in normal_indices or j in normal_indices:
-                if i not in all_indices or j not in all_indices:
-                    raise ValueError("Dangling constraint")
+            if i in normal_indices and j in normal_indices:
                 subinst.constraints.append(cid)
 
         # subfrags can contain further subfrags
@@ -399,33 +343,20 @@ class TopStar():
                         part_id, oldname, type, charge, mass
                     )
         # bonds
-        for bond in frag.harmonic_bonds:
-            i, j, length, force = bond
-            b = self.system.add_bond(particles[i], particles[j], length, force)
-            inst.bonds.append(b)
+        for (force, i, j, params) in frag.bonds:
+            b = force.add(particles[i], particles[j], *params)
+            inst.interactions.append(b)
         # angles
-        for angle in frag.harmonic_angles:
-            i, j, k, theta, force = angle
-            a = self.system.add_angle(
-                particles[i], particles[j], particles[k], theta, force
-            )
-            inst.angles.append(a)
-        # proper dihedrals
-        for dih in frag.proper_dihedrals:
-            i, j, k, l, theta, force, mult = dih
-            d = self.system.add_proper_dihedral(
+        for (force, i, j, k, params) in frag.angles:
+            a = force.add(particles[i], particles[j], particles[k], *params)
+            inst.interactions.append(a)
+        # dihedrals
+        for (force, i, j, k, l, params) in frag.dihedrals:
+            d = force.add(
                 particles[i], particles[j], particles[k], particles[l],
-                theta, force, mult
+                *params
             )
-            inst.dihedrals.append(d)
-        # improper dihedrals
-        for imp in frag.improper_dihedrals:
-            i, j, k, l, theta, force = imp
-            d = self.system.add_improper_dihedral(
-                particles[i], particles[j], particles[k], particles[l],
-                theta, force
-            )
-            inst.impropers.append(d)
+            inst.interactions.append(d)
         # exclusions
         for i, excl in enumerate(frag.exclusions):
             for j in excl:
@@ -473,14 +404,8 @@ class TopStar():
                     i += 1
 
         # 2. remove forces in fragment
-        for bond in frag.bonds:
-            self.system.remove_bond(bond)
-        for angle in frag.angles:
-            self.system.remove_angle(angle)
-        for dih in frag.dihedrals:
-            self.system.remove_proper_dihedral(dih)
-        for dih in frag.impropers:
-            self.system.remove_improper(dih)
+        for interaction in frag.interactions:
+            interaction.remove()
         for excl in frag.exclusions:
             self.system.remove_exclusion(excl)
         for con in frag.constraints:
@@ -515,56 +440,23 @@ class TopStar():
             inst.edge.append(False)
             self.defrag_list[part].insert(0, (inst_id, i, False))
 
-        # multiline editing helps a lot with this, no I didn't type this out
-        # by hand FIXME this is getting painful to look at though...
-        bonds_yes = set()
-        bonds_no = set()
-        for bond in frag1.bonds:
-            bonds_no.add(bond)
-        for bond in frag2.bonds:
-            bonds_no.add(bond)
-        for bond in frag_prod.bonds:
-            bonds_yes.add(bond)
-        for bond in complete1.bonds:
-            bonds_yes.add(bond)
-        for bond in complete2.bonds:
-            bonds_yes.add(bond)
-        bonds = bonds_yes - bonds_no
-        for bond in bonds:
-            inst.bonds.append(bond)
+        inter_yes = set()
+        inter_no = set()
+        for inter in frag1.interactions:
+            inter_no.add(inter)
+        for inter in frag2.interactions:
+            inter_no.add(inter)
+        for inter in frag_prod.interactions:
+            inter_yes.add(inter)
+        for inter in complete1.interactions:
+            inter_yes.add(inter)
+        for inter in complete2.interactions:
+            inter_yes.add(inter)
+        inters = inter_yes - inter_no
+        for inter in inters:
+            inst.interactions.append(inter)
 
-        angles_yes = set()
-        angles_no = set()
-        for angle in frag1.angles:
-            angles_no.add(angle)
-        for angle in frag2.angles:
-            angles_no.add(angle)
-        for angle in frag_prod.angles:
-            angles_yes.add(angle)
-        for angle in complete1.angles:
-            angles_yes.add(angle)
-        for angle in complete2.angles:
-            angles_yes.add(angle)
-        angles = angles_yes - angles_no
-        for angle in angles:
-            inst.angles.append(angle)
-
-        dihedrals_yes = set()
-        dihedrals_no = set()
-        for dihedral in frag1.dihedrals:
-            dihedrals_no.add(dihedral)
-        for dihedral in frag2.dihedrals:
-            dihedrals_no.add(dihedral)
-        for dihedral in frag_prod.dihedrals:
-            dihedrals_yes.add(dihedral)
-        for dihedral in complete1.dihedrals:
-            dihedrals_yes.add(dihedral)
-        for dihedral in complete2.dihedrals:
-            dihedrals_yes.add(dihedral)
-        dihedrals = dihedrals_yes - dihedrals_no
-        for dihedral in dihedrals:
-            inst.dihedrals.append(dihedral)
-
+        # TODO modularize exclusions and constraints into the same system later
         exclusions_yes = set()
         exclusions_no = set()
         for exclusion in frag1.exclusions:
@@ -596,22 +488,6 @@ class TopStar():
         constraints = constraints_yes - constraints_no
         for constraint in constraints:
             inst.constraints.append(constraint)
-
-        impropers_yes = set()
-        impropers_no = set()
-        for improper in frag1.impropers:
-            impropers_no.add(improper)
-        for improper in frag2.impropers:
-            impropers_no.add(improper)
-        for improper in frag_prod.impropers:
-            impropers_yes.add(improper)
-        for improper in complete1.impropers:
-            impropers_yes.add(improper)
-        for improper in complete2.impropers:
-            impropers_yes.add(improper)
-        impropers = impropers_yes - impropers_no
-        for improper in impropers:
-            inst.impropers.append(improper)
 
     def detection(self,
                   frag1: Fragment,
