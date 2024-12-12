@@ -302,7 +302,27 @@ def DaemonTopFile(file, include_dir=None, defines={}):
 
     p.add_level("nonbond_params", process_nonbond_params)
     p.add_level("virtual_sites2", TODO)
-    p.add_level("virtual_sites3", TODO)
+
+    def process_virtual_sites3(tokens):
+        vid = unwrap(tokens, 0, "int") - 1
+        i = unwrap(tokens, 1, "int") - 1
+        j = unwrap(tokens, 2, "int") - 1
+        k = unwrap(tokens, 3, "int") - 1
+        type = unwrap(tokens, 4, "int")
+        match type:
+            case 3:
+                # 3fad
+                theta = unwrap(tokens, 5, "float") * math.pi / 180
+                d = unwrap(tokens, 6, "float")
+                last_molecule().dihedrals.append(
+                    (system.vsite_3fad, vid, i, j, k, [theta, d])
+                )
+            case _:
+                raise ValueError(
+                    f"Virtual site 3 type {type} not implemented."
+                )
+
+    p.add_level("virtual_sites3", process_virtual_sites3)
     p.add_level("virtual_sitesn", TODO)
 
     # custom additions: rx and frag

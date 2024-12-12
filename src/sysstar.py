@@ -301,6 +301,56 @@ class RBTorsion(Force):
         raise NotImplementedError
 
 
+class VSite3fad(Force):
+    # Force because it implements the same interface, but it reimplements
+    # everything, the default helpers don't suit it well (no _force_obj).
+
+    def _make_vsite(self, vid, i, j, k, theta, d):
+        dcos = d * math.cos(theta)
+        dsin = d * math.sin(theta)
+        vsite = mm.LocalCoordinatesSite(
+            [k, j, i],  # particles
+            [0.0, 0.0, 1.0],  # origin weights
+            [0.0, 0.5, -0.5],  # x direction weight
+            [0.5, -0.5, 0.0],  # y direction weight
+            [dcos, dsin, 0.0]  # coordinates
+        )
+        self._sysstar._system.setVirtualSite(vid, vsite)
+
+    def _build(self):
+        for (vid, i, j, k, theta, d) in self._list:
+            self._make_vsite(vid, i, j, k, theta, d)
+
+    def add(self, vid, i, j, k, theta, d):
+        self._list.append((vid, i, j, k, theta, d))
+        if not self._rebuild:
+            self._make_vsite(vid, i, j, k, theta, d)
+
+    def get_members(self, i):
+        vid, i, j, k, _, _ = self._list[i]
+        return [vid, i, j, k]
+
+    def update_params(self, i, *params):
+        raise NotImplementedError
+
+    def remove(self, i):
+        raise NotImplementedError
+
+    def build(self):
+        # only should get called once when building it initially
+        if self._rebuild:
+            self._build()
+            self._rebuild = False
+            self._sysstar._reinitialize = True
+
+    def destroy(self):
+        # no _force_obj, so it shold never be called like this
+        raise NotImplementedError
+
+    def _interaction(self):
+        return Interaction(self, len(self._list) - 1)
+
+
 class SysStar():
 
     _system: mm.System
@@ -334,6 +384,8 @@ class SysStar():
     """
     _nb_types: dict[(str, str), (float, float)]
 
+    modular_forces: list[Force]
+
     def __init__(self):
         self._part_list = []
         self._used_atom_types = {}
@@ -354,11 +406,13 @@ class SysStar():
         self.restricted_angle = RestrictedAngle(self)
         self.combined_bending_torsion = CombinedBendingTorsion(self)
         self.rb_torsion = RBTorsion(self)
+        self.vsite_3fad = VSite3fad(self)
         self.modular_forces = [
             self.harmonic_bond, self.harmonic_angle,
             self.proper_dihedral, self.improper_dihedral,
             self.g96_angle, self.restricted_angle,
-            self.combined_bending_torsion, self.rb_torsion
+            self.combined_bending_torsion, self.rb_torsion,
+            self.vsite_3fad,
         ]
 
     def get_defaults(self, part_type, charge, mass):
@@ -367,7 +421,8 @@ class SysStar():
             raise ValueError("Attempt to add particle with unknown atom type"
                              f"Particle type: {part_type}.")
         dcharge, dmass = defaults
-        return (charge or dcharge, mass or dmass)
+        return (charge if charge is not None else dcharge,
+                mass if mass is not None else dmass)
 
     def add_particle(self, part_name, part_type, charge, mass):
         """Adds a particle to the list, and returns its part_id"""
@@ -466,9 +521,7 @@ class SysStar():
         for t1, i in self._used_atom_types.items():
             for t2, j in self._used_atom_types.items():
                 nb_params = self._nb_types.get((t1, t2)) or\
-                            self._nb_types.get((t2, t1))
-                if nb_params is None:
-                    raise ValueError(f"Couldn't find LJ params for {t1}; {t2}")
+                            self._nb_types.get((t2, t1)) or (0., 0.)
                 V, W = nb_params
                 c6 = 4 * W * (V ** 6)
                 c12 = 4 * W * (V ** 12)
@@ -714,9 +767,7 @@ class SysStar():
         with open("sys.dump", "w") as file:
             print("==== SysStar Dump ====", file=file)
             print("Particles:", self._part_list, file=file)
-            print("Bonds:", self._harmonic_bond_list, file=file)
-            print("Angles:", self._harmonic_angle_list, file=file)
-            print("Dihedrals:", self._proper_dihedral_list, file=file)
-            print("Impropers:", self._improper_dihedral_list, file=file)
+            for force in self.modular_forces:
+                print(force.__class__.__name__, force._list, file=file)
             print("Exclusions:", self._exclusion_list, file=file)
             print("Constraints:", self._constraint_list, file=file)
