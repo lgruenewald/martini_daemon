@@ -136,6 +136,56 @@ class HarmonicAngle(Force):
         raise NotImplementedError
 
 
+class G96Angle(Force):
+    def _build(self):
+        self._force_obj = mm.CustomAngleForce(
+            "0.5*k*(cos(theta)-cos(theta0))^2"
+        )
+        self._force_obj.addPerAngleParameter("theta0")
+        self._force_obj.addPerAngleParameter("k")
+        for (i, j, k, theta, force) in filter(None, self._list):
+            self._force_obj.addAngle(i, j, k, (theta, force))
+
+    def add(self, i, j, k, theta, force):
+        self._list.append((i, j, k, theta, force))
+        if not self._rebuild:
+            self._force_obj.addAngle(i, j, k, (theta, force))
+            self._sysstar._reinitialize = True
+        return self._interaction()
+
+    def get_members(self, id):
+        i, j, k, _, _ = self._list[id]
+        return [i, j, k]
+
+    def update_params(self, id, theta, force):
+        raise NotImplementedError
+
+
+class RestrictedAngle(Force):
+    def _build(self):
+        self._force_obj = mm.CustomAngleForce(
+            "0.5*k*(cos(theta)-cos(theta0))^2/sin(theta)^2"
+        )
+        self._force_obj.addPerAngleParameter("theta0")
+        self._force_obj.addPerAngleParameter("k")
+        for (i, j, k, theta, force) in filter(None, self._list):
+            self._force_obj.addAngle(i, j, k, (theta, force))
+
+    def add(self, i, j, k, theta, force):
+        self._list.append((i, j, k, theta, force))
+        if not self._rebuild:
+            self._force_obj.addAngle(i, j, k, (theta, force))
+            self._sysstar._reinitialize = True
+        return self._interaction()
+
+    def get_members(self, id):
+        i, j, k, _, _ = self._list[id]
+        return [i, j, k]
+
+    def update_params(self, id, theta, force):
+        raise NotImplementedError
+
+
 class ProperDihedral(Force):
     """All the proper dihedrals in the system
     indices are called proper_dihedral_id
@@ -171,9 +221,11 @@ class ImproperDihedral(Force):
 
     def _build(self):
         self._force_obj = mm.CustomTorsionForce(
-            "0.5*k*(thetap-theta0)^2; thetap = "
-            "step(-(theta-theta0+pi))*2*pi+theta+step(theta-theta0-pi)*(-2*pi)"
-            f"; pi = {math.pi:.14f}"
+            "0.5*k*(thetap-theta0)^2;"
+            "thetap = step(-plus)*2*pi+theta+step(minus)*(-2*pi);"
+            "plus=theta+pi-theta0;"
+            "minus=theta-pi-theta0;"
+            f"pi = {math.pi:.14f}"
         )
         self._force_obj.addPerTorsionParameter("theta0")
         self._force_obj.addPerTorsionParameter("k")
@@ -192,6 +244,60 @@ class ImproperDihedral(Force):
         return [i, j, k, l]
 
     def update_params(self, id, theta, force):
+        raise NotImplementedError
+
+
+class CombinedBendingTorsion(Force):
+    def _build(self):
+        self._force_obj = mm.CustomCompoundBondForce(
+            4,
+            "k*sintheta0^3*sintheta1^3*(a0 + a1*cosphi + a2*cosphi^2 + a3*cosphi^3 + a4*cosphi^4); "
+            "sintheta0 = sin(angle(p1, p2, p3));"
+            "sintheta1 = sin(angle(p2, p3, p4));"
+            "cosphi = cos(dihedral(p1, p2, p3, p4));",
+        )
+        self._force_obj.addPerBondParameter("k")
+        self._force_obj.addPerBondParameter("a0")
+        self._force_obj.addPerBondParameter("a1")
+        self._force_obj.addPerBondParameter("a2")
+        self._force_obj.addPerBondParameter("a3")
+        self._force_obj.addPerBondParameter("a4")
+        for (i, j, k, l, force, a0, a1, a2, a3, a4) in filter(None, self._list):
+            self._force_obj.addBond(i, j, k, l, (force, a0, a1, a2, a3, a4))
+
+    def add(self, i, j, k, l, force, a0, a1, a2, a3, a4):
+        self._list.append((i, j, k, l, force, a0, a1, a2, a3, a4))
+        if not self._rebuild:
+            self._force_obj.addBond(i, j, k, l, (force, a0, a1, a2, a3, a4))
+            self._sysstar._reinitialize = True
+        return self._interaction()
+
+    def get_members(self, id):
+        i, j, k, l, _, _, _, _, _, _ = self._list[id]
+        return [i, j, k, l]
+
+    def update_params(self, id, theta, force):
+        raise NotImplementedError
+
+
+class RBTorsion(Force):
+    def _build(self):
+        self._force_obj = mm.RBTorsionForce()
+        for (i, j, k, l, c0, c1, c2, c3, c4, c5) in filter(None, self._list):
+            self._force_obj.addTorsion(i, j, k, l, c0, c1, c2, c3, c4, c5)
+
+    def add(self, i, j, k, l, c0, c1, c2, c3, c4, c5):
+        self._list.append((i, j, k, l, c0, c1, c2, c3, c4, c5))
+        if not self._rebuild:
+            self._force_obj.addTorsion(i, j, k, l, c0, c1, c2, c3, c4, c5)
+            self._sysstar._reinitialize = True
+        return self._interaction()
+
+    def get_members(self, id):
+        i, j, k, l, _, _, _ = self._list[id]
+        return [i, j, k, l]
+
+    def update_params(self, id, theta, force, mult):
         raise NotImplementedError
 
 
@@ -244,9 +350,15 @@ class SysStar():
         self.harmonic_angle = HarmonicAngle(self)
         self.proper_dihedral = ProperDihedral(self)
         self.improper_dihedral = ImproperDihedral(self)
+        self.g96_angle = G96Angle(self)
+        self.restricted_angle = RestrictedAngle(self)
+        self.combined_bending_torsion = CombinedBendingTorsion(self)
+        self.rb_torsion = RBTorsion(self)
         self.modular_forces = [
             self.harmonic_bond, self.harmonic_angle,
-            self.proper_dihedral, self.improper_dihedral
+            self.proper_dihedral, self.improper_dihedral,
+            self.g96_angle, self.restricted_angle,
+            self.combined_bending_torsion, self.rb_torsion
         ]
 
     def get_defaults(self, part_type, charge, mass):

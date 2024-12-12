@@ -71,21 +71,8 @@ Fragments have to obey the following rules:
 - all particles have to be a part of at least one complete fragment,
   which has to be the first element in their defrag list
   - the other fragments they are a part of can be incomplete or complete
-- All particles that interact (bond, angle...) with normal atoms should be
-  present in the fragment as at least edge atoms
 - All fragments should contain an exhaustive list of all forces between its
-  particles
-  - generally any force involving a normal atom must be part of the force list
-  in the fragment, some conservative exceptions can be made as long as such
-  exceptions are clearly defined and that they generally correspond to the
-  intention that "normal atoms" are atoms whose bonding structure changes,
-  while "edge atoms" are those whose bonding structure doesn't change.
-  The exceptions are:
-    - angles: only angles centered at normal atoms have to be included,
-    ones centered on edge atoms must not be part of the fragment
-    - proper dihedrals: angles that contain normal atoms only the outer atoms
-    (i and l in i j k l) must not be part of the fragment, if either j or k
-    is a normal atom, it must be part of the fragment
+  normal particles
 - incomplete fragments always have a clear complete fragment, that is,
   in the defrag list, all entries should be fragments that are subsets of the
   first entry

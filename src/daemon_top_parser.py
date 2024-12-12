@@ -154,15 +154,16 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         type = unwrap(tokens, 3, "int")
         theta = unwrap(tokens, 4, "float", -1.) * math.pi / 180
         force = unwrap(tokens, 5, "float", -1.)
-        if type == 1:
-            # harmonic
-            last_molecule().angles.append((system.harmonic_angle, i, j, k,
-                                          [theta, force]))
-        else:
-            # TODO 2 is g96 angle
-            # 10 is restricted angle, they are also supported by
-            # martini_openmm
-            raise ValueError("Unsupported angle function type")
+        match type:
+            case 1:
+                force_obj = system.harmonic_angle
+            case 2:
+                force_obj = system.g96_angle
+            case 10:
+                force_obj = system.restricted_angle
+            case _:
+                raise ValueError(f"Unsupported angle type {type}.")
+        last_molecule().angles.append((force_obj, i, j, k, [theta, force]))
 
     p.add_level("angles", process_angles)
 
@@ -172,28 +173,68 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         k = unwrap(tokens, 2, "int") - 1
         l = unwrap(tokens, 3, "int") - 1
         type = unwrap(tokens, 4, "int")
-        theta = unwrap(tokens, 5, "float", -1.)
-        force = unwrap(tokens, 6, "float", -1.)
         multiplicity = unwrap(tokens, 7, "int", 1)
-        if type == 1:
-            # proper dihedral
-            theta_rad = theta * math.pi / 180
-            last_molecule().dihedrals.append(
-                (system.proper_dihedral, i, j, k, l,
-                 [theta_rad, force, multiplicity])
-            )
-        elif type == 2:
-            # improper
-            theta = theta - 360 if theta > 180 else theta
-            theta_rad = theta * math.pi / 180
-            last_molecule().dihedrals.append(
-                (system.improper_dihedral, i, j, k, l,
-                 [theta_rad, force])
-            )
-        else:
-            # TODO 2, 3, 4, 5, 9 and 11 should also supported by
-            # martini_openmm
-            raise ValueError("Unsupported dihedral function type")
+        match type:
+            case 1 | 9:
+                # proper dihedral | proper dihedral (multiple)
+                theta = unwrap(tokens, 5, "float")
+                force = unwrap(tokens, 6, "float")
+                theta_rad = theta * math.pi / 180
+                last_molecule().dihedrals.append(
+                    (system.proper_dihedral, i, j, k, l,
+                     [theta_rad, force, multiplicity])
+                )
+            case 2:
+                # improper
+                theta = unwrap(tokens, 5, "float")
+                force = unwrap(tokens, 6, "float")
+                theta = theta - 360 if theta > 180 else theta
+                theta_rad = theta * math.pi / 180
+                last_molecule().dihedrals.append(
+                    (system.improper_dihedral, i, j, k, l,
+                     [theta_rad, force])
+                )
+            case 3:
+                # ryckaert-bellemans = RB
+                params = []
+                for i in range(6):
+                    # C0 to C5
+                    params.append(unwrap(tokens, 5+i, "float"))
+                last_molecule().dihedrals.append(
+                    (system.rb_torsion, i, j, k, l, params)
+                )
+            case 4:
+                # periodic improper dihedral TODO
+                raise NotImplementedError
+            case 5:
+                # Fourier dihedral
+                params = []
+                for i in range(5):
+                    # C1 to C5
+                    params.append(unwrap(tokens, 5+i, "float"))
+                rb_params = [
+                    params[1] + 0.5 * (params[0] + params[2]),
+                    0.5 * (-params[0] + 3 * params[2]),
+                    -params[1] + 4 * params[3],
+                    -2 * params[2],
+                    -4 * params[3],
+                    0,
+                ]
+                last_molecule().dihedrals.append(
+                    (system.rb_torsion, i, j, k, l, rb_params)
+                )
+            case 11:
+                # combined bending-torsion potential
+                force = unwrap(tokens, 5, "float")
+                params = [force]
+                for i in range(5):
+                    # a0 to a4
+                    params.append(unwrap(tokens, 6+i, "float"))
+                last_molecule().dihedrals.append(
+                    (system.combined_bending_torsion, i, j, k, l, params)
+                )
+            case _:
+                raise ValueError("Unsupported dihedral function type {type}.")
 
     p.add_level("dihedrals", process_dihedrals)
 
