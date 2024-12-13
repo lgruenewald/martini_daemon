@@ -1,0 +1,53 @@
+;AEA topology Martini 3 version
+
+[ moleculetype ]
+; molname  nrexcl
+AEA    1
+
+[ atoms ]
+; i type resnr residue atom cgnr charge mass
+1 SP1  1      AEA   O1C   1    0.0    54.0
+2 SP2  1      AEA   NCO   2    0.0    54.0
+3 SC2  1      AEA    C1   3    0.0    54.0
+4 SC4  1      AEA    C2   4    0.0    54.0
+5 SC4  1      AEA    C3   5    0.0    54.0
+6 SC4  1      AEA    C4   6    0.0    54.0
+7 SC4  1      AEA    C5   7    0.0    54.0
+8  C1  1      AEA    C6   8    0.0    72.0
+
+[ bonds ]
+; i  j  funct  length  force
+1 2  1  0.3 30000 ;b1
+2 3  1  0.3 6500 ;b2
+3 4  1  0.35 4000 ;b3
+4 5  1  0.34 9000 ;b4
+5 6  1  0.34 9000 ;b5
+6 7  1  0.34 9000 ;b6
+7 8  1  0.42 5000 ;b7
+
+[ angles ]
+1 2 3 1 150 45 ;a1
+2 3 4 1 140  13 ;a2
+3 4 5 1 125   13 ;a3
+4 5 6 1 120   20 ;a4
+5 6 7 1 120   25 ;a5
+6 7 8 1 125   20 ;a6
+
+;[ dihedrals ]
+;1  2  3  4   1  -166.2  100
+;2  3  4  5   1   36.3  100
+;3  4  5  6   1  -174.2  100
+;4  5  6  7   1   160   100
+;5  6  7  8   1   126.3   100
+
+;[ exclusions ]
+; i  j  k  ...
+;1  2  3  4  5  6  7  8
+;2  3  4  5  6  7  8
+;3  4  5  6  7  8
+;4  5  6  7  8
+;5  6  7  8
+;6  7  8
+;7  8
+
+

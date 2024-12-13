@@ -1,0 +1,3 @@
+Single molecule of BDT dimer.
+Notably, it test the 3fad virtual site, and the restraint potential
+(angle type 10).

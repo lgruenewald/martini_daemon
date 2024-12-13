@@ -173,13 +173,13 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         k = unwrap(tokens, 2, "int") - 1
         l = unwrap(tokens, 3, "int") - 1
         type = unwrap(tokens, 4, "int")
-        multiplicity = unwrap(tokens, 7, "int", 1)
         match type:
             case 1 | 9:
                 # proper dihedral | proper dihedral (multiple)
                 theta = unwrap(tokens, 5, "float")
                 force = unwrap(tokens, 6, "float")
                 theta_rad = theta * math.pi / 180
+                multiplicity = unwrap(tokens, 7, "int", 1)
                 last_molecule().dihedrals.append(
                     (system.proper_dihedral, i, j, k, l,
                      [theta_rad, force, multiplicity])
@@ -197,9 +197,9 @@ def DaemonTopFile(file, include_dir=None, defines={}):
             case 3:
                 # ryckaert-bellemans = RB
                 params = []
-                for i in range(6):
+                for c in range(6):
                     # C0 to C5
-                    params.append(unwrap(tokens, 5+i, "float"))
+                    params.append(unwrap(tokens, 5+c, "float"))
                 last_molecule().dihedrals.append(
                     (system.rb_torsion, i, j, k, l, params)
                 )
@@ -209,9 +209,9 @@ def DaemonTopFile(file, include_dir=None, defines={}):
             case 5:
                 # Fourier dihedral
                 params = []
-                for i in range(5):
+                for c in range(5):
                     # C1 to C5
-                    params.append(unwrap(tokens, 5+i, "float"))
+                    params.append(unwrap(tokens, 5+c, "float"))
                 rb_params = [
                     params[1] + 0.5 * (params[0] + params[2]),
                     0.5 * (-params[0] + 3 * params[2]),
@@ -227,9 +227,9 @@ def DaemonTopFile(file, include_dir=None, defines={}):
                 # combined bending-torsion potential
                 force = unwrap(tokens, 5, "float")
                 params = [force]
-                for i in range(5):
+                for c in range(5):
                     # a0 to a4
-                    params.append(unwrap(tokens, 6+i, "float"))
+                    params.append(unwrap(tokens, 6+c, "float"))
                 last_molecule().dihedrals.append(
                     (system.combined_bending_torsion, i, j, k, l, params)
                 )

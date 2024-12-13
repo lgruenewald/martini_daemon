@@ -139,7 +139,7 @@ class HarmonicAngle(Force):
 class G96Angle(Force):
     def _build(self):
         self._force_obj = mm.CustomAngleForce(
-            "0.5*k*(cos(theta)-cos(theta0))^2"
+            "0.5 * k * (cos(theta) - cos(theta0))^2"
         )
         self._force_obj.addPerAngleParameter("theta0")
         self._force_obj.addPerAngleParameter("k")
@@ -309,10 +309,10 @@ class VSite3fad(Force):
         dcos = d * math.cos(theta)
         dsin = d * math.sin(theta)
         vsite = mm.LocalCoordinatesSite(
-            [k, j, i],  # particles
-            [0.0, 0.0, 1.0],  # origin weights
-            [0.0, 0.5, -0.5],  # x direction weight
-            [0.5, -0.5, 0.0],  # y direction weight
+            [i, j, k],  # particles
+            [1.0, 0.0, 0.0],  # origin weights
+            [-0.5, 0.5, 0.0],  # x direction weight
+            [0.0, -0.5, 0.5],  # y direction weight
             [dcos, dsin, 0.0]  # coordinates
         )
         self._sysstar._system.setVirtualSite(vid, vsite)
@@ -325,6 +325,8 @@ class VSite3fad(Force):
         self._list.append((vid, i, j, k, theta, d))
         if not self._rebuild:
             self._make_vsite(vid, i, j, k, theta, d)
+            self._sysstar._reinitialize = True
+        return self._interaction()
 
     def get_members(self, i):
         vid, i, j, k, _, _ = self._list[i]
@@ -442,11 +444,8 @@ class SysStar():
             # Change of LJ params plus self correction force
             part_type_id = self.use_atom_type(part_type)
             self._nb_force.setParticleParameters(part_id, [part_type_id, charge])
-            if old_charge != charge and old_charge == 0.:
-                self._es_self_correction_force.addBond(
-                    part_id, part_id, [0.5 * charge ** 2]
-                )
-            else:
+            if old_charge != charge:
+                # TODO optimize this later maybe?
                 self._es_self_correction_force_rebuild = True
 
         if old_mass != mass:
@@ -545,8 +544,18 @@ class SysStar():
                 return True
         return False
 
+    def es_self_correction_add(self, i, j):
+        _, _, q1, _ = self._part_list[i]
+        _, _, q2, _ = self._part_list[j]
+        qprod = q1 * q2
+        if i == j:
+            qprod *= 0.5
+        if qprod != 0:
+            self._es_self_correction_force.addBond(
+                i, j, [qprod]
+            )
+
     def build_es_self_correction_force(self):
-        """
         self._es_self_correction_force = mm.CustomBondForce(
             f"step(rcut-r) * ES;"
             f"ES = f*q_product/epsilon_r * (krf * r^2 - crf);"
@@ -556,25 +565,17 @@ class SysStar():
             f"f = 138.935458;"
             f"rcut={self.nonbonded_cutoff.value_in_unit(nanometer)};"
         )
-        """
         # https://manual.gromacs.org/documentation/current/reference-manual/functions/nonbonded-interactions.html
         # see section Coulomb interaction with reaction field
-        f = 138.935458
-        rcut = self.nonbonded_cutoff.value_in_unit(nanometer)
-        er = self.epsilon_r
-        factor = - 3. / 2. * f / er / rcut
-        self._es_self_correction_force = mm.CustomBondForce(
-            f"{factor}*q_product"
-        )
         self._es_self_correction_force.addPerBondParameter("q_product")
         self._system.addForce(self._es_self_correction_force)
         self._forces_list.append(self._es_self_correction_force)
         for i, (_, _, charge, _) in enumerate(filter(None, self._part_list)):
             if charge != 0:
                 # self term in reaction field correction
-                self._es_self_correction_force.addBond(
-                    i, i, [0.5 * charge ** 2]
-                )
+                self.es_self_correction_add(i, i)
+        for (i, j) in self._exclusion_list:
+            self.es_self_correction_add(i, j)
         self._es_self_correction_force_rebuild = False
         self._reinitialize = True
 
@@ -582,6 +583,7 @@ class SysStar():
         self._exclusion_list.append((i, j))
         if self.context_initialized:
             self._nb_force.addExclusion(i, j)
+            self.es_self_correction_add(i, j)
             self._reinitialize = True
         return len(self._exclusion_list) - 1
 
@@ -710,7 +712,8 @@ class SysStar():
         """Returns a state with forces and energies, used in test.py."""
         if not self.context_initialized:
             raise Exception("Initialize the context first")
-        state = self._context.getState(forces=True, energy=True)
+        state = self._context.getState(positions=True, velocities=True,
+                                       forces=True, energy=True)
         return state
 
     def apply_constraints(self):

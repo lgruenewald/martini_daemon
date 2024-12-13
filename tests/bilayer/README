@@ -1,0 +1,3 @@
+A lipid bilayer generated with insane, DPPC:DIPC 1:1, in water. Tests the G96
+angles used in martini 3 lipids. Also has two (opposing) charges bonded to
+eachother, so it tests excluded Coulomb forces (and the correction term).
