@@ -317,6 +317,14 @@ def DaemonTopFile(file, include_dir=None, defines={}):
                 last_molecule().dihedrals.append(
                     (system.vsite_3fad, vid, i, j, k, [theta, d])
                 )
+            case 4:
+                # 3out
+                a = unwrap(tokens, 5, "float")
+                b = unwrap(tokens, 6, "float")
+                c = unwrap(tokens, 7, "float")
+                last_molecule().dihedrals.append(
+                    (system.vsite_3out, vid, i, j, k, [a, b, c])
+                )
             case _:
                 raise ValueError(
                     f"Virtual site 3 type {type} not implemented."
