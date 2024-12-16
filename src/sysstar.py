@@ -263,12 +263,12 @@ class CombinedBendingTorsion(Force):
         self._force_obj.addPerBondParameter("a3")
         self._force_obj.addPerBondParameter("a4")
         for (i, j, k, l, force, a0, a1, a2, a3, a4) in filter(None, self._list):
-            self._force_obj.addBond(i, j, k, l, (force, a0, a1, a2, a3, a4))
+            self._force_obj.addBond((i, j, k, l), (force, a0, a1, a2, a3, a4))
 
     def add(self, i, j, k, l, force, a0, a1, a2, a3, a4):
         self._list.append((i, j, k, l, force, a0, a1, a2, a3, a4))
         if not self._rebuild:
-            self._force_obj.addBond(i, j, k, l, (force, a0, a1, a2, a3, a4))
+            self._force_obj.addBond((i, j, k, l), (force, a0, a1, a2, a3, a4))
             self._sysstar._reinitialize = True
         return self._interaction()
 

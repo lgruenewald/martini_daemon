@@ -209,8 +209,8 @@ def DaemonTopFile(file, include_dir=None, defines={}):
             case 5:
                 # Fourier dihedral
                 params = []
-                for c in range(5):
-                    # C1 to C5
+                for c in range(4):
+                    # C1 to C4
                     params.append(unwrap(tokens, 5+c, "float"))
                 rb_params = [
                     params[1] + 0.5 * (params[0] + params[2]),
