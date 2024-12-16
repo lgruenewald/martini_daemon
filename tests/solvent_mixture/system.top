@@ -1,4 +1,6 @@
-#include "martini_subset.itp"
+#include "../martini_v3.0.0.itp"
+#include "../martini_v3.0.0_small_molecules_v2.itp"
+#include "../martini_v3.0.0_solvents_v1.itp"
 
 [ system ]
 ; name

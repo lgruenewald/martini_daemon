@@ -301,29 +301,58 @@ def DaemonTopFile(file, include_dir=None, defines={}):
         system.add_nb_type(type1, type2, V, W)
 
     p.add_level("nonbond_params", process_nonbond_params)
-    p.add_level("virtual_sites2", TODO)
+    p.add_level("virtual_sites1", TODO)
+
+    def process_virtual_sites2(tokens):
+        vid = unwrap(tokens, 0, "int") - 1
+        i = unwrap(tokens, 1, "int") - 1
+        j = unwrap(tokens, 2, "int") - 1
+        members = [vid, i, j]
+        type = unwrap(tokens, 3, "int")
+        match type:
+            case 1:
+                a = unwrap(tokens, 4, "float")
+                weights = [1-a, a]
+                last_molecule().interactions.append(
+                    (system.vsite_avg, members, weights)
+                )
+            case _:
+                raise ValueError(
+                    f"Virtua site 2 type {type} not implemented."
+                )
+
+    p.add_level("virtual_sites2", process_virtual_sites2)
 
     def process_virtual_sites3(tokens):
         vid = unwrap(tokens, 0, "int") - 1
         i = unwrap(tokens, 1, "int") - 1
         j = unwrap(tokens, 2, "int") - 1
         k = unwrap(tokens, 3, "int") - 1
+        members = [vid, i, j, k]
         type = unwrap(tokens, 4, "int")
         match type:
+            case 1:
+                # 3
+                a = unwrap(tokens, 5, "float")
+                b = unwrap(tokens, 6, "float")
+                weights = [1 - a - b, a, b]
+                last_molecule().interactions.append(
+                    (system.vsite_avg, members, weights)
+                )
             case 3:
                 # 3fad
                 theta = unwrap(tokens, 5, "float") * math.pi / 180
                 d = unwrap(tokens, 6, "float")
-                last_molecule().dihedrals.append(
-                    (system.vsite_3fad, vid, i, j, k, [theta, d])
+                last_molecule().interactions.append(
+                    (system.vsite_3fad, members, [theta, d])
                 )
             case 4:
                 # 3out
                 a = unwrap(tokens, 5, "float")
                 b = unwrap(tokens, 6, "float")
                 c = unwrap(tokens, 7, "float")
-                last_molecule().dihedrals.append(
-                    (system.vsite_3out, vid, i, j, k, [a, b, c])
+                last_molecule().interactions.append(
+                    (system.vsite_3out, members, [a, b, c])
                 )
             case _:
                 raise ValueError(
@@ -331,7 +360,27 @@ def DaemonTopFile(file, include_dir=None, defines={}):
                 )
 
     p.add_level("virtual_sites3", process_virtual_sites3)
-    p.add_level("virtual_sitesn", TODO)
+    p.add_level("virtual_sites4", TODO)
+
+    def process_virtual_sitesn(tokens):
+        vid = unwrap(tokens, 0, "int") - 1
+        members = [vid]
+        type = unwrap(tokens, 1, "int")
+        match type:
+            case 1:
+                for c in range(2, len(tokens)):
+                    members.append(unwrap(tokens, c, "int") - 1)
+                n = len(members) - 1
+                weights = [1/n] * n
+                last_molecule().interactions.append(
+                    (system.vsite_avg, members, weights)
+                )
+            case _:
+                raise ValueError(
+                    f"Virtua site n type {type} not implemented."
+                )
+
+    p.add_level("virtual_sitesn", process_virtual_sitesn)
 
     # custom additions: rx and frag
     _last_frag = None

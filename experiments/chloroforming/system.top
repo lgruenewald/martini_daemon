@@ -1,4 +1,5 @@
-#include "martini_subset.itp"
+#include "../../tests/martini_v3.0.0.itp"
+#include "../../tests/martini_v3.0.0_solvents_v1.itp"
 
 [ system ]
 ; name

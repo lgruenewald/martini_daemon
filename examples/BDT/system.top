@@ -1,4 +1,4 @@
-#include "/martini/aster/gromacs/martini_v300/martini_v3.0.0.itp"
+#include "../../tests/martini_v3.0.0.itp"
 #include "dimer.itp"
 
 [ system ]

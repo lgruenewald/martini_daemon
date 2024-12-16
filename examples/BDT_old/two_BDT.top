@@ -1,5 +1,5 @@
 
-#include "martini_subset.itp"
+#include "../../tests/martini_v3.0.0.itp"
 #include "BDT.itp"
 
 #ifdef DAEMON

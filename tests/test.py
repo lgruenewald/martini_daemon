@@ -45,7 +45,9 @@ def test_daemon(top, gro):
     system.set_positions(gro.getPositions(True))
     state = system.get_state()
     energy = state.getPotentialEnergy().value_in_unit(kilojoule_per_mole)
-    return energy
+    forces = state.getForces(asNumpy=True).\
+        value_in_unit(kilojoule / nanometer / mole).flatten()
+    return energy, forces
 
 
 def test_martini_openmm(top, gro):
@@ -78,7 +80,7 @@ for x in tests:
         os.system("./gmxrun.sh")
         constraint_passed = test_constraints("system.top", "system.gro")
         # Run Daemon+openmm
-        daemon_energy = test_daemon("system.top", "system.gro")
+        daemon_energy, daemon_forces = test_daemon("system.top", "system.gro")
         # run martini_openmm
         # Compare forces and energies
         with open("energy.xvg") as f:
@@ -87,12 +89,34 @@ for x in tests:
 
         diff = math.fabs(gmx_energy / daemon_energy - 1)
 
-        gromacs_passed = False
+        gromacs_passed = True
         if diff > etol:
-            print("Gromacs energy:", gmx_energy)
-            print("Daemon energy:", daemon_energy)
-        else:
-            gromacs_passed = True
+            print(f"Gromacs energy: {gmx_energy:.10e}")
+            print(f"Daemon energy: {daemon_energy:.10e}")
+            gromacs_passed = False
+
+        with open("forces.xvg") as f:
+            lines = [line for line in f]
+            gmx_force_line = lines[-1].split()
+            gmx_forces = np.array([float(x) for x in gmx_force_line][1:])
+
+        force_passed = True
+        force_diff = np.fabs(gmx_forces / daemon_forces - 1.)
+        if np.any(force_diff > ftol):
+            print("Unmatched forces")
+            i_max = np.argmax(force_diff)
+            max = force_diff[i_max]
+            daemon_force = daemon_forces[i_max]
+            gmx_force = gmx_forces[i_max]
+            abs_diff = np.fabs(daemon_force - gmx_force)
+            atom_index = i_max // 3
+            atom_dim = i_max % 3
+            print(f"Largest deviation for particle {atom_index} "
+                  f"dimension {atom_dim}: {max}")
+            print(f"Daemon force: {daemon_force:.10e}")
+            print(f"Gromacs force: {gmx_force:.10e}")
+            print(f"Absolute difference: {abs_diff:.3e}")
+            force_passed = False
 
         try:
             martini_openmm_energy = test_martini_openmm("system.top", "system.gro")
@@ -100,13 +124,15 @@ for x in tests:
             if diff2 > etol:
                 print("Warning: martini_openmm energy different")
                 if gromacs_passed:
-                    print("Gromacs energy:", gmx_energy)
-                    print(f"Daemon energy: {daemon_energy}")
-                print(f"Martini openmm energy: {martini_openmm_energy}")
+                    print(f"Gromacs energy: {gmx_energy:.10e}")
+                    print(f"Daemon energy: {daemon_energy:.10e}")
+                print(f"Martini openmm energy: {martini_openmm_energy:.10e}")
+            elif not gromacs_passed:
+                print("Note - martini_openmm energy same as daemon")
         except:
             print("Note - martini openmm comparison failed")
 
-        if not constraint_passed or not gromacs_passed:
+        if not constraint_passed or not gromacs_passed or not force_passed:
             print("FAIL")
         else:
             print("PASS")

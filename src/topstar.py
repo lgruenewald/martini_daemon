@@ -54,6 +54,8 @@ class MolFragment:
     exclusions: list[list[int]]
     # constraints: i j length
     constraints: list[(int, int, float)]
+    # interactions: generic members and params
+    interactions: list[(Force, list, list)]
 
     def add_exclusion(self, i, j):
         """Adds an exclusion to the list of exclusions
@@ -169,7 +171,7 @@ class TopStar():
     def new_mol_fragment(self, name: str):
         if self.type_lookup.get(name):
             raise ValueError(f"Second definition of fragment type {name}")
-        mol_fragment = MolFragment(name, [], [], [], [], [], [])
+        mol_fragment = MolFragment(name, [], [], [], [], [], [], [])
         self.type_lookup[name] = mol_fragment
         return mol_fragment
 
@@ -368,6 +370,10 @@ class TopStar():
             i, j, length = cons
             c = self.system.add_constraint(particles[i], particles[j], length)
             inst.constraints.append(c)
+        # generic interactions
+        for (force, members, params) in frag.interactions:
+            members = [particles[x] for x in members]
+            inst.interactions.append(force.add(members, params))
 
         self.instantiate_subfrags(frag_name, inst, original_parent=inst)
         return inst
