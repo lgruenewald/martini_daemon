@@ -123,9 +123,8 @@ Updating the T* should be done following these rules:
 ## Limitations
 
 - the number of particles cannot be changed during reactions
-- fragments that overlap will destroy eachother, so if there are multiple
-  reactive groups that can react independently their fragments should not
-  overlap, or they should be built together
+- constraints and virtual sites cannot be created or removed during reactions
+- fragments that overlap can't react
 - no checking for duplicate exclusions created between two particles during
   reactions (yet?) - this will throw an exception
 - constraints and interactions specified by the user

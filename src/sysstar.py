@@ -48,6 +48,7 @@ class Force():
         if self._rebuild:
             self.destroy()
             self._build()
+            self._force_obj.setUsesPeriodicBoundaryConditions(True)
             self._rebuild = False
             self._sysstar._forces_list.append(self._force_obj)
             self._sysstar._system.addForce(self._force_obj)
@@ -339,8 +340,7 @@ class VSiteWeighedAverage(Force):
         vid, *members = members
         self._list.append((vid, members, weights))
         if not self._rebuild:
-            self._make_vsite(vid, members, weights)
-            self._sysstar._reinitialize = True
+            raise Exception("Can't add virtual sites during run")
         return self._interaction()
 
     def get_members(self, i):
@@ -393,8 +393,7 @@ class VSite3fad(Force):
         theta, d = params
         self._list.append((vid, i, j, k, theta, d))
         if not self._rebuild:
-            self._make_vsite(vid, i, j, k, theta, d)
-            self._sysstar._reinitialize = True
+            raise Exception("Can't add virtual sites during run")
         return self._interaction()
 
     def get_members(self, i):
@@ -441,8 +440,7 @@ class VSite3out(Force):
         a, b, c = params
         self._list.append((vid, i, j, k, a, b, c))
         if not self._rebuild:
-            self._make_vsite(vid, i, j, k, a, b, c)
-            self._sysstar._reinitialize = True
+            raise Exception("Can't add virtual sites during run")
         return self._interaction()
 
     def get_members(self, i):
@@ -615,6 +613,8 @@ class SysStar():
             "f = 138.935458;"
             f"rcut={self.nonbonded_cutoff.value_in_unit(nanometer)};"
         )
+        # self._nb_force.setUsesPeriodicBoundaryConditions(True)
+        # doesn't seem to exist for nb forces
         self._nb_force.addPerParticleParameter("type")
         self._nb_force.addPerParticleParameter("q")
         self._nb_force.setNonbondedMethod(
@@ -687,6 +687,7 @@ class SysStar():
         # https://manual.gromacs.org/documentation/current/reference-manual/functions/nonbonded-interactions.html
         # see section Coulomb interaction with reaction field
         self._es_self_correction_force.addPerBondParameter("q_product")
+        self._es_self_correction_force.setUsesPeriodicBoundaryConditions(True)
         self._system.addForce(self._es_self_correction_force)
         self._forces_list.append(self._es_self_correction_force)
         for i, (_, _, charge, _) in enumerate(filter(None, self._part_list)):
@@ -717,8 +718,7 @@ class SysStar():
         """Adds a constraint to the list, returns its constraint_id"""
         self._constraint_list.append((i, j, length))
         if self.context_initialized:
-            self._system.addConstraint(i, j, length)
-            self._reinitialize = True
+            raise Exception("Can't add constraint during run")
         return len(self._constraint_list) - 1
 
     def get_constraint_members(self, constraint_id):
@@ -726,7 +726,7 @@ class SysStar():
         return (i, j)
 
     def remove_constraint(self, constraint_id):
-        raise NotImplementedError("Constraints cannot be safely removed yet")
+        raise NotImplementedError("Constraints cannot be safely removed")
 
     def add_atom_type(self, type, charge, mass):
         if self.context_initialized:

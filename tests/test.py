@@ -61,7 +61,10 @@ def test_martini_openmm(top, gro):
     sim = mmapp.Simulation(top.topology, system, integrator)
     sim.context.setPositions(gro.getPositions())
     state = sim.context.getState(getEnergy=True, getForces=True)
-    return state.getPotentialEnergy().value_in_unit(kilojoule_per_mole)
+    energy = state.getPotentialEnergy().value_in_unit(kilojoule_per_mole)
+    forces = state.getForces(asNumpy=True).\
+        value_in_unit(kilojoule / nanometer / mole).flatten()
+    return energy, forces
 
 
 argv = sys.argv
@@ -77,7 +80,7 @@ for x in tests:
         # Run GMX
         print(f"Test {x}:")
         os.chdir(x)
-        os.system("./gmxrun.sh")
+        os.system("../gmxrun.sh")
         constraint_passed = test_constraints("system.top", "system.gro")
         # Run Daemon+openmm
         daemon_energy, daemon_forces = test_daemon("system.top", "system.gro")
@@ -119,16 +122,35 @@ for x in tests:
             force_passed = False
 
         try:
-            martini_openmm_energy = test_martini_openmm("system.top", "system.gro")
-            diff2 = math.fabs(martini_openmm_energy / daemon_energy - 1)
-            if diff2 > etol:
+            mo_energy, mo_forces = test_martini_openmm("system.top", "system.gro")
+            diff2 = math.fabs(mo_energy / daemon_energy - 1)
+            if diff2 > 1e-7:
                 print("Warning: martini_openmm energy different")
                 if gromacs_passed:
                     print(f"Gromacs energy: {gmx_energy:.10e}")
                     print(f"Daemon energy: {daemon_energy:.10e}")
-                print(f"Martini openmm energy: {martini_openmm_energy:.10e}")
+                print(f"Martini openmm energy: {mo_energy:.10e}")
             elif not gromacs_passed:
-                print("Note - martini_openmm energy same as daemon")
+                print("Note - martini_openmm energy same as daemon.")
+
+            force_diff2 = np.fabs(mo_forces / daemon_forces - 1.)
+            if np.any(force_diff2 > 1e-7):
+                print("Warning - Unmatched martini_openmm force")
+                i_max = np.argmax(force_diff2)
+                max = force_diff2[i_max]
+                daemon_force = daemon_forces[i_max]
+                mo_force = mo_forces[i_max]
+                abs_diff = np.fabs(daemon_force - mo_force)
+                atom_index = i_max // 3
+                atom_dim = i_max % 3
+                print(f"Largest deviation for particle {atom_index} "
+                      f"dimension {atom_dim}: {max}")
+                print(f"Daemon force: {daemon_force:.10e}")
+                print(f"Martini Openmm force: {mo_force:.10e}")
+                print(f"Absolute difference: {abs_diff:.3e}")
+            elif not force_passed:
+                print("Note - martini openmm forces match with daemon.")
+
         except:
             print("Note - martini openmm comparison failed")
 
