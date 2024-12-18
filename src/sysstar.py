@@ -738,7 +738,7 @@ class SysStar():
             raise ValueError("Cannot do this after context is initialized")
         self._nb_types[(type1, type2)] = (V, W)
 
-    def build_context(self, integrator, periodicBoxVectors):
+    def build_context(self, integrator, periodicBoxVectors, platform=None):
         """context_initialized flips the state of S* in a way
         the parsing of a topology and the addition of all particles, bonds, ...
         should happen before calling build_context
@@ -759,7 +759,7 @@ class SysStar():
         # Build context
         self._periodic_box = periodicBoxVectors
         self._system.setDefaultPeriodicBoxVectors(*periodicBoxVectors)
-        self._context = mm.Context(self._system, integrator)
+        self._context = mm.Context(self._system, integrator, platform)
         self._context.setPeriodicBoxVectors(*periodicBoxVectors)
 
     def reinitialize(self):

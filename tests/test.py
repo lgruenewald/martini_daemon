@@ -20,11 +20,13 @@ rtol = 2e-3  # distance tolerance
 
 def test_constraints(top, gro):
     # applies constraints and vsites and checks for position change
+    platform = mm.Platform.getPlatformByName("Reference")
     system, top = DaemonTopFile(top)
     gro = mmapp.GromacsGroFile(gro)
     oldpos = gro.getPositions(True)
     system.build_context(mm.VerletIntegrator(20 * femtosecond),
-                         gro.getPeriodicBoxVectors())
+                         gro.getPeriodicBoxVectors(),
+                         platform=platform)
     system.set_positions(gro.getPositions(True))
     system.apply_constraints()
     newpos = system.get_state().getPositions(asNumpy=True)
@@ -38,10 +40,12 @@ def test_constraints(top, gro):
 
 
 def test_daemon(top, gro):
+    platform = mm.Platform.getPlatformByName("Reference")
     system, top = DaemonTopFile(top)
     gro = mmapp.GromacsGroFile(gro)
     system.build_context(mm.VerletIntegrator(20 * femtosecond),
-                         gro.getPeriodicBoxVectors())
+                         gro.getPeriodicBoxVectors(),
+                         platform=platform)
     system.set_positions(gro.getPositions(True))
     state = system.get_state()
     energy = state.getPotentialEnergy().value_in_unit(kilojoule_per_mole)
@@ -51,6 +55,7 @@ def test_daemon(top, gro):
 
 
 def test_martini_openmm(top, gro):
+    platform = mm.Platform.getPlatformByName("Reference")
     gro = mmapp.GromacsGroFile(gro)
     box_vectors = gro.getPeriodicBoxVectors()
     top = martini.MartiniTopFile(top, periodicBoxVectors=box_vectors)
@@ -58,7 +63,7 @@ def test_martini_openmm(top, gro):
     integrator = mm.LangevinIntegrator(
         300, 1.0, 2
     )
-    sim = mmapp.Simulation(top.topology, system, integrator)
+    sim = mmapp.Simulation(top.topology, system, integrator, platform)
     sim.context.setPositions(gro.getPositions())
     state = sim.context.getState(getEnergy=True, getForces=True)
     energy = state.getPotentialEnergy().value_in_unit(kilojoule_per_mole)
