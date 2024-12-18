@@ -48,6 +48,3 @@ gen_seed                 = 11111
 constraints              = none 
 constraint_algorithm     = Lincs
 
-lincs-iter               = 2  
-lincs-order              = 12
-

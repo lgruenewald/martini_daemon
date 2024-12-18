@@ -33,10 +33,9 @@ def test_constraints(top, gro):
     delta = np.linalg.norm(newpos - oldpos, axis=1)
     if np.any(delta > rtol):
         largest_index = np.argmax(delta)
-        print("Constraint/VSite position deviation, largest at "
-              f"{largest_index}: {delta[largest_index]} nm.")
-        return False
-    return True
+        return False, "Constraint/VSite position deviation, largest at "\
+                      f"{largest_index}: {delta[largest_index]} nm.\n"
+    return True, None
 
 
 def test_daemon(top, gro):
@@ -80,13 +79,20 @@ tests = os.listdir(os.curdir)
 if argc > 1:
     tests = argv[1:]
 
+passed = 0
+failed = 0
+
 for x in tests:
     if os.path.isdir(x):
         # Run GMX
-        print(f"Test {x}:")
         os.chdir(x)
         os.system("../gmxrun.sh")
-        constraint_passed = test_constraints("system.top", "system.gro")
+        errors = []
+        notes = []
+
+        constraint_passed, msg = test_constraints("system.top", "system.gro")
+        if not constraint_passed:
+            errors.append(msg)
         # Run Daemon+openmm
         daemon_energy, daemon_forces = test_daemon("system.top", "system.gro")
         # run martini_openmm
@@ -97,21 +103,19 @@ for x in tests:
 
         diff = math.fabs(gmx_energy / daemon_energy - 1)
 
-        gromacs_passed = True
         if diff > etol:
-            print(f"Gromacs energy: {gmx_energy:.10e}")
-            print(f"Daemon energy: {daemon_energy:.10e}")
-            gromacs_passed = False
+            errors.append(
+                f"Gromacs energy: {gmx_energy:.10e}\n"
+                f"Daemon energy: {daemon_energy:.10e}\n"
+            )
 
         with open("forces.xvg") as f:
             lines = [line for line in f]
             gmx_force_line = lines[-1].split()
             gmx_forces = np.array([float(x) for x in gmx_force_line][1:])
 
-        force_passed = True
         force_diff = np.fabs(gmx_forces / daemon_forces - 1.)
         if np.any(force_diff > ftol):
-            print("Unmatched forces")
             i_max = np.argmax(force_diff)
             max = force_diff[i_max]
             daemon_force = daemon_forces[i_max]
@@ -119,28 +123,29 @@ for x in tests:
             abs_diff = np.fabs(daemon_force - gmx_force)
             atom_index = i_max // 3
             atom_dim = i_max % 3
-            print(f"Largest deviation for particle {atom_index} "
-                  f"dimension {atom_dim}: {max}")
-            print(f"Daemon force: {daemon_force:.10e}")
-            print(f"Gromacs force: {gmx_force:.10e}")
-            print(f"Absolute difference: {abs_diff:.3e}")
-            force_passed = False
+            errors.append(
+                f"Large force deviation for particle {atom_index} "
+                f"dimension {atom_dim}\n"
+                f"absolute diff: {abs_diff:.3e}    relative diff: {max:.3e}\n"
+                f"Daemon force: {daemon_force:.10e}\n"
+                f"Gromacs force: {gmx_force:.10e}\n"
+            )
 
         try:
             mo_energy, mo_forces = test_martini_openmm("system.top", "system.gro")
             diff2 = math.fabs(mo_energy / daemon_energy - 1)
             if diff2 > 1e-7:
-                print("Warning: martini_openmm energy different")
-                if gromacs_passed:
-                    print(f"Gromacs energy: {gmx_energy:.10e}")
-                    print(f"Daemon energy: {daemon_energy:.10e}")
-                print(f"Martini openmm energy: {mo_energy:.10e}")
-            elif not gromacs_passed:
-                print("Note - martini_openmm energy same as daemon.")
+                notes.append(
+                    "Warning: martini_openmm energy different\n"
+                    f"Gromacs energy: {gmx_energy:.10e}\n"
+                    f"Daemon energy: {daemon_energy:.10e}\n"
+                    f"Martini openmm energy: {mo_energy:.10e}.\n"
+                )
+            elif len(errors) > 0:
+                notes.append("Martini_openmm energy matches daemon.\n")
 
             force_diff2 = np.fabs(mo_forces / daemon_forces - 1.)
             if np.any(force_diff2 > 1e-7):
-                print("Warning - Unmatched martini_openmm force")
                 i_max = np.argmax(force_diff2)
                 max = force_diff2[i_max]
                 daemon_force = daemon_forces[i_max]
@@ -148,25 +153,37 @@ for x in tests:
                 abs_diff = np.fabs(daemon_force - mo_force)
                 atom_index = i_max // 3
                 atom_dim = i_max % 3
-                print(f"Largest deviation for particle {atom_index} "
-                      f"dimension {atom_dim}: {max}")
-                print(f"Daemon force: {daemon_force:.10e}")
-                print(f"Martini Openmm force: {mo_force:.10e}")
-                print(f"Absolute difference: {abs_diff:.3e}")
-            elif not force_passed:
-                print("Note - martini openmm forces match with daemon.")
+                notes.append(
+                    f"Large force deviation for particle {atom_index} "
+                    f"dimension {atom_dim}\n"
+                    f"absolute diff: {abs_diff:.3e}    relative diff: {max:.3e}\n"
+                    f"Daemon force: {daemon_force:.10e}\n"
+                    f"Gromacs force: {mo_force:.10e}\n"
+                )
+            elif len(errors) > 0:
+                notes.append("Martini openmm forces match with daemon.\n")
 
         except:
-            print("Note - martini openmm comparison failed")
+            notes.append("Martini openmm failed to run.\n")
 
-        if not constraint_passed or not gromacs_passed or not force_passed:
-            print("FAIL")
+        if len(errors) > 0 or len(notes) > 0:
+            sys.stderr.write(f"== Test {x} ==\n")
+            for error in errors:
+                sys.stderr.write("\x1b[1;31m[ERROR] ")
+                sys.stderr.write(error)
+            for note in notes:
+                sys.stderr.write("\x1b[1;33m[NOTE] ")
+                sys.stderr.write(note)
+            sys.stderr.write("\x1b[0m")
+
+        if len(errors) > 0:
+            failed += 1
         else:
-            print("PASS")
+            passed += 1
 
         # cleanup
         os.remove("energy.xvg")
         os.remove("forces.xvg")
         os.chdir("..")
-    else:
-        print(f"Skipping {x}, not a directory.")
+
+print(f"Passed: {passed} Failed: {failed}")
