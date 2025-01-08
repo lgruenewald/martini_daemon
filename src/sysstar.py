@@ -838,10 +838,20 @@ class SysStar():
         # since enforcePeriodicBox really doesn't like bonds formed across
         # boundaries
         state = self._context.getState(positions=True)
-        box = state.getPeriodicBoxVectors()[0].x
+        box = state.getPeriodicBoxVectors()
+        box_x = box[0].x
+        box_y = box[1].y
+        box_z = box[2].z
+        # TODO: don't assume 90 degree angles in martini_daemon in general
+        # these asserts are there to ensure only 90 degree boxes are ran
+        assert box[1].x == 0.
+        assert box[2].x == 0.
+        assert box[2].y == 0.
         pos = state.getPositions(asNumpy=True).value_in_unit(nanometer)
-        pos = np.remainder(pos, box)
-        return pos, box
+        pos[:, 0] = np.remainder(pos[:, 0], box_x)
+        pos[:, 1] = np.remainder(pos[:, 1], box_y)
+        pos[:, 2] = np.remainder(pos[:, 2], box_z)
+        return pos, np.array([box_x, box_y, box_z])
 
     def get_state(self):
         """Returns a state with forces and energies, used in test.py."""
@@ -873,9 +883,7 @@ class SysStar():
             raise Exception("Initialize the context first")
         utils.backup_try(path)
         state = self._context.getState(positions=True, velocities=True)
-        box = state.getPeriodicBoxVectors()[0].x
-        pos = state.getPositions(asNumpy=True).value_in_unit(nanometer)
-        pos = np.remainder(pos, box)
+        pos, _ = self.get_positions()
         vel = state.getVelocities(asNumpy=True).\
             value_in_unit_system(md_unit_system)
         natoms = len(pos)

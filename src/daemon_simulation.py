@@ -27,7 +27,7 @@ class DaemonSimulation():
         self.gro = GromacsGroFile(gro_path)
 
         # FIXME: choice of coupling options etc
-#        self.system.add_force(mm.MonteCarloBarostat(p, T))
+        self.system.add_force(mm.MonteCarloBarostat(p, T))
         self.reaction_matrix = self.top.build_reaction_matrix()
         self.initiator_list = self.top.get_initiator_list()
 
@@ -37,6 +37,7 @@ class DaemonSimulation():
         self.system.set_positions(self.gro.getPositions(True))
         # FIXME: gen velocities or load velocities explicitly
         self.system.generate_velocities(T)
+        self.system.minimize_energy()
         # FIXME: hardcoded path
         self.system.set_xtc_path("traj.xtc")
 

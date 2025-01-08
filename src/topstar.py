@@ -544,7 +544,7 @@ class TopStar():
         init1 = frag1.particles[0]
         init2 = frag2.particles[0]
         # position dependent checks
-        dist = utils.pdist(pos[init1], pos[init2], float(box))
+        dist = utils.pdist(pos[init1], pos[init2], box)
         if dist >= rx.distance_max:
             return False
         return True
