@@ -13,8 +13,8 @@ import martini_openmm as martini
 sys.path.append("../src")
 from daemon_top_parser import DaemonTopFile
 
-etol = 1e-4  # energy relative tolerance
-ftol = 1e-4  # force relative tolerance
+etol = 1e-5  # energy relative tolerance
+ftol = 1e-5  # force relative tolerance
 rtol = 2e-3  # distance tolerance
 
 
@@ -24,7 +24,7 @@ def test_constraints(top, gro):
     system, top = DaemonTopFile(top)
     gro = mmapp.GromacsGroFile(gro)
     oldpos = gro.getPositions(True)
-    system.build_context(mm.VerletIntegrator(20 * femtosecond),
+    system.build_context(mm.VerletIntegrator(2 * femtosecond),
                          gro.getPeriodicBoxVectors(),
                          platform=platform)
     system.set_positions(gro.getPositions(True))
@@ -42,7 +42,7 @@ def test_daemon(top, gro):
     platform = mm.Platform.getPlatformByName("Reference")
     system, top = DaemonTopFile(top)
     gro = mmapp.GromacsGroFile(gro)
-    system.build_context(mm.VerletIntegrator(20 * femtosecond),
+    system.build_context(mm.VerletIntegrator(2 * femtosecond),
                          gro.getPeriodicBoxVectors(),
                          platform=platform)
     system.set_positions(gro.getPositions(True))
@@ -50,6 +50,10 @@ def test_daemon(top, gro):
     energy = state.getPotentialEnergy().value_in_unit(kilojoule_per_mole)
     forces = state.getForces(asNumpy=True).\
         value_in_unit(kilojoule / nanometer / mole).flatten()
+    for vsite in system.vsites:
+        forces[vsite * 3] = 0.
+        forces[vsite * 3 + 1] = 0.
+        forces[vsite * 3 + 2] = 0.
     return energy, forces
 
 
@@ -60,7 +64,7 @@ def test_martini_openmm(top, gro):
     top = martini.MartiniTopFile(top, periodicBoxVectors=box_vectors)
     system = top.create_system()
     integrator = mm.LangevinIntegrator(
-        300, 1.0, 2
+        300, 1.0, 2 * femtosecond
     )
     sim = mmapp.Simulation(top.topology, system, integrator, platform)
     sim.context.setPositions(gro.getPositions())
@@ -68,6 +72,10 @@ def test_martini_openmm(top, gro):
     energy = state.getPotentialEnergy().value_in_unit(kilojoule_per_mole)
     forces = state.getForces(asNumpy=True).\
         value_in_unit(kilojoule / nanometer / mole).flatten()
+    for vsite in top._all_vsites:
+        forces[vsite * 3] = 0.
+        forces[vsite * 3 + 1] = 0.
+        forces[vsite * 3 + 2] = 0.
     return energy, forces
 
 
@@ -107,6 +115,7 @@ for x in tests:
             errors.append(
                 f"Gromacs energy: {gmx_energy:.10e}\n"
                 f"Daemon energy: {daemon_energy:.10e}\n"
+                f"Relative difference {diff:.3e} above tolerance {etol:.2e}\n"
             )
 
         with open("forces.xvg") as f:
@@ -114,8 +123,9 @@ for x in tests:
             gmx_force_line = lines[-1].split()
             gmx_forces = np.array([float(x) for x in gmx_force_line][1:])
 
-        force_diff = np.fabs(gmx_forces / daemon_forces - 1.)
-        if np.any(force_diff > ftol):
+        force_diff = np.fabs(gmx_forces - daemon_forces) / \
+            (np.fabs(daemon_forces) + ftol)
+        if not np.allclose(gmx_forces, daemon_forces, ftol, 0.):
             i_max = np.argmax(force_diff)
             max = force_diff[i_max]
             daemon_force = daemon_forces[i_max]
@@ -144,7 +154,8 @@ for x in tests:
             elif len(errors) > 0:
                 notes.append("Martini_openmm energy matches daemon.\n")
 
-            force_diff2 = np.fabs(mo_forces / daemon_forces - 1.)
+            force_diff2 = np.fabs(mo_forces - daemon_forces) / \
+                (np.fabs(daemon_forces) + 1e-7)
             if np.any(force_diff2 > 1e-7):
                 i_max = np.argmax(force_diff2)
                 max = force_diff2[i_max]
@@ -158,7 +169,7 @@ for x in tests:
                     f"dimension {atom_dim}\n"
                     f"absolute diff: {abs_diff:.3e}    relative diff: {max:.3e}\n"
                     f"Daemon force: {daemon_force:.10e}\n"
-                    f"Gromacs force: {mo_force:.10e}\n"
+                    f"Martini Openmm force: {mo_force:.10e}\n"
                 )
             elif len(errors) > 0:
                 notes.append("Martini openmm forces match with daemon.\n")
@@ -174,7 +185,7 @@ for x in tests:
             for note in notes:
                 sys.stderr.write("\x1b[1;33m[NOTE] ")
                 sys.stderr.write(note)
-            sys.stderr.write("\x1b[0m")
+            sys.stderr.write("\x1b[0m\n")
 
         if len(errors) > 0:
             failed += 1

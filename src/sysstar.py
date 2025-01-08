@@ -83,6 +83,14 @@ class Interaction():
     def remove(self):
         self._force.remove(self._index)
 
+    def __hash__(self):
+        return hash((self._index, self._force.__class__))
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        return self._force == other._force and self._index == other._index
+
 
 class HarmonicBond(Force):
     """All bonds in the system
@@ -339,6 +347,7 @@ class VSiteWeighedAverage(Force):
     def add(self, members, weights):
         vid, *members = members
         self._list.append((vid, members, weights))
+        self._sysstar.vsites.append(vid)
         if not self._rebuild:
             raise Exception("Can't add virtual sites during run")
         return self._interaction()
@@ -392,6 +401,7 @@ class VSite3fad(Force):
         vid, i, j, k = members
         theta, d = params
         self._list.append((vid, i, j, k, theta, d))
+        self._sysstar.vsites.append(vid)
         if not self._rebuild:
             raise Exception("Can't add virtual sites during run")
         return self._interaction()
@@ -439,6 +449,7 @@ class VSite3out(Force):
         vid, i, j, k = members
         a, b, c = params
         self._list.append((vid, i, j, k, a, b, c))
+        self._sysstar.vsites.append(vid)
         if not self._rebuild:
             raise Exception("Can't add virtual sites during run")
         return self._interaction()
@@ -533,6 +544,8 @@ class SysStar():
             self.combined_bending_torsion, self.rb_torsion,
             self.vsite_avg, self.vsite_3fad, self.vsite_3out
         ]
+
+        self.vsites = []
 
     def get_defaults(self, part_type, charge, mass):
         defaults = self._atom_types.get(part_type)
@@ -759,7 +772,10 @@ class SysStar():
         # Build context
         self._periodic_box = periodicBoxVectors
         self._system.setDefaultPeriodicBoxVectors(*periodicBoxVectors)
-        self._context = mm.Context(self._system, integrator, platform)
+        if platform is None:
+            self._context = mm.Context(self._system, integrator)
+        else:
+            self._context = mm.Context(self._system, integrator, platform)
         self._context.setPeriodicBoxVectors(*periodicBoxVectors)
 
     def reinitialize(self):

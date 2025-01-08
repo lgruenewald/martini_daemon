@@ -55,17 +55,16 @@ class DaemonSimulation():
 
         pairs = []
         skip = set()
-        # FIXME this skip system does not handle overlapping reactive fragments
         # Detection algorithm
         for i, frag1 in enumerate(self.initiator_list):
             if frag1 is None:
                 continue
+            if i in skip:
+                continue
             for j, frag2 in enumerate(self.initiator_list):
                 if frag2 is None:
                     continue
-                if j >= i:
-                    continue
-                if i in skip or j in skip:
+                if j in skip:
                     continue
                 rx = self.reaction_matrix.get((frag1.name, frag2.name))
                 if rx is not None:
@@ -73,6 +72,7 @@ class DaemonSimulation():
                         skip.add(i)
                         skip.add(j)
                         pairs.append((frag1, frag2, rx))
+                        break  # skip i - break entire loop over js with i
 
         if len(pairs) == 0:
             return
