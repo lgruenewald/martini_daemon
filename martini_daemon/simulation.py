@@ -3,14 +3,13 @@
 the D/M algorithm + wrappers
 """
 
-from daemon_top_parser import DaemonTopFile
-from sysstar import SysStar
-from topstar import TopStar, ReactionTemplate, Fragment
+from .top_parser import DaemonTopFile
+from .sysstar import SysStar
+from .topstar import TopStar, ReactionTemplate, Fragment
 import sys
 import openmm as mm
 from openmm.app import GromacsGroFile
 from openmm.unit import femtosecond, nanometer
-import utils
 
 
 class DaemonSimulation():
@@ -22,34 +21,61 @@ class DaemonSimulation():
     reaction_matrix: dict[(str, str), ReactionTemplate]
     initiator_list: list[Fragment]
 
-    def __init__(self, top_path, gro_path, T=300., p=1., dt=20*femtosecond):
+    i: int = 0
+    reactions: int = 0
+    max_steps: int
+    steps_per_step: int
+    silent: bool  # if silent no files or stdout are written to
+    traj_path: str  # trajectory to write
+    out_path: str  # final geometry to write
+
+    def __init__(self, top_path, gro_path, T=300., p=1., dt=20*femtosecond,
+                 max_steps=100, steps_per_step=5000, traj_path="traj.xtc",
+                 out_path="final.gro", silent=False, platform=None,
+                 minimize_energy=True, generate_velocities=True):
         self.system, self.top = DaemonTopFile(top_path)
         self.gro = GromacsGroFile(gro_path)
+        if platform is not None:
+            platform = mm.Platform.getPlatformByName(platform)
 
-        # FIXME: choice of coupling options etc
-        self.system.add_force(mm.MonteCarloBarostat(p, T))
+        if p is not None:
+            self.system.add_force(mm.MonteCarloBarostat(p, T))
         self.reaction_matrix = self.top.build_reaction_matrix()
         self.initiator_list = self.top.get_initiator_list()
 
-        self.system.build_context(mm.LangevinIntegrator(T, 10.0, dt),
-                                  self.gro.getPeriodicBoxVectors())
+        integrator = mm.LangevinIntegrator(T, 10.0, dt)
+        box = self.gro.getPeriodicBoxVectors()
+
+        if platform is not None:
+            self.system.build_context(integrator, box, platform)
+        else:
+            self.system.build_context(integrator, box)
 
         self.system.set_positions(self.gro.getPositions(True))
-        # FIXME: gen velocities or load velocities explicitly
-        self.system.generate_velocities(T)
-        self.system.minimize_energy()
-        # FIXME: hardcoded path
-        self.system.set_xtc_path("traj.xtc")
+        if generate_velocities:
+            self.system.generate_velocities(T)
+        if minimize_energy:
+            self.system.minimize_energy()
+        if not silent:
+            self.system.set_xtc_path(traj_path)
+        self.max_steps = max_steps
+        self.steps_per_step = steps_per_step
+        self.silent = silent
+        self.traj_path = traj_path
+        self.out_path = out_path
 
-    i: int = 0
-    max_steps: int = 1000
-    reactions: int = 0
+    def simulate(self):
+        for i in range(self.max_steps):
+            self.step()
+        print()
+        if not self.silent:
+            self.system.write_gro(self.out_path)
 
     def step(self):
-        # FIXME: hardcoded everything
-        self.system.do_steps(1000)
-        sys.stdout.write(f"\rStep {self.i+1:8} of {self.max_steps}   "
-                         f"[reactions: {self.reactions}]")
+        self.system.do_steps(self.steps_per_step)
+        if not self.silent:
+            sys.stdout.write(f"\rStep {self.i+1:8} of {self.max_steps}   "
+                             f"[reactions: {self.reactions}]")
         self.i += 1
 
         pos, box = self.system.get_positions()

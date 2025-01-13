@@ -1,0 +1,65 @@
+[ frag ]
+name: coh_end mol: PEG
+[ fragatoms ]
+; parent_id     type   name  is_edge
+      1          *      COH   0
+	  2          *      COC   1
+
+[ frag ]
+name: coh_end mol: PEG
+[ fragatoms ]
+; parent_id     type   name  is_edge
+      46         *      COH   0
+	  45         *      COC   1
+
+[ frag ]
+name: nco_end mol: DesmodurN
+[ fragatoms ]
+; parent_id     type   name  is_edge
+      1          *      NCO     0
+	  2          *      CC1     1
+
+[ frag ]
+name: nco_end mol: DesmodurN
+[ fragatoms ]
+; parent_id     type   name  is_edge
+      9          *      NCO     0
+	  8          *      CC1     1
+
+[ frag ]
+name: nco_end mol: DesmodurN
+[ fragatoms ]
+; parent_id     type   name  is_edge
+      14         *      NCO     0
+	  13         *      CC1     1
+
+[ moleculetype ]
+; molname nrexcl
+coh_nco 1
+
+[ atoms ]
+; id type resnr residue atom cgnr charge mass
+  1  TN3    1     BOND  COH   1      0
+  2  *      1     BOND  COC   1      0
+  3  SP4    1     BOND  NCO   1      0
+  4  *      1     BOND  CC1   1      0
+
+[ bonds ]
+; i j funct length k
+  1 3   1   0.300  15000
+
+[ angles ]
+; i j k funct theta force
+  4 3 1   2    140   100
+  2 1 3   2    120   80
+
+[ reaction ]
+name: coh_nco_bond
+r1: coh_end
+r2: nco_end
+p1: coh_nco
+distance_max: 0.6 ; nm, distance cutoff
+type: poly
+
+; [ constraints ]
+; todo: angle, reaction rate, etc constraints

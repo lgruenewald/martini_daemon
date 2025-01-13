@@ -25,10 +25,10 @@ topology is an object that contains the following information:
     - "defrag list" - backmapping of particles to fragments that contain them
 """
 from dataclasses import dataclass
-from sysstar import SysStar
+from .sysstar import SysStar
+from .sysstar import Force, Interaction
 from fnmatch import fnmatch
-import utils
-from sysstar import Force, Interaction
+from .utils import pdist, backup_try
 
 @dataclass
 class FragFragment:
@@ -544,7 +544,7 @@ class TopStar():
         init1 = frag1.particles[0]
         init2 = frag2.particles[0]
         # position dependent checks
-        dist = utils.pdist(pos[init1], pos[init2], box)
+        dist = pdist(pos[init1], pos[init2], box)
         if dist >= rx.distance_max:
             return False
         return True
@@ -606,7 +606,7 @@ class TopStar():
         return initiators
 
     def dump(self):
-        utils.backup_try("top.dump")
+        backup_try("top.dump")
         with open("top.dump", "w") as file:
             print("==== TopStar / Fragment Types ====", file=file)
             for k, molfrag in self.type_lookup.items():

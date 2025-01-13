@@ -5,7 +5,7 @@ import openmm as mm
 import openmm.app as mmapp
 from openmm.unit import nanometer, picosecond, md_unit_system
 import math
-import utils
+from .utils import backup_try
 from collections import OrderedDict
 import numpy as np
 from dataclasses import dataclass
@@ -871,7 +871,7 @@ class SysStar():
     def set_xtc_path(self, path):
         if not self.context_initialized:
             raise Exception("Initialize the context first")
-        utils.backup_try(path)
+        backup_try(path)
         mmtopol = mmapp.Topology()
         mmtopol._numAtoms = self.len_particles()
         mmtopol._periodicBoxVectors = self._periodic_box
@@ -881,7 +881,7 @@ class SysStar():
     def write_gro(self, path):
         if not self.context_initialized:
             raise Exception("Initialize the context first")
-        utils.backup_try(path)
+        backup_try(path)
         state = self._context.getState(positions=True, velocities=True)
         pos, _ = self.get_positions()
         vel = state.getVelocities(asNumpy=True).\
@@ -909,7 +909,7 @@ class SysStar():
             )
 
     def dump(self):
-        utils.backup_try("sys.dump")
+        backup_try("sys.dump")
         with open("sys.dump", "w") as file:
             print("==== SysStar Dump ====", file=file)
             print("Particles:", self._part_list, file=file)

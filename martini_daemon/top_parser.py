@@ -5,9 +5,9 @@ A more modular
 parser that constructs S* and T* rather than openmm's internal objects
 """
 
-from parser import TopParser, unwrap
-from topstar import TopStar, ReactionTemplate
-from sysstar import SysStar
+from .parser import TopParser, unwrap
+from .topstar import TopStar, ReactionTemplate
+from .sysstar import SysStar
 import sys
 import os
 import distutils
