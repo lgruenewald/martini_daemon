@@ -10,8 +10,7 @@ import numpy as np
 import math
 import martini_openmm as martini
 
-sys.path.append("../src")
-from daemon_top_parser import DaemonTopFile
+from martini_daemon.top_parser import DaemonTopFile
 
 etol = 1e-5  # energy relative tolerance
 ftol = 1e-5  # force relative tolerance

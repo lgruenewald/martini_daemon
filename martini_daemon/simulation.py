@@ -67,8 +67,8 @@ class DaemonSimulation():
     def simulate(self):
         for i in range(self.max_steps):
             self.step()
-        print()
         if not self.silent:
+            print()
             self.system.write_gro(self.out_path)
 
     def step(self):
