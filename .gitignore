@@ -3,9 +3,13 @@
 !tests/**/*.gro
 !examples/**/*.gro
 !experiments/**/*.gro
+!benchmarks/**/*.gro
 # exclude all xyz and xtc trajectory files
 *.xyz
 *.xtc
+!examples/**/*.xtc
+# exclude xvg from tests directory (energy.xvg, forces.xvg usually)
+tests/**/*.xvg
 # exclude all S* and T* dumps
 *.dump
 # exclude python cache
@@ -19,3 +23,6 @@ build/*
 martini_daemon.egg-info/*
 dist/*
 martini_daemon/**/*.c
+build
+martini_daemon.egg-info
+dist

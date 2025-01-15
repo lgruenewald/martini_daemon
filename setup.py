@@ -10,6 +10,20 @@ ext_modules = [
         include_dirs=["."],
         extra_compile_args=["-O3", "-Wall"],
         libraries=["m"]
+    ),
+    Extension(
+        "martini_daemon.sysstar",
+        sources=["martini_daemon/sysstar.pyx"],
+        include_dirs=["."],
+        extra_compile_args=["-O3", "-Wall"],
+        libraries=["m"]
+    ),
+    Extension(
+        "martini_daemon.topstar",
+        sources=["martini_daemon/topstar.pyx"],
+        include_dirs=["."],
+        extra_compile_args=["-O3", "-Wall"],
+        libraries=["m"]
     )
 ]
 

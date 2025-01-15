@@ -1,20 +1,21 @@
 # Martini Daemon
 
-Readme last updated: Dec 2 2024
+Readme last updated: Jan 15 2024
 
-## Src
+## Martini_daemon
 
 First prototype version of martini_daemon.
 
+Install with `pip install .` in the root directory of this repo, where `setup.py` is located.
+
 ## Tests
 
-Single point energy calculation tests (TODO in future also forces), that verify
+Single point energy and force calculation tests, that verify
 that Martini is implemented correctly by comparing it to GROMACS energies.
 
 ## Examples
 
-Currently building an example system of two BDT molecules that will be able to
-react if within a cutoff distance, to form a dimer.
+The example systems with BDT and polyurethane polymerization are built/going to be built here.
 
 ## Docs
 
