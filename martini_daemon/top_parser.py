@@ -12,6 +12,7 @@ import sys
 import os
 import distutils
 import math
+from openmm.unit import nanometer
 
 
 def _get_default_gromacs_include_dir():
@@ -47,12 +48,13 @@ def _get_default_gromacs_include_dir():
     return "/usr/local/gromacs/share/gromacs/top"
 
 
-def DaemonTopFile(file, include_dir=None, defines={}):
+def DaemonTopFile(file, include_dir=None, defines={},
+                  epsilon_r=15.0, nonbonded_cutoff=1.1*nanometer):
     """Parses a Martini Top file for Gromacs and generates T*, sys and top
     from it. Also parses .frag and .rx files included in the .top file.
     """
     # field init
-    system = SysStar()
+    system = SysStar(epsilon_r, nonbonded_cutoff)
     topology = TopStar(system)
 
     if include_dir is None:

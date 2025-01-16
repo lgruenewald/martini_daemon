@@ -513,7 +513,7 @@ class SysStar():
 
     modular_forces: list[Force]
 
-    def __init__(self):
+    def __init__(self, epsilon_r, nonbonded_cutoff):
         self._part_list = []
         self._used_atom_types = {}
         self._exclusion_list = []
@@ -523,8 +523,8 @@ class SysStar():
         self._reinitialize = True
         self._nb_types = {}
         self._forces_list = []
-        self.epsilon_r = 15.0  # TODO unhardcode
-        self.nonbonded_cutoff = 1.1 * nanometer
+        self.epsilon_r = epsilon_r
+        self.nonbonded_cutoff = nonbonded_cutoff
         self.harmonic_bond = HarmonicBond(self)
         self.harmonic_angle = HarmonicAngle(self)
         self.proper_dihedral = ProperDihedral(self)
@@ -863,7 +863,7 @@ class SysStar():
     def apply_constraints(self):
         if not self.context_initialized:
             raise Exception("Initialize the context first")
-        self._context.applyConstraints(tol=1e-5)
+        self._context.applyConstraints(tol=1e-10)
 
     _xtc: mmapp.XTCFile = None
 

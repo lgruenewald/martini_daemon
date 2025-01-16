@@ -32,14 +32,23 @@ class DaemonSimulation():
     def __init__(self, top_path, gro_path, T=300., p=1., dt=20*femtosecond,
                  max_steps=100, steps_per_step=5000, traj_path="traj.xtc",
                  out_path="final.gro", silent=False, platform=None,
-                 minimize_energy=True, generate_velocities=True):
-        self.system, self.top = DaemonTopFile(top_path)
+                 minimize_energy=True, generate_velocities=True,
+                 remove_com_motion=True, epsilon_r=15.0,
+                 nonbonded_cutoff=1.1*nanometer, include_dir=None,
+                 defines={}):
+        self.system, self.top = DaemonTopFile(
+            top_path,
+            include_dir=include_dir, defines=defines,
+            epsilon_r=epsilon_r, nonbonded_cutoff=nonbonded_cutoff
+        )
         self.gro = GromacsGroFile(gro_path)
         if platform is not None:
             platform = mm.Platform.getPlatformByName(platform)
 
         if p is not None:
             self.system.add_force(mm.MonteCarloBarostat(p, T))
+        if remove_com_motion:
+            self.system.add_force(mm.CMMotionRemover())
         self.reaction_matrix = self.top.build_reaction_matrix()
         self.initiator_list = self.top.get_initiator_list()
 
