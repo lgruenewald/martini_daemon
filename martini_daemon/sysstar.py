@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from __future__ import annotations
 import openmm as mm
 import openmm.app as mmapp
 from openmm.unit import nanometer, picosecond, md_unit_system
@@ -14,6 +13,7 @@ from .forces.g96angle import G96Angle
 from .forces.harmonic_angle import HarmonicAngle
 from .forces.harmonic_bond import HarmonicBond
 from .forces.improper_dihedral import ImproperDihedral
+from .forces.nonbonded import NonBonded, ExclusionHelper
 from .forces.proper_dihedral import ProperDihedral
 from .forces.rbtorsion import RBTorsion
 from .forces.restricted_angle import RestrictedAngle
@@ -28,47 +28,34 @@ class SysStar():
     _context: mm.Context
     _reinitialize: bool
     _integrator: mm.Integrator
-    _nb_force: mm.Force
-    _nb_force_rebuild = False
-    _es_self_correction_force: mm.Force
-    _es_self_correction_force_rebuild = False
+    nonbonded_force: NonBonded
+    exclusions: ExclusionHelper
     _forces_list: list[mm.Force]  # to keep track of indices
     context_initialized: bool
     _part_list: list[(str, str, float, float)]
-    _used_atom_types: OrderedDict[str, int]
-    """All the exclusions in the system
-    indices are caled excl_id
-    values are (i: part_id, j: part_id)
-    """
-    _exclusion_list: list[(int, int)]
+
     """All the constraints in the system
     indices are called constraint_id
     values are (i: part_id, j: part_id, length: float)
     """
     _constraint_list: list[(int, int, float)]
+
     """Atom types to look up default charges and default masses
     values are atom_type: string, (mass: float, charge: float)
     """
     _atom_types: dict[str, (float, float)]
-    """Non bonded parameters are for building the C6/C12 table
-    values are (type1: string, type2: string), (V: float, W: float)
-    """
-    _nb_types: dict[(str, str), (float, float)]
 
     modular_forces: list[Force]
 
     def __init__(self, epsilon_r, nonbonded_cutoff):
+        self.epsilon_r = epsilon_r
+        self.nonbonded_cutoff = nonbonded_cutoff
         self._part_list = []
-        self._used_atom_types = {}
-        self._exclusion_list = []
         self._constraint_list = []
         self._atom_types = OrderedDict()
         self.context_initialized = False
         self._reinitialize = True
-        self._nb_types = {}
         self._forces_list = []
-        self.epsilon_r = epsilon_r
-        self.nonbonded_cutoff = nonbonded_cutoff
         self.harmonic_bond = HarmonicBond(self)
         self.harmonic_angle = HarmonicAngle(self)
         self.proper_dihedral = ProperDihedral(self)
@@ -80,12 +67,15 @@ class SysStar():
         self.vsite_3fad = VSite3fad(self)
         self.vsite_3out = VSite3out(self)
         self.vsite_avg = VSiteWeighedAverage(self)
+        self.nonbonded_force = NonBonded(self)
+        self.exclusions = self.nonbonded_force.get_exclusion_helper()
         self.modular_forces = [
             self.harmonic_bond, self.harmonic_angle,
             self.proper_dihedral, self.improper_dihedral,
             self.g96_angle, self.restricted_angle,
             self.combined_bending_torsion, self.rb_torsion,
-            self.vsite_avg, self.vsite_3fad, self.vsite_3out
+            self.vsite_avg, self.vsite_3fad, self.vsite_3out,
+            self.nonbonded_force, self.exclusions
         ]
 
         self.vsites = []
@@ -114,12 +104,10 @@ class SysStar():
         if not self.context_initialized:
             return
         if old_type != part_type or old_charge != charge:
-            # Change of LJ params plus self correction force
-            part_type_id = self.use_atom_type(part_type)
-            self._nb_force.setParticleParameters(part_id, [part_type_id, charge])
-            if old_charge != charge:
-                # TODO optimize this later maybe?
-                self._es_self_correction_force_rebuild = True
+            # Change of LJ params plus self correction force (called by nb)
+            self.nonbonded_force.update_params(
+                part_id, part_type, charge, old_charge != charge
+            )
 
         if old_mass != mass:
             self._system.setParticleMass(part_id, mass)
@@ -140,135 +128,8 @@ class SysStar():
         """Returns the particle's name, type, charge, mass"""
         return self._part_list[i]
 
-    def use_atom_type(self, part_type):
-        """Add new atom types for LJ, used in build_nb_force.
-
-        It is not a problem to call this with atom types already present.
-
-        Returns the atom type index
-        """
-        id = self._used_atom_types.get(part_type)
-        if id is None:
-            id = len(self._used_atom_types)
-            self._used_atom_types[part_type] = id
-            self._nb_force_rebuild = True
-        return id
-
     def len_particles(self):
         return len(self._part_list)
-
-    def build_nb_force(self):
-        self._nb_force = mm.CustomNonbondedForce(
-            "step(rcut-r)*(LJ - corr + ES);"
-            "LJ = (W(type1, type2) / r^12 - V(type1, type2) / r^6);"
-            "corr = (W(type1, type2) / rcut^12 - V(type1, type2) / rcut^6);"
-            "ES = f/epsilon_r*q1*q2 * (1/r + krf * r^2 - crf);"
-            "crf = 1 / rcut + krf * rcut^2;"
-            "krf = 1 / (2 * rcut^3);"
-            f"epsilon_r = {self.epsilon_r};"
-            "f = 138.935458;"
-            f"rcut={self.nonbonded_cutoff.value_in_unit(nanometer)};"
-        )
-        # self._nb_force.setUsesPeriodicBoundaryConditions(True)
-        # doesn't seem to exist for nb forces
-        self._nb_force.addPerParticleParameter("type")
-        self._nb_force.addPerParticleParameter("q")
-        self._nb_force.setNonbondedMethod(
-            mm.CustomNonbondedForce.CutoffPeriodic)
-        self._nb_force.setCutoffDistance(self.nonbonded_cutoff
-                                         .value_in_unit(nanometer))
-        self._system.addForce(self._nb_force)
-        self._forces_list.append(self._nb_force)
-
-        for (_, type, charge, _) in filter(None, self._part_list):
-            part_type_id = self.use_atom_type(type)
-            self._nb_force.addParticle([part_type_id, charge])
-
-        for (i, j) in filter(None, self._exclusion_list):
-            self._nb_force.addExclusion(i, j)
-
-        # add LJ parameters to the system
-        C6 = []
-        C12 = []
-        # i,j => type index; t1,t2 => type names
-        n = len(self._used_atom_types)
-        for t1, i in self._used_atom_types.items():
-            for t2, j in self._used_atom_types.items():
-                nb_params = self._nb_types.get((t1, t2)) or\
-                            self._nb_types.get((t2, t1)) or (0., 0.)
-                V, W = nb_params
-                c6 = 4 * W * (V ** 6)
-                c12 = 4 * W * (V ** 12)
-                C6.append(c6)
-                C12.append(c12)
-        self._nb_force.addTabulatedFunction(
-            "V", mm.Discrete2DFunction(n, n, C6)
-        )
-        self._nb_force.addTabulatedFunction(
-            "W", mm.Discrete2DFunction(n, n, C12)
-        )
-        self._nb_force_rebuild = False
-        self._reinitialize = True
-
-    def remove_force(self, force):
-        for i, f in enumerate(self._forces_list):
-            if f == force:
-                del self._forces_list[i]
-                self._system.removeForce(i)
-                self._reinitialize = True
-                return True
-        return False
-
-    def es_self_correction_add(self, i, j):
-        _, _, q1, _ = self._part_list[i]
-        _, _, q2, _ = self._part_list[j]
-        qprod = q1 * q2
-        if i == j:
-            qprod *= 0.5
-        if qprod != 0:
-            self._es_self_correction_force.addBond(
-                i, j, [qprod]
-            )
-
-    def build_es_self_correction_force(self):
-        self._es_self_correction_force = mm.CustomBondForce(
-            f"step(rcut-r) * ES;"
-            f"ES = f*q_product/epsilon_r * (krf * r^2 - crf);"
-            f"crf = 1 / rcut + krf * rcut^2;"
-            f"krf = 1 / (2 * rcut^3);"
-            f"epsilon_r = {self.epsilon_r};"
-            f"f = 138.935458;"
-            f"rcut={self.nonbonded_cutoff.value_in_unit(nanometer)};"
-        )
-        # https://manual.gromacs.org/documentation/current/reference-manual/functions/nonbonded-interactions.html
-        # see section Coulomb interaction with reaction field
-        self._es_self_correction_force.addPerBondParameter("q_product")
-        self._es_self_correction_force.setUsesPeriodicBoundaryConditions(True)
-        self._system.addForce(self._es_self_correction_force)
-        self._forces_list.append(self._es_self_correction_force)
-        for i, (_, _, charge, _) in enumerate(filter(None, self._part_list)):
-            if charge != 0:
-                # self term in reaction field correction
-                self.es_self_correction_add(i, i)
-        for (i, j) in self._exclusion_list:
-            self.es_self_correction_add(i, j)
-        self._es_self_correction_force_rebuild = False
-        self._reinitialize = True
-
-    def add_exclusion(self, i, j):
-        self._exclusion_list.append((i, j))
-        if self.context_initialized:
-            self._nb_force.addExclusion(i, j)
-            self.es_self_correction_add(i, j)
-            self._reinitialize = True
-        return len(self._exclusion_list) - 1
-
-    def get_exclusion_members(self, excl_id):
-        return self._exclusion_list[excl_id]
-
-    def remove_exclusion(self, excl_id):
-        self._nb_force_rebuild = True
-        self._exclusion_list[excl_id] = None
 
     def add_constraint(self, i, j, length):
         """Adds a constraint to the list, returns its constraint_id"""
@@ -292,7 +153,7 @@ class SysStar():
     def add_nb_type(self, type1, type2, V, W):
         if self.context_initialized:
             raise ValueError("Cannot do this after context is initialized")
-        self._nb_types[(type1, type2)] = (V, W)
+        self.nonbonded_force._nb_types[(type1, type2)] = (V, W)
 
     def build_context(self, integrator, periodicBoxVectors, platform=None):
         """context_initialized flips the state of S* in a way
@@ -308,8 +169,6 @@ class SysStar():
         self.context_initialized = True
         self._reinitialize = False
         self._integrator = integrator
-        self.build_nb_force()
-        self.build_es_self_correction_force()
         for modular_force in self.modular_forces:
             modular_force.build()
         # Build context
@@ -324,12 +183,6 @@ class SysStar():
     def reinitialize(self):
         if not self.context_initialized:
             raise Exception("Initialize the context first")
-        if self._es_self_correction_force_rebuild:
-            self.remove_force(self._es_self_correction_force)
-            self.build_es_self_correction_force()
-        if self._nb_force_rebuild:
-            self.remove_force(self._nb_force)
-            self.build_nb_force()
         for modular_force in self.modular_forces:
             modular_force.build()
         if self._reinitialize:

@@ -44,6 +44,7 @@ class MolFragment:
     molecule_name: str
     # atoms: type, resnum, resname, atomname, chargegr, charge, mass
     atoms: list[(str, int, str, str, int, float, float)]
+    # TODO generalize this into just interactions
     # force i j params
     bonds: list[(Force, int, int, list)]
     # force i j k params
@@ -113,7 +114,6 @@ class Fragment():
     name: str
     particles: list[int]
     interactions: list[Interaction]
-    exclusions: list[int]
     constraints: list[int]
     edge: list[bool]
     frag_id: int
@@ -123,7 +123,6 @@ class Fragment():
         self.name = name
         self.particles = []
         self.interactions = []
-        self.exclusions = []
         self.constraints = []
         self.edge = []
         self.frag_id = id
@@ -256,11 +255,7 @@ class TopStar():
             if include_interaction:
                 subinst.interactions.append(interaction)
 
-        # exclusions, constaints get added if both of the atoms is a normal atom
-        for excl_id in inst.exclusions:
-            i, j = self.system.get_exclusion_members(excl_id)
-            if i in normal_indices and j in normal_indices:
-                subinst.exclusions.append(excl_id)
+        # constaints get added if both of the atoms is a normal atom
         for cid in inst.constraints:
             i, j = self.system.get_constraint_members(cid)
             if i in normal_indices and j in normal_indices:
@@ -363,8 +358,8 @@ class TopStar():
         for i, excl in enumerate(frag.exclusions):
             for j in excl:
                 if i < j:
-                    e = self.system.add_exclusion(particles[i], particles[j])
-                    inst.exclusions.append(e)
+                    e = self.system.exclusions.add(particles[i], particles[j])
+                    inst.interactions.append(e)
         # constraints
         for cons in frag.constraints:
             i, j, length = cons
@@ -402,7 +397,7 @@ class TopStar():
                         other_frag_id == frag.frag_id:
                     # remove frag + remove other frags if the particle in frag
                     # is not edge OR if the other frag contains it as non edge
-                    # 
+                    #
                     # allowed to stay if it's edge-edge overlap
                     del defrag[i]
                     self.frag_list[other_frag_id] = None
@@ -412,8 +407,6 @@ class TopStar():
         # 2. remove forces in fragment
         for interaction in frag.interactions:
             interaction.remove()
-        for excl in frag.exclusions:
-            self.system.remove_exclusion(excl)
         for con in frag.constraints:
             # constraints can't be removed, so this will throw an exception
             self.system.remove_constraint(con)
@@ -462,22 +455,7 @@ class TopStar():
         for inter in inters:
             inst.interactions.append(inter)
 
-        # TODO modularize exclusions and constraints into the same system later
-        exclusions_yes = set()
-        exclusions_no = set()
-        for exclusion in frag1.exclusions:
-            exclusions_no.add(exclusion)
-        for exclusion in frag2.exclusions:
-            exclusions_no.add(exclusion)
-        for exclusion in frag_prod.exclusions:
-            exclusions_yes.add(exclusion)
-        for exclusion in complete1.exclusions:
-            exclusions_yes.add(exclusion)
-        for exclusion in complete2.exclusions:
-            exclusions_yes.add(exclusion)
-        exclusions = exclusions_yes - exclusions_no
-        for exclusion in exclusions:
-            inst.exclusions.append(exclusion)
+        # TODO modularize constraints into the same system later
 
         constraints_yes = set()
         constraints_no = set()
