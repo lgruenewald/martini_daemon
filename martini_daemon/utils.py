@@ -1,9 +1,5 @@
 import os
 import numpy as np
-cimport cython
-cdef extern from "math.h":
-    double sqrt(double x)
-    int floor(double x)
 
 def backup_try(path):
     if os.path.isfile(path):
@@ -15,6 +11,8 @@ def backup_try(path):
         os.rename(path, bkup_path)
         print(f"Backed up {path} to {bkup_path}")
 
+
+"""
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cpdef double pdist(double[:] v1, double[:] v2, double[:] size):
@@ -29,6 +27,13 @@ cpdef double pdist(double[:] v1, double[:] v2, double[:] size):
         base = floor(diff / size[i] + 0.5) * size[i]
         sum += pow(diff-base, 2)
     return sqrt(sum)
+"""
+
+
+def pdist(v1, v2, size):
+    diff = v1 - v2
+    base = np.floor(diff / size + 0.5) * size
+    return np.sqrt(np.sum((diff - base)**2))
 
 
 def test_utils():

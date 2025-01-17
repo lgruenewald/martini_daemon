@@ -194,8 +194,8 @@ for x in tests:
             passed += 1
 
         # cleanup
-        os.remove("energy.xvg")
-        os.remove("forces.xvg")
+#        os.remove("energy.xvg")
+#        os.remove("forces.xvg")
         os.chdir("..")
 
 print(f"Passed: {passed} Failed: {failed}")

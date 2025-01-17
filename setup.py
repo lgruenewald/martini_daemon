@@ -4,27 +4,13 @@ from setuptools import Extension, setup, find_packages
 from Cython.Build import cythonize
 
 ext_modules = [
-    Extension(
-        "martini_daemon.utils",
-        sources=["martini_daemon/utils.pyx"],
-        include_dirs=["."],
-        extra_compile_args=["-O3", "-Wall"],
-        libraries=["m"]
-    ),
-    Extension(
-        "martini_daemon.sysstar",
-        sources=["martini_daemon/sysstar.pyx"],
-        include_dirs=["."],
-        extra_compile_args=["-O3", "-Wall"],
-        libraries=["m"]
-    ),
-    Extension(
-        "martini_daemon.topstar",
-        sources=["martini_daemon/topstar.pyx"],
-        include_dirs=["."],
-        extra_compile_args=["-O3", "-Wall"],
-        libraries=["m"]
-    )
+#    Extension(
+#        "martini_daemon.utils",
+#        sources=["martini_daemon/utils.pyx"],
+#        include_dirs=["."],
+#        extra_compile_args=["-O3", "-Wall"],
+#        libraries=["m"]
+#    )
 ]
 
 setup(

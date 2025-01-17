@@ -26,7 +26,7 @@ topology is an object that contains the following information:
 """
 from dataclasses import dataclass
 from .sysstar import SysStar
-from .sysstar import Force, Interaction
+from .forces.force import Force, Interaction
 from fnmatch import fnmatch
 from .utils import pdist, backup_try
 
