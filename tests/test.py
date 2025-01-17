@@ -45,7 +45,6 @@ def test_daemon(top, gro):
                          gro.getPeriodicBoxVectors(),
                          platform=platform)
     system.set_positions(gro.getPositions(True))
-#    system.apply_constraints()
     state = system.get_state()
     energy = state.getPotentialEnergy().value_in_unit(kilojoule_per_mole)
     forces = state.getForces(asNumpy=True).\
@@ -68,7 +67,6 @@ def test_martini_openmm(top, gro):
     )
     sim = mmapp.Simulation(top.topology, system, integrator, platform)
     sim.context.setPositions(gro.getPositions())
-#    sim.context.applyConstraints(tol=1e-10)
     state = sim.context.getState(getEnergy=True, getForces=True)
     energy = state.getPotentialEnergy().value_in_unit(kilojoule_per_mole)
     forces = state.getForces(asNumpy=True).\
@@ -194,8 +192,8 @@ for x in tests:
             passed += 1
 
         # cleanup
-#        os.remove("energy.xvg")
-#        os.remove("forces.xvg")
+        os.remove("energy.xvg")
+        os.remove("forces.xvg")
         os.chdir("..")
 
 print(f"Passed: {passed} Failed: {failed}")
