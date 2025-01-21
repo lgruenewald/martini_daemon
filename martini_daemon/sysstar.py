@@ -20,8 +20,11 @@ from .forces.nonbonded import NonBonded, ExclusionHelper
 from .forces.proper_dihedral import ProperDihedral
 from .forces.rbtorsion import RBTorsion
 from .forces.restricted_angle import RestrictedAngle
+from .vsites.two_fd import VSite2fd
+from .vsites.three_fd import VSite3fd
 from .vsites.three_fad import VSite3fad
 from .vsites.three_out import VSite3out
+from .vsites.four_fdn import VSite4fdn
 from .vsites.weighed_average import VSiteWeighedAverage
 from .vsites.center_of_mass import VSiteCenterOfMass
 
@@ -71,8 +74,11 @@ class SysStar():
         self.restricted_angle = RestrictedAngle(self)
         self.combined_bending_torsion = CombinedBendingTorsion(self)
         self.rb_torsion = RBTorsion(self)
+        self.vsite_2fd = VSite2fd(self)
+        self.vsite_3fd = VSite3fd(self)
         self.vsite_3fad = VSite3fad(self)
         self.vsite_3out = VSite3out(self)
+        self.vsite_4fdn = VSite4fdn(self)
         self.vsite_avg = VSiteWeighedAverage(self)
         self.vsite_com = VSiteCenterOfMass(self)
         self.nonbonded_force = NonBonded(self)
@@ -83,6 +89,7 @@ class SysStar():
             self.g96_angle, self.restricted_angle,
             self.combined_bending_torsion, self.rb_torsion,
             self.morse_bond, self.cubic_bond, self.fene_bond,
+            self.vsite_2fd, self.vsite_3fd, self.vsite_4fdn,
             self.vsite_avg, self.vsite_3fad, self.vsite_3out, self.vsite_com,
             self.nonbonded_force, self.exclusions
         ]

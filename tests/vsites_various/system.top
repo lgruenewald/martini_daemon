@@ -1,0 +1,80 @@
+#include "../martini_v3.0.0.itp"
+
+[ moleculetype ] 
+XX 1 
+
+[ atoms ]
+  1 TC5   1 XX XX1    1 0.0  60.0
+  2 TC5   1 XX XX2    2 0.0  40.0
+  3 TC5   1 XX XX3    3 0.0  30.0
+  4 TC5   1 XX XX4    4 0.0  0.0
+  5 TC5   1 XX XX5    5 0.0  0.0
+  6 TC5   1 XX XX6    6 0.0  0.0
+  7 TC5   1 XX XX7    7 0.0  0.0
+  8 TC5   1 XX XX8    8 0.0  0.0
+  9 TC5   1 XX XX9    9 0.0  0.0
+  10 TC5  1 XX XX10  10 0.0  0.0
+  11 TC5  1 XX XX11  11 0.0  0.0
+  12 TC5  1 XX XX12  12 0.0  0.0
+  13 TC5  1 XX XX13  13 0.0  0.0
+  14 TC5  1 XX XX14  14 0.0  0.0
+  15 TC5  1 XX XX15  15 0.0  0.0
+ 
+[ bonds ]
+  1 2 1 0.2 1000
+  2 3 1 0.2 1000
+  3 1 1 0.2 1000
+; check backpropagating of forces from virtual sites too
+  4 5 1 0.1 10
+  5 6 1 0.1 10
+  6 7 1 0.1 20
+  7 8 1 0.1 20
+  8 9 1 0.1 30
+  9 10 1 0.1 30
+  10 11 1 0.1 30
+  11 12 1 0.1 30
+  12 13 1 0.1 10
+  13 14 1 0.1 10
+  14 15 1 0.1 10
+
+[ angles ]
+; check backpropagating of forces from virtual sites too
+; i j k type theta k
+  4 5 6  1    60   100
+  7 8 9  1    100  100
+  10 11 12 1  100  100
+  13 14 15 1  120  100
+
+[ virtual_sites1 ]
+; vid i type
+4 3 1
+
+[ virtual_sites2 ]
+; vid i j type a/d
+  5   1 2  1   0.3  ;2
+  6   1 4  2   0.05 ;2fd
+
+[ virtual_sites3 ]
+; vid i j k type params
+   7  1 2 3  1    0.2 0.3  ; 3
+   8  1 7 6  2    0.2 0.05 ; 3fd
+   9  4 5 6  3    120.0 0.5 ; 3fad
+   10 5 6 7  4    0.1 0.2 0.15 ;3out
+
+[ virtual_sites4 ]
+; vid i j k l type params
+  11 8 9 10 5 2   0.1 0.2 0.15 ; 4fdn
+
+[ virtual_sitesn ]
+; vid type ids
+   12  1    1 2 3 4 5 6 7 8 9 10 ; average
+   13  2    1 2 3  ; com
+   14  3    1 0.1 2 0.2 3 0.3 4 0.4 ; weighed average
+   15  3    5 1.1 6 1.2 7 1.3 8 1.4 ; weighed average with weights above 1
+   
+
+[ system ]
+vsite test
+
+[ molecules ]
+XX 1

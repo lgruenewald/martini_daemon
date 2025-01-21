@@ -321,7 +321,18 @@ def DaemonTopFile(file, include_dir=None, defines={},
         system.add_nb_type(type1, type2, V, W)
 
     p.add_level("nonbond_params", process_nonbond_params)
-    p.add_level("virtual_sites1", TODO)
+
+    def process_virtual_sites1(tokens):
+        vid = unwrap(tokens, 0, "int") - 1
+        member = unwrap(tokens, 1, "int") - 1
+        type = unwrap(tokens, 2, "int")
+        if type != 1:
+            raise ValueError(f"Virtual site 1 type {type} not implemented.")
+        last_molecule().interactions.append(
+            (system.vsite_avg, [vid, member], [1.])
+        )
+
+    p.add_level("virtual_sites1", process_virtual_sites1)
 
     def process_virtual_sites2(tokens):
         vid = unwrap(tokens, 0, "int") - 1
@@ -335,6 +346,11 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 weights = [1-a, a]
                 last_molecule().interactions.append(
                     (system.vsite_avg, members, weights)
+                )
+            case 2:
+                d = unwrap(tokens, 4, "float")
+                last_molecule().interactions.append(
+                    (system.vsite_2fd, members, [d])
                 )
             case _:
                 raise ValueError(
@@ -359,6 +375,13 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 last_molecule().interactions.append(
                     (system.vsite_avg, members, weights)
                 )
+            case 2:
+                # 3fd
+                a = unwrap(tokens, 5, "float")
+                d = unwrap(tokens, 6, "float")
+                last_molecule().interactions.append(
+                    (system.vsite_3fd, members, [a, d])
+                )
             case 3:
                 # 3fad
                 theta = unwrap(tokens, 5, "float") * math.pi / 180
@@ -380,7 +403,25 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 )
 
     p.add_level("virtual_sites3", process_virtual_sites3)
-    p.add_level("virtual_sites4", TODO)
+
+    def process_virtual_sites4(tokens):
+        vid = unwrap(tokens, 0, "int") - 1
+        i = unwrap(tokens, 1, "int") - 1
+        j = unwrap(tokens, 2, "int") - 1
+        k = unwrap(tokens, 3, "int") - 1
+        l = unwrap(tokens, 4, "int") - 1
+        members = [vid, i, j, k, l]
+        type = unwrap(tokens, 5, "int")
+        match type:
+            case 2:
+                a = unwrap(tokens, 6, "float")
+                b = unwrap(tokens, 7, "float")
+                c = unwrap(tokens, 8, "float")
+                last_molecule().interactions.append(
+                    (system.vsite_4fdn, members, [a, b, c])
+                )
+
+    p.add_level("virtual_sites4", process_virtual_sites4)
 
     def process_virtual_sitesn(tokens):
         vid = unwrap(tokens, 0, "int") - 1
@@ -401,6 +442,21 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 n = len(members) - 1
                 last_molecule().interactions.append(
                     (system.vsite_com, members, [])
+                )
+            case 3:
+                weights = []
+                wsum = 0.
+                if len(tokens) % 2 != 0:
+                    raise ValueError("Must have an even number of arguments")
+                for c in range(2, len(tokens), 2):
+                    index = unwrap(tokens, c, "int") - 1
+                    weight = unwrap(tokens, c+1, "float")
+                    members.append(index)
+                    weights.append(weight)
+                    wsum += weight
+                weights = [w/wsum for w in weights]
+                last_molecule().interactions.append(
+                    (system.vsite_avg, members, weights)
                 )
             case _:
                 raise ValueError(
