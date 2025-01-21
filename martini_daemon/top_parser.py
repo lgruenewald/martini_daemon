@@ -135,13 +135,31 @@ def DaemonTopFile(file, include_dir=None, defines={},
         i = unwrap(tokens, 0, "int") - 1
         j = unwrap(tokens, 1, "int") - 1
         type = unwrap(tokens, 2, "int")
-        if type != 1 and type != 6:
-            # 1 is "bond", 6 is "harmonic potential"
-            raise ValueError("Unsupported  bond function type")
         length = unwrap(tokens, 3, "float", None)
-        force = unwrap(tokens, 4, "float", None)
-        last_molecule().bonds.append((system.harmonic_bond, i, j,
-                                     [length, force]))
+        if type == 1 or type == 6:
+            # harmonic bond / harmonic potential
+            force = unwrap(tokens, 4, "float", None)
+            last_molecule().bonds.append((system.harmonic_bond, i, j,
+                                         [length, force]))
+        elif type == 3:
+            # morse
+            D = unwrap(tokens, 4, "float", None)
+            beta = unwrap(tokens, 5, "float", None)
+            last_molecule().bonds.append((system.morse_bond, i, j,
+                                         [length, D, beta]))
+        elif type == 4:
+            # cubic bond
+            kb = unwrap(tokens, 4, "float", None)
+            kcub = unwrap(tokens, 5, "float", None)
+            last_molecule().bonds.append((system.cubic_bond, i, j,
+                                         [length, kb, kcub]))
+        elif type == 7:
+            # FENE (finitely extensible nonlinear elastic) bond
+            force = unwrap(tokens, 4, "float", None)
+            last_molecule().bonds.append((system.fene_bond, i, j,
+                                         [length, force]))
+        else:
+            raise ValueError("Unsupported  bond function type")
         if type != 6:
             # type 6 does not generate exclusions
             # nrexcl other than 1 is not supported
@@ -376,6 +394,13 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 weights = [1/n] * n
                 last_molecule().interactions.append(
                     (system.vsite_avg, members, weights)
+                )
+            case 2:
+                for c in range(2, len(tokens)):
+                    members.append(unwrap(tokens, c, "int") - 1)
+                n = len(members) - 1
+                last_molecule().interactions.append(
+                    (system.vsite_com, members, [])
                 )
             case _:
                 raise ValueError(

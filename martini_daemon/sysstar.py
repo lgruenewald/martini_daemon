@@ -12,6 +12,9 @@ from .forces.force import Force
 from .forces.g96angle import G96Angle
 from .forces.harmonic_angle import HarmonicAngle
 from .forces.harmonic_bond import HarmonicBond
+from .forces.cubic_bond import CubicBond
+from .forces.morse_bond import MorseBond
+from .forces.fene_bond import FENEBond
 from .forces.improper_dihedral import ImproperDihedral
 from .forces.nonbonded import NonBonded, ExclusionHelper
 from .forces.proper_dihedral import ProperDihedral
@@ -20,6 +23,7 @@ from .forces.restricted_angle import RestrictedAngle
 from .vsites.three_fad import VSite3fad
 from .vsites.three_out import VSite3out
 from .vsites.weighed_average import VSiteWeighedAverage
+from .vsites.center_of_mass import VSiteCenterOfMass
 
 
 class SysStar():
@@ -57,6 +61,9 @@ class SysStar():
         self._reinitialize = True
         self._forces_list = []
         self.harmonic_bond = HarmonicBond(self)
+        self.morse_bond = MorseBond(self)
+        self.cubic_bond = CubicBond(self)
+        self.fene_bond = FENEBond(self)
         self.harmonic_angle = HarmonicAngle(self)
         self.proper_dihedral = ProperDihedral(self)
         self.improper_dihedral = ImproperDihedral(self)
@@ -67,6 +74,7 @@ class SysStar():
         self.vsite_3fad = VSite3fad(self)
         self.vsite_3out = VSite3out(self)
         self.vsite_avg = VSiteWeighedAverage(self)
+        self.vsite_com = VSiteCenterOfMass(self)
         self.nonbonded_force = NonBonded(self)
         self.exclusions = self.nonbonded_force.get_exclusion_helper()
         self.modular_forces = [
@@ -74,7 +82,8 @@ class SysStar():
             self.proper_dihedral, self.improper_dihedral,
             self.g96_angle, self.restricted_angle,
             self.combined_bending_torsion, self.rb_torsion,
-            self.vsite_avg, self.vsite_3fad, self.vsite_3out,
+            self.morse_bond, self.cubic_bond, self.fene_bond,
+            self.vsite_avg, self.vsite_3fad, self.vsite_3out, self.vsite_com,
             self.nonbonded_force, self.exclusions
         ]
 
