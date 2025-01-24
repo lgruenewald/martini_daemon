@@ -283,7 +283,34 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     p.add_level("constraints", process_constraints)
 
-    p.add_level("pairs", TODO)
+    def process_pairtypes(tokens):
+        t1 = unwrap(tokens, 0, "word")
+        t2 = unwrap(tokens, 0, "word")
+        type = unwrap(tokens, 2, "int")
+        if type != 1:
+            raise ValueError("Unsupported pairs type")
+        V = unwrap(tokens, 3, "float")
+        W = unwrap(tokens, 4, "float")
+        system.pairs.add_type(t1, t2, V, W)
+
+    p.add_level("pairtypes", process_pairtypes)
+
+    def process_pairs(tokens):
+        i = unwrap(tokens, 0, "int") - 1
+        j = unwrap(tokens, 1, "int") - 1
+        type = unwrap(tokens, 2, "int")
+        if type != 1:
+            raise ValueError("Unsupported pairs type")
+        if len(tokens) >= 5:
+            V = unwrap(tokens, 3, "float")
+            W = unwrap(tokens, 4, "float")
+            last_molecule().interactions.append(
+                (system.pairs, [i, j], [V, W])
+            )
+        else:
+            last_molecule().interactions.append((system.pairs, [i, j], []))
+
+    p.add_level("pairs", process_pairs)
     p.add_level("cmap", TODO)
 
     def process_atomtypes(tokens):
@@ -307,7 +334,6 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("angletypes", TODO)
     p.add_level("dihedraltypes", TODO)
     p.add_level("implicit_genborn_params", TODO)
-    p.add_level("pairtypes", TODO)
     p.add_level("cmaptypes", TODO)
 
     def process_nonbond_params(tokens):

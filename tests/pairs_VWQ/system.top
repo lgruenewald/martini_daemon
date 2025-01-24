@@ -1,0 +1,29 @@
+#include "../martini_v3.0.0.itp"
+
+[ moleculetype ] 
+XX 1 
+
+[ atoms ]
+  1 TC5   1 XX XX1    1 1.0  60.0
+  2 TC5   1 XX XX2    2 0.0  60.0
+  3 TC5   1 XX XX3    3 0.0  60.0
+  4 TC5   1 XX XX4    4 -1.0  60.0
+ 
+[ bonds ]
+  1 2 1 0.2 1000
+  2 3 1 0.2 1000
+  3 4 1 0.2 1000
+
+[ pairs ]
+; i j type V W
+  1 4  1   0.3 1.5
+
+[ exclusions ]
+1 4
+
+[ system ]
+pairs VW test
+
+[ molecules ]
+XX 1
+

@@ -17,6 +17,7 @@ from .forces.morse_bond import MorseBond
 from .forces.fene_bond import FENEBond
 from .forces.improper_dihedral import ImproperDihedral
 from .forces.nonbonded import NonBonded, ExclusionHelper
+from .forces.pairs import Pairs
 from .forces.proper_dihedral import ProperDihedral
 from .forces.rbtorsion import RBTorsion
 from .forces.restricted_angle import RestrictedAngle
@@ -74,6 +75,7 @@ class SysStar():
         self.restricted_angle = RestrictedAngle(self)
         self.combined_bending_torsion = CombinedBendingTorsion(self)
         self.rb_torsion = RBTorsion(self)
+        self.pairs = Pairs(self)
         self.vsite_2fd = VSite2fd(self)
         self.vsite_3fd = VSite3fd(self)
         self.vsite_3fad = VSite3fad(self)
@@ -91,7 +93,7 @@ class SysStar():
             self.morse_bond, self.cubic_bond, self.fene_bond,
             self.vsite_2fd, self.vsite_3fd, self.vsite_4fdn,
             self.vsite_avg, self.vsite_3fad, self.vsite_3out, self.vsite_com,
-            self.nonbonded_force, self.exclusions
+            self.nonbonded_force, self.exclusions, self.pairs
         ]
 
         self.vsites = []
