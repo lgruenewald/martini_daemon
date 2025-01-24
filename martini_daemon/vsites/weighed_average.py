@@ -9,8 +9,12 @@ class VSiteWeighedAverage(Force):
     def _make_vsite(self, vid, members, weights):
         n = len(members)
         if n == 1:
-            vsite = mm.TwoParticleAverageSite(
-                members[0], members[0], 1.0, 0.0
+            vsite = mm.LocalCoordinatesSite(
+                [members[0], 0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [0.0, 0.0],
+                [0.0, 0.0, 0.0]
             )
         elif n == 2:
             vsite = mm.TwoParticleAverageSite(

@@ -8,8 +8,8 @@ class VSite4fdn(Force):
         vsite = mm.LocalCoordinatesSite(
             [i, j, k, l],  # particles
             [1.0, 0.0, 0.0, 0.0],  # origin weights
-            [-1.0 - a, 1.0, a, 0.0],  # x direction weight
-            [-1.0 - b, 1.0, 0.0, b],  # y direction weight
+            [1.0 - a, -1.0, a, 0.0],  # x direction weight
+            [1.0 - b, -1.0, 0.0, b],  # y direction weight
             [0.0, 0.0, c]  # coordinates
         )
         self._sysstar._system.setVirtualSite(vid, vsite)
