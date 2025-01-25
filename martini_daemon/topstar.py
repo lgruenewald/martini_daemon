@@ -128,7 +128,8 @@ class Fragment():
 class TopStar():
     # === Live molecule/fragment information ===
     # T* fragment and defrag list
-    frag_list: list[Fragment]
+    frag_list: dict[int, Fragment]
+    next_frag_id: int
     # for every part_id have a list of fragments it is in
     # type: list[list[(frag_id, in_fragment_id, is_edge)]]
     # this list has to be at least 1 long per particle, and the first element
@@ -152,7 +153,8 @@ class TopStar():
     system: SysStar
 
     def __init__(self, system):
-        self.frag_list = []
+        self.frag_list = {}
+        self.next_frag_id = 0
         self.defrag_list = []
         self.frag_fragments = []
         self.mol_fragments = []
@@ -204,9 +206,10 @@ class TopStar():
             raise ValueError(f"Attempt to recursively instantiate {name_id}, "
                              "but it's not a frag fragment type."
                              f"It is: {name_id}")
-        subinst_id = len(self.frag_list)
+        subinst_id = self.next_frag_id
+        self.next_frag_id += 1
         subinst = Fragment(name, subinst_id, original_parent=original_parent)
-        self.frag_list.append(subinst)
+        self.frag_list[subinst_id] = subinst
         normal_indices = set()
         all_indices = set()
         # particles
@@ -299,9 +302,10 @@ class TopStar():
             raise ValueError(f"Attempt to instantiate {frag_name}, but it's"
                              " not a mol fragment type."
                              f" It is: {frag}")
-        inst_id = len(self.frag_list)
+        inst_id = self.next_frag_id
+        self.next_frag_id += 1
         inst = Fragment(frag_name, inst_id)
-        self.frag_list.append(inst)
+        self.frag_list[inst_id] = inst
         # particles
         for in_frag_id, part_id in enumerate(particles):
             inst.particles.append(part_id)
@@ -326,9 +330,23 @@ class TopStar():
                 # edge atoms are not updated
                 # non edge atoms get updated, no match check for type, q, m
                 if not edge_list[in_frag_id]:
-                    self.system.update_particle(
-                        part_id, oldname, type, charge, mass
-                    )
+                    # There is no full matching allowed here because the
+                    # purpose of this is to update types to new ones.
+                    #
+                    # The * is only here as an option not to update types.
+                    if oldtype == type or type == "*":
+                        # same type or type to remain same with *
+                        # update if charge or mass change
+                        if (charge is not None and oldcharge != charge) or \
+                                (mass is not None and oldmass != mass):
+                            self.system.update_particle(
+                                part_id, oldname, oldtype, charge, mass
+                            )
+                    else:
+                        # new type, so gotta update anyway
+                        self.system.update_particle(
+                            part_id, oldname, type, charge, mass
+                        )
         # bonds
         for (force, i, j, params) in frag.bonds:
             b = force.add(particles[i], particles[j], *params)
@@ -347,6 +365,7 @@ class TopStar():
         # exclusions
         for i, excl in enumerate(frag.exclusions):
             for j in excl:
+                # TODO why i < j?
                 if i < j:
                     e = self.system.exclusions.add(particles[i], particles[j])
                     inst.interactions.append(e)
@@ -385,7 +404,8 @@ class TopStar():
                     #
                     # allowed to stay if it's edge-edge overlap
                     del defrag[i]
-                    self.frag_list[other_frag_id] = None
+                    if self.frag_list.get(other_frag_id):
+                        del self.frag_list[other_frag_id]
                 else:
                     i += 1
 
@@ -405,7 +425,7 @@ class TopStar():
                     del defrag[i]
                 else:
                     i += 1
-        self.frag_list[frag.frag_id] = None
+        del self.frag_list[frag.frag_id]
 
     def new_dynamic_complete_fragment(self, particles, frag1, frag2, frag_prod,
                                       complete1, complete2):
@@ -413,9 +433,10 @@ class TopStar():
         # exclude those from frag1, frag2 (those were deleted from system)
         # and add a new fragment to the list that contains particles and
         # forces obtained that way
-        inst_id = len(self.frag_list)
+        inst_id = self.next_frag_id
+        self.next_frag_id += 1
         inst = Fragment("<dyn>", inst_id)
-        self.frag_list.append(inst)
+        self.frag_list[inst_id] = inst
         for i, part in enumerate(particles):
             inst.particles.append(part)
             inst.edge.append(False)
@@ -538,9 +559,7 @@ class TopStar():
 
     def get_initiator_list(self):
         initiators: list[Fragment] = []
-        for frag in self.frag_list:
-            if frag is None:
-                continue
+        for id, frag in self.frag_list.items():
             if frag.name in self.reactive_types:
                 initiators.append(frag)
 
@@ -557,5 +576,5 @@ class TopStar():
             for rx in self.reaction_list:
                 print(rx, file=file)
             print("==== TopStar / Fragments ====", file=file)
-            for frag in self.frag_list:
-                print(frag, file=file)
+            for id, frag in self.frag_list.items():
+                print(id, frag, file=file)

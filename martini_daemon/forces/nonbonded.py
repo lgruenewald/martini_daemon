@@ -43,7 +43,7 @@ class NonBonded(Force):
 
     def update_params(self, i, part_type, charge, charge_changed):
         part_type_id = self.use_atom_type(part_type)
-        self._force_obj.setPerParticleParameters(i, [part_type_id, charge])
+        self._force_obj.setParticleParameters(i, [part_type_id, charge])
         self._sysstar.pairs._rebuild = True
         if charge_changed:
             self._es_force._rebuild = True

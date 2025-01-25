@@ -1,4 +1,4 @@
-# Daemon architecture
+# Daemon architecture - WIP/outdated
 
 Elements
 - DaemonParser
@@ -124,9 +124,11 @@ Updating the T* should be done following these rules:
 
 - the number of particles cannot be changed during reactions
 - constraints and virtual sites cannot be created or removed during reactions
+  - cannot be created because of periodic boundary conditions inside openmm
+  - cannot be removed because it messes indexing up
 - fragments that overlap can't react
 - no checking for duplicate exclusions created between two particles during
   reactions (yet?) - this will throw an exception
-- constraints and interactions specified by the user
+- reaction constraints and product interactions specified by the user
   should lead to forces during bond formation that don't blow up the system,
   and it's the user's responsibility to ensure this
