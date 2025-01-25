@@ -274,7 +274,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
         type = unwrap(tokens, 2, "int")
         length = unwrap(tokens, 3, "float")
         if type == 1 or type == 2:
-            last_molecule().constraints.append((i, j, length))
+            last_molecule().bonds.append((system.constraint, i, j, [length]))
             if type == 1:
                 # type 2 doesn't generate exclusions
                 last_molecule().add_exclusion(i, j)

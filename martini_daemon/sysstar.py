@@ -8,6 +8,7 @@ from collections import OrderedDict
 import numpy as np
 
 from .forces.combined_bending_torsion import CombinedBendingTorsion
+from .forces.constraint import Constraint
 from .forces.force import Force
 from .forces.g96angle import G96Angle
 from .forces.harmonic_angle import HarmonicAngle
@@ -64,6 +65,7 @@ class SysStar():
         self.context_initialized = False
         self._reinitialize = True
         self._forces_list = []
+        self.constraint = Constraint(self)
         self.harmonic_bond = HarmonicBond(self)
         self.morse_bond = MorseBond(self)
         self.cubic_bond = CubicBond(self)
@@ -86,6 +88,7 @@ class SysStar():
         self.nonbonded_force = NonBonded(self)
         self.exclusions = self.nonbonded_force.get_exclusion_helper()
         self.modular_forces = [
+            self.constraint,
             self.harmonic_bond, self.harmonic_angle,
             self.proper_dihedral, self.improper_dihedral,
             self.g96_angle, self.restricted_angle,
@@ -135,8 +138,6 @@ class SysStar():
         self._system = mm.System()
         for (_, _, _, mass) in filter(None, self._part_list):
             self._system.addParticle(mass)
-        for (i, j, length) in filter(None, self._constraint_list):
-            self._system.addConstraint(i, j, length)
 
     def get_particle_name_type(self, i):
         name, type, _, _ = self._part_list[i]
@@ -148,20 +149,6 @@ class SysStar():
 
     def len_particles(self):
         return len(self._part_list)
-
-    def add_constraint(self, i, j, length):
-        """Adds a constraint to the list, returns its constraint_id"""
-        self._constraint_list.append((i, j, length))
-        if self.context_initialized:
-            raise Exception("Can't add constraint during run")
-        return len(self._constraint_list) - 1
-
-    def get_constraint_members(self, constraint_id):
-        i, j, _ = self._constraint_list[constraint_id]
-        return (i, j)
-
-    def remove_constraint(self, constraint_id):
-        raise NotImplementedError("Constraints cannot be safely removed")
 
     def add_atom_type(self, type, charge, mass):
         if self.context_initialized:
@@ -185,10 +172,10 @@ class SysStar():
         for force in self._forces_list:
             self._system.addForce(force)
         self.context_initialized = True
-        self._reinitialize = False
         self._integrator = integrator
         for modular_force in self.modular_forces:
             modular_force.build()
+        self._reinitialize = False
         # Build context
         self._periodic_box = periodicBoxVectors
         self._system.setDefaultPeriodicBoxVectors(*periodicBoxVectors)

@@ -53,8 +53,6 @@ class MolFragment:
     dihedrals: list[(Force, int, int, int, int, list)]
     # exclusions: list of id's
     exclusions: list[list[int]]
-    # constraints: i j length
-    constraints: list[(int, int, float)]
     # interactions: generic members and params
     interactions: list[(Force, list, list)]
 
@@ -114,7 +112,6 @@ class Fragment():
     name: str
     particles: list[int]
     interactions: list[Interaction]
-    constraints: list[int]
     edge: list[bool]
     frag_id: int
     original_parent = None
@@ -123,7 +120,6 @@ class Fragment():
         self.name = name
         self.particles = []
         self.interactions = []
-        self.constraints = []
         self.edge = []
         self.frag_id = id
         self.original_parent = original_parent
@@ -170,7 +166,7 @@ class TopStar():
     def new_mol_fragment(self, name: str):
         if self.type_lookup.get(name):
             raise ValueError(f"Second definition of fragment type {name}")
-        mol_fragment = MolFragment(name, [], [], [], [], [], [], [])
+        mol_fragment = MolFragment(name, [], [], [], [], [], [])
         self.type_lookup[name] = mol_fragment
         return mol_fragment
 
@@ -254,12 +250,6 @@ class TopStar():
                     break
             if include_interaction:
                 subinst.interactions.append(interaction)
-
-        # constaints get added if both of the atoms is a normal atom
-        for cid in inst.constraints:
-            i, j = self.system.get_constraint_members(cid)
-            if i in normal_indices and j in normal_indices:
-                subinst.constraints.append(cid)
 
         # subfrags can contain further subfrags
         self.instantiate_subfrags(name, subinst)
@@ -360,11 +350,6 @@ class TopStar():
                 if i < j:
                     e = self.system.exclusions.add(particles[i], particles[j])
                     inst.interactions.append(e)
-        # constraints
-        for cons in frag.constraints:
-            i, j, length = cons
-            c = self.system.add_constraint(particles[i], particles[j], length)
-            inst.constraints.append(c)
         # generic interactions
         for (force, members, params) in frag.interactions:
             members = [particles[x] for x in members]
@@ -407,9 +392,6 @@ class TopStar():
         # 2. remove forces in fragment
         for interaction in frag.interactions:
             interaction.remove()
-        for con in frag.constraints:
-            # constraints can't be removed, so this will throw an exception
-            self.system.remove_constraint(con)
 
     def remove_fragment(self, frag: Fragment):
         """Removes a fragment from frag_lits and defrag_list
@@ -454,24 +436,6 @@ class TopStar():
         inters = inter_yes - inter_no
         for inter in inters:
             inst.interactions.append(inter)
-
-        # TODO modularize constraints into the same system later
-
-        constraints_yes = set()
-        constraints_no = set()
-        for constraint in frag1.constraints:
-            constraints_no.add(constraint)
-        for constraint in frag2.constraints:
-            constraints_no.add(constraint)
-        for constraint in frag_prod.constraints:
-            constraints_yes.add(constraint)
-        for constraint in complete1.constraints:
-            constraints_yes.add(constraint)
-        for constraint in complete2.constraints:
-            constraints_yes.add(constraint)
-        constraints = constraints_yes - constraints_no
-        for constraint in constraints:
-            inst.constraints.append(constraint)
 
     def detection(self,
                   frag1: Fragment,
