@@ -534,46 +534,60 @@ def DaemonTopFile(file, include_dir=None, defines={},
     # unsuitable for this
     last_reaction: ReactionTemplate = None
 
-    def is_complete():
-        return (
-            last_reaction is not None and last_reaction.r1 is not None and
-            last_reaction.r2 is not None and last_reaction.p1 is not None and
-            last_reaction.distance_max is not None and
-            last_reaction.type is not None
-        )
+    def require_complete_reaction():
+        nonlocal last_reaction
+        if last_reaction is None:
+            return
+        if (last_reaction.r1 is not None and last_reaction.r2 is not None and
+                last_reaction.p1 is not None and
+                last_reaction.distance_max is not None and
+                last_reaction.type is not None):
+            # complete
+            topology.new_reaction(last_reaction)
+            last_reaction = None
+        else:
+            raise ValueError(f"unfinished reaction {last_reaction.name}")
 
     def process_reaction(tokens):
         nonlocal last_reaction
-        for i in range(len(tokens)):
-            key, value = unwrap(tokens, i, "pair")
-            match key:
-                case "name":
-                    if last_reaction is not None and not is_complete():
-                        raise ValueError(f"unfinished reaction {last_reaction.name}")
-                    last_reaction = ReactionTemplate(value, None, None, None, None, None)
-                case "r1":
-                    last_reaction.r1 = value
-                case "r2":
-                    last_reaction.r2 = value
-                case "p1":
-                    last_reaction.p1 = value
-                case "type":
-                    last_reaction.type = value
-                case "distance_max":
-                    last_reaction.distance_max = value
-            if is_complete():
-                topology.new_reaction(last_reaction)
-                last_reaction = None
+        require_complete_reaction()
+        name = unwrap(tokens, 0, "word")
+        last_reaction = ReactionTemplate(name, None, None, None, None, None)
 
-    p.add_level("reaction", process_reaction)
+    p.add_level("rx", process_reaction)
+
+    def process_reactants(tokens):
+        nonlocal last_reaction
+        r1 = unwrap(tokens, 0, "word")
+        r2 = unwrap(tokens, 1, "word")
+        last_reaction.r1 = r1
+        last_reaction.r2 = r2
+
+    p.add_level("rx_reactants", process_reactants)
+
+    def process_products(tokens):
+        nonlocal last_reaction
+        p1 = unwrap(tokens, 0, "word")
+        last_reaction.p1 = p1
+
+    p.add_level("rx_products", process_products)
+
+    def process_conditions(tokens):
+        key, value = unwrap(tokens, 0, "pair")
+        match key:
+            case "distance_max":
+                last_reaction.distance_max = value
+            case "type":
+                last_reaction.type = value
+
+    p.add_level("rx_conditions", process_conditions)
 
     # run parser
     ok = p.parse(file, include_dir, defines)
     if not ok:
         raise ValueError("Parsing error")
 
-    if last_reaction is not None and not is_complete():
-        raise ValueError(f"unfinished reaction {last_reaction.name}")
+    require_complete_reaction()
 
     return (system, topology)
 

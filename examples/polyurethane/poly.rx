@@ -40,13 +40,12 @@ coh_nco 1
   4 3 1   2    140   100
   2 1 3   2    120   80
 
-[ reaction ]
-name: coh_nco_bond
-r1: coh_end
-r2: nco_end
-p1: coh_nco
-distance_max: 0.6 ; nm, distance cutoff
+[ rx ]
+coh_nco_bond
+[ rx_reactants ]
+coh_end nco_end
+[ rx_products ]
+coh_nco
+[ rx_conditions ]
+distance_max: 0.6
 type: poly
-
-; [ constraints ]
-; todo: angle, reaction rate, etc constraints
