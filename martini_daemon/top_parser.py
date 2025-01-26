@@ -126,8 +126,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
             raise ValueError("Bad atom ID, are they out of order?"
                              f" got id {id} but expected {atom_index}")
         last_molecule().atoms.append((type, resnum, resname,
-                                            atomname, charge_group_num,
-                                            charge, mass))
+                                      atomname, charge_group_num,
+                                      charge, mass))
 
     p.add_level("atoms", process_atoms)
 
@@ -492,41 +492,43 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("virtual_sitesn", process_virtual_sitesn)
 
     # custom additions: rx and frag
-    _last_frag = None
-
-    def last_frag():
-        if _last_frag is None:
-            raise ValueError("define a [ frag ] first")
-        return _last_frag
+    _frag_name = None
+    _atom_list = []
 
     def process_frag(tokens):
-        nonlocal _last_frag
-        name = None
-        mol = None
-        for i in range(len(tokens)):
-            key, value = unwrap(tokens, i, "pair")
-            match key:
-                case "name":
-                    name = value
-                case "mol":
-                    mol = value
-                case _:
-                    raise ValueError(f"Unexpected key {key}, "
-                                     "expected 'name' or 'mol'")
-        if name is None or mol is None:
-            raise ValueError("name and mol must be defined in [ frag ]")
-        _last_frag = topology.new_frag_fragment(name, mol)
+        nonlocal _frag_name, _atom_list
+        _atom_list = []
+        _frag_name = unwrap(tokens, 0, "word")
 
     p.add_level("frag", process_frag)
 
     def process_fragatoms(tokens):
-        parent_id = unwrap(tokens, 0, "int") - 1
-        type = unwrap(tokens, 1, {"word", "pattern"})
-        name = unwrap(tokens, 2, {"word", "pattern"})
-        is_edge = unwrap(tokens, 3, "int") != 0
-        last_frag().atoms.append((parent_id, type, name, is_edge))
+        nonlocal _atom_list, _frag_name
+        if _frag_name is None:
+            raise ValueError("Define a [frag] first.")
+        type = unwrap(tokens, 0, {"word", "pattern"})
+        name = unwrap(tokens, 1, {"word", "pattern"})
+        is_edge = unwrap(tokens, 2, "int") != 0
+        _atom_list.append((type, name, is_edge))
 
-    p.add_level("fragatoms", process_fragatoms)
+    p.add_level("frag_atoms", process_fragatoms)
+
+    def process_fragfrom(tokens):
+        nonlocal _frag_name, _atom_list
+        if _frag_name is None or len(_atom_list) == 0:
+            raise ValueError("Define a [frag] and give [frag_atoms] first.")
+        mol = unwrap(tokens, 0, "word")
+        parent_ids = []
+        for i in range(1, len(tokens)):
+            parent_ids.append(unwrap(tokens, i, "int") - 1)
+        if len(parent_ids) != len(_atom_list):
+            raise ValueError("Wrong number of atoms, expect "
+                             f"{len(_atom_list)}, got {len(parent_ids)}")
+        frag = topology.new_frag_fragment(_frag_name, mol)
+        for i in range(len(parent_ids)):
+            frag.atoms.append((parent_ids[i], *(_atom_list[i])))
+
+    p.add_level("frag_from", process_fragfrom)
 
     # FIXME this is terrible, the current callback architecture is really
     # unsuitable for this

@@ -1,37 +1,24 @@
 [ frag ]
-name: coh_end mol: PEG
-[ fragatoms ]
-; parent_id     type   name  is_edge
-      1          *      COH   0
-	  2          *      COC   1
+coh_end
+[ frag_atoms ]
+; type   name  is_edge
+   *      COH   0
+   *      COC   1
+[ frag_from ]
+PEG 1 2
+PEG 46 45
+
 
 [ frag ]
-name: coh_end mol: PEG
-[ fragatoms ]
-; parent_id     type   name  is_edge
-      46         *      COH   0
-	  45         *      COC   1
-
-[ frag ]
-name: nco_end mol: DesmodurN
-[ fragatoms ]
-; parent_id     type   name  is_edge
-      1          *      NCO     0
-	  2          *      CC1     1
-
-[ frag ]
-name: nco_end mol: DesmodurN
-[ fragatoms ]
-; parent_id     type   name  is_edge
-      9          *      NCO     0
-	  8          *      CC1     1
-
-[ frag ]
-name: nco_end mol: DesmodurN
-[ fragatoms ]
-; parent_id     type   name  is_edge
-      14         *      NCO     0
-	  13         *      CC1     1
+nco_end
+[ frag_atoms ]
+;  type   name  is_edge
+    *      NCO     0
+    *      CC1     1
+[ frag_from ]
+DesmodurN 1 2
+DesmodurN 9 8
+DesmodurN 14 13
 
 [ moleculetype ]
 ; molname nrexcl

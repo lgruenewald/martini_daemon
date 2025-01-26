@@ -104,7 +104,7 @@ class TopParser:
         patterns["float"] = re.compile("[-+]?[0-9]+(\\.[0-9]*)?"
                                        "([eE][-+]?[0-9]+)?")
         patterns["key"] = re.compile("[a-zA-Z0-9_]+:")
-        patterns["word"] = re.compile("[a-zA-Z0-9_]+")
+        patterns["word"] = re.compile("[a-zA-Z0-9_.]+")
         patterns["pattern"] = re.compile("[a-zA-Z0-9_?*{}]+")
         patterns["macro"] = re.compile("#[a-zA-Z0-9_]+")
         patterns["string"] = re.compile('"[^"]*"')
