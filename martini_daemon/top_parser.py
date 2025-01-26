@@ -113,7 +113,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
         return _last_molecule
 
     def process_atoms(tokens):
-        id = unwrap(tokens, 0, "int") - 1
+        id = unwrap(tokens, 0, "index")
         type = unwrap(tokens, 1, {"word", "pattern"})
         resnum = unwrap(tokens, 2, "int")
         resname = unwrap(tokens, 3, "word")
@@ -132,30 +132,30 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("atoms", process_atoms)
 
     def process_bonds(tokens):
-        i = unwrap(tokens, 0, "int") - 1
-        j = unwrap(tokens, 1, "int") - 1
+        i = unwrap(tokens, 0, "index")
+        j = unwrap(tokens, 1, "index")
         type = unwrap(tokens, 2, "int")
-        length = unwrap(tokens, 3, "float", None)
+        length = unwrap(tokens, 3, "float")
         if type == 1 or type == 6:
             # harmonic bond / harmonic potential
-            force = unwrap(tokens, 4, "float", None)
+            force = unwrap(tokens, 4, "float")
             last_molecule().bonds.append((system.harmonic_bond, i, j,
                                          [length, force]))
         elif type == 3:
             # morse
-            D = unwrap(tokens, 4, "float", None)
-            beta = unwrap(tokens, 5, "float", None)
+            D = unwrap(tokens, 4, "float")
+            beta = unwrap(tokens, 5, "float")
             last_molecule().bonds.append((system.morse_bond, i, j,
                                          [length, D, beta]))
         elif type == 4:
             # cubic bond
-            kb = unwrap(tokens, 4, "float", None)
-            kcub = unwrap(tokens, 5, "float", None)
+            kb = unwrap(tokens, 4, "float")
+            kcub = unwrap(tokens, 5, "float")
             last_molecule().bonds.append((system.cubic_bond, i, j,
                                          [length, kb, kcub]))
         elif type == 7:
             # FENE (finitely extensible nonlinear elastic) bond
-            force = unwrap(tokens, 4, "float", None)
+            force = unwrap(tokens, 4, "float")
             last_molecule().bonds.append((system.fene_bond, i, j,
                                          [length, force]))
         else:
@@ -168,12 +168,12 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("bonds", process_bonds)
 
     def process_angles(tokens):
-        i = unwrap(tokens, 0, "int") - 1
-        j = unwrap(tokens, 1, "int") - 1
-        k = unwrap(tokens, 2, "int") - 1
+        i = unwrap(tokens, 0, "index")
+        j = unwrap(tokens, 1, "index")
+        k = unwrap(tokens, 2, "index")
         type = unwrap(tokens, 3, "int")
-        theta = unwrap(tokens, 4, "float", -1.) * math.pi / 180
-        force = unwrap(tokens, 5, "float", -1.)
+        theta = unwrap(tokens, 4, "float") * math.pi / 180
+        force = unwrap(tokens, 5, "float")
         match type:
             case 1:
                 force_obj = system.harmonic_angle
@@ -188,10 +188,10 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("angles", process_angles)
 
     def process_dihedrals(tokens):
-        i = unwrap(tokens, 0, "int") - 1
-        j = unwrap(tokens, 1, "int") - 1
-        k = unwrap(tokens, 2, "int") - 1
-        l = unwrap(tokens, 3, "int") - 1
+        i = unwrap(tokens, 0, "index")
+        j = unwrap(tokens, 1, "index")
+        k = unwrap(tokens, 2, "index")
+        l = unwrap(tokens, 3, "index")
         type = unwrap(tokens, 4, "int")
         match type:
             case 1 | 9:
@@ -259,18 +259,18 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("dihedrals", process_dihedrals)
 
     def process_exclusions(tokens):
-        i = unwrap(tokens, 0, "int") - 1
-        j = unwrap(tokens, 1, "int") - 1
+        i = unwrap(tokens, 0, "index")
+        j = unwrap(tokens, 1, "index")
         last_molecule().add_exclusion(i, j)
         for k in range(2, len(tokens)):
-            c = unwrap(tokens, k, "int") - 1
+            c = unwrap(tokens, k, "index")
             last_molecule().add_exclusion(i, c)
 
     p.add_level("exclusions", process_exclusions)
 
     def process_constraints(tokens):
-        i = unwrap(tokens, 0, "int") - 1
-        j = unwrap(tokens, 1, "int") - 1
+        i = unwrap(tokens, 0, "index")
+        j = unwrap(tokens, 1, "index")
         type = unwrap(tokens, 2, "int")
         length = unwrap(tokens, 3, "float")
         if type == 1 or type == 2:
@@ -296,8 +296,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("pairtypes", process_pairtypes)
 
     def process_pairs(tokens):
-        i = unwrap(tokens, 0, "int") - 1
-        j = unwrap(tokens, 1, "int") - 1
+        i = unwrap(tokens, 0, "index")
+        j = unwrap(tokens, 1, "index")
         type = unwrap(tokens, 2, "int")
         if type != 1:
             raise ValueError("Unsupported pairs type")
@@ -349,8 +349,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("nonbond_params", process_nonbond_params)
 
     def process_virtual_sites1(tokens):
-        vid = unwrap(tokens, 0, "int") - 1
-        member = unwrap(tokens, 1, "int") - 1
+        vid = unwrap(tokens, 0, "index")
+        member = unwrap(tokens, 1, "index")
         type = unwrap(tokens, 2, "int")
         if type != 1:
             raise ValueError(f"Virtual site 1 type {type} not implemented.")
@@ -361,9 +361,9 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("virtual_sites1", process_virtual_sites1)
 
     def process_virtual_sites2(tokens):
-        vid = unwrap(tokens, 0, "int") - 1
-        i = unwrap(tokens, 1, "int") - 1
-        j = unwrap(tokens, 2, "int") - 1
+        vid = unwrap(tokens, 0, "index")
+        i = unwrap(tokens, 1, "index")
+        j = unwrap(tokens, 2, "index")
         members = [vid, i, j]
         type = unwrap(tokens, 3, "int")
         match type:
@@ -386,10 +386,10 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("virtual_sites2", process_virtual_sites2)
 
     def process_virtual_sites3(tokens):
-        vid = unwrap(tokens, 0, "int") - 1
-        i = unwrap(tokens, 1, "int") - 1
-        j = unwrap(tokens, 2, "int") - 1
-        k = unwrap(tokens, 3, "int") - 1
+        vid = unwrap(tokens, 0, "index")
+        i = unwrap(tokens, 1, "index")
+        j = unwrap(tokens, 2, "index")
+        k = unwrap(tokens, 3, "index")
         members = [vid, i, j, k]
         type = unwrap(tokens, 4, "int")
         match type:
@@ -431,11 +431,11 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("virtual_sites3", process_virtual_sites3)
 
     def process_virtual_sites4(tokens):
-        vid = unwrap(tokens, 0, "int") - 1
-        i = unwrap(tokens, 1, "int") - 1
-        j = unwrap(tokens, 2, "int") - 1
-        k = unwrap(tokens, 3, "int") - 1
-        l = unwrap(tokens, 4, "int") - 1
+        vid = unwrap(tokens, 0, "index")
+        i = unwrap(tokens, 1, "index")
+        j = unwrap(tokens, 2, "index")
+        k = unwrap(tokens, 3, "index")
+        l = unwrap(tokens, 4, "index")
         members = [vid, i, j, k, l]
         type = unwrap(tokens, 5, "int")
         match type:
@@ -450,13 +450,13 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("virtual_sites4", process_virtual_sites4)
 
     def process_virtual_sitesn(tokens):
-        vid = unwrap(tokens, 0, "int") - 1
+        vid = unwrap(tokens, 0, "index")
         members = [vid]
         type = unwrap(tokens, 1, "int")
         match type:
             case 1:
                 for c in range(2, len(tokens)):
-                    members.append(unwrap(tokens, c, "int") - 1)
+                    members.append(unwrap(tokens, c, "index"))
                 n = len(members) - 1
                 weights = [1/n] * n
                 last_molecule().interactions.append(
@@ -464,7 +464,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 )
             case 2:
                 for c in range(2, len(tokens)):
-                    members.append(unwrap(tokens, c, "int") - 1)
+                    members.append(unwrap(tokens, c, "index"))
                 n = len(members) - 1
                 last_molecule().interactions.append(
                     (system.vsite_com, members, [])
@@ -475,7 +475,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 if len(tokens) % 2 != 0:
                     raise ValueError("Must have an even number of arguments")
                 for c in range(2, len(tokens), 2):
-                    index = unwrap(tokens, c, "int") - 1
+                    index = unwrap(tokens, c, "index")
                     weight = unwrap(tokens, c+1, "float")
                     members.append(index)
                     weights.append(weight)
@@ -520,7 +520,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
         mol = unwrap(tokens, 0, "word")
         parent_ids = []
         for i in range(1, len(tokens)):
-            parent_ids.append(unwrap(tokens, i, "int") - 1)
+            parent_ids.append(unwrap(tokens, i, "index"))
         if len(parent_ids) != len(_atom_list):
             raise ValueError("Wrong number of atoms, expect "
                              f"{len(_atom_list)}, got {len(parent_ids)}")

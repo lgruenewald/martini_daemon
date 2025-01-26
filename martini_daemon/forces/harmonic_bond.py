@@ -13,8 +13,6 @@ class HarmonicBond(Force):
             self._force_obj.addBond(i, j, length, force)
 
     def add(self, i, j, length, force):
-        if length is None or force is None:
-            raise NotImplementedError("Bond length and force are mandatory.")
         self._list.append((i, j, length, force))
         if not self._rebuild:
             self._force_obj.addBond(i, j, length, force)
