@@ -91,6 +91,7 @@ class DaemonSimulation():
 
         pairs = []
         skip = set()
+        self.top.pre_detection()
         # Detection algorithm
         for i, frag1 in enumerate(self.initiator_list):
             if frag1 is None:
@@ -116,7 +117,7 @@ class DaemonSimulation():
         # Modification algorithm
         for frag1, frag2, rx in pairs:
             self.reactions += 1
-            self.top.modification(frag1, frag2, rx.p1)
+            self.top.modification(frag1, frag2, rx)
 
         # reinitialize context, initator list
         self.initiator_list = self.top.get_initiator_list()

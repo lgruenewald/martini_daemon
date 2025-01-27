@@ -29,14 +29,19 @@ from .sysstar import SysStar
 from .forces.force import Force, Interaction
 from fnmatch import fnmatch
 from .utils import pdist, backup_try
+import random
+
+
+random.seed()
+
 
 @dataclass
 class FragFragment:
     name: str  # when instantiated it has this name (e.g. in [ rx ])
     mol: str
     name_id: str  # internally it has this name for subfrag mapping
-    # list[(in_itp_id, type, name, is_edge)]
-    atoms: list[(int, str, str, bool)]
+    # list[(in_itp_id, type, name)]
+    atoms: list[(int, str, str)]
 
 
 @dataclass
@@ -87,18 +92,46 @@ class MolFragment:
                                  f"self.exclusions[{i}]")
 
 
-@dataclass
 class ReactionTemplate:
     name: str
     r1: str
     r2: str
     p1: str
-    distance_max: float
-    break_pairs: list[(int, int)]
+    distance_max: list[(int, int, float)]
+    distance_min: list[(int, int, float)]
+    probability: float
+    global_counter: int
+    global_limit: int
+    break_groups: list[list[int]]
     update_groups: list[list[int]]
 
+    def __init__(self, name):
+        self.name = name
+        self.r1 = None
+        self.r2 = None
+        self.p1 = None
+        self.distance_max = []
+        self.distance_min = []
+        self.probability = 1.0
+        self.global_counter = 0
+        self.global_limit = None
+        self.break_groups = []
+        self.update_groups = []
 
-@dataclass
+    def is_complete(self):
+        # when a reaction is finished parsing, if this returns False
+        # it is considered an error
+
+        # currently: must have a reactant and product and at least one distance
+        # constraint, but this is a bit arbitrary / should reflect common
+        # potential mistakes people would make when writing *.rx files
+        return (
+            self.r1 is not None and
+            self.p1 is not None and
+            (len(self.distance_max) > 0 or len(self.distance_min) > 0)
+        )
+
+
 class Fragment():
     """Helper class for building and storing fragment information
     fragment name is used for its type
@@ -238,6 +271,7 @@ class TopStar():
                 self.defrag_list[part_index].append(subinst.frag_id)
 
         # interactions get added if all participants are normal atoms
+        # TODO functionalize these checks
         for interaction in inst.interactions:
             members = interaction.get_members()
             include_interaction = False
@@ -276,7 +310,9 @@ class TopStar():
             self.defrag_list.append([])
         return self.instantiate_over_existing(frag_name, parts)
 
-    def instantiate_over_existing(self, frag_name, particles, reaction=False):
+    def instantiate_over_existing(
+            self, frag_name, particles, reaction=False,
+            interactions=[]):
         """Takes a name of a mol fragment, creates new particles for it in
         the system and the corresponding interactions as well.
         Recursively instantiates all subfragments too.
@@ -346,6 +382,9 @@ class TopStar():
         for (force, members, params) in frag.interactions:
             members = [particles[x] for x in members]
             inst.interactions.append(force.add(members, params))
+        # interactions inherited / not added here
+        for inter in interactions:
+            inst.interactions.append(inter)
 
         self.instantiate_subfrags(frag_name, inst)
         return inst
@@ -354,6 +393,7 @@ class TopStar():
         """Removes a fragment from frag_lits and defrag_list
         """
 
+        # TODO functionalize these checks
         for part in frag.particles:
             defrag = self.defrag_list[part]
             i = 0
@@ -372,6 +412,7 @@ class TopStar():
         removes overlapping fragments, then removes fragment
         """
 
+        # TODO functionalize these checks
         for part in frag.particles:
             # "cache", since remove_fragment will change this list
             defrag = self.defrag_list[part].copy()
@@ -386,6 +427,10 @@ class TopStar():
 
         self.remove_fragment(frag)
 
+    def pre_detection(self):
+        for rx in self.reaction_list:
+            rx.global_counter = 0
+
     def detection(self,
                   frag1: Fragment,
                   frag2: Fragment,
@@ -397,28 +442,90 @@ class TopStar():
 
         Returns False if they should not react
         """
+        # the order of checks should be from fastest to slowest to maximize
+        # performance
         # simple rules check
-        if len(set(frag1.particles) & set(frag2.particles)) != 0:
-            # Overlapping fragments can never react
-            return False
+        # overlapping fragments can never react:
+        if frag2 is not None:
+            for i in frag1.particles:
+                for j in frag2.particles:
+                    if i == j:
+                        return False
 
-        init1 = frag1.particles[0]
-        init2 = frag2.particles[0]
-        # position dependent checks
-        dist = pdist(pos[init1], pos[init2], box)
-        if dist > rx.distance_max:
+        # limiter checks, first for performance
+        if rx.global_limit is not None and rx.global_counter >= rx.global_limit:
             return False
+        if random.random() > rx.probability:
+            return False
+        # position dependent checks
+        particles = frag1.particles.copy()
+        if frag2 is not None:
+            particles += frag2.particles
+        for (i, j, rmax) in rx.distance_max:
+            init1 = particles[i]
+            init2 = particles[j]
+            dist = pdist(pos[init1], pos[init2], box)
+            if dist > rmax:
+                return False
+        for (i, j, rmin) in rx.distance_min:
+            init1 = particles[i]
+            init2 = particles[j]
+            dist = pdist(pos[init1], pos[init2], box)
+            if dist < rmin:
+                return False
+
+        rx.global_counter += 1
         return True
 
-    def modification(self, frag1, frag2, product):
+    def modification(self, frag1, frag2, rx: ReactionTemplate):
         """Modification helper for the D/M algorithm
         """
-        product_particles = frag1.particles + frag2.particles
+        product = rx.p1
+        product_particles = frag1.particles.copy()
+        all_interactions = frag1.interactions.copy()
+        if frag2 is not None:
+            product_particles += frag2.particles
+            all_interactions += frag2.interactions
+        i = 0
+        while i < len(all_interactions):
+            # TODO functionalize these checks
+            interaction = all_interactions[i]
+            remove = False
+            members = interaction.get_members()
+            # process rx_break
+            # if any in group not in members -> not remove candidate
+            for group in rx.break_groups:
+                all = True
+                for atom in group:
+                    if atom not in members:
+                        all = False
+                        break
+                if all:
+                    remove = True
+
+            # process rx_update
+            # if any in members not in group -> not remove candidate
+            for group in rx.update_groups:
+                all = True
+                for atom in members:
+                    if atom not in group:
+                        all = False
+                        break
+                if all:
+                    remove = True
+            if remove:
+                interaction.remove()
+                del all_interactions[i]
+            else:
+                i += 1
+
         self.destroy_fragment(frag1)
-        self.destroy_fragment(frag2)
+        if frag2 is not None:
+            self.destroy_fragment(frag2)
 
         self.instantiate_over_existing(
-            product, product_particles, reaction=True
+            product, product_particles, reaction=True,
+            interactions=all_interactions
         )
 
     def build_reaction_matrix(self):
@@ -447,4 +554,4 @@ class TopStar():
                 print(rx, file=file)
             print("==== TopStar / Fragments ====", file=file)
             for id, frag in self.frag_list.items():
-                print(id, frag, file=file)
+                print(f"{id}: <frag {frag.name} ps {frag.particles}>", file=file)

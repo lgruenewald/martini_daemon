@@ -1,9 +1,9 @@
 [ frag ]
 coh_end
 [ frag_atoms ]
-; type   name  is_edge
-   *      COH   0
-   *      COC   1
+; type   name
+   *      COH
+   *      COC
 [ frag_from ]
 PEG 1 2
 PEG 46 45
@@ -12,9 +12,9 @@ PEG 46 45
 [ frag ]
 nco_end
 [ frag_atoms ]
-;  type   name  is_edge
-    *      NCO     0
-    *      CC1     1
+;  type   name
+    *      NCO
+    *      CC1
 [ frag_from ]
 DesmodurN 1 2
 DesmodurN 9 8
@@ -47,4 +47,5 @@ coh_end nco_end
 [ rx_products ]
 coh_nco
 [ rx_conditions ]
-distance_max: 0.6
+r_max 1 3 0.6
+limit 1

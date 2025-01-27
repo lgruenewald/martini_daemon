@@ -536,9 +536,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
         nonlocal last_reaction
         if last_reaction is None:
             return
-        if (last_reaction.r1 is not None and last_reaction.r2 is not None and
-                last_reaction.p1 is not None and
-                last_reaction.distance_max is not None):
+        if last_reaction.is_complete():
             # complete
             topology.new_reaction(last_reaction)
             last_reaction = None
@@ -551,16 +549,19 @@ def DaemonTopFile(file, include_dir=None, defines={},
             raise ValueError("[ rx ] must be before [ system ]")
         require_complete_reaction()
         name = unwrap(tokens, 0, "word")
-        last_reaction = ReactionTemplate(name, None, None, None, None, [], [])
+        last_reaction = ReactionTemplate(name)
 
     p.add_level("rx", process_reaction)
 
     def process_reactants(tokens):
         nonlocal last_reaction
         r1 = unwrap(tokens, 0, "word")
-        r2 = unwrap(tokens, 1, "word")
         last_reaction.r1 = r1
-        last_reaction.r2 = r2
+        if len(tokens) == 2:
+            r2 = unwrap(tokens, 1, "word")
+            last_reaction.r2 = r2
+        elif len(tokens) > 2:
+            raise ValueError("Only up to two reactants are supported.")
 
     p.add_level("rx_reactants", process_reactants)
 
@@ -572,14 +573,47 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("rx_products", process_products)
 
     def process_conditions(tokens):
-        key, value = unwrap(tokens, 0, "pair")
+        nonlocal last_reaction
+        key = unwrap(tokens, 0, "word")
         match key:
-            case "distance_max":
-                last_reaction.distance_max = value
+            case "r_max":
+                i = unwrap(tokens, 1, "index")
+                j = unwrap(tokens, 2, "index")
+                cutoff = unwrap(tokens, 3, "float")
+                last_reaction.distance_max.append((i, j, cutoff))
+            case "r_min":
+                i = unwrap(tokens, 1, "index")
+                j = unwrap(tokens, 2, "index")
+                cutoff = unwrap(tokens, 3, "float")
+                last_reaction.distance_min.append((i, j, cutoff))
+            case "p":
+                probability = unwrap(tokens, 1, "float")
+                last_reaction.probability = probability
+            case "limit":
+                limit = unwrap(tokens, 1, "int")
+                last_reaction.global_limit = limit
             case _:
                 raise ValueError(f"Unknown key {key} in [rx_conditions]")
 
     p.add_level("rx_conditions", process_conditions)
+
+    def process_break(tokens):
+        nonlocal last_reaction
+        atoms = []
+        for i in range(len(tokens)):
+            atoms.append(unwrap(tokens, i, "index"))
+        last_reaction.break_groups.append(atoms)
+
+    p.add_level("rx_break", process_break)
+
+    def process_update(tokens):
+        nonlocal last_reaction
+        atoms = []
+        for i in range(len(tokens)):
+            atoms.append(unwrap(tokens, i, "index"))
+        last_reaction.update_groups.append(atoms)
+
+    p.add_level("rx_update", process_update)
 
     def process_system(tokens):
         nonlocal system_defined
