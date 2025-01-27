@@ -48,4 +48,3 @@ coh_end nco_end
 coh_nco
 [ rx_conditions ]
 distance_max: 0.6
-type: poly

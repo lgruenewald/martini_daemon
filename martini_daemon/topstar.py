@@ -32,9 +32,9 @@ from .utils import pdist, backup_try
 
 @dataclass
 class FragFragment:
-    name: str  # when instantiated it has this name
+    name: str  # when instantiated it has this name (e.g. in [ rx ])
     mol: str
-    name_id: str  # internally it has this name
+    name_id: str  # internally it has this name for subfrag mapping
     # list[(in_itp_id, type, name, is_edge)]
     atoms: list[(int, str, str, bool)]
 
@@ -94,7 +94,8 @@ class ReactionTemplate:
     r2: str
     p1: str
     distance_max: float
-    type: str  # one of: simple, poly, inter, intra, mono
+    break_pairs: list[(int, int)]
+    update_groups: list[list[int]]
 
 
 @dataclass
@@ -112,17 +113,13 @@ class Fragment():
     name: str
     particles: list[int]
     interactions: list[Interaction]
-    edge: list[bool]
     frag_id: int
-    original_parent = None
 
-    def __init__(self, name, id, original_parent=None):
+    def __init__(self, name, id):
         self.name = name
         self.particles = []
         self.interactions = []
-        self.edge = []
         self.frag_id = id
-        self.original_parent = original_parent
 
 
 class TopStar():
@@ -131,10 +128,8 @@ class TopStar():
     frag_list: dict[int, Fragment]
     next_frag_id: int
     # for every part_id have a list of fragments it is in
-    # type: list[list[(frag_id, in_fragment_id, is_edge)]]
-    # this list has to be at least 1 long per particle, and the first element
-    # should always be the reference to the complete fragment
-    defrag_list: list[list[(int, int, bool)]]
+    # type: list[list[frag_id]]
+    defrag_list: list[list[int]]
 
     # === Fragment Types ===
     # type name -> list of subfrag names
@@ -193,7 +188,16 @@ class TopStar():
         self.reactive_types.add(reaction.r1)
         self.reactive_types.add(reaction.r2)
 
-    def instantiate_subfrag(self, name_id, inst, original_parent=None):
+    def add_frag_to_list(self, name: str):
+        if name in self.reactive_types:
+            inst = Fragment(name, self.next_frag_id)
+            self.frag_list[self.next_frag_id] = inst
+            self.next_frag_id += 1
+            return inst
+        else:
+            return Fragment(name, -1)
+
+    def instantiate_subfrag(self, name_id, inst):
         """Instantiates a subfragment subfrag, with forces in S* as seen in
         inst.
 
@@ -206,16 +210,12 @@ class TopStar():
             raise ValueError(f"Attempt to recursively instantiate {name_id}, "
                              "but it's not a frag fragment type."
                              f"It is: {name_id}")
-        subinst_id = self.next_frag_id
-        self.next_frag_id += 1
-        subinst = Fragment(name, subinst_id, original_parent=original_parent)
-        self.frag_list[subinst_id] = subinst
-        normal_indices = set()
+        subinst = self.add_frag_to_list(name)
         all_indices = set()
         # particles
         for i, atom in enumerate(frag.atoms):
             # remapping of parent_id's to frag_id's
-            parent_id, type, name, is_edge = atom
+            parent_id, type, name = atom
             # parent_id must be i range
             if parent_id < 0 or parent_id >= len(inst.particles):
                 raise ValueError("Parent particle ID out of range")
@@ -226,30 +226,24 @@ class TopStar():
                 raise ValueError("During subfrag instantiation name/type "
                                  f"doesn't match. Expected name {sname} "
                                  f"type {stype}. Got name {name} type {type}.")
-            # can only add non edge if it's not an edge in parent
-            if not is_edge and inst.edge[parent_id]:
-                raise ValueError("Attempt to add non-edge atom in subfrag "
-                                 "from an edge atom in parent.")
             # build up these sets that are used for constructing the forces
             # prevent double inclusion of the same atom
             if part_index in all_indices:
                 raise ValueError("Double inclusion of atom in subfrag")
             all_indices.add(part_index)
-            if not is_edge:
-                normal_indices.add(part_index)
             # build up subinst
             subinst.particles.append(part_index)
-            subinst.edge.append(is_edge)
-            # frag_id, in_frag_id, is_edge
-            self.defrag_list[part_index].append((subinst_id, i, is_edge))
+            # frag_id, in_frag_id
+            if subinst.frag_id != -1:
+                self.defrag_list[part_index].append(subinst.frag_id)
 
         # interactions get added if all participants are normal atoms
         for interaction in inst.interactions:
             members = interaction.get_members()
-            include_interaction = True
+            include_interaction = False
             for member in members:
-                if member not in normal_indices:
-                    include_interaction = False
+                if member in all_indices:
+                    include_interaction = True
                     break
             if include_interaction:
                 subinst.interactions.append(interaction)
@@ -257,14 +251,14 @@ class TopStar():
         # subfrags can contain further subfrags
         self.instantiate_subfrags(name, subinst)
 
-    def instantiate_subfrags(self, frag_name, inst, original_parent=None):
+    def instantiate_subfrags(self, frag_name, inst):
         """Instantiates all subfrags of frag_name.
         inst is a Fragment instance that contains the reference to all forces
         in S*."""
         subfrags = self.subfrag_map.get(frag_name)
         if subfrags is not None:
             for subfrag in subfrags:
-                self.instantiate_subfrag(subfrag, inst, original_parent)
+                self.instantiate_subfrag(subfrag, inst)
 
     def instantiate(self, frag_name):
         frag = self.type_lookup.get(frag_name)  # frag type
@@ -282,17 +276,10 @@ class TopStar():
             self.defrag_list.append([])
         return self.instantiate_over_existing(frag_name, parts)
 
-    def instantiate_over_existing(
-            self, frag_name, particles, first=False, edge_list=False):
+    def instantiate_over_existing(self, frag_name, particles, reaction=False):
         """Takes a name of a mol fragment, creates new particles for it in
         the system and the corresponding interactions as well.
         Recursively instantiates all subfragments too.
-
-        first: if set to true, it will insert into the defrag list, if false
-        it will append
-
-        edge_list: if false, won't change particle types, names, etc.
-        if a list of booleans, it will change them where the booleans are False
         """
 
         frag = self.type_lookup.get(frag_name)  # frag type
@@ -302,22 +289,15 @@ class TopStar():
             raise ValueError(f"Attempt to instantiate {frag_name}, but it's"
                              " not a mol fragment type."
                              f" It is: {frag}")
-        inst_id = self.next_frag_id
-        self.next_frag_id += 1
-        inst = Fragment(frag_name, inst_id)
-        self.frag_list[inst_id] = inst
+        inst = self.add_frag_to_list(frag_name)
         # particles
         for in_frag_id, part_id in enumerate(particles):
             inst.particles.append(part_id)
-            # frag_id, in_frag_id, is_edge
-            if first:
-                self.defrag_list[part_id].insert(
-                    0, (inst_id, in_frag_id, False)
-                )
-            else:
-                self.defrag_list[part_id].append((inst_id, in_frag_id, False))
-            inst.edge.append(False)
-            if edge_list:
+            # defrag
+            if inst.frag_id != -1:
+                self.defrag_list[part_id].append(inst.frag_id)
+            if reaction:
+                # update_types is only True if this is called during a reaction
                 type, resnum, resname, atomname, chargegr, charge, mass = \
                     frag.atoms[in_frag_id]
                 oldname, oldtype, oldcharge, oldmass = \
@@ -327,26 +307,20 @@ class TopStar():
                 if not fnmatch(oldname, atomname):
                     raise Exception("Unmatching name during instantiate: "
                                     f"was {oldname}, pattern is {atomname}")
-                # edge atoms are not updated
-                # non edge atoms get updated, no match check for type, q, m
-                if not edge_list[in_frag_id]:
-                    # There is no full matching allowed here because the
-                    # purpose of this is to update types to new ones.
-                    #
-                    # The * is only here as an option not to update types.
-                    if oldtype == type or type == "*":
-                        # same type or type to remain same with *
-                        # update if charge or mass change
-                        if (charge is not None and oldcharge != charge) or \
-                                (mass is not None and oldmass != mass):
-                            self.system.update_particle(
-                                part_id, oldname, oldtype, charge, mass
-                            )
-                    else:
-                        # new type, so gotta update anyway
+                # The * is only here as an option not to update types.
+                if oldtype == type or type == "*":
+                    # same type or type to remain same with *
+                    # update if charge or mass change
+                    if (charge is not None and oldcharge != charge) or \
+                            (mass is not None and oldmass != mass):
                         self.system.update_particle(
-                            part_id, oldname, type, charge, mass
+                            part_id, oldname, oldtype, charge, mass
                         )
+                else:
+                    # new type, so gotta update anyway
+                    self.system.update_particle(
+                        part_id, oldname, type, charge, mass
+                    )
         # bonds
         for (force, i, j, params) in frag.bonds:
             b = force.add(particles[i], particles[j], *params)
@@ -365,7 +339,6 @@ class TopStar():
         # exclusions
         for i, excl in enumerate(frag.exclusions):
             for j in excl:
-                # TODO why i < j?
                 if i < j:
                     e = self.system.exclusions.add(particles[i], particles[j])
                     inst.interactions.append(e)
@@ -374,89 +347,44 @@ class TopStar():
             members = [particles[x] for x in members]
             inst.interactions.append(force.add(members, params))
 
-        self.instantiate_subfrags(frag_name, inst, original_parent=inst)
+        self.instantiate_subfrags(frag_name, inst)
         return inst
 
-    def get_molecule_fragment(self, frag: Fragment):
-        # 0. save the molecule fragment
-        molfrag_id, _, _ = self.defrag_list[frag.particles[0]][0]
-        return self.frag_list[molfrag_id]
+    def remove_fragment(self, frag: Fragment):
+        """Removes a fragment from frag_lits and defrag_list
+        """
+
+        for part in frag.particles:
+            defrag = self.defrag_list[part]
+            i = 0
+            while i < len(defrag):
+                if defrag[i] == frag.frag_id:
+                    del defrag[i]
+                else:
+                    i += 1
+
+        del self.frag_list[frag.frag_id]
 
     def destroy_fragment(self, frag: Fragment):
         """args:
         frag: Fragment
 
-        returns: the root molecule fragment from underneath
+        removes overlapping fragments, then removes fragment
         """
 
-        # 1. remove overlapping fragments
-        # get the list of fragments to remove
-        for part_id, part in enumerate(frag.particles):
-            is_edge = frag.edge[part_id]
-            defrag = self.defrag_list[part]
-            i = 0
-            while i < len(defrag):
-                other_frag_id, _, is_other_edge = defrag[i]
-                if not is_edge or not is_other_edge or \
-                        other_frag_id == frag.frag_id:
-                    # remove frag + remove other frags if the particle in frag
-                    # is not edge OR if the other frag contains it as non edge
-                    #
-                    # allowed to stay if it's edge-edge overlap
-                    del defrag[i]
-                    if self.frag_list.get(other_frag_id):
-                        del self.frag_list[other_frag_id]
-                else:
-                    i += 1
-
-        # 2. remove forces in fragment
-        for interaction in frag.interactions:
-            interaction.remove()
-
-    def remove_fragment(self, frag: Fragment):
-        """Removes a fragment from frag_lits and defrag_list
-        """
         for part in frag.particles:
-            defrag = self.defrag_list[part]
-            i = 0
-            while i < len(defrag):
-                frag_id, _, _ = defrag[i]
-                if frag_id == frag.frag_id:
-                    del defrag[i]
-                else:
-                    i += 1
-        del self.frag_list[frag.frag_id]
+            # "cache", since remove_fragment will change this list
+            defrag = self.defrag_list[part].copy()
+            for other_frag_id in defrag:
+                # remove self at the end, not here
+                if frag.frag_id == other_frag_id:
+                    continue
+                # if the other frag hasn't been removed yet, remove it
+                other_frag = self.frag_list.get(other_frag_id)
+                if other_frag is not None:
+                    self.remove_fragment(other_frag)
 
-    def new_dynamic_complete_fragment(self, particles, frag1, frag2, frag_prod,
-                                      complete1, complete2):
-        # get all forces from frag_prod, complete1, complete2 but
-        # exclude those from frag1, frag2 (those were deleted from system)
-        # and add a new fragment to the list that contains particles and
-        # forces obtained that way
-        inst_id = self.next_frag_id
-        self.next_frag_id += 1
-        inst = Fragment("<dyn>", inst_id)
-        self.frag_list[inst_id] = inst
-        for i, part in enumerate(particles):
-            inst.particles.append(part)
-            inst.edge.append(False)
-            self.defrag_list[part].insert(0, (inst_id, i, False))
-
-        inter_yes = set()
-        inter_no = set()
-        for inter in frag1.interactions:
-            inter_no.add(inter)
-        for inter in frag2.interactions:
-            inter_no.add(inter)
-        for inter in frag_prod.interactions:
-            inter_yes.add(inter)
-        for inter in complete1.interactions:
-            inter_yes.add(inter)
-        for inter in complete2.interactions:
-            inter_yes.add(inter)
-        inters = inter_yes - inter_no
-        for inter in inters:
-            inst.interactions.append(inter)
+        self.remove_fragment(frag)
 
     def detection(self,
                   frag1: Fragment,
@@ -473,83 +401,25 @@ class TopStar():
         if len(set(frag1.particles) & set(frag2.particles)) != 0:
             # Overlapping fragments can never react
             return False
-        mol1 = self.get_molecule_fragment(frag1)
-        mol2 = self.get_molecule_fragment(frag2)
-        if rx.type == "simple":
-            # simple bimolecular reaction with no additional restrictions
-            pass
-        elif rx.type == "poly":
-            # subfragments instantiated together (same monomer)
-            # cannot react with eachother
-            if frag1.original_parent is not None and \
-                    frag1.original_parent == frag2.original_parent:
-                return False
-        elif rx.type == "inter":
-            # subfragments in the same molecule cannot react with
-            # eachother
-            if mol1 == mol2:
-                return False
-        elif rx.type == "intra":
-            # subfragments only in the same molecule can react with
-            # eachother
-            if mol1 != mol2:
-                return False
-        elif rx.type == "mono":
-            # there is only one fragment as reactant
-            # frag1 == frag2 must be true i guess?
-            # TODO this will take more work...
-            if frag1 != frag2:
-                return False
-        else:
-            raise ValueError(f"Unknown rx type {rx.type}")
 
         init1 = frag1.particles[0]
         init2 = frag2.particles[0]
         # position dependent checks
         dist = pdist(pos[init1], pos[init2], box)
-        if dist >= rx.distance_max:
+        if dist > rx.distance_max:
             return False
         return True
 
     def modification(self, frag1, frag2, product):
         """Modification helper for the D/M algorithm
         """
-        # TODO check for overlapping frag1 and frag2 and reject such reactions
-        complete1 = self.get_molecule_fragment(frag1)
-        complete2 = self.get_molecule_fragment(frag2)
-        if len(set(frag1.particles) & set(frag2.particles)) != 0:
-            raise Exception("Overlapping fragments reacting")
         product_particles = frag1.particles + frag2.particles
-        product_edge = frag1.edge + frag2.edge
         self.destroy_fragment(frag1)
         self.destroy_fragment(frag2)
 
-        if complete1 != complete2:
-            # bimolecular
-            complete_particles = complete1.particles + complete2.particles
-            assert len(complete_particles) >= len(product_particles)
-            if len(complete_particles) > len(product_particles):
-                frag_prod = self.instantiate_over_existing(
-                    product, product_particles, edge_list=product_edge
-                )
-                self.new_dynamic_complete_fragment(
-                    complete_particles, frag1, frag2, frag_prod, complete1,
-                    complete2
-                )
-            else:
-                self.instantiate_over_existing(
-                    product, product_particles, first=True,
-                    edge_list=product_edge
-                )
-        else:
-            # intramolecular TODO
-            frag_prod = self.instantiate_over_existing(
-                product, product_particles, edge_list=product_edge
-            )
-            self.new_dynamic_complete_fragment(
-                complete1.particles, frag1, frag2, frag_prod, complete1,
-                complete1
-            )
+        self.instantiate_over_existing(
+            product, product_particles, reaction=True
+        )
 
     def build_reaction_matrix(self):
         """Returns a hash table where reactions can be looked up for 2

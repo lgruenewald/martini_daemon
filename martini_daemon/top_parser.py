@@ -66,6 +66,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
     # make parser
     p = TopParser()
 
+    system_defined = False  # whether the [system] happened yet
+
     # add all handlers
     def TODO(tokens):
         raise ValueError("Handler not implemented yet")
@@ -83,9 +85,6 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     p.add_level("defaults", process_defaults)
 
-    def process_system(tokens):
-        pass
-    p.add_level("system", process_system)
 
     _last_molecule = None
 
@@ -508,8 +507,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
             raise ValueError("Define a [frag] first.")
         type = unwrap(tokens, 0, {"word", "pattern"})
         name = unwrap(tokens, 1, {"word", "pattern"})
-        is_edge = unwrap(tokens, 2, "int") != 0
-        _atom_list.append((type, name, is_edge))
+        _atom_list.append((type, name))
 
     p.add_level("frag_atoms", process_fragatoms)
 
@@ -540,8 +538,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
             return
         if (last_reaction.r1 is not None and last_reaction.r2 is not None and
                 last_reaction.p1 is not None and
-                last_reaction.distance_max is not None and
-                last_reaction.type is not None):
+                last_reaction.distance_max is not None):
             # complete
             topology.new_reaction(last_reaction)
             last_reaction = None
@@ -550,9 +547,11 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     def process_reaction(tokens):
         nonlocal last_reaction
+        if system_defined:
+            raise ValueError("[ rx ] must be before [ system ]")
         require_complete_reaction()
         name = unwrap(tokens, 0, "word")
-        last_reaction = ReactionTemplate(name, None, None, None, None, None)
+        last_reaction = ReactionTemplate(name, None, None, None, None, [], [])
 
     p.add_level("rx", process_reaction)
 
@@ -577,17 +576,22 @@ def DaemonTopFile(file, include_dir=None, defines={},
         match key:
             case "distance_max":
                 last_reaction.distance_max = value
-            case "type":
-                last_reaction.type = value
+            case _:
+                raise ValueError(f"Unknown key {key} in [rx_conditions]")
 
     p.add_level("rx_conditions", process_conditions)
+
+    def process_system(tokens):
+        nonlocal system_defined
+        require_complete_reaction()
+        system_defined = True  # hack so that reactions are complete
+
+    p.add_level("system", process_system)
 
     # run parser
     ok = p.parse(file, include_dir, defines)
     if not ok:
         raise ValueError("Parsing error")
-
-    require_complete_reaction()
 
     return (system, topology)
 
