@@ -145,7 +145,10 @@ class TopParser:
                         longest_type = type
                 # no matching token
                 if longest_type is None:
-                    self.error("Unexpected character " + ch)
+                    if self._current_level != "system":
+                        # allow anything in [system] since that's used
+                        # for basically a comment
+                        self.error("Unexpected character " + ch)
                     cur += 1
                     continue
                 content = line[cur:cur + longest_span]
