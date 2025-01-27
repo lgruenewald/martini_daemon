@@ -114,10 +114,12 @@ class DaemonSimulation():
         if len(pairs) == 0:
             return
 
+        self.top.pre_modification()
         # Modification algorithm
         for frag1, frag2, rx in pairs:
             self.reactions += 1
             self.top.modification(frag1, frag2, rx)
+        self.top.post_modification()
 
         # reinitialize context, initator list
         self.initiator_list = self.top.get_initiator_list()

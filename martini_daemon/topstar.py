@@ -180,7 +180,9 @@ class TopStar():
 
     system: SysStar
 
-    def __init__(self, system):
+    log_path: str
+
+    def __init__(self, system, log_path="top.log"):
         self.frag_list = {}
         self.next_frag_id = 0
         self.defrag_list = []
@@ -192,6 +194,9 @@ class TopStar():
         self.reactive_pairs = {}
         self.reactive_types = set()
         self.system = system
+        self.log_path = log_path
+        if log_path is not None:
+            backup_try(log_path)
 
     def new_mol_fragment(self, name: str):
         if self.type_lookup.get(name):
@@ -217,7 +222,8 @@ class TopStar():
     def new_reaction(self, reaction: ReactionTemplate):
         self.reaction_list.append(reaction)
         self.reactive_pairs[(reaction.r1, reaction.r2)] = reaction
-        self.reactive_pairs[(reaction.r2, reaction.r1)] = reaction
+# TODO: find out why this inverted thing worked in the past
+#        self.reactive_pairs[(reaction.r2, reaction.r1)] = reaction
         self.reactive_types.add(reaction.r1)
         self.reactive_types.add(reaction.r2)
 
@@ -270,6 +276,7 @@ class TopStar():
             if subinst.frag_id != -1:
                 self.defrag_list[part_index].append(subinst.frag_id)
 
+        self.log(f"[info] instantiate_subfrag {frag.name} over particles {frag.atoms}")
         # interactions get added if all participants are normal atoms
         # TODO functionalize these checks
         for interaction in inst.interactions:
@@ -326,6 +333,11 @@ class TopStar():
                              " not a mol fragment type."
                              f" It is: {frag}")
         inst = self.add_frag_to_list(frag_name)
+        if reaction:
+            self.log("instantiate_over_existing during reaction "
+                     f"product_name {frag_name} "
+                     f"transferring interactions #: {len(interactions)}")
+
         # particles
         for in_frag_id, part_id in enumerate(particles):
             inst.particles.append(part_id)
@@ -405,29 +417,34 @@ class TopStar():
 
         del self.frag_list[frag.frag_id]
 
-    def destroy_fragment(self, frag: Fragment):
+    def destroy_fragment(self, frags: list[Fragment], modified_atoms: list[int]):
         """args:
         frag: Fragment
 
-        removes overlapping fragments, then removes fragment
+        removes overlapping fragments with modified_atoms,
+        then removes fragments in frags
         """
 
+        frag_ids = {frag.frag_id for frag in frags}
+
         # TODO functionalize these checks
-        for part in frag.particles:
+        for part in modified_atoms:
             # "cache", since remove_fragment will change this list
             defrag = self.defrag_list[part].copy()
             for other_frag_id in defrag:
                 # remove self at the end, not here
-                if frag.frag_id == other_frag_id:
+                if other_frag_id in frag_ids:
                     continue
                 # if the other frag hasn't been removed yet, remove it
                 other_frag = self.frag_list.get(other_frag_id)
                 if other_frag is not None:
                     self.remove_fragment(other_frag)
 
-        self.remove_fragment(frag)
+        for frag in frags:
+            self.remove_fragment(frag)
 
     def pre_detection(self):
+        self.log("[info] pre_detection hook")
         for rx in self.reaction_list:
             rx.global_counter = 0
 
@@ -477,15 +494,26 @@ class TopStar():
         rx.global_counter += 1
         return True
 
+    def pre_modification(self):
+        # hook that gets called after detection, before modification
+        # only called if there is any modification going on
+        self.log("[info] pre modification hook")
+
     def modification(self, frag1, frag2, rx: ReactionTemplate):
         """Modification helper for the D/M algorithm
         """
+        self.log("[info] Modification algo!")
+        self.log(f"reaction {rx.name}")
         product = rx.p1
         product_particles = frag1.particles.copy()
         all_interactions = frag1.interactions.copy()
+        self.log(f"frag1 particles {frag1.particles}")
         if frag2 is not None:
+            self.log(f"frag2 particles {frag2.particles}")
             product_particles += frag2.particles
             all_interactions += frag2.interactions
+        self.log(f"product_particles {product_particles}")
+        modified_atoms = set()
         i = 0
         while i < len(all_interactions):
             # TODO functionalize these checks
@@ -514,19 +542,32 @@ class TopStar():
                 if all:
                     remove = True
             if remove:
+                # mark atoms that were modified for fragment overlap deleting
+                for atom in members:
+                    modified_atoms.add(atom)
                 interaction.remove()
                 del all_interactions[i]
             else:
                 i += 1
 
-        self.destroy_fragment(frag1)
+        modified_atoms = list(modified_atoms)
+        self.log(f"modified_atoms {modified_atoms}")
+
         if frag2 is not None:
-            self.destroy_fragment(frag2)
+            self.destroy_fragment([frag1, frag2], modified_atoms)
+        else:
+            self.destroy_fragment([frag1], modified_atoms)
 
         self.instantiate_over_existing(
             product, product_particles, reaction=True,
             interactions=all_interactions
         )
+
+    def post_modification(self):
+        # hook that only gets called after modification
+        self.log("[info] post modification hook")
+        if self.log_path is not None:
+            self.dump(self.log_path, True)
 
     def build_reaction_matrix(self):
         """Returns a hash table where reactions can be looked up for 2
@@ -542,16 +583,23 @@ class TopStar():
 
         return initiators
 
-    def dump(self):
-        backup_try("top.dump")
-        with open("top.dump", "w") as file:
+    def log(self, message):
+        if self.log_path is not None:
+            with open(self.log_path, "a") as file:
+                print(message, file=file)
+
+    def dump(self, path="top.dump", append=False):
+        if not append:
+            backup_try(path)
+        with open(path, "a") as file:
+            print("===== TopStar Dump =====", file=file)
             print("==== TopStar / Fragment Types ====", file=file)
             for k, molfrag in self.type_lookup.items():
                 file.write(f"{k} ")
             file.write("\n")
             print("==== TopStar / ReactionTemplates ====", file=file)
             for rx in self.reaction_list:
-                print(rx, file=file)
+                print(f"rx {rx.name} r1 {rx.r1} r2 {rx.r2} p1 {rx.p1}", file=file)
             print("==== TopStar / Fragments ====", file=file)
             for id, frag in self.frag_list.items():
                 print(f"{id}: <frag {frag.name} ps {frag.particles}>", file=file)

@@ -1,18 +1,47 @@
-; initiation
-; two monomers forming a dimer
+[ frag ]
+monomer
+[ frag_atoms ]
+* *
+[ frag_from ]
+W 1
 
 [ frag ]
-name: monomer mol: W
-[ fragatoms ]
-1 * * 1
+tail
+[ frag_atoms ]
+* *
+* *
+[ frag_from ]
+dimer 1 2
+dimer 2 1
+tail_plus_one 3 1
 
-[ reaction ]
-name: initiation
-r1: monomer
-r2: monomer
-p1: dimer
-distance_max: 0.51
-type: simple
+[ rx ]
+initiation
+[ rx_reactants ]
+monomer monomer
+[ rx_products ]
+dimer
+[ rx_conditions ]
+r_max 1 2 0.51
+
+[ rx ]
+propagation
+[ rx_reactants ]
+tail monomer
+[ rx_products ]
+tail_plus_one
+[ rx_conditions ]
+r_max 1 3 0.51
+
+; termination
+[ rx ]
+termination
+[ rx_reactants ]
+tail tail
+[ rx_products ]
+tail_dimer
+[ rx_conditions ]
+r_max 1 3 0.51
 
 [ moleculetype ]
 dimer 1
@@ -22,27 +51,6 @@ dimer 1
   2  *    1     w   *   1      0
 [ bonds ]
 1 2 1 0.200 1000
-
-[ frag ]
-name: tail mol: dimer
-[ fragatoms ]
-1 * * 1
-2 * * 1
-
-[ frag ]
-name: tail mol: dimer
-[ fragatoms ]
-2 * * 1
-1 * * 1
-
-; propagation
-[ reaction ]
-name: propagation
-r1: tail
-r2: monomer
-p1: tail_plus_one
-distance_max: 0.51
-type: simple
 
 [ moleculetype ]
 tail_plus_one 1
@@ -57,21 +65,6 @@ tail_plus_one 1
 1 3 1 0.200 1000
 [ angles ]
 2 1 3 1 120.0 1000
-
-[ frag ]
-name: tail mol: tail_plus_one
-[ fragatoms ]
-3 * * 1
-1 * * 1
-
-; termination
-[ reaction ]
-name: termination
-r1: tail
-r2: tail
-p1: tail_dimer
-distance_max: 0.51
-type: poly
 
 [ moleculetype ]
 tail_dimer 1

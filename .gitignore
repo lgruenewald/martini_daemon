@@ -12,6 +12,7 @@
 tests/**/*.xvg
 # exclude all S* and T* dumps
 *.dump
+*.log
 # exclude python cache
 **/__pycache__/
 # exclude backed up files

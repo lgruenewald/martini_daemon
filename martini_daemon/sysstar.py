@@ -196,6 +196,13 @@ class SysStar():
     def set_positions(self, positions):
         if not self.context_initialized:
             raise Exception("Initialize the context first")
+        if len(positions) != len(self._part_list):
+            raise ValueError(
+                "Wrong length of coordinate file."
+                f"Supplied {len(positions)} coordinates."
+                f"Particle list contains {len(self._part_list)} particles."
+                "Please check your .gro file."
+            )
         self._context.setPositions(positions)
 
     def generate_velocities(self, temp):
