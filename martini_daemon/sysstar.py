@@ -29,6 +29,7 @@ from .vsites.three_out import VSite3out
 from .vsites.four_fdn import VSite4fdn
 from .vsites.weighed_average import VSiteWeighedAverage
 from .vsites.center_of_mass import VSiteCenterOfMass
+from .reporters.reporter import Reporter
 
 
 class SysStar():
@@ -55,6 +56,10 @@ class SysStar():
     _atom_types: dict[str, (float, float)]
 
     modular_forces: list[Force]
+
+    """Extra reporters that can write stuff to files every step / at the end
+    """
+    reporters: list[Reporter]
 
     def __init__(self, epsilon_r, nonbonded_cutoff):
         self.epsilon_r = epsilon_r
@@ -100,6 +105,8 @@ class SysStar():
         ]
 
         self.vsites = []
+
+        self.reporters = []
 
     def get_defaults(self, part_type, charge, mass):
         defaults = self._atom_types.get(part_type)
@@ -230,14 +237,19 @@ class SysStar():
             self._forces_list.append(force)
             return False
 
+    def add_reporter(self, reporter_class):
+        self.reporters.append(reporter_class(self))
+
     def do_steps(self, steps):
         if not self.context_initialized:
             raise Exception("Initialize the context first")
         self._integrator.step(steps)
         if self._xtc is not None:
             self._xtc.interval = steps
-            pos, _ = self.get_positions()
+            pos, box = self.get_positions()
             self._xtc.writeModel(pos)
+            for reporter in self.reporters:
+                reporter.step(pos, box, self._xtc_name)
 
     def get_positions(self):
         if not self.context_initialized:
@@ -279,19 +291,26 @@ class SysStar():
     def set_xtc_path(self, path):
         if not self.context_initialized:
             raise Exception("Initialize the context first")
+        if len(path) < 5 or path[-4:] != ".xtc":
+            raise Exception("Xtc path must end with .xtc")
         backup_try(path)
+        for reporter in self.reporters:
+            reporter.pre_steps(path[:-4])
         mmtopol = mmapp.Topology()
         mmtopol._numAtoms = self.len_particles()
         mmtopol._periodicBoxVectors = self._periodic_box
         timestep = self._integrator.getStepSize()
         self._xtc = mmapp.XTCFile(path, mmtopol, timestep)
+        self._xtc_name = path[:-4]
 
     def write_gro(self, path):
         if not self.context_initialized:
             raise Exception("Initialize the context first")
+        if len(path) < 5 or path[-4:] != ".gro":
+            raise Exception("Gro path must end with .gro")
         backup_try(path)
         state = self._context.getState(positions=True, velocities=True)
-        pos, _ = self.get_positions()
+        pos, box = self.get_positions()
         vel = state.getVelocities(asNumpy=True).\
             value_in_unit_system(md_unit_system)
         natoms = len(pos)
@@ -315,6 +334,8 @@ class SysStar():
                 f"{v1[0]:.4f} {v2[1]:.4f} {v3[2]:.4f} {v1[1]:.4f} {v1[2]:.4f} "
                 f"{v2[0]:.4f} {v2[2]:.4f} {v3[0]:.4f} {v3[1]:.4f}\n"
             )
+        for reporter in self.reporters:
+            reporter.final(pos, box, path[:-4])
 
     def dump(self):
         backup_try("sys.dump")

@@ -35,12 +35,13 @@ class DaemonSimulation():
                  minimize_energy=True, generate_velocities=True,
                  remove_com_motion=True, epsilon_r=15.0,
                  nonbonded_cutoff=1.1*nanometer, include_dir=None,
-                 defines={}):
+                 defines={}, top_logpath=None, reporters=[]):
         self.system, self.top = DaemonTopFile(
             top_path,
             include_dir=include_dir, defines=defines,
             epsilon_r=epsilon_r, nonbonded_cutoff=nonbonded_cutoff
         )
+        self.top.log_path = top_logpath
         self.gro = GromacsGroFile(gro_path)
         if platform is not None:
             platform = mm.Platform.getPlatformByName(platform)
@@ -66,6 +67,8 @@ class DaemonSimulation():
         if minimize_energy:
             self.system.minimize_energy()
         if not silent:
+            for rep in reporters:
+                self.system.add_reporter(rep)
             self.system.set_xtc_path(traj_path)
         self.max_steps = max_steps
         self.steps_per_step = steps_per_step

@@ -1,6 +1,7 @@
 import os
 import numpy as np
 
+
 def backup_try(path):
     if os.path.isfile(path):
         bkup_num = 2
@@ -34,6 +35,13 @@ def pdist(v1, v2, size):
     diff = v1 - v2
     base = np.floor(diff / size + 0.5) * size
     return np.sqrt(np.sum((diff - base)**2))
+
+
+def cross_box(v1, v2, size):
+    dist = np.sqrt(np.sum((v1 - v2)**2))
+    pbc_dist = pdist(v1, v2, size)
+    if np.abs(dist - pbc_dist) > 0.00001:
+        return True
 
 
 def test_utils():

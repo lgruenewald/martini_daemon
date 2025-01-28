@@ -8,6 +8,8 @@ class Constraint(Force):
     _rebuild: bool
     # or when removing elements from the bond
 
+    visualize_as_bond = True
+
     def __init__(self, sysstar):
         self._list = []
         self._sysstar = sysstar

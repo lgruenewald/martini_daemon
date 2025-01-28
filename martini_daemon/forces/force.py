@@ -12,6 +12,8 @@ class Force():
     # rebuild is True for example before force_obj is built in the first place,
     # or when removing elements from the bond
 
+    visualize_as_bond = False
+
     def __init__(self, sysstar):
         self._list = []
         self._sysstar = sysstar

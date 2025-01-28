@@ -7,6 +7,8 @@ class CubicBond(Force):
     indices are called bond_id
     values are (i: part_id, j: part_id, length, kb, kcub: float)"""
 
+    visualize_as_bond = True
+
     def _build(self):
         self._force_obj = mm.CustomBondForce(
             "kb * (r - b)^2 + kb * kcub * (r - b)^3"

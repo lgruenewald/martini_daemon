@@ -182,7 +182,7 @@ class TopStar():
 
     log_path: str
 
-    def __init__(self, system, log_path="top.log"):
+    def __init__(self, system, log_path=None):
         self.frag_list = {}
         self.next_frag_id = 0
         self.defrag_list = []
