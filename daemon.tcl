@@ -52,6 +52,10 @@ proc decode_nested_list {filename} {
 	
 }
 
+# opens a .gro and .xtc with CPK that can be used for visualizing e.g. the bonds
+# removes the extra frame from the .gro
+# supply molid if opening as a different molid, though the supplied molid
+# should be manually verified to be the next one to be added
 proc daemon_open {gro xtc {molid 0}} {
 	mol new $gro
 	mol addfile $xtc
@@ -60,6 +64,7 @@ proc daemon_open {gro xtc {molid 0}} {
 	animate pause
 }
 
+# colors molecule molid according to the daemon reporter output file npy
 proc daemon_color {npy {molid 0}} {
 	
 	set dsel [ atomselect $molid all ]
@@ -100,6 +105,8 @@ proc daemon_color {npy {molid 0}} {
 	
 }
 
+# displays bonds in frame $frame for molecule $molid according to the
+# daemon bonds reporter output file $npy
 proc daemon_bonds {npy frame {molid 0}} {
 	set dsel [ atomselect $molid all ]
 	set all_frames [ decode_nested_list $npy ]
@@ -117,4 +124,24 @@ proc daemon_bonds {npy frame {molid 0}} {
 
 	puts "daemon_bonds: loaded $len lists; atom n $n; frame n $n_frames;"
 	puts "selected frame $frame data $frame_start to $frame_end"
+}
+
+proc render_bonds {npy {molid 0}} {
+	set dsel [ atomselect $molid all ]
+	set all_frames [ decode_nested_list $npy ]
+	set len [ llength $all_frames ]
+	set n [ $dsel num ]
+	set n_frames [ expr $len / $n ]
+	
+	puts "render_bonds: loaded $len lists; atom n $n; frame n $n_frames;"
+	for {set frame 0} {$frame < $n_frames} {incr frame 1} {
+		$dsel frame $frame
+		set frame_start [expr $n * $frame]
+		set frame_end [expr $frame_start + $n - 1]
+		set frame_data [lrange $all_frames $frame_start $frame_end]
+		$dsel setbonds $frame_data
+		animate goto $frame
+		set frame_name [format %05i $frame]
+		render snapshot "frame$frame_name.png"
+	}
 }
