@@ -531,11 +531,13 @@ class TopStar():
             # so a theta of 0 represents perfect alignment
             v1 = np.cross(a, b)
             v2 = np.cross(d, c)
-            # coordinates on the unit circle
-            x = np.dot(v1, v2) / np.sqrt(v1.dot(v1)) / np.sqrt(v2.dot(v2))
-            y = np.cross(v1, v2) / np.sqrt(v1.dot(v1)) / np.sqrt(v2.dot(v2))
-            # get the angle from the coords on the unit circle
-            theta = np.angle(np.complex128(real=x, imag=y))
+            # cartesian coordinates on a circle with center at origin,
+            # with radius |v1||v2| and with a phase angle corresponding to
+            # the dihedral angle
+            x = np.dot(v1, v2)
+            y = np.cross(v1, v2)
+            # cartesian -> polar, but we only need the angle
+            theta = np.arctan2(y, x)
             if theta < min or theta > max:
                 self.log(f"Rejected reaction because of dihedral {theta} "
                          f"outside of {min} to {max} range")

@@ -172,7 +172,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
         j = unwrap(tokens, 1, "index")
         k = unwrap(tokens, 2, "index")
         type = unwrap(tokens, 3, "int")
-        theta = unwrap(tokens, 4, "float") * math.pi / 180
+        theta = unwrap(tokens, 4, "degree")
         force = unwrap(tokens, 5, "float")
         match type:
             case 1:
@@ -196,23 +196,21 @@ def DaemonTopFile(file, include_dir=None, defines={},
         match type:
             case 1 | 9:
                 # proper dihedral | proper dihedral (multiple)
-                theta = unwrap(tokens, 5, "float")
+                theta = unwrap(tokens, 5, "degree")
                 force = unwrap(tokens, 6, "float")
-                theta_rad = theta * math.pi / 180
                 multiplicity = unwrap(tokens, 7, "int", 1)
                 last_molecule().dihedrals.append(
                     (system.proper_dihedral, i, j, k, l,
-                     [theta_rad, force, multiplicity])
+                     [theta, force, multiplicity])
                 )
             case 2:
                 # improper
-                theta = unwrap(tokens, 5, "float")
+                theta = unwrap(tokens, 5, "degree")
                 force = unwrap(tokens, 6, "float")
-                theta = theta - 360 if theta > 180 else theta
-                theta_rad = theta * math.pi / 180
+                theta = theta - math.tau if theta > math.pi else theta
                 last_molecule().dihedrals.append(
                     (system.improper_dihedral, i, j, k, l,
-                     [theta_rad, force])
+                     [theta, force])
                 )
             case 3:
                 # ryckaert-bellemans = RB
@@ -410,7 +408,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 )
             case 3:
                 # 3fad
-                theta = unwrap(tokens, 5, "float") * math.pi / 180
+                theta = unwrap(tokens, 5, "degree")
                 d = unwrap(tokens, 6, "float")
                 last_molecule().interactions.append(
                     (system.vsite_3fad, members, [theta, d])
@@ -591,8 +589,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 i = unwrap(tokens, 1, "index")
                 j = unwrap(tokens, 2, "index")
                 k = unwrap(tokens, 3, "index")
-                theta_min = unwrap(tokens, 4, "float") * math.pi / 180
-                theta_max = unwrap(tokens, 5, "float") * math.pi / 180
+                theta_min = unwrap(tokens, 4, "degree")
+                theta_max = unwrap(tokens, 5, "degree")
                 last_reaction.angle_limits.append(
                     (i, j, k, math.cos(theta_min), math.cos(theta_max))
                 )
@@ -601,8 +599,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 j = unwrap(tokens, 2, "index")
                 k = unwrap(tokens, 3, "index")
                 l = unwrap(tokens, 4, "index")
-                theta_min = unwrap(tokens, 5, "float") * math.pi / 180
-                theta_max = unwrap(tokens, 6, "float") * math.pi / 180
+                theta_min = unwrap(tokens, 5, "degree")
+                theta_max = unwrap(tokens, 6, "degree")
                 last_reaction.dihedral_limits.append(
                     (i, j, k, l, theta_min, theta_max)
                 )

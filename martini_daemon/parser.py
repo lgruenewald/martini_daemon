@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 from collections import OrderedDict
 import os
+import math
 
 
 @dataclass
@@ -32,6 +33,10 @@ def unwrap(tokens, index, type_filter, default="default placeholder"):
         elif tokens[index].type == "int" and type_filter == "index":
             # the other magic done here is subtracting 1 from indices
             return tokens[index].content - 1
+        elif ((tokens[index].type == "int" or tokens[index].type == "float")
+              and type_filter == "degree"):
+            # magic 3: convert degrees to radians
+            return tokens[index].content * math.pi / 180.0
         raise ValueError(f"Token {tokens[index].content}: "
                          f"expected {type_filter} "
                          f"but received {tokens[index].type} instead")
