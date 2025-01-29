@@ -601,9 +601,19 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 l = unwrap(tokens, 4, "index")
                 theta_min = unwrap(tokens, 5, "degree")
                 theta_max = unwrap(tokens, 6, "degree")
-                last_reaction.dihedral_limits.append(
-                    (i, j, k, l, theta_min, theta_max)
-                )
+                # periodicity consideration
+                if theta_max > theta_min:
+                    last_reaction.dihedral_limits.append(
+                        (i, j, k, l, theta_min, theta_max)
+                    )
+                else:
+                    # minus one / add one for inclusive ranges
+                    last_reaction.dihedral_limits.append(
+                        (i, j, k, l, -1., theta_max)
+                    )
+                    last_reaction.dihedral_limits.append(
+                        (i, j, k, l, theta_min, math.tau + 1.)
+                    )
             case "p":
                 probability = unwrap(tokens, 1, "float")
                 last_reaction.probability = probability
