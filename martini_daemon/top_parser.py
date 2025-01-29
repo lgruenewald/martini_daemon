@@ -585,7 +585,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 j = unwrap(tokens, 2, "index")
                 cutoff = unwrap(tokens, 3, "float")
                 last_reaction.distance_min.append((i, j, cutoff))
-            case "angle":
+            case "banned_angle":
                 i = unwrap(tokens, 1, "index")
                 j = unwrap(tokens, 2, "index")
                 k = unwrap(tokens, 3, "index")
@@ -594,7 +594,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 last_reaction.angle_limits.append(
                     (i, j, k, math.cos(theta_min), math.cos(theta_max))
                 )
-            case "dihedral":
+            case "banned_dihedral":
                 i = unwrap(tokens, 1, "index")
                 j = unwrap(tokens, 2, "index")
                 k = unwrap(tokens, 3, "index")

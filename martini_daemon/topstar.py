@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from .sysstar import SysStar
 from .forces.force import Force, Interaction
 from fnmatch import fnmatch
-from .utils import pdist, backup_try, psub
+from .utils import pdist, backup_try, pcos_angle, pdihedral
 import random
 import numpy as np
 
@@ -504,16 +504,10 @@ class TopStar():
             p1 = pos[particles[i]]
             p2 = pos[particles[j]]
             p3 = pos[particles[k]]
-            # the two vectors going from central atom (2) to the edge atoms
-            # aware of periodic boxes
-            v1 = psub(p2, p1, box)
-            v2 = psub(p2, p3, box)
-            # to get the cosine of the angle divide the dot product by the
-            # lengths of the vectors
-            cos = np.dot(v1, v2) / np.sqrt(v1.dot(v1)) / np.sqrt(v2.dot(v2))
-            if cos < cos_min or cos > cos_max:
+            cos = pcos_angle(p1, p2, p3, box)
+            if cos > cos_min and cos < cos_max:
                 self.log(f"Rejected reaction because of cos_angle {cos} "
-                         f"outside of {cos_min} to {cos_max} range")
+                         f"inside of {cos_min} to {cos_max} range")
                 return False
 
         for (i, j, k, l, min, max) in rx.dihedral_limits:
@@ -522,25 +516,10 @@ class TopStar():
             p2 = pos[particles[j]]
             p3 = pos[particles[k]]
             p4 = pos[particles[l]]
-            # as if angle construction, center atoms on p2 and p3
-            a = psub(p2, p1)
-            b = psub(p2, p3)
-            c = psub(p3, p2)
-            d = psub(p3, p4)
-            # cross products, exact mirror images
-            # so a theta of 0 represents perfect alignment
-            v1 = np.cross(a, b)
-            v2 = np.cross(d, c)
-            # cartesian coordinates on a circle with center at origin,
-            # with radius |v1||v2| and with a phase angle corresponding to
-            # the dihedral angle
-            x = np.dot(v1, v2)
-            y = np.cross(v1, v2)
-            # cartesian -> polar, but we only need the angle
-            theta = np.arctan2(y, x)
-            if theta < min or theta > max:
+            theta = pdihedral(p1, p2, p3, p4, box)
+            if theta > min and theta < max:
                 self.log(f"Rejected reaction because of dihedral {theta} "
-                         f"outside of {min} to {max} range")
+                         f"inside of {min} to {max} range")
                 return False
 
         rx.global_counter += 1
