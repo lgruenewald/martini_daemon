@@ -4,17 +4,17 @@
 DIM 1 
 
 [ atoms ]
-  1 TC5   1 TDI BNZ1    1 0.0  60.0
-  2 TC5   1 TDI BNZ2    2 0.0  60.0
-  3 U     1 TDI BNZ3    3 0.0  60.0
-  4 TC6   1 TDI BS1     4 0.0   0.0
-  5 TC6   1 TDI BS2     5 0.0   0.0
+  1 TC5   1 DIM BNZ1    1 0.0  60.0
+  2 TC5   1 DIM BNZ2    2 0.0  60.0
+  3 U     1 DIM BNZ3    3 0.0  60.0
+  4 TC6   1 DIM BS1     4 0.0   0.0
+  5 TC6   1 DIM BS2     5 0.0   0.0
 ;
-  6 TC5   1 TDI BNZ4    6 0.0  60.0
-  7 TC5   1 TDI BNZ5    7 0.0  60.0
-  8 U     1 TDI BNZ6    8 0.0  60.0
-  9 TC6   1 TDI BS3     9 0.0   0.0
- 10 TC6   1 TDI BS4    10 0.0   0.0
+  6 TC5   1 DIM BNZ4    6 0.0  60.0
+  7 TC5   1 DIM BNZ5    7 0.0  60.0
+  8 U     1 DIM BNZ6    8 0.0  60.0
+  9 TC6   1 DIM BS3     9 0.0   0.0
+ 10 TC6   1 DIM BS4    10 0.0   0.0
  
 [ bonds ]
   5 9 1 0.275 15000 ; BS2_BS3 

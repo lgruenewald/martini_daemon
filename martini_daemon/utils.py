@@ -13,35 +13,23 @@ def backup_try(path):
         print(f"Backed up {path} to {bkup_path}")
 
 
-"""
-@cython.boundscheck(False)
-@cython.wraparound(False)
-cpdef double pdist(double[:] v1, double[:] v2, double[:] size):
-    # periodic boundary adjusted difference between two Vec3
-    # based on ReferenceForce.cpp getDeltaRPeriodic from OpenMM
-
-    cdef double diff
-    cdef double base
-    cdef double sum = 0
-    for i in range(3):
-        diff = v1[i] - v2[i]
-        base = floor(diff / size[i] + 0.5) * size[i]
-        sum += pow(diff-base, 2)
-    return sqrt(sum)
-"""
+def psub(v1, v2, size):
+    diff = v1 - v2
+    base = np.floor(diff / size + 0.5) * size
+    return diff - base
 
 
 def pdist(v1, v2, size):
-    diff = v1 - v2
-    base = np.floor(diff / size + 0.5) * size
-    return np.sqrt(np.sum((diff - base)**2))
+    pdiff = psub(v1, v2, size)
+    return np.sqrt(np.sum(pdiff**2))
 
 
 def cross_box(v1, v2, size):
-    dist = np.sqrt(np.sum((v1 - v2)**2))
-    pbc_dist = pdist(v1, v2, size)
-    if np.abs(dist - pbc_dist) > 0.00001:
-        return True
+    return np.any((v1 - v2) / size > 0.5)
+#    dist = np.sqrt(np.sum((v1 - v2)**2))
+#    pbc_dist = pdist(v1, v2, size)
+#    if np.abs(dist - pbc_dist) > 0.00001:
+#        return True
 
 
 def test_utils():

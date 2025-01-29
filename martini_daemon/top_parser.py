@@ -13,6 +13,7 @@ import os
 import distutils
 import math
 from openmm.unit import nanometer
+import numpy as np
 
 
 def _get_default_gromacs_include_dir():
@@ -586,6 +587,25 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 j = unwrap(tokens, 2, "index")
                 cutoff = unwrap(tokens, 3, "float")
                 last_reaction.distance_min.append((i, j, cutoff))
+            case "angle":
+                i = unwrap(tokens, 1, "index")
+                j = unwrap(tokens, 2, "index")
+                k = unwrap(tokens, 3, "index")
+                theta_min = unwrap(tokens, 4, "float") * math.pi / 180
+                theta_max = unwrap(tokens, 5, "float") * math.pi / 180
+                last_reaction.angle_limits.append(
+                    (i, j, k, math.cos(theta_min), math.cos(theta_max))
+                )
+            case "dihedral":
+                i = unwrap(tokens, 1, "index")
+                j = unwrap(tokens, 2, "index")
+                k = unwrap(tokens, 3, "index")
+                l = unwrap(tokens, 4, "index")
+                theta_min = unwrap(tokens, 5, "float") * math.pi / 180
+                theta_max = unwrap(tokens, 6, "float") * math.pi / 180
+                last_reaction.dihedral_limits.append(
+                    (i, j, k, l, theta_min, theta_max)
+                )
             case "p":
                 probability = unwrap(tokens, 1, "float")
                 last_reaction.probability = probability

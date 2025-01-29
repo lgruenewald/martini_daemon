@@ -1,14 +1,14 @@
 ; SASA ~11% smaller
 
 [ moleculetype ] 
-TDI 1 
+BDT 1 
 
 [ atoms ]
-  1 TC5   1 TDI BNZ1    1 0.0  60.0
-  2 TC5   1 TDI BNZ2    2 0.0  60.0
-  3 U     1 TDI BNZ3    3 0.0  60.0
-  4 TC6   1 TDI BS1     4 0.0   0.0
-  5 TC6   1 TDI BS2     5 0.0   0.0
+  1 TC5   1 BDT BNZ1    1 0.0  60.0
+  2 TC5   1 BDT BNZ2    2 0.0  60.0
+  3 U     1 BDT BNZ3    3 0.0  60.0
+  4 TC6   1 BDT BS1     4 0.0   0.0
+  5 TC6   1 BDT BS2     5 0.0   0.0
 
 [ bonds ]
 #ifdef FLEXIBLE

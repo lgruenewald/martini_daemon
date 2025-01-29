@@ -106,6 +106,13 @@ class DaemonSimulation():
                     continue
                 if j in skip:
                     continue
+                if frag1.name == frag2.name and j <= i:
+                    # do not double count if frag1.name==frag2.name
+                    # reaction matrix so we only check reactions of the same
+                    # type with itself once
+                    #
+                    # this also skips frag1==frag2
+                    continue
                 rx = self.reaction_matrix.get((frag1.name, frag2.name))
                 if rx is not None:
                     if self.top.detection(frag1, frag2, rx, pos, box):

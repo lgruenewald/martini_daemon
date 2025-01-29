@@ -1,8 +1,9 @@
 #include "../../tests/martini_v3.0.0.itp"
-#include "dimer.itp"
+#include "monomer.itp"
+#include "dimerize.rx"
 
 [ system ]
-BDT dimer CG
+BDT dimerization CG
 
 [ molecules ]
-DIM 1
+BDT 2

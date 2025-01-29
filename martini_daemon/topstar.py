@@ -28,8 +28,9 @@ from dataclasses import dataclass
 from .sysstar import SysStar
 from .forces.force import Force, Interaction
 from fnmatch import fnmatch
-from .utils import pdist, backup_try
+from .utils import pdist, backup_try, psub
 import random
+import numpy as np
 
 
 random.seed()
@@ -112,6 +113,8 @@ class ReactionTemplate:
         self.p1 = None
         self.distance_max = []
         self.distance_min = []
+        self.angle_limits = []
+        self.dihedral_limits = []
         self.probability = 1.0
         self.global_counter = 0
         self.global_limit = None
@@ -462,6 +465,8 @@ class TopStar():
         # the order of checks should be from fastest to slowest to maximize
         # performance
         # simple rules check
+        # fragments that were removed cannot react any more
+
         # overlapping fragments can never react:
         if frag2 is not None:
             for i in frag1.particles:
@@ -474,21 +479,66 @@ class TopStar():
             return False
         if random.random() > rx.probability:
             return False
+
         # position dependent checks
         particles = frag1.particles.copy()
         if frag2 is not None:
             particles += frag2.particles
+
         for (i, j, rmax) in rx.distance_max:
             init1 = particles[i]
             init2 = particles[j]
             dist = pdist(pos[init1], pos[init2], box)
             if dist > rmax:
                 return False
+
         for (i, j, rmin) in rx.distance_min:
             init1 = particles[i]
             init2 = particles[j]
             dist = pdist(pos[init1], pos[init2], box)
             if dist < rmin:
+                return False
+
+        for (i, j, k, cos_min, cos_max) in rx.angle_limits:
+            # the particle positions of particle i, j, k
+            p1 = pos[particles[i]]
+            p2 = pos[particles[j]]
+            p3 = pos[particles[k]]
+            # the two vectors going from central atom (2) to the edge atoms
+            # aware of periodic boxes
+            v1 = psub(p2, p1, box)
+            v2 = psub(p2, p3, box)
+            # to get the cosine of the angle divide the dot product by the
+            # lengths of the vectors
+            cos = np.dot(v1, v2) / np.sqrt(v1.dot(v1)) / np.sqrt(v2.dot(v2))
+            if cos < cos_min or cos > cos_max:
+                self.log(f"Rejected reaction because of cos_angle {cos} "
+                         f"outside of {cos_min} to {cos_max} range")
+                return False
+
+        for (i, j, k, l, min, max) in rx.dihedral_limits:
+            # particle positions
+            p1 = pos[particles[i]]
+            p2 = pos[particles[j]]
+            p3 = pos[particles[k]]
+            p4 = pos[particles[l]]
+            # as if angle construction, center atoms on p2 and p3
+            a = psub(p2, p1)
+            b = psub(p2, p3)
+            c = psub(p3, p2)
+            d = psub(p3, p4)
+            # cross products, exact mirror images
+            # so a theta of 0 represents perfect alignment
+            v1 = np.cross(a, b)
+            v2 = np.cross(d, c)
+            # coordinates on the unit circle
+            x = np.dot(v1, v2) / np.sqrt(v1.dot(v1)) / np.sqrt(v2.dot(v2))
+            y = np.cross(v1, v2) / np.sqrt(v1.dot(v1)) / np.sqrt(v2.dot(v2))
+            # get the angle from the coords on the unit circle
+            theta = np.angle(np.complex128(real=x, imag=y))
+            if theta < min or theta > max:
+                self.log(f"Rejected reaction because of dihedral {theta} "
+                         f"outside of {min} to {max} range")
                 return False
 
         rx.global_counter += 1
