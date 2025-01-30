@@ -512,12 +512,16 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     def process_fragfrom(tokens):
         nonlocal _frag_name, _atom_list
-        if _frag_name is None or len(_atom_list) == 0:
-            raise ValueError("Define a [frag] and give [frag_atoms] first.")
+        if _frag_name is None:
+            raise ValueError("Define a [frag] first.")
         mol = unwrap(tokens, 0, "word")
         parent_ids = []
         for i in range(1, len(tokens)):
             parent_ids.append(unwrap(tokens, i, "index"))
+        if len(_atom_list) == 0:
+            # no [frag_atoms]
+            for i in range(len(parent_ids)):
+                _atom_list.append(("*", "*"))
         if len(parent_ids) != len(_atom_list):
             raise ValueError("Wrong number of atoms, expect "
                              f"{len(_atom_list)}, got {len(parent_ids)}")
