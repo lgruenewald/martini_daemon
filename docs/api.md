@@ -14,9 +14,12 @@ This imports the main class to use.
 # Constructing the DaemonSimulation object
 
 The constructor takes two mandatory positional arguments:
+
 - the path of the Topology (.top) file, must be a string
 - the path of the Coordinate (.gro) file, must be a string
+
 The constructor takes the following named arguments:
+
 - `T`, default 300.0, the temperature coupling temperature of the system in 
   kelvin, other things like generating velocities is also based on this value
 - `p`, default 1.0, the pressure coupling pressure of the system in bars,

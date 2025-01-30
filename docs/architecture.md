@@ -100,10 +100,11 @@ If a limiter is defined, for every reaction step in the simulation, the
 specific reaction type can only happen up to the defined amount. This can
 be useful to possibly speed up the detection step. Currently setting this
 might bias the system to prefer reactions on the molecules that come first
-in topology (TODO).
+in topology.
+<!-- TODO -->
 
-TODO: later allow reaction rates to be independent of how often reaction
-steps are done.
+<!-- TODO: later allow reaction rates to be independent of how often reaction
+steps are done. -->
 
 At least one distance cutoff for every reaction is mandatory. There is both
 r_max possible for maximum distance and r_min possible for minimum distance.
@@ -140,9 +141,9 @@ The modification algorithm will first break interactions defined in
 All fragments that contain atoms that have interactions removed during
 the reaction will be removed from the system, since they are considered
 no longer applicable / representing the functional group that was.
-(TODO: make it possible to delete overlapping fragments without changing
+<!-- (TODO: make it possible to delete overlapping fragments without changing
 interactions with rx_update, TODO: only update atom types, charge when rx_update,
-TODO: break overlapping fragment types when the LJ type or charge is changed)
+TODO: break overlapping fragment types when the LJ type or charge is changed) -->
 
 Then, the modification algorithm will update the types, charge, mass of all
 atoms according to the product [moleculetype]. Information, such as name
@@ -158,9 +159,9 @@ reaction products can still be reactive.
 
 ## Simulation user experience // Tooling
 
-- TODO, write the final Topology to a file, along with the final coordinates
+<!-- - TODO, write the final Topology to a file, along with the final coordinates
   to allow continuing simulations with reactions, additionally TODO
-  simulations with checkpoints
+  simulations with checkpoints -->
 - reporters in martini_daemon.reporters can do various cool things:
   - the bond_reporter can report the list of bonds (currently only those that
   do not cross the pbc), separately in every frame.
