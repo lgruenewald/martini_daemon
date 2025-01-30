@@ -77,6 +77,7 @@ class DaemonSimulation():
         self.out_path = out_path
 
     def simulate(self):
+        self.i = 0
         for i in range(self.max_steps):
             self.step()
         if not self.silent:
@@ -148,9 +149,4 @@ if __name__ == "__main__":
     gro_path = argv[2]
 
     sim = DaemonSimulation(top_path, gro_path)
-    for i in range(sim.max_steps):
-        sim.step()
-    sys.stdout.write("\n")
-    sim.system.dump()
-    sim.top.dump()
-    sim.system.write_gro("final.gro")
+    sim.simulate()
