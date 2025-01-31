@@ -1,0 +1,9 @@
+[ rx ]
+to_chloroform
+[ rx_reactants ]
+W
+[ rx_products ]
+CLF
+[ rx_conditions ]
+limit 1
+p 0.001

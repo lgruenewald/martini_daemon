@@ -130,8 +130,7 @@ class ReactionTemplate:
         # potential mistakes people would make when writing *.rx files
         return (
             self.r1 is not None and
-            self.p1 is not None and
-            (len(self.distance_max) > 0 or len(self.distance_min) > 0)
+            self.p1 is not None
         )
 
 
@@ -225,10 +224,9 @@ class TopStar():
     def new_reaction(self, reaction: ReactionTemplate):
         self.reaction_list.append(reaction)
         self.reactive_pairs[(reaction.r1, reaction.r2)] = reaction
-# TODO: find out why this inverted thing worked in the past
-#        self.reactive_pairs[(reaction.r2, reaction.r1)] = reaction
         self.reactive_types.add(reaction.r1)
-        self.reactive_types.add(reaction.r2)
+        if reaction.r2 is not None:
+            self.reactive_types.add(reaction.r2)
 
     def add_frag_to_list(self, name: str):
         if name in self.reactive_types:
@@ -353,11 +351,7 @@ class TopStar():
                     frag.atoms[in_frag_id]
                 oldname, oldtype, oldcharge, oldmass = \
                     self.system.get_particle_details(part_id)
-                # names are pattern matched rather than updated
-                # so atom names actually stay the same as in monomers
-                if not fnmatch(oldname, atomname):
-                    raise Exception("Unmatching name during instantiate: "
-                                    f"was {oldname}, pattern is {atomname}")
+                # Atom names are not updated.
                 # The * is only here as an option not to update types.
                 if oldtype == type or type == "*":
                     # same type or type to remain same with *

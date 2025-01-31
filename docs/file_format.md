@@ -152,9 +152,6 @@ syntax in daemon:
 - `*` is a valid atom type, which signifies that the atom type in the reactant
   should remain unchanged during the reaction. Note, that atom types are not
   patterns, only the `*` is recognized as a special value.
-- Atom names are patterns that get checked against during the modification
-  algorithm. If the pattern does not match an error is raised, this is
-  present to help users catch and debug misbehaving reaction templates.
 
 # Using non-daemon [moleculetype]s as reaction products
 

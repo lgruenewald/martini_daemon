@@ -102,6 +102,14 @@ class DaemonSimulation():
                 continue
             if i in skip:
                 continue
+            # unimolecular
+            uni_rx = self.reaction_matrix.get((frag1.name, None))
+            if uni_rx is not None:
+                if self.top.detection(frag1, None, uni_rx, pos, box):
+                    skip.add(i)
+                    pairs.append((frag1, None, uni_rx))
+                    continue  # skip bimolecular
+            # bimolecular
             for j, frag2 in enumerate(self.initiator_list):
                 if frag2 is None:
                     continue

@@ -1,0 +1,12 @@
+#include "../../tests/martini_v3.0.0.itp"
+#include "../../tests/martini_v3.0.0_solvents_v1.itp"
+#include "chloroform.rx"
+
+[ system ]
+; name
+Test system where water turns into chloroform slowly
+
+[ molecules ]
+; name  number
+W 400
+

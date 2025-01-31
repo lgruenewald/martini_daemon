@@ -146,11 +146,8 @@ interactions with rx_update, TODO: only update atom types, charge when rx_update
 TODO: break overlapping fragment types when the LJ type or charge is changed) -->
 
 Then, the modification algorithm will update the types, charge, mass of all
-atoms according to the product [moleculetype]. Information, such as name
-is not updated, but is rather pattern matched, and there is an error raised
-if there is a name mismatch. If the type is * in the [moleculetype], the
-type is not updated. An atom name of * can be also used, if the name pattern
-matching is not needed (a * is just a pattern that matches everything).
+atoms according to the product [moleculetype]. If the type is * in the 
+[moleculetype], the type is not updated.
 
 The product particles are 1-1 mapped to the reacting fragments particles,
 in the same order (use a [frag] to reorder if needed). When a product is
