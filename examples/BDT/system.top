@@ -1,9 +1,14 @@
 #include "../../tests/martini_v3.0.0.itp"
-#include "monomer.itp"
+#include "../../tests/martini_v3.0.0_solvents_v1.itp"
+#include "../../tests/martini_v3.0.0_small_molecules_v2.itp"
+#include "BDT.itp"
+#ifdef DAEMON
 #include "dimerize.rx"
+#endif
 
 [ system ]
-BDT dimerization CG
+BDT dimerization
 
 [ molecules ]
-BDT 2
+BDT 100
+BENZ 1283

@@ -119,10 +119,14 @@ directives work identically to how they work in [rx_conditions].
 
 The difference between the two, is how interactions that are broken are
 selected, see the section in `docs/architecture.md` for this for more
-detail.
+detail. The second difference, is that any atoms included in rx_update
+will remove all fragments that contain that atom during a reaction.
 
 The main use case for [rx_break] is to specify a pair of particles, and to
-break the molecule apart into two between those two particles.
+break the molecule apart into two between those two particles. Note: if
+additional exclusions were added when two monomers were connected, 
+besides the main new bonded interactions, remember to break all these
+exclusions as well, not just the bonded interactions.
 
 The main use case for [rx_update] is to change how a part of the molecule
 is constructed. It will break interactions within the group, but will not

@@ -8,10 +8,12 @@
 *.xyz
 *.xtc
 !examples/**/*.xtc
+# exclude out files
+out*
+**/out*
 # exclude xvg from tests directory (energy.xvg, forces.xvg usually)
 tests/**/*.xvg
-# exclude all S* and T* dumps
-*.dump
+# exclude logs
 *.log
 # exclude python cache
 **/__pycache__/

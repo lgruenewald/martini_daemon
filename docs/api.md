@@ -28,10 +28,11 @@ The constructor takes the following named arguments:
 - `max_steps`, default 100, how many reaction steps to do (the D/M algorithm is
   ran once per reaction step)
 - `steps_per_step`, default 5000, how many md steps per reaction step
-- `traj_path`, default "traj.xtc", the trajectory file to write, currently
-  one frame is written once per reaction step
-- `out_path`, default "final.gro", the file to write the coordinates at the
-  end of the simulation
+- `sim_name`, default "daemon", this will determine the default name of the output
+  files
+- `traj_path`, path to the xtc file to write, default is sim_name + ".xtc"
+- `out_path`, path to the gro file to write (final coordinates), default is
+  sim_name + ".gro"
 - `silent`, default False, if True daemon will not write any files nor to the
   stdout, only useful for benchmarking
 - `platform`, default None, if the name of an openmm platform is given
@@ -49,9 +50,7 @@ The constructor takes the following named arguments:
 - `include_dir`, default None, daemon will also look for *.itp's in this
   directory when #include-ing from .top files
 - `defines`, default {}, extra #define defines to be set during parsing
-- `top_logpath`, default None, T* log path, if set it will dump longs there
-  that contain information about the current fragment list and the D/M
-  algorithm
+- `log_path`, path to the log file to write, default is sim_name + ".log"
 - `reporters`, default [], a list of reporters (available ones are in the
   submodule martini_daemon.reporters), which can write extra information
   from simulations to files, for example the list of bonds per xtc frame.

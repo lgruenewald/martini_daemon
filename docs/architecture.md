@@ -138,12 +138,10 @@ The modification algorithm will first break interactions defined in
   atom (since single atom interactions do not exist currently, this will
   do nothing).
 
-All fragments that contain atoms that have interactions removed during
-the reaction will be removed from the system, since they are considered
-no longer applicable / representing the functional group that was.
-<!-- (TODO: make it possible to delete overlapping fragments without changing
-interactions with rx_update, TODO: only update atom types, charge when rx_update,
-TODO: break overlapping fragment types when the LJ type or charge is changed) -->
+All fragments that contain atoms that are in a [rx_update] block will
+also be deleted, since [rx_update] is used to "restructure" a part of
+the molecule, signifying that its functionality is changing.
+<!-- (TODO: only update atom types, charge when rx_update-->
 
 Then, the modification algorithm will update the types, charge, mass of all
 atoms according to the product [moleculetype]. If the type is * in the 

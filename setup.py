@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from setuptools import Extension, setup, find_packages
-from Cython.Build import cythonize
+#from Cython.Build import cythonize
 
 ext_modules = [
 #    Extension(
@@ -16,6 +16,6 @@ ext_modules = [
 setup(
     name="martini_daemon",
     version="0.0.1",
-    ext_modules=cythonize(ext_modules),
+ #   ext_modules=cythonize(ext_modules),
     packages=find_packages()
 )

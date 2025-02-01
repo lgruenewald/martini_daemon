@@ -1,0 +1,13 @@
+A system of 100 benzene dithiol molecules in benzene.
+
+Note: the angle cutoff reaction condition is essential for system stability.
+
+Files:
+BDT.itp - itp of BDT monomer and dimer, as parametrized
+BDT.gro, dimer.gro - single monomer and dimer coordinate files
+benzbox.gro - equilbirated box of martini benzene
+**system.gro** - input file for the system
+**system.top** - topology for system.gro
+**dimerize.rx** - dithiol formation and breakage
+**run.py** - script to run daemon on the system
+`good_out.*` - output files from a run that didn't blow up

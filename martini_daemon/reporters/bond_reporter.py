@@ -23,7 +23,7 @@ class BondReporter(Reporter):
         for force in self._sysstar.modular_forces:
             if not force.visualize_as_bond:
                 continue
-            for entry in force._list:
+            for entry in filter(None, force._list):
                 i, j, *_ = entry
                 if cross_box(pos[i], pos[j], box):
                     continue

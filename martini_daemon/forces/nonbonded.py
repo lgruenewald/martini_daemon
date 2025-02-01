@@ -196,7 +196,7 @@ class ExclusionHelper(Force):
             if charge != 0:
                 # self term in reaction field correction
                 self.es_self_correction_add(i, i)
-        for (i, j) in self._list:
+        for (i, j) in filter(None, self._list):
             self.es_self_correction_add(i, j)
 
     def add(self, i, j):

@@ -27,7 +27,7 @@ class MorseBond(Force):
         return self._interaction()
 
     def get_members(self, id):
-        i, j, _, _ = self._list[id]
+        i, j, *_ = self._list[id]
         return [i, j]
 
     def update_params(self, id, length, kb, kcub):

@@ -10,7 +10,7 @@ from martini_daemon.simulation import DaemonSimulation
 def test_daemon(top, gro, reactive, steps, per_step):
     start = time.time()
     sim = DaemonSimulation(top, gro, max_steps=steps, steps_per_step=per_step,
-                           silent=True)
+                           silent=True, platform="CUDA")
     sim.simulate()
     end = time.time()
     return end - start

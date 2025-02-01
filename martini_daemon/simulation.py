@@ -32,12 +32,19 @@ class DaemonSimulation():
     out_path: str  # final geometry to write
 
     def __init__(self, top_path, gro_path, T=300., p=1., dt=20*femtosecond,
-                 max_steps=100, steps_per_step=5000, traj_path="traj.xtc",
-                 out_path="final.gro", silent=False, platform=None,
+                 max_steps=100, steps_per_step=5000,
+                 sim_name="daemon", traj_path=None,
+                 out_path=None, silent=False, platform=None,
                  minimize_energy=True, generate_velocities=True,
                  remove_com_motion=True, epsilon_r=15.0,
                  nonbonded_cutoff=1.1*nanometer, include_dir=None,
                  defines={}, log_path=None, reporters=[]):
+        if traj_path is None:
+            traj_path = sim_name + ".xtc"
+        if out_path is None:
+            out_path = sim_name + ".gro"
+        if log_path is None:
+            log_path = sim_name + ".log"
         self.log_path = log_path
         backup_try(log_path)
         self.log("__init__ in DaemonSimulation")
@@ -166,6 +173,9 @@ class DaemonSimulation():
         self.log("reinitializing")
         self.system.reinitialize()
         self.log("reinitialized")
+        # TODO: temporary
+#        self.system.minimize_energy()
+#        self.log("energy reminimized")
 
     def log(self, message):
         with open(self.log_path, "a") as file:

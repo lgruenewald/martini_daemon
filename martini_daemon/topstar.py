@@ -489,12 +489,16 @@ class TopStar():
             p2 = pos[particles[j]]
             p3 = pos[particles[k]]
             cos = pcos_angle(p1, p2, p3, box)
-            if cos > cos_min and cos < cos_max:
+            if cos < cos_min and cos > cos_max:
+                # inverted comparison because cosine is a constantly decreasing
+                # function, cos_min is the minimum angle => max cosine value
+                # cos_max is the maximum angle => min cosine value
                 self.log(f"Rejected reaction because of cos_angle {cos} "
                          f"inside of {cos_min} to {cos_max} range")
                 return False
             else:
-                self.log(f"Accepted reaction cos_angle {cos}")
+                self.log(f"Accepted reaction cos_angle {cos} "
+                         f"between cos_min {cos_min} and cos_max {cos_max}")
 
         for (i, j, k, l, min, max) in rx.dihedral_limits:
             # particle positions
@@ -508,7 +512,8 @@ class TopStar():
                          f"inside of {min} to {max} range")
                 return False
             else:
-                self.log(f"Accepted reaction dihedral {theta}")
+                self.log(f"Accepted reaction dihedral {theta} "
+                         f"between {min} and {max}")
 
         rx.global_counter += 1
         return True
@@ -543,7 +548,7 @@ class TopStar():
             for group in rx.break_groups:
                 all = True
                 for atom in group:
-                    if atom not in members:
+                    if product_particles[atom] not in members:
                         all = False
                         break
                 if all:
@@ -554,22 +559,21 @@ class TopStar():
             for group in rx.update_groups:
                 all = True
                 for atom in members:
-                    if atom not in group:
+                    # rx_update => remove overlapping fragments
+                    modified_atoms.add(product_particles[atom])
+                    if product_particles[atom] not in group:
                         all = False
-                        break
                 if all:
                     remove = True
             if remove:
-                # mark atoms that were modified for fragment overlap deleting
-                for atom in members:
-                    modified_atoms.add(atom)
                 interaction.remove()
+                self.log(f"Removing interaction {interaction} with members {members}")
                 del all_interactions[i]
             else:
                 i += 1
 
         modified_atoms = list(modified_atoms)
-        self.log(f"modified_atoms {modified_atoms}")
+        self.log(f"updating atoms: {modified_atoms}")
 
         if frag2 is not None:
             self.destroy_fragment([frag1, frag2], modified_atoms)
@@ -584,7 +588,7 @@ class TopStar():
     def post_modification(self):
         # hook that only gets called after modification
         if self.log_path is not None:
-            self.dump(self.log_path, True)
+            self.dump(self.log_path)
 
     def build_reaction_matrix(self):
         """Returns a hash table where reactions can be looked up for 2
