@@ -17,7 +17,7 @@ class BondReporter(Reporter):
 
     def step(self, pos, box, xtc_name):
         bonds_name = xtc_name + "_bonds.npy"
-        n = len(self._sysstar._part_list)
+        n = self._sysstar.len_particles()
 
         bonds = [[] for _ in range(n)]
         for force in self._sysstar.modular_forces:

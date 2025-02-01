@@ -42,7 +42,8 @@ class SysStar():
     exclusions: ExclusionHelper
     _forces_list: list[mm.Force]  # to keep track of indices
     context_initialized: bool
-    _part_list: list[(str, str, float, float)]
+    # name, resid, resname, type, charge, mass
+    _part_list: list[(str, int, str, str, float, float)]
 
     """All the constraints in the system
     indices are called constraint_id
@@ -108,6 +109,8 @@ class SysStar():
 
         self.reporters = []
 
+        self.last_resid = 0
+
     def get_defaults(self, part_type, charge, mass):
         defaults = self._atom_types.get(part_type)
         if defaults is None:
@@ -117,18 +120,21 @@ class SysStar():
         return (charge if charge is not None else dcharge,
                 mass if mass is not None else dmass)
 
-    def add_particle(self, part_name, part_type, charge, mass):
+    def new_residue(self):
+        self.last_resid += 1
+
+    def add_particle(self, part_name, resname, part_type, charge, mass):
         """Adds a particle to the list, and returns its part_id"""
         if self.context_initialized:
             raise ValueError("Do this operation before context is initialized")
         charge, mass = self.get_defaults(part_type, charge, mass)
-        self._part_list.append((part_name, part_type, charge, mass))
+        self._part_list.append((part_name, self.last_resid, resname, part_type, charge, mass))
         return len(self._part_list) - 1
 
-    def update_particle(self, part_id, part_name, part_type, charge, mass):
-        old_name, old_type, old_charge, old_mass = self._part_list[part_id]
+    def update_particle(self, part_id, part_type, charge, mass):
+        name, resid, resname, old_type, old_charge, old_mass = self._part_list[part_id]
         charge, mass = self.get_defaults(part_type, charge, mass)
-        self._part_list[part_id] = (part_name, part_type, charge, mass)
+        self._part_list[part_id] = (name, resid, resname, part_type, charge, mass)
         if not self.context_initialized:
             return
         if old_type != part_type or old_charge != charge:
@@ -143,16 +149,17 @@ class SysStar():
 
     def build_system(self):
         self._system = mm.System()
-        for (_, _, _, mass) in filter(None, self._part_list):
+        for (_, _, _, _, _, mass) in filter(None, self._part_list):
             self._system.addParticle(mass)
 
     def get_particle_name_type(self, i):
-        name, type, _, _ = self._part_list[i]
+        name, _, _, type, _, _ = self._part_list[i]
         return name, type
 
     def get_particle_details(self, i):
-        """Returns the particle's name, type, charge, mass"""
-        return self._part_list[i]
+        """Returns the particle's type, charge, mass"""
+        _, _, _, type, charge, mass = self._part_list[i]
+        return (type, charge, mass)
 
     def len_particles(self):
         return len(self._part_list)
@@ -321,10 +328,9 @@ class SysStar():
             for i in range(natoms):
                 cpos = pos[i]
                 cvel = vel[i]
-                atom_name = self._part_list[i][0]
+                atom_name, resid, resname, *_ = self._part_list[i]
                 atom_index = i + 1
-                # TODO resname, resid
-                file.write(f"{atom_index:5}{atom_name:5}{atom_name:>5}"
+                file.write(f"{resid:5}{resname:5}{atom_name:>5}"
                            f"{atom_index:5}{cpos[0]:8.3f}{cpos[1]:8.3f}"
                            f"{cpos[2]:8.3f}{cvel[0]:8.4f}{cvel[1]:8.4f}"
                            f"{cvel[2]:8.4f}\n")

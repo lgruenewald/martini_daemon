@@ -28,7 +28,7 @@ The constructor takes the following named arguments:
 - `max_steps`, default 100, how many reaction steps to do (the D/M algorithm is
   ran once per reaction step)
 - `steps_per_step`, default 5000, how many md steps per reaction step
-- `sim_name`, default "daemon", this will determine the default name of the output
+- `sim_name`, default "out", this will determine the default name of the output
   files
 - `traj_path`, path to the xtc file to write, default is sim_name + ".xtc"
 - `out_path`, path to the gro file to write (final coordinates), default is

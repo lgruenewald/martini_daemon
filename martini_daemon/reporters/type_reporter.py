@@ -14,11 +14,11 @@ class TypeReporter(Reporter):
 
     def step(self, pos, box, xtc_name):
         bonds_name = xtc_name + "_types.npy"
-        n = len(self._sysstar._part_list)
+        n = self._sysstar.len_particles()
 
         types = []
         for i in range(n):
-            _, type, _, _ = self._sysstar.get_particle_details(i)
+            type, _, _ = self._sysstar.get_particle_details(i)
             type_id = self._sysstar.nonbonded_force.use_atom_type(type)
             types.append(type_id)
         types = np.array(types, np.int32)

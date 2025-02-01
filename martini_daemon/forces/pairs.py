@@ -27,8 +27,8 @@ class Pairs(Force):
     def _addbond(self, i, j, p1, p2):
         # p1, p2 are c6 and c12 in this order if type is 1
         # p1, p2 are atom types if type is 0
-        _, t1, q1, _ = self._sysstar._part_list[i]
-        _, t2, q2, _ = self._sysstar._part_list[j]
+        t1, q1, _ = self._sysstar.get_particle_details(i)
+        t2, q2, _ = self._sysstar.get_particle_details(j)
         qprod = q1 * q2
         if p1 is None or p2 is None:
             p1, p2 = self.types[(t1, t2)]

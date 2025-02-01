@@ -306,9 +306,13 @@ class TopStar():
                              " not a mol fragment type."
                              f" It is: {frag}")
         parts = []
+        prev_resnum = 0
         for in_frag_id, atom in enumerate(frag.atoms):
             type, resnum, resname, atomname, chargegr, charge, mass = atom
-            p = self.system.add_particle(atomname, type, charge, mass)
+            if resnum != prev_resnum:
+                self.system.new_residue()
+                prev_resnum = resnum
+            p = self.system.add_particle(atomname, resname, type, charge, mass)
             parts.append(p)
             self.defrag_list.append([])
         return self.instantiate_over_existing(frag_name, parts)
@@ -340,7 +344,7 @@ class TopStar():
                 # update_types is only True if this is called during a reaction
                 type, resnum, resname, atomname, chargegr, charge, mass = \
                     frag.atoms[in_frag_id]
-                oldname, oldtype, oldcharge, oldmass = \
+                oldtype, oldcharge, oldmass = \
                     self.system.get_particle_details(part_id)
                 # Atom names are not updated.
                 # The * is only here as an option not to update types.
@@ -350,12 +354,12 @@ class TopStar():
                     if (charge is not None and oldcharge != charge) or \
                             (mass is not None and oldmass != mass):
                         self.system.update_particle(
-                            part_id, oldname, oldtype, charge, mass
+                            part_id, oldtype, charge, mass
                         )
                 else:
                     # new type, so gotta update anyway
                     self.system.update_particle(
-                        part_id, oldname, type, charge, mass
+                        part_id, type, charge, mass
                     )
         # bonds
         for (force, i, j, params) in frag.bonds:

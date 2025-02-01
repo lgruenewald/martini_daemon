@@ -69,7 +69,8 @@ class NonBonded(Force):
             self._sysstar.nonbonded_cutoff.value_in_unit(nanometer)
         )
 
-        for (_, type, charge, _) in filter(None, self._sysstar._part_list):
+        for i in range(self._sysstar.len_particles()):
+            type, charge, _ = self._sysstar.get_particle_details(i)
             part_type_id = self.use_atom_type(type)
             self._force_obj.addParticle([part_type_id, charge])
 
@@ -169,8 +170,8 @@ class ExclusionHelper(Force):
         self._force_obj = None
 
     def es_self_correction_add(self, i, j):
-        _, _, q1, _ = self._sysstar._part_list[i]
-        _, _, q2, _ = self._sysstar._part_list[j]
+        _, q1, _ = self._sysstar.get_particle_details(i)
+        _, q2, _ = self._sysstar.get_particle_details(j)
         qprod = q1 * q2
         if i == j:
             qprod *= 0.5
@@ -191,8 +192,8 @@ class ExclusionHelper(Force):
         )
         self._force_obj.addPerBondParameter("q_product")
         self._force_obj.setUsesPeriodicBoundaryConditions(True)
-        for i, (_, _, charge, _) in \
-                enumerate(filter(None, self._sysstar._part_list)):
+        for i in range(self._sysstar.len_particles()):
+            _, charge, _ = self._sysstar.get_particle_details(i)
             if charge != 0:
                 # self term in reaction field correction
                 self.es_self_correction_add(i, i)

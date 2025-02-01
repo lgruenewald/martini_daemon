@@ -33,7 +33,7 @@ class DaemonSimulation():
 
     def __init__(self, top_path, gro_path, T=300., p=1., dt=20*femtosecond,
                  max_steps=100, steps_per_step=5000,
-                 sim_name="daemon", traj_path=None,
+                 sim_name="out", traj_path=None,
                  out_path=None, silent=False, platform=None,
                  minimize_energy=True, generate_velocities=True,
                  remove_com_motion=True, epsilon_r=15.0,
