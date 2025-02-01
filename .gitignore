@@ -7,10 +7,8 @@
 # exclude all xyz and xtc trajectory files
 *.xyz
 *.xtc
-!examples/**/*.xtc
 # exclude out files
 out*
-**/out*
 # exclude xvg from tests directory (energy.xvg, forces.xvg usually)
 tests/**/*.xvg
 # exclude logs
