@@ -4,5 +4,5 @@ from martini_daemon.simulation import DaemonSimulation
 from martini_daemon.reporters.type_reporter import TypeReporter
 
 sim = DaemonSimulation("system.top", "system.gro", max_steps=500,
-                       top_logpath="top.log", reporters=[TypeReporter])
+                       reporters=[TypeReporter])
 sim.simulate()

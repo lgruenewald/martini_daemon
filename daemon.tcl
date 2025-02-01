@@ -67,22 +67,23 @@ proc daemon_open {gro xtc {molid 0}} {
 # colors molecule molid according to the daemon reporter output file npy
 proc daemon_color {npy {molid 0}} {
 	
-	set dsel [ atomselect $molid all ]
+	set asel [ atomselect $molid all ]
+	set n [ $asel num ]
 	set all_frames [ decode_list $npy ]
 	set len [ llength $all_frames ]
 	# number of atoms, assumed to be costant
-	set n [ $dsel num ]
 	set n_frames [expr $len / $n]
 	
 	for {set frame 0} {$frame < $n_frames} {incr frame 1} {
 		# for every frame...
-		$dsel frame $frame
+		$asel frame $frame
+		$asel update
 		set frame_start [expr $n * $frame]
 		set frame_end [expr $frame_start + $n - 1]
 		# lrange is inclusive on both ends
 		set frame_data [ lrange $all_frames $frame_start $frame_end]
 		# set custom data
-		$dsel set user $frame_data
+		$asel set user $frame_data
 	}
 
 	# if called multiple times after itself it should always clean up the 
@@ -98,6 +99,7 @@ proc daemon_color {npy {molid 0}} {
 		mol selection user % 32 == $i
 		mol material Opaque
 		mol addrep $molid
+		mol selupdate $i $molid 1
 	}
 
 	# display some diagnostic data
@@ -105,43 +107,36 @@ proc daemon_color {npy {molid 0}} {
 	
 }
 
-# displays bonds in frame $frame for molecule $molid according to the
-# daemon bonds reporter output file $npy
-proc daemon_bonds {npy frame {molid 0}} {
-	set dsel [ atomselect $molid all ]
-	set all_frames [ decode_nested_list $npy ]
-	set len [ llength $all_frames ]
-	set n [ $dsel num ]
-	set n_frames [ expr $len / $n ]
+proc adj_bonds { name element op } {
+	# args are vmd_frame molid write, not relevant for us
+	# get current frame
+	global all_bonds
 
-	# sadly setbonds seems to not be frame specific (unlike User)
-	$dsel frame $frame
+	set asel [atomselect 0 all]
+	set n [$asel num]
+	set frame [molinfo 0 get frame]
+
+	# calculate where in the all_bonds we wanna be
 	set frame_start [expr $n * $frame]
 	set frame_end [expr $frame_start + $n - 1]
-	set frame_data [lrange $all_frames $frame_start $frame_end]
-	$dsel setbonds $frame_data
-	animate goto $frame
+	set frame_data [lrange $all_bonds $frame_start $frame_end]
 
-	puts "daemon_bonds: loaded $len lists; atom n $n; frame n $n_frames;"
-	puts "selected frame $frame data $frame_start to $frame_end"
+	# update $asel to the current frame and set bond data
+	$asel frame $frame
+	$asel update
+	$asel setbonds $frame_data
 }
 
-proc render_bonds {npy {molid 0}} {
-	set dsel [ atomselect $molid all ]
-	set all_frames [ decode_nested_list $npy ]
-	set len [ llength $all_frames ]
-	set n [ $dsel num ]
-	set n_frames [ expr $len / $n ]
-	
-	puts "render_bonds: loaded $len lists; atom n $n; frame n $n_frames;"
-	for {set frame 0} {$frame < $n_frames} {incr frame 1} {
-		$dsel frame $frame
-		set frame_start [expr $n * $frame]
-		set frame_end [expr $frame_start + $n - 1]
-		set frame_data [lrange $all_frames $frame_start $frame_end]
-		$dsel setbonds $frame_data
-		animate goto $frame
-		set frame_name [format %05i $frame]
-		render snapshot "frame$frame_name.png"
-	}
+# displays bonds in frame $frame for molecule $molid according to the
+# daemon bonds reporter output file $npy
+proc daemon_bonds {npy {molid 0}} {
+	global vmd_frame
+	global all_bonds
+	set all_bonds [ decode_nested_list $npy ]
+
+	trace add variable vmd_frame write adj_bonds
+	puts "daemon_bonds: vmd_frame trace added"
+
+	adj_bonds a a a
 }
+
