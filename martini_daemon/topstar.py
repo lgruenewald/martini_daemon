@@ -28,10 +28,8 @@ from dataclasses import dataclass
 from .sysstar import SysStar
 from .forces.force import Force, Interaction
 from fnmatch import fnmatch
-from .utils import pdist, backup_try, pcos_angle, pdihedral
+from .utils import pdist, pcos_angle, pdihedral
 import random
-import numpy as np
-
 
 random.seed()
 
@@ -197,8 +195,6 @@ class TopStar():
         self.reactive_types = set()
         self.system = system
         self.log_path = log_path
-        if log_path is not None:
-            backup_try(log_path)
 
     def new_mol_fragment(self, name: str):
         if self.type_lookup.get(name):
@@ -277,7 +273,6 @@ class TopStar():
             if subinst.frag_id != -1:
                 self.defrag_list[part_index].append(subinst.frag_id)
 
-        self.log(f"[info] instantiate_subfrag {frag.name} over particles {frag.atoms}")
         # interactions get added if all participants are normal atoms
         # TODO functionalize these checks
         for interaction in inst.interactions:
@@ -334,10 +329,6 @@ class TopStar():
                              " not a mol fragment type."
                              f" It is: {frag}")
         inst = self.add_frag_to_list(frag_name)
-        if reaction:
-            self.log("instantiate_over_existing during reaction "
-                     f"product_name {frag_name} "
-                     f"transferring interactions #: {len(interactions)}")
 
         # particles
         for in_frag_id, part_id in enumerate(particles):
@@ -441,7 +432,6 @@ class TopStar():
             self.remove_fragment(frag)
 
     def pre_detection(self):
-        self.log("[info] pre_detection hook")
         for rx in self.reaction_list:
             rx.global_counter = 0
 
@@ -503,6 +493,8 @@ class TopStar():
                 self.log(f"Rejected reaction because of cos_angle {cos} "
                          f"inside of {cos_min} to {cos_max} range")
                 return False
+            else:
+                self.log(f"Accepted reaction cos_angle {cos}")
 
         for (i, j, k, l, min, max) in rx.dihedral_limits:
             # particle positions
@@ -515,6 +507,8 @@ class TopStar():
                 self.log(f"Rejected reaction because of dihedral {theta} "
                          f"inside of {min} to {max} range")
                 return False
+            else:
+                self.log(f"Accepted reaction dihedral {theta}")
 
         rx.global_counter += 1
         return True
@@ -522,13 +516,12 @@ class TopStar():
     def pre_modification(self):
         # hook that gets called after detection, before modification
         # only called if there is any modification going on
-        self.log("[info] pre modification hook")
+        pass
 
     def modification(self, frag1, frag2, rx: ReactionTemplate):
         """Modification helper for the D/M algorithm
         """
-        self.log("[info] Modification algo!")
-        self.log(f"reaction {rx.name}")
+        self.log(f"Modification algo: reaction {rx.name}")
         product = rx.p1
         product_particles = frag1.particles.copy()
         all_interactions = frag1.interactions.copy()
@@ -590,7 +583,6 @@ class TopStar():
 
     def post_modification(self):
         # hook that only gets called after modification
-        self.log("[info] post modification hook")
         if self.log_path is not None:
             self.dump(self.log_path, True)
 
@@ -613,9 +605,7 @@ class TopStar():
             with open(self.log_path, "a") as file:
                 print(message, file=file)
 
-    def dump(self, path="top.dump", append=False):
-        if not append:
-            backup_try(path)
+    def dump(self, path):
         with open(path, "a") as file:
             print("===== TopStar Dump =====", file=file)
             print("==== TopStar / Fragment Types ====", file=file)

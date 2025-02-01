@@ -10,6 +10,8 @@ import sys
 import openmm as mm
 from openmm.app import GromacsGroFile
 from openmm.unit import femtosecond, nanometer
+from datetime import datetime
+from .utils import backup_try
 
 
 class DaemonSimulation():
@@ -35,13 +37,18 @@ class DaemonSimulation():
                  minimize_energy=True, generate_velocities=True,
                  remove_com_motion=True, epsilon_r=15.0,
                  nonbonded_cutoff=1.1*nanometer, include_dir=None,
-                 defines={}, top_logpath=None, reporters=[]):
+                 defines={}, log_path=None, reporters=[]):
+        self.log_path = log_path
+        backup_try(log_path)
+        self.log("__init__ in DaemonSimulation")
+        self.log("Parsing start")
         self.system, self.top = DaemonTopFile(
             top_path,
             include_dir=include_dir, defines=defines,
             epsilon_r=epsilon_r, nonbonded_cutoff=nonbonded_cutoff
         )
-        self.top.log_path = top_logpath
+        self.log("Parsing done")
+        self.top.log_path = log_path
         self.gro = GromacsGroFile(gro_path)
         if platform is not None:
             platform = mm.Platform.getPlatformByName(platform)
@@ -50,21 +57,28 @@ class DaemonSimulation():
             self.system.add_force(mm.MonteCarloBarostat(p, T))
         if remove_com_motion:
             self.system.add_force(mm.CMMotionRemover())
+        self.log("Building reaction matrix and initiator list")
         self.reaction_matrix = self.top.build_reaction_matrix()
         self.initiator_list = self.top.get_initiator_list()
+        self.log("Reaction matrix and initiator list built")
 
         integrator = mm.LangevinIntegrator(T, 10.0, dt)
         box = self.gro.getPeriodicBoxVectors()
 
+        self.log("Building context")
         if platform is not None:
             self.system.build_context(integrator, box, platform)
         else:
             self.system.build_context(integrator, box)
+        self.log("Context built")
 
+        self.log("Setting positions")
         self.system.set_positions(self.gro.getPositions(True))
         if generate_velocities:
+            self.log("Generating velocities")
             self.system.generate_velocities(T)
         if minimize_energy:
+            self.log("Minimizing energy")
             self.system.minimize_energy()
         if not silent:
             for rep in reporters:
@@ -75,6 +89,7 @@ class DaemonSimulation():
         self.silent = silent
         self.traj_path = traj_path
         self.out_path = out_path
+        self.log("__init__ finished")
 
     def simulate(self):
         self.i = 0
@@ -85,12 +100,15 @@ class DaemonSimulation():
             self.system.write_gro(self.out_path)
 
     def step(self):
+        self.log(f"step {self.i}, doing MD steps")
         self.system.do_steps(self.steps_per_step)
+        self.log(f"{self.steps_per_step} MD steps performed")
         if not self.silent:
             sys.stdout.write(f"\rStep {self.i+1:8} of {self.max_steps}   "
                              f"[reactions: {self.reactions}]")
         self.i += 1
 
+        self.log("Running the detection algorithm")
         pos, box = self.system.get_positions()
 
         pairs = []
@@ -130,9 +148,11 @@ class DaemonSimulation():
                         pairs.append((frag1, frag2, rx))
                         break  # skip i - break entire loop over js with i
 
+        self.log("Detection finished")
         if len(pairs) == 0:
             return
 
+        self.log("Doing the modification algorithm")
         self.top.pre_modification()
         # Modification algorithm
         for frag1, frag2, rx in pairs:
@@ -142,7 +162,14 @@ class DaemonSimulation():
 
         # reinitialize context, initator list
         self.initiator_list = self.top.get_initiator_list()
+        self.log("Modification finished")
+        self.log("reinitializing")
         self.system.reinitialize()
+        self.log("reinitialized")
+
+    def log(self, message):
+        with open(self.log_path, "a") as file:
+            print(datetime.now(), message, file=file)
 
 
 if __name__ == "__main__":
