@@ -58,10 +58,10 @@ proc decode_nested_list {filename} {
 # should be manually verified to be the next one to be added
 proc daemon_open {gro xtc {molid 0}} {
 	mol new $gro
-	mol addfile $xtc
+	mol addfile $xtc waitfor all
 	animate delete  beg 0 end 0 skip 0 $molid
-	mol modstyle 0 $molid CPK 3.0 1.5 12.0 12.0
-	animate pause
+#	mol modstyle 0 $molid CPK 3.0 1.5 12.0 12.0
+#	animate pause
 }
 
 # colors molecule molid according to the daemon reporter output file npy

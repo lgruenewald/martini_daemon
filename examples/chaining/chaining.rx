@@ -1,15 +1,10 @@
 [ frag ]
 monomer
-[ frag_atoms ]
-* *
 [ frag_from ]
 W 1
 
 [ frag ]
 tail
-[ frag_atoms ]
-* *
-* *
 [ frag_from ]
 dimer 1 2
 dimer 2 1
