@@ -9,7 +9,7 @@ class VSiteCenterOfMass(Force):
         masses = []
         sum = 0.
         for i in members:
-            _, _, _, m = self._sysstar.get_particle_details(i)
+            _, _, m = self._sysstar.get_particle_details(i)
             masses.append(m)
             sum += m
         weights = [m/sum for m in masses]
