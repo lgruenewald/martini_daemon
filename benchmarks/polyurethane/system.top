@@ -2,7 +2,9 @@
 #include "../../tests/martini_v3.0.0_solvents_v1.itp"
 #include "CGM_DesmodurN.itp"
 #include "CGM_PEG.itp"
+#ifdef REACT
 #include "poly.rx"
+#endif
 
 [ system ]
 polysmart test_case

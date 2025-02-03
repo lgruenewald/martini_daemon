@@ -27,14 +27,13 @@ class DaemonSimulation():
     reactions: int = 0
     max_steps: int
     steps_per_step: int
-    silent: bool  # if silent no files or stdout are written to
     traj_path: str  # trajectory to write
     out_path: str  # final geometry to write
 
     def __init__(self, top_path, gro_path, T=300., p=1., dt=20*femtosecond,
                  max_steps=100, steps_per_step=5000,
                  sim_name="out", traj_path=None,
-                 out_path=None, silent=False, platform=None,
+                 out_path=None, platform=None,
                  minimize_energy=True, generate_velocities=True,
                  remove_com_motion=True, epsilon_r=15.0,
                  nonbonded_cutoff=1.1*nanometer, include_dir=None,
@@ -87,13 +86,11 @@ class DaemonSimulation():
         if minimize_energy:
             self.log("Minimizing energy")
             self.system.minimize_energy()
-        if not silent:
-            for rep in reporters:
-                self.system.add_reporter(rep)
-            self.system.set_xtc_path(traj_path)
+        for rep in reporters:
+            self.system.add_reporter(rep)
+        self.system.set_xtc_path(traj_path)
         self.max_steps = max_steps
         self.steps_per_step = steps_per_step
-        self.silent = silent
         self.traj_path = traj_path
         self.out_path = out_path
         self.log("__init__ finished")
@@ -102,17 +99,15 @@ class DaemonSimulation():
         self.i = 0
         for i in range(self.max_steps):
             self.step()
-        if not self.silent:
-            print()
-            self.system.write_gro(self.out_path)
+        print()
+        self.system.write_gro(self.out_path)
 
     def step(self):
         self.log(f"step {self.i}, doing MD steps")
         self.system.do_steps(self.steps_per_step)
         self.log(f"{self.steps_per_step} MD steps performed")
-        if not self.silent:
-            sys.stdout.write(f"\rStep {self.i+1:8} of {self.max_steps}   "
-                             f"[reactions: {self.reactions}]")
+        sys.stdout.write(f"\rStep {self.i+1:8} of {self.max_steps}   "
+                         f"[reactions: {self.reactions}]")
         self.i += 1
 
         self.log("Running the detection algorithm")

@@ -33,8 +33,6 @@ The constructor takes the following named arguments:
 - `traj_path`, path to the xtc file to write, default is sim_name + ".xtc"
 - `out_path`, path to the gro file to write (final coordinates), default is
   sim_name + ".gro"
-- `silent`, default False, if True daemon will not write any files nor to the
-  stdout, only useful for benchmarking
 - `platform`, default None, if the name of an openmm platform is given
   (as a string), it uses that one, with None it will fall back to whichever
   platform openmm considers default
