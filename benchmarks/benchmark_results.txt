@@ -1,0 +1,24 @@
+[2025-02-03 17:31:15.597254] == System information ==
+[2025-02-03 17:31:15.599707] Linux-6.8.0-52-generic-x86_64-with-glibc2.35
+[2025-02-03 17:31:15.603567] CPU model: Intel(R) Xeon(R) W-2235 CPU @ 3.80GHz
+[2025-02-03 17:31:15.604037] CPU percent used 6.7%
+[2025-02-03 17:31:15.604455] RAM total 62.5G - used 5.3%
+[2025-02-03 17:31:15.631790] GPU  NVIDIA GeForce RTX 3080: GPU utilization 0 %, Total mem  10240 MiB, Used mem  266 MiB, Temperature  55C
+
+[2025-02-03 17:31:15.632357] == Software information ==
+[2025-02-03 17:31:15.632832] OpenMM version: 8.2.0.dev-5377094
+[2025-02-03 17:31:15.633261] OpenMM platform being used: CUDA
+[2025-02-03 17:31:15.634643] == Benchmark polyurethane ==
+[2025-02-03 17:32:24.219993] polyurethane/gromacs/0:68.58s
+[2025-02-03 17:33:32.743104] polyurethane/gromacs/1:68.52s
+[2025-02-03 17:34:40.965491] polyurethane/gromacs/2:68.22s
+[2025-02-03 17:34:40.966295] polyurethane/gromacs runs:3 avg:68.44s [68.58s..68.22s] std:0.16s
+[2025-02-03 17:36:00.057402] polyurethane/daemon with reactions/0:79.09s
+[2025-02-03 17:37:16.333569] polyurethane/daemon with reactions/1:76.28s
+[2025-02-03 17:38:35.280765] polyurethane/daemon with reactions/2:78.95s
+[2025-02-03 17:38:35.281398] polyurethane/daemon with reactions runs:3 avg:78.10s [79.09s..76.28s] std:1.29s
+[2025-02-03 17:39:39.119789] polyurethane/daemon without reactions/0:63.84s
+[2025-02-03 17:40:42.821522] polyurethane/daemon without reactions/1:63.70s
+[2025-02-03 17:41:47.344909] polyurethane/daemon without reactions/2:64.52s
+[2025-02-03 17:41:47.345925] polyurethane/daemon without reactions runs:3 avg:64.02s [64.52s..63.70s] std:0.36s
+[2025-02-03 17:41:47.346594] Reactions cost a 22.0% slowdown
