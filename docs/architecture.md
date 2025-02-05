@@ -101,10 +101,6 @@ specific reaction type can only happen up to the defined amount. This can
 be useful to possibly speed up the detection step. Currently setting this
 might bias the system to prefer reactions on the molecules that come first
 in topology.
-<!-- TODO -->
-
-<!-- TODO: later allow reaction rates to be independent of how often reaction
-steps are done. -->
 
 At least one distance cutoff for every reaction is mandatory. There is both
 r_max possible for maximum distance and r_min possible for minimum distance.
@@ -141,7 +137,6 @@ The modification algorithm will first break interactions defined in
 All fragments that contain atoms that are in a [rx_update] block will
 also be deleted, since [rx_update] is used to "restructure" a part of
 the molecule, signifying that its functionality is changing.
-<!-- (TODO: only update atom types, charge when rx_update-->
 
 Then, the modification algorithm will update the types, charge, mass of all
 atoms according to the product [moleculetype]. If the type is * in the 
@@ -154,9 +149,6 @@ reaction products can still be reactive.
 
 ## Simulation user experience // Tooling
 
-<!-- - TODO, write the final Topology to a file, along with the final coordinates
-  to allow continuing simulations with reactions, additionally TODO
-  simulations with checkpoints -->
 - reporters in martini_daemon.reporters can do various cool things:
   - the bond_reporter can report the list of bonds (currently only those that
   do not cross the pbc), separately in every frame.

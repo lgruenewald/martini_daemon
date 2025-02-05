@@ -1,0 +1,23 @@
+#include ../../tests/martini_v3.0.0.itp
+#include gol.rx
+
+[system]
+game of life
+
+[molecules]
+; line 1-3
+OFF 30
+; line 4
+OFF 4
+ON 2
+OFF 4
+; line 5
+OFF 5
+ON 2
+OFF 3
+; line 6
+OFF 5
+ON 1
+OFF 4
+; line 7-10
+OFF 40

@@ -32,8 +32,6 @@ Defines a list of atom types and name patterns to match against when
 instantiating this fragment. If there is a mismatch, an error is raised.
 Can be used for debugging templates, or to limit their misuse.
 
-<!-- TODO: might be removed for simplicity if it is not used in practice -->
-
 ## The [frag_from] directive
 
 Must be after a [frag] directive was already defined. If [frag_atoms] is present

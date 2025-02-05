@@ -48,7 +48,6 @@ class MolFragment:
     molecule_name: str
     # atoms: type, resnum, resname, atomname, chargegr, charge, mass
     atoms: list[(str, int, str, str, int, float, float)]
-    # TODO generalize this into just interactions
     # force i j params
     bonds: list[(Force, int, int, list)]
     # force i j k params
@@ -93,9 +92,8 @@ class MolFragment:
 
 class ReactionTemplate:
     name: str
-    r1: str
-    r2: str
-    p1: str
+    reactants: list[str]
+    products: list[list[str]]
     distance_max: list[(int, int, float)]
     distance_min: list[(int, int, float)]
     probability: float
@@ -103,12 +101,12 @@ class ReactionTemplate:
     global_limit: int
     break_groups: list[list[int]]
     update_groups: list[list[int]]
+    skip: int
 
     def __init__(self, name):
         self.name = name
-        self.r1 = None
-        self.r2 = None
-        self.p1 = None
+        self.reactants = []
+        self.products = []
         self.distance_max = []
         self.distance_min = []
         self.angle_limits = []
@@ -118,17 +116,14 @@ class ReactionTemplate:
         self.global_limit = None
         self.break_groups = []
         self.update_groups = []
+        self.skip = None
 
     def is_complete(self):
         # when a reaction is finished parsing, if this returns False
         # it is considered an error
 
-        # currently: must have a reactant and product and at least one distance
-        # constraint, but this is a bit arbitrary / should reflect common
-        # potential mistakes people would make when writing *.rx files
         return (
-            self.r1 is not None and
-            self.p1 is not None
+            len(self.reactants) > 0
         )
 
 
@@ -162,7 +157,7 @@ class TopStar():
     next_frag_id: int
     # for every part_id have a list of fragments it is in
     # type: list[list[frag_id]]
-    defrag_list: list[list[int]]
+    defrag_list: list[list[(str, int)]]
 
     # === Fragment Types ===
     # type name -> list of subfrag names
@@ -174,15 +169,11 @@ class TopStar():
     # === Reaction templates ===
     reaction_list: list[ReactionTemplate]
 
-    reactive_pairs: dict[(str, str), ReactionTemplate]
-
     reactive_types: set[str]
 
     system: SysStar
 
-    log_path: str
-
-    def __init__(self, system, log_path=None):
+    def __init__(self, system):
         self.frag_list = {}
         self.next_frag_id = 0
         self.defrag_list = []
@@ -191,10 +182,8 @@ class TopStar():
         self.reaction_list = []
         self.type_lookup = {}
         self.subfrag_map = {}
-        self.reactive_pairs = {}
         self.reactive_types = set()
         self.system = system
-        self.log_path = log_path
 
     def new_mol_fragment(self, name: str):
         if self.type_lookup.get(name):
@@ -219,10 +208,8 @@ class TopStar():
 
     def new_reaction(self, reaction: ReactionTemplate):
         self.reaction_list.append(reaction)
-        self.reactive_pairs[(reaction.r1, reaction.r2)] = reaction
-        self.reactive_types.add(reaction.r1)
-        if reaction.r2 is not None:
-            self.reactive_types.add(reaction.r2)
+        for r in reaction.reactants:
+            self.reactive_types.add(r)
 
     def add_frag_to_list(self, name: str):
         if name in self.reactive_types:
@@ -440,8 +427,7 @@ class TopStar():
             rx.global_counter = 0
 
     def detection(self,
-                  frag1: Fragment,
-                  frag2: Fragment,
+                  reactants: list[Fragment],
                   rx: ReactionTemplate,
                   pos,
                   box
@@ -456,11 +442,12 @@ class TopStar():
         # fragments that were removed cannot react any more
 
         # overlapping fragments can never react:
-        if frag2 is not None:
-            for i in frag1.particles:
-                for j in frag2.particles:
-                    if i == j:
-                        return False
+        particles = []
+        for r in reactants:
+            for p in r.particles:
+                if p in particles:
+                    return False
+                particles.append(p)
 
         # limiter checks, first for performance
         if rx.global_limit is not None and rx.global_counter >= rx.global_limit:
@@ -469,10 +456,6 @@ class TopStar():
             return False
 
         # position dependent checks
-        particles = frag1.particles.copy()
-        if frag2 is not None:
-            particles += frag2.particles
-
         for (i, j, rmax) in rx.distance_max:
             init1 = particles[i]
             init2 = particles[j]
@@ -497,12 +480,7 @@ class TopStar():
                 # inverted comparison because cosine is a constantly decreasing
                 # function, cos_min is the minimum angle => max cosine value
                 # cos_max is the maximum angle => min cosine value
-                self.log(f"Rejected reaction because of cos_angle {cos} "
-                         f"inside of {cos_min} to {cos_max} range")
                 return False
-            else:
-                self.log(f"Accepted reaction cos_angle {cos} "
-                         f"between cos_min {cos_min} and cos_max {cos_max}")
 
         for (i, j, k, l, min, max) in rx.dihedral_limits:
             # particle positions
@@ -512,12 +490,7 @@ class TopStar():
             p4 = pos[particles[l]]
             theta = pdihedral(p1, p2, p3, p4, box)
             if theta > min and theta < max:
-                self.log(f"Rejected reaction because of dihedral {theta} "
-                         f"inside of {min} to {max} range")
                 return False
-            else:
-                self.log(f"Accepted reaction dihedral {theta} "
-                         f"between {min} and {max}")
 
         rx.global_counter += 1
         return True
@@ -527,19 +500,14 @@ class TopStar():
         # only called if there is any modification going on
         pass
 
-    def modification(self, frag1, frag2, rx: ReactionTemplate):
+    def modification(self, frags: list[Fragment], rx: ReactionTemplate):
         """Modification helper for the D/M algorithm
         """
-        self.log(f"Modification algo: reaction {rx.name}")
-        product = rx.p1
-        product_particles = frag1.particles.copy()
-        all_interactions = frag1.interactions.copy()
-        self.log(f"frag1 particles {frag1.particles}")
-        if frag2 is not None:
-            self.log(f"frag2 particles {frag2.particles}")
-            product_particles += frag2.particles
-            all_interactions += frag2.interactions
-        self.log(f"product_particles {product_particles}")
+        product_particles = []
+        all_interactions = []
+        for f in frags:
+            product_particles += f.particles
+            all_interactions += f.interactions
         modified_atoms = set()
         i = 0
         while i < len(all_interactions):
@@ -571,47 +539,54 @@ class TopStar():
                     remove = True
             if remove:
                 interaction.remove()
-                self.log(f"Removing interaction {interaction} with members {members}")
                 del all_interactions[i]
             else:
                 i += 1
 
         modified_atoms = list(modified_atoms)
-        self.log(f"updating atoms: {modified_atoms}")
+        self.destroy_fragment(frags, modified_atoms)
 
-        if frag2 is not None:
-            self.destroy_fragment([frag1, frag2], modified_atoms)
-        else:
-            self.destroy_fragment([frag1], modified_atoms)
+        # the index of the next particle for which a new product needs to be
+        # instantiated
+        product_particle_index = 0
 
-        self.instantiate_over_existing(
-            product, product_particles, reaction=True,
-            interactions=all_interactions
-        )
+        for product_line in rx.products:
+            for product in product_line:
+                start = product_particle_index
+                frag = self.type_lookup.get(product)  # frag type
+                if frag is None:
+                    raise ValueError(f"Can't find mol {product}.")
+                elif not isinstance(frag, MolFragment):
+                    raise ValueError(f"Product {product}, is"
+                                     " not a mol fragment type."
+                                     f" It is: {frag}"
+                                     "Use [frag_from] to create fragments "
+                                     "in reactions.")
+
+                end = start + len(frag.atoms)
+                parts = product_particles[start:end]
+                product_particle_index = end
+                self.instantiate_over_existing(
+                    product, parts, reaction=True,
+                    interactions=all_interactions
+                )
+            assert product_particle_index == len(product_particles)
 
     def post_modification(self):
         # hook that only gets called after modification
-        if self.log_path is not None:
-            self.dump(self.log_path)
+        pass
 
-    def build_reaction_matrix(self):
-        """Returns a hash table where reactions can be looked up for 2
-        fragment names
-        """
-        return self.reactive_pairs
+    def build_reaction_list(self):
+        return self.reaction_list
 
     def get_initiator_list(self):
-        initiators: list[Fragment] = []
+        initiators: dict[str, list[Fragment]] = {}
         for id, frag in self.frag_list.items():
-            if frag.name in self.reactive_types:
-                initiators.append(frag)
+            if initiators.get(frag.name) is None:
+                initiators[frag.name] = []
+            initiators[frag.name].append(frag)
 
         return initiators
-
-    def log(self, message):
-        if self.log_path is not None:
-            with open(self.log_path, "a") as file:
-                print(message, file=file)
 
     def dump(self, path):
         with open(path, "a") as file:
@@ -622,7 +597,7 @@ class TopStar():
             file.write("\n")
             print("==== TopStar / ReactionTemplates ====", file=file)
             for rx in self.reaction_list:
-                print(f"rx {rx.name} r1 {rx.r1} r2 {rx.r2} p1 {rx.p1}", file=file)
+                print(f"rx {rx.name} r1 {rx.r1} r2 {rx.r2} products {rx.products}", file=file)
             print("==== TopStar / Fragments ====", file=file)
             for id, frag in self.frag_list.items():
                 print(f"{id}: <frag {frag.name} ps {frag.particles}>", file=file)

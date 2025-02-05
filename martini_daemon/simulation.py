@@ -12,6 +12,8 @@ from openmm.app import GromacsGroFile
 from openmm.unit import femtosecond, nanometer
 from datetime import datetime
 from .utils import backup_try
+import operator
+from functools import reduce
 
 
 class DaemonSimulation():
@@ -20,8 +22,8 @@ class DaemonSimulation():
     top: TopStar
     gro: GromacsGroFile
 
-    reaction_matrix: dict[(str, str), ReactionTemplate]
-    initiator_list: list[Fragment]
+    reaction_list: list[ReactionTemplate]
+    initiator_list: dict[str, list[Fragment]]
 
     i: int = 0
     reactions: int = 0
@@ -54,7 +56,6 @@ class DaemonSimulation():
             epsilon_r=epsilon_r, nonbonded_cutoff=nonbonded_cutoff
         )
         self.log("Parsing done")
-        self.top.log_path = log_path
         self.gro = GromacsGroFile(gro_path)
         if platform is not None:
             platform = mm.Platform.getPlatformByName(platform)
@@ -64,7 +65,7 @@ class DaemonSimulation():
         if remove_com_motion:
             self.system.add_force(mm.CMMotionRemover())
         self.log("Building reaction matrix and initiator list")
-        self.reaction_matrix = self.top.build_reaction_matrix()
+        self.reaction_list = self.top.build_reaction_list()
         self.initiator_list = self.top.get_initiator_list()
         self.log("Reaction matrix and initiator list built")
 
@@ -80,15 +81,18 @@ class DaemonSimulation():
 
         self.log("Setting positions")
         self.system.set_positions(self.gro.getPositions(True))
+        for rep in reporters:
+            self.system.add_reporter(rep)
+        # must set xtc path after adding reporters currently
+        self.system.set_xtc_path(traj_path)
+        self.system.write_xtc_frame()
         if generate_velocities:
             self.log("Generating velocities")
             self.system.generate_velocities(T)
         if minimize_energy:
             self.log("Minimizing energy")
             self.system.minimize_energy()
-        for rep in reporters:
-            self.system.add_reporter(rep)
-        self.system.set_xtc_path(traj_path)
+        self.system.write_xtc_frame()
         self.max_steps = max_steps
         self.steps_per_step = steps_per_step
         self.traj_path = traj_path
@@ -113,53 +117,70 @@ class DaemonSimulation():
         self.log("Running the detection algorithm")
         pos, box = self.system.get_positions()
 
-        pairs = []
+        reactions = []
         skip = set()
         self.top.pre_detection()
-        # Detection algorithm
-        for i, frag1 in enumerate(self.initiator_list):
-            if frag1 is None:
-                continue
-            if i in skip:
-                continue
-            # unimolecular
-            uni_rx = self.reaction_matrix.get((frag1.name, None))
-            if uni_rx is not None:
-                if self.top.detection(frag1, None, uni_rx, pos, box):
-                    skip.add(i)
-                    pairs.append((frag1, None, uni_rx))
-                    continue  # skip bimolecular
-            # bimolecular
-            for j, frag2 in enumerate(self.initiator_list):
-                if frag2 is None:
+        # Detection algorithm, generic for all reacting molecule amounts
+        for rx in self.reaction_list:
+            # get a product of possible reactant combinations
+            n_reactants = len(rx.reactants)
+            n_types_per_reactant = []  # how many frags of such reactant are in the system
+            n_types = 1
+            for r in rx.reactants:
+                if self.initiator_list.get(r) is None:
+                    # reaction isn't possible, no reactant available
+                    n_types = 0
+                    break
+                n = len(self.initiator_list[r])
+                n_types_per_reactant.append(n)
+                n_types *= n
+            for i in range(n_types):
+                frag_ids = []
+                remainder = i
+                cont = False
+                for rid in range(n_reactants):
+                    frag_id = remainder % n_types_per_reactant[rid]
+                    remainder = remainder // n_types_per_reactant[rid]
+                    # continue if skip
+                    if frag_id in skip:
+                        cont = True
+                        break
+                    # frag id's must be in order if the name is the same to
+                    # prevent double counting and self reaction
+                    for prev_rid, prev_frag_id in enumerate(frag_ids):
+                        if rx.reactants[rid] == rx.reactants[prev_rid] and \
+                                frag_id <= prev_frag_id:
+                            cont = True
+                            break
+                    frag_ids.append(frag_id)
+                if cont:
                     continue
-                if j in skip:
-                    continue
-                if frag1.name == frag2.name and j <= i:
-                    # do not double count if frag1.name==frag2.name
-                    # reaction matrix so we only check reactions of the same
-                    # type with itself once
-                    #
-                    # this also skips frag1==frag2
-                    continue
-                rx = self.reaction_matrix.get((frag1.name, frag2.name))
-                if rx is not None:
-                    if self.top.detection(frag1, frag2, rx, pos, box):
-                        skip.add(i)
-                        skip.add(j)
-                        pairs.append((frag1, frag2, rx))
-                        break  # skip i - break entire loop over js with i
+                frags = []
+                for rid, frag_id in enumerate(frag_ids):
+                    frag = self.initiator_list[rx.reactants[rid]][frag_id]
+                    frags.append(frag)
+                # detection
+                if self.top.detection(frags, rx, pos, box):
+                    # if rx.skip is defined, only run the modification on the
+                    # first skip atoms, and only skip the first skip atoms
+                    # the other "reactants" were there only for the detection
+                    if rx.skip is not None:
+                        frag_ids = frag_ids[:skip]
+                        frags = frags[:skip]
+                    for j, frag_id in enumerate(frag_ids):
+                        skip.add(frag_id)
+                    reactions.append((frags, rx))
 
         self.log("Detection finished")
-        if len(pairs) == 0:
+        if len(reactions) == 0:
             return
 
-        self.log("Doing the modification algorithm")
+        self.log(f"Doing the modification algorithm {reactions}")
         self.top.pre_modification()
         # Modification algorithm
-        for frag1, frag2, rx in pairs:
+        for (frags, rx) in reactions:
             self.reactions += 1
-            self.top.modification(frag1, frag2, rx)
+            self.top.modification(frags, rx)
         self.top.post_modification()
 
         # reinitialize context, initator list
@@ -168,9 +189,6 @@ class DaemonSimulation():
         self.log("reinitializing")
         self.system.reinitialize()
         self.log("reinitialized")
-        # TODO: temporary
-#        self.system.minimize_energy()
-#        self.log("energy reminimized")
 
     def log(self, message):
         with open(self.log_path, "a") as file:

@@ -14,7 +14,7 @@ import openmm.version
 from martini_daemon.simulation import DaemonSimulation
 from martini_daemon.utils import backup_try
 
-result_path = "benchmark_results.txt"
+result_path = "benchmark_results.log"
 backup_try(result_path)
 mm_platform = "CUDA"
 
@@ -29,25 +29,27 @@ def bprint(message, yellow=False, file_only=False):
             print(message)
 
 
-def test_daemon(reactive):
+def test_daemon(reactive, data):
     defines = {}
     if reactive:
         defines["REACT"] = 1
-    with open("params.json") as f:
-        data = json.load(f)
+
+    p = data.get("p") or 1.0
+    if p == 0 or p == 0.:
+        p = None
     sim = DaemonSimulation(data["top"], data["gro"], max_steps=data["steps"],
-                           steps_per_step=data["per_step"],
+                           steps_per_step=data["per_step"], p=p,
                            platform=mm_platform, defines=defines)
     sim.simulate()
 
 
-def test_gromacs():
-    with open("params.json") as f:
-        data = json.load(f)
+def test_gromacs(data):
     top = data["top"]
     gro = data["gro"]
     steps = data["steps"] * data["per_step"]
-    os.system(f"../gmxrun.sh {top} {gro} {steps}")
+    p = data.get("p") or 1.0
+    ptype = "C-rescale" if p > 0 else "no"
+    os.system(f"../gmxrun.sh {top} {gro} {steps} {ptype} {p}")
 
 
 def bench_function(function, args, benchmark, label, n=3):
@@ -121,10 +123,17 @@ for x in benchmarks:
     if os.path.isdir(x):
         os.chdir(x)
 
+        with open("params.json") as f:
+            data = json.load(f)
+
+        n = 3
+        if data.get("category") == "slow":
+            n = 1
+
         bprint(f"== Benchmark {x} ==", yellow=True)
-        bench_function(test_gromacs, [], x, "gromacs")
-        daemon_time = bench_function(test_daemon, [True], x, "daemon with reactions")
-        no_reaction_time = bench_function(test_daemon, [False], x, "daemon without reactions")
+        bench_function(test_gromacs, [data], x, "gromacs", n=n)
+        daemon_time = bench_function(test_daemon, [True, data], x, "daemon with reactions", n=n)
+        no_reaction_time = bench_function(test_daemon, [False, data], x, "daemon without reactions", n=n)
 
         percent = (daemon_time - no_reaction_time) / no_reaction_time * 100
         bprint(f"Reactions cost a {percent:.1f}% slowdown", yellow=True)

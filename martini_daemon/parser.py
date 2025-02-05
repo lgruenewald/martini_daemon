@@ -122,7 +122,7 @@ class TopParser:
 
         cur = 0  # current position in the line
         tokens = []  # list of tokens built up so far
-        key = None  # FIXME this is also horrible
+        key = None  # TODO this is so horrible
 
         while cur < len(line):
             ch = line[cur]

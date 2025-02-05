@@ -247,16 +247,19 @@ class SysStar():
     def add_reporter(self, reporter_class):
         self.reporters.append(reporter_class(self))
 
+    def write_xtc_frame(self):
+        pos, box = self.get_positions()
+        self._xtc.writeModel(pos)
+        for reporter in self.reporters:
+            reporter.step(pos, box, self._xtc_name)
+
     def do_steps(self, steps):
         if not self.context_initialized:
             raise Exception("Initialize the context first")
         self._integrator.step(steps)
         if self._xtc is not None:
             self._xtc.interval = steps
-            pos, box = self.get_positions()
-            self._xtc.writeModel(pos)
-            for reporter in self.reporters:
-                reporter.step(pos, box, self._xtc_name)
+            self.write_xtc_frame()
 
     def get_positions(self):
         if not self.context_initialized:
@@ -269,8 +272,7 @@ class SysStar():
         box_x = box[0].x
         box_y = box[1].y
         box_z = box[2].z
-        # TODO: don't assume 90 degree angles in martini_daemon in general
-        # these asserts are there to ensure only 90 degree boxes are ran
+        # only works for 90 degree pbc
         assert box[1].x == 0.
         assert box[2].x == 0.
         assert box[2].y == 0.

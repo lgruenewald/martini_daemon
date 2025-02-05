@@ -69,10 +69,6 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     system_defined = False  # whether the [system] happened yet
 
-    # add all handlers
-    def TODO(tokens):
-        raise ValueError("Handler not implemented yet")
-
     def process_defaults(tokens):
         nb_type = unwrap(tokens, 0, "int")
         if nb_type != 1:
@@ -85,7 +81,6 @@ def DaemonTopFile(file, include_dir=None, defines={},
             raise ValueError("Too many fields in [ defaults ] directive")
 
     p.add_level("defaults", process_defaults)
-
 
     _last_molecule = None
 
@@ -221,9 +216,6 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 last_molecule().dihedrals.append(
                     (system.rb_torsion, i, j, k, l, params)
                 )
-            case 4:
-                # periodic improper dihedral TODO
-                raise NotImplementedError
             case 5:
                 # Fourier dihedral
                 params = []
@@ -309,7 +301,6 @@ def DaemonTopFile(file, include_dir=None, defines={},
             last_molecule().interactions.append((system.pairs, [i, j], []))
 
     p.add_level("pairs", process_pairs)
-    p.add_level("cmap", TODO)
 
     def process_atomtypes(tokens):
         if len(tokens) != 6:
@@ -328,11 +319,6 @@ def DaemonTopFile(file, include_dir=None, defines={},
         system.add_atom_type(type, charge, mass)
 
     p.add_level("atomtypes", process_atomtypes)
-    p.add_level("bondtypes", TODO)
-    p.add_level("angletypes", TODO)
-    p.add_level("dihedraltypes", TODO)
-    p.add_level("implicit_genborn_params", TODO)
-    p.add_level("cmaptypes", TODO)
 
     def process_nonbond_params(tokens):
         type1 = unwrap(tokens, 0, "word")
@@ -531,7 +517,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     p.add_level("frag_from", process_fragfrom)
 
-    # FIXME this is terrible, the current callback architecture is really
+    # TODO this is terrible, the current callback architecture is really
     # unsuitable for this
     last_reaction: ReactionTemplate = None
 
@@ -558,20 +544,15 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     def process_reactants(tokens):
         nonlocal last_reaction
-        r1 = unwrap(tokens, 0, "word")
-        last_reaction.r1 = r1
-        if len(tokens) == 2:
-            r2 = unwrap(tokens, 1, "word")
-            last_reaction.r2 = r2
-        elif len(tokens) > 2:
-            raise ValueError("Only up to two reactants are supported.")
+        rxs = [unwrap(tokens, i, "word") for i in range(len(tokens))]
+        last_reaction.reactants = rxs
 
     p.add_level("rx_reactants", process_reactants)
 
     def process_products(tokens):
         nonlocal last_reaction
-        p1 = unwrap(tokens, 0, "word")
-        last_reaction.p1 = p1
+        ps = [unwrap(tokens, i, "word") for i in range(len(tokens))]
+        last_reaction.products.append(ps)
 
     p.add_level("rx_products", process_products)
 
@@ -624,6 +605,9 @@ def DaemonTopFile(file, include_dir=None, defines={},
             case "limit":
                 limit = unwrap(tokens, 1, "int")
                 last_reaction.global_limit = limit
+            case "skip":
+                skip = unwrap(tokens, 1, "int")
+                last_reaction.skip = skip
             case _:
                 raise ValueError(f"Unknown key {key} in [rx_conditions]")
 
