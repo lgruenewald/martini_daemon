@@ -48,9 +48,9 @@ skip 1
 [moleculetype]
 ON 1
 [atoms]
-1 U 1 ON ON1 1 0.0 10.0
+1 P1 1 ON ON1 1 0.0 10.0
 
 [moleculetype]
 OFF 1
 [atoms]
-1 U 1 OFF OFF1 1 0.0 10.0
+1 C1 1 OFF OFF1 1 0.0 10.0

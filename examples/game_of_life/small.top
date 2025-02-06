@@ -6,18 +6,15 @@ game of life
 
 [molecules]
 ; line 1
-OFF 5
+OFF 4
 ; line 2
 OFF 1
 ON 2
-OFF 2
+OFF 1
 ; line 3
 OFF 2
 ON 2
-OFF 1
 ; line 4
 OFF 2
 ON 1
-OFF 2
-; line 5
-OFF 5
+OFF 1

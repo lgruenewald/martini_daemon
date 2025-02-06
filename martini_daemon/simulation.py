@@ -135,6 +135,8 @@ class DaemonSimulation():
                 n_types_per_reactant.append(n)
                 n_types *= n
             for i in range(n_types):
+                if i % 500000 == 0:
+                    self.log(f"currently doing combination {i} out of {n_types}")
                 frag_ids = []
                 remainder = i
                 cont = False
@@ -165,8 +167,8 @@ class DaemonSimulation():
                     # first skip atoms, and only skip the first skip atoms
                     # the other "reactants" were there only for the detection
                     if rx.skip is not None:
-                        frag_ids = frag_ids[:skip]
-                        frags = frags[:skip]
+                        frag_ids = frag_ids[:rx.skip]
+                        frags = frags[:rx.skip]
                     for j, frag_id in enumerate(frag_ids):
                         skip.add(frag_id)
                     reactions.append((frags, rx))

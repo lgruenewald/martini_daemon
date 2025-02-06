@@ -66,7 +66,7 @@ class TopParser:
     # which DEFINES were defined
     _defines: dict
     # current level similar to how openmm parses top files
-    _current_level: str
+    _current_level = None
     # TODO potential improvement: validate the nesting of levels to see if the
     # structure makes sense. It wouldn't change behavior on correct top files
     # but would enhance error messages on incorrect top files
