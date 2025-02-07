@@ -11,11 +11,11 @@ class BondReporter(Reporter):
     Does not report bonds that cross the periodic boundary conditions,
     once a daemon aware pbc whole is written perhaps this can change"""
 
-    def pre_steps(self, xtc_name):
+    def on_set_xtc_path(self, xtc_name):
         bonds_name = xtc_name + "_bonds.npy"
         backup_try(bonds_name)
 
-    def step(self, pos, box, xtc_name):
+    def on_xtc_frame(self, pos, box, xtc_name):
         bonds_name = xtc_name + "_bonds.npy"
         n = self._sysstar.len_particles()
 

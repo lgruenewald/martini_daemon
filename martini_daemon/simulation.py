@@ -46,18 +46,21 @@ class DaemonSimulation():
             out_path = sim_name + ".gro"
         if log_path is None:
             log_path = sim_name + ".log"
-        self.log_path = log_path
         backup_try(log_path)
-        logging.basicConfig(filename=log_path, level=logging.INFO)
         self.logger = logging.getLogger(__name__)
-        self.log("__init__ in DaemonSimulation")
-        self.log("Parsing start")
+        self.logger.setLevel(logging.INFO)
+        formatter = logging.Formatter("%(asctime)s %(message)s")
+        fh = logging.FileHandler(log_path)
+        fh.setFormatter(formatter)
+        self.logger.addHandler(fh)
+        self.logger.info("__init__ in DaemonSimulation")
+        self.logger.info("Parsing start")
         self.system, self.top = DaemonTopFile(
             top_path,
             include_dir=include_dir, defines=defines,
             epsilon_r=epsilon_r, nonbonded_cutoff=nonbonded_cutoff
         )
-        self.log("Parsing done")
+        self.logger.info("Parsing done")
         self.gro = GromacsGroFile(gro_path)
         if platform is not None:
             platform = mm.Platform.getPlatformByName(platform)
@@ -66,40 +69,41 @@ class DaemonSimulation():
             self.system.add_force(mm.MonteCarloBarostat(p, T))
         if remove_com_motion:
             self.system.add_force(mm.CMMotionRemover())
-        self.log("Building reaction matrix and initiator list")
+        self.logger.info("Building reaction matrix and initiator list")
         self.reaction_list = self.top.build_reaction_list()
         self.initiator_list = self.top.get_initiator_list()
-        self.log("Reaction matrix and initiator list built")
+        self.logger.info("Reaction matrix and initiator list built")
 
         integrator = mm.LangevinIntegrator(T, 10.0, dt)
         box = self.gro.getPeriodicBoxVectors()
 
-        self.log("Building context")
+        self.logger.info("Building context")
         if platform is not None:
             self.system.build_context(integrator, box, platform)
         else:
             self.system.build_context(integrator, box)
-        self.log("Context built")
+        self.logger.info("Context built")
 
-        self.log("Setting positions")
+        self.logger.info("Setting positions")
         self.system.set_positions(self.gro.getPositions(True))
         for rep in reporters:
             self.system.add_reporter(rep)
+            self.top.add_reporter(rep)
         # must set xtc path after adding reporters currently
         self.system.set_xtc_path(traj_path)
         self.system.write_xtc_frame()
         if generate_velocities:
-            self.log("Generating velocities")
+            self.logger.info("Generating velocities")
             self.system.generate_velocities(T)
         if minimize_energy:
-            self.log("Minimizing energy")
+            self.logger.info("Minimizing energy")
             self.system.minimize_energy()
         self.system.write_xtc_frame()
         self.max_steps = max_steps
         self.steps_per_step = steps_per_step
         self.traj_path = traj_path
         self.out_path = out_path
-        self.log("__init__ finished")
+        self.logger.info("__init__ finished")
 
     def simulate(self):
         self.i = 0
@@ -109,14 +113,14 @@ class DaemonSimulation():
         self.system.write_gro(self.out_path)
 
     def step(self):
-        self.log(f"step {self.i}, doing MD steps")
+        self.logger.info(f"step {self.i}, doing MD steps")
         self.system.do_steps(self.steps_per_step)
-        self.log(f"{self.steps_per_step} MD steps performed")
+        self.logger.info(f"{self.steps_per_step} MD steps performed")
         sys.stdout.write(f"\rStep {self.i+1:8} of {self.max_steps}   "
                          f"[reactions: {self.reactions}]")
         self.i += 1
 
-        self.log("Detection start")
+        self.logger.info("Detection start")
         pos, box = self.system.get_positions()
 
         reactions = []
@@ -139,7 +143,7 @@ class DaemonSimulation():
             for i in range(n_types):
                 if i > 0 and i % 5000000 == 0:
                     # logging for very slow D/M algos
-                    self.log(f"D algorithm ({i/n_types*100.0:.1f}%): currently doing combination {i} out of {n_types}")
+                    self.logger.info(f"D algorithm ({i/n_types*100.0:.1f}%): currently doing combination {i} out of {n_types}")
                 frag_ids = []
                 frags = []
                 frag_names = []
@@ -189,12 +193,12 @@ class DaemonSimulation():
                         skip.add((frag_names[j], frag_id))
                     reactions.append((frags, rx))
 
-        self.log("Detection finished")
+        self.logger.info("Detection finished")
         if len(reactions) == 0:
             return
 
-        self.log("Modification start")
-        self.top.pre_modification()
+        self.logger.info("Modification start")
+        self.top.pre_modification(reactions)
         # Modification algorithm
         for (frags, rx) in reactions:
             self.reactions += 1
@@ -203,13 +207,10 @@ class DaemonSimulation():
 
         # reinitialize context, initator list
         self.initiator_list = self.top.get_initiator_list()
-        self.log("Modification finished")
-        self.log("reinitializing")
+        self.logger.info("Modification finished")
+        self.logger.info("reinitializing")
         self.system.reinitialize()
-        self.log("reinitialized")
-
-    def log(self, message):
-        self.logger.info(f"{datetime.now()} {message}")
+        self.logger.info("reinitialized")
 
 
 if __name__ == "__main__":

@@ -1,35 +1,11 @@
 #!/usr/bin/env python3
-"""
-topstar.py
-
-TLDR: - topology is a list of fragment types, reaction templates and fragments
-      - fragments are a group of atoms and their internal interactions
-      - reaction templates are fragment based rules used by the D/M algorithm
-      to do reactions
-
-topology is an object that contains the following information:
-- list of fragment types
-    - can be molecules (with bond, angle, etc. strengths), all the information
-        needed to instantiate a new molecule in the system basically, except
-        the coordinates of particles (similar to a single molecule in itp)
-    - can be frag's, which are just mappings to define "subfragments" within
-        a molecule
-- list of reaction templates
-    - reaction name, reactants, products, distance cutoff, constraints,
-        initator atom indicies
-    - no longer contains a "remapping" of atoms from product->reactant
-        as that can be achieved by just using a .frag fragment to "remap" and
-        then just use the .frag fragment as the reactant rather than .itp one
-- list of fragments
-    - list of fragments currently in the system
-    - "defrag list" - backmapping of particles to fragments that contain them
-"""
 from dataclasses import dataclass
 from .sysstar import SysStar
 from .forces.force import Force, Interaction
 from fnmatch import fnmatch
 from .utils import pdist, pcos_angle, pdihedral
 import random
+from .reporters.reporter import Reporter
 
 random.seed()
 
@@ -151,7 +127,6 @@ class Fragment():
 
 
 class TopStar():
-    # === Live molecule/fragment information ===
     # T* fragment and defrag list
     frag_list: dict[int, Fragment]
     next_frag_id: int
@@ -159,19 +134,18 @@ class TopStar():
     # type: list[list[frag_id]]
     defrag_list: list[list[(str, int)]]
 
-    # === Fragment Types ===
     # type name -> list of subfrag names
     subfrag_map: dict[str, list[str]]
 
     # type name -> type
     type_lookup: dict[str, FragFragment | MolFragment]
 
-    # === Reaction templates ===
     reaction_list: list[ReactionTemplate]
-
     reactive_types: set[str]
 
     system: SysStar
+
+    reporters: list[Reporter]
 
     def __init__(self, system):
         self.frag_list = {}
@@ -183,7 +157,11 @@ class TopStar():
         self.type_lookup = {}
         self.subfrag_map = {}
         self.reactive_types = set()
+        self.reporters = []
         self.system = system
+
+    def add_reporter(self, reporter):
+        self.reporters.append(reporter)
 
     def new_mol_fragment(self, name: str):
         if self.type_lookup.get(name):
@@ -425,6 +403,8 @@ class TopStar():
     def pre_detection(self):
         for rx in self.reaction_list:
             rx.global_counter = 0
+        for reporter in self.reporters:
+            reporter.pre_detection()
 
     def detection(self,
                   reactants: list[Fragment],
@@ -498,10 +478,11 @@ class TopStar():
         rx.global_counter += 1
         return True
 
-    def pre_modification(self):
+    def pre_modification(self, rx_list: list[(list, ReactionTemplate)]):
         # hook that gets called after detection, before modification
         # only called if there is any modification going on
-        pass
+        for reporter in self.reporters:
+            reporter.pre_modification(rx_list)
 
     def modification(self, frags: list[Fragment], rx: ReactionTemplate):
         """Modification helper for the D/M algorithm
@@ -577,7 +558,8 @@ class TopStar():
 
     def post_modification(self):
         # hook that only gets called after modification
-        pass
+        for reporter in self.reporters:
+            reporter.post_modification()
 
     def build_reaction_list(self):
         return self.reaction_list

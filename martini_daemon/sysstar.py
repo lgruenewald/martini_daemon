@@ -251,7 +251,7 @@ class SysStar():
         pos, box = self.get_positions()
         self._xtc.writeModel(pos)
         for reporter in self.reporters:
-            reporter.step(pos, box, self._xtc_name)
+            reporter.on_xtc_frame(pos, box, self._xtc_name)
 
     def do_steps(self, steps):
         if not self.context_initialized:
@@ -304,7 +304,7 @@ class SysStar():
             raise Exception("Xtc path must end with .xtc")
         backup_try(path)
         for reporter in self.reporters:
-            reporter.pre_steps(path[:-4])
+            reporter.on_set_xtc_path(path[:-4])
         mmtopol = mmapp.Topology()
         mmtopol._numAtoms = self.len_particles()
         mmtopol._periodicBoxVectors = self._periodic_box
@@ -343,7 +343,7 @@ class SysStar():
                 f"{v2[0]:.4f} {v2[2]:.4f} {v3[0]:.4f} {v3[1]:.4f}\n"
             )
         for reporter in self.reporters:
-            reporter.final(pos, box, path[:-4])
+            reporter.on_write_gro(pos, box, path[:-4])
 
     def dump(self):
         backup_try("sys.dump")

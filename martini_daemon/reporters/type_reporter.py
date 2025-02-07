@@ -8,11 +8,11 @@ class TypeReporter(Reporter):
         Reporter that reports on the LJ types (with numerical indices)
     """
 
-    def pre_steps(self, xtc_name):
+    def on_set_xtc_path(self, xtc_name):
         bonds_name = xtc_name + "_types.npy"
         backup_try(bonds_name)
 
-    def step(self, pos, box, xtc_name):
+    def on_xtc_frame(self, pos, box, xtc_name):
         bonds_name = xtc_name + "_types.npy"
         n = self._sysstar.len_particles()
 

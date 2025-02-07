@@ -8,11 +8,11 @@ class ChargeReporter(Reporter):
         Reporter that reports on the charge
     """
 
-    def pre_steps(self, xtc_name):
+    def on_set_xtc_path(self, xtc_name):
         filename = xtc_name + "_charges.npy"
         backup_try(filename)
 
-    def step(self, pos, box, xtc_name):
+    def on_xtc_frame(self, pos, box, xtc_name):
         filename = xtc_name + "_charges.npy"
         n = self._sysstar.len_particles()
 

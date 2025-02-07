@@ -3,13 +3,13 @@
 import os
 import sys
 import time
-from datetime import datetime
 import json
 import numpy as np
 import platform
 import psutil
 import subprocess
 import openmm.version
+import logging
 
 from martini_daemon.simulation import DaemonSimulation
 from martini_daemon.utils import backup_try
@@ -19,14 +19,18 @@ backup_try(result_path)
 mm_platform = "CUDA"
 
 
-def bprint(message, yellow=False, file_only=False):
-    with open(result_path, "a") as f:
-        print(f"[{datetime.now()}]", message, file=f)
-    if not file_only:
-        if yellow:
-            print("\x1b[1;33m" + message + "\x1b[0m")
-        else:
-            print(message)
+logger = logging.getLogger(__name__)
+time_formatter = logging.Formatter("%(asctime)s %(message)s")
+message_only = logging.Formatter("%(message)s")
+fh = logging.FileHandler(result_path)
+fh.setLevel(logging.DEBUG)
+fh.setFormatter(time_formatter)
+sh = logging.StreamHandler(sys.stdout)
+sh.setLevel(logging.INFO)
+sh.setFormatter(message_only)
+logger.setLevel(logging.DEBUG)
+logger.addHandler(fh)
+logger.addHandler(sh)
 
 
 def test_daemon(reactive, data):
@@ -63,16 +67,17 @@ def bench_function(function, args, benchmark, label, n=3):
         start = time.time()
         function(*args)
         end = time.time()
-        bprint(f"{benchmark}/{label}/{i}:{end-start:.2f}s")
+        logger.info(f"{benchmark} {label} run {i}: {end-start:.2f} s")
         times.append(end - start)
     times = np.array(times)
 
     mean = np.mean(times)
-    stdev = np.std(times)
+    stddev = np.std(times)
     max = np.max(times)
     min = np.min(times)
-    bprint(f"{benchmark}/{label} runs:{n} avg:{mean:.2f}s [{max:.2f}s..{min:.2f}s] "
-           f"std:{stdev:.2f}s", yellow=True)
+    logger.info(f"{benchmark} {label} runs: {n} avg: {mean:.2f} s "
+                f"[{max:.2f} s .. {min:.2f} s] "
+                f"std dev: {stddev:.2f} s")
     return mean
 
 
@@ -96,17 +101,14 @@ def get_gpu_stats():
 
 
 # print data about hardware and current utilization of resources
-bprint("== System information ==", file_only=True)
-bprint(f"{platform.platform()}", file_only=True)  # OS info
-bprint(f"CPU model: {get_cpu_model()}", file_only=True)  # CPU model
-bprint(f"CPU percent used {psutil.cpu_percent()}%", file_only=True)  # current CPU utilization
-mem = psutil.virtual_memory()
-bprint(f"RAM total {mem.total / 1024**3:.1f}G - used {mem.percent}%", file_only=True)  # RAM amount, utilization
-bprint(f"{get_gpu_stats()}", file_only=True)  # All GPU data we need
-# gromacs and openmm data (TODO more?)
-bprint("== Software information ==", file_only=True)
-bprint(f"OpenMM version: {openmm.version.version}", file_only=True)
-bprint(f"OpenMM platform being used: {mm_platform}")  # most relevant info, print it to the stdout as well
+logger.debug("== System information ==")
+logger.debug(f"{platform.platform()}")
+logger.debug(f"CPU model: {get_cpu_model()} utilization {psutil.cpu_percent()}%")
+logger.debug(f"{get_gpu_stats()}")
+logger.debug("== Software information ==")
+logger.debug(f"OpenMM version: {openmm.version.version}")
+logger.debug(f"OpenMM platform being used: {mm_platform}")
+logger.debug("")
 
 # run the benchmarks
 
@@ -116,9 +118,8 @@ argc = len(argv)
 benchmarks = os.listdir(os.curdir)
 
 if argc > 1:
-    tests = argv[1:]
+    benchmarks = argv[1:]
 
-result_path = "../" + result_path
 for x in benchmarks:
     if os.path.isdir(x):
         os.chdir(x)
@@ -130,13 +131,13 @@ for x in benchmarks:
         if data.get("category") == "slow":
             n = 1
 
-        bprint(f"== Benchmark {x} ==", yellow=True)
+        logger.info(f"Benchmark {x}")
         bench_function(test_gromacs, [data], x, "gromacs", n=n)
         daemon_time = bench_function(test_daemon, [True, data], x, "daemon with reactions", n=n)
         no_reaction_time = bench_function(test_daemon, [False, data], x, "daemon without reactions", n=n)
 
         percent = (daemon_time - no_reaction_time) / no_reaction_time * 100
-        bprint(f"Reactions cost a {percent:.1f}% slowdown", yellow=True)
+        logger.info(f"Reactions cost a {percent:.1f}% slowdown")
 
         os.system("../cleanup.sh")
         os.chdir("..")

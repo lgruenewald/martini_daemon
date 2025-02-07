@@ -1,7 +1,10 @@
 More flexible templates
 
+- reoptimize D algo for n reactants
+
 - allow constructing fragments based on graphs, even without explicitly mentioning
 the parent fragment name
+  - allow "negative" constraints in these graphs (e.g. not bonded to X, bonded to up to n instances of Y)
 - indexing in products, conditions should be 2D
 - fragments with variable number of atoms, out of index reads in reaction templates
   should be ignored, if they are marked with a ?
@@ -28,7 +31,6 @@ the parent fragment name
 - error on attempts to break constraints/vsites before running the simulation
 
 Better logging and reporting
-- use python's built in logging
 - T* reporters
 - reporter that reports the number of fragments
 - reporter that reports reactions (including frame id)
