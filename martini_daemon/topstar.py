@@ -442,12 +442,15 @@ class TopStar():
         # fragments that were removed cannot react any more
 
         # overlapping fragments can never react:
+
         particles = []
+        pset = set()
         for r in reactants:
             for p in r.particles:
-                if p in particles:
+                if p in pset:
                     return False
-                particles.append(p)
+                pset.add(p)
+            particles += r.particles
 
         # limiter checks, first for performance
         if rx.global_limit is not None and rx.global_counter >= rx.global_limit:

@@ -12,8 +12,8 @@ from openmm.app import GromacsGroFile
 from openmm.unit import femtosecond, nanometer
 from datetime import datetime
 from .utils import backup_try
-import operator
-from functools import reduce
+from math import isclose
+import logging
 
 
 class DaemonSimulation():
@@ -48,6 +48,8 @@ class DaemonSimulation():
             log_path = sim_name + ".log"
         self.log_path = log_path
         backup_try(log_path)
+        logging.basicConfig(filename=log_path, level=logging.INFO)
+        self.logger = logging.getLogger(__name__)
         self.log("__init__ in DaemonSimulation")
         self.log("Parsing start")
         self.system, self.top = DaemonTopFile(
@@ -114,7 +116,7 @@ class DaemonSimulation():
                          f"[reactions: {self.reactions}]")
         self.i += 1
 
-        self.log("Running the detection algorithm")
+        self.log("Detection start")
         pos, box = self.system.get_positions()
 
         reactions = []
@@ -135,32 +137,46 @@ class DaemonSimulation():
                 n_types_per_reactant.append(n)
                 n_types *= n
             for i in range(n_types):
-                if i % 500000 == 0:
-                    self.log(f"currently doing combination {i} out of {n_types}")
+                if i > 0 and i % 5000000 == 0:
+                    # logging for very slow D/M algos
+                    self.log(f"D algorithm ({i/n_types*100.0:.1f}%): currently doing combination {i} out of {n_types}")
                 frag_ids = []
+                frags = []
+                frag_names = []
                 remainder = i
                 cont = False
                 for rid in range(n_reactants):
                     frag_id = remainder % n_types_per_reactant[rid]
+                    frag = self.initiator_list[rx.reactants[rid]][frag_id]
+                    frag_name = frag.name
                     remainder = remainder // n_types_per_reactant[rid]
-                    # continue if skip
-                    if frag_id in skip:
+                    # continue if skip before skip cutoff is in skip
+                    if (rx.skip is None or rid < rx.skip) and (frag_name, frag_id) in skip:
                         cont = True
                         break
                     # frag id's must be in order if the name is the same to
                     # prevent double counting and self reaction
                     for prev_rid, prev_frag_id in enumerate(frag_ids):
+                        # always ban self reaction
                         if rx.reactants[rid] == rx.reactants[prev_rid] and \
-                                frag_id <= prev_frag_id:
+                                frag_id == prev_frag_id:
                             cont = True
                             break
+                        # don't cross the skip boundary here
+                        if rx.skip is not None and prev_rid < rx.skip and rid >= rx.skip:
+                            continue
+                        # order them well, if it doesn't cross a skip boundary
+                        if rx.reactants[rid] == rx.reactants[prev_rid] and \
+                                frag_id < prev_frag_id:
+                            cont = True
+                            break
+                    if cont:
+                        break
                     frag_ids.append(frag_id)
+                    frags.append(frag)
+                    frag_names.append(frag_name)
                 if cont:
                     continue
-                frags = []
-                for rid, frag_id in enumerate(frag_ids):
-                    frag = self.initiator_list[rx.reactants[rid]][frag_id]
-                    frags.append(frag)
                 # detection
                 if self.top.detection(frags, rx, pos, box):
                     # if rx.skip is defined, only run the modification on the
@@ -170,14 +186,14 @@ class DaemonSimulation():
                         frag_ids = frag_ids[:rx.skip]
                         frags = frags[:rx.skip]
                     for j, frag_id in enumerate(frag_ids):
-                        skip.add(frag_id)
+                        skip.add((frag_names[j], frag_id))
                     reactions.append((frags, rx))
 
         self.log("Detection finished")
         if len(reactions) == 0:
             return
 
-        self.log(f"Doing the modification algorithm {reactions}")
+        self.log("Modification start")
         self.top.pre_modification()
         # Modification algorithm
         for (frags, rx) in reactions:
@@ -193,8 +209,7 @@ class DaemonSimulation():
         self.log("reinitialized")
 
     def log(self, message):
-        with open(self.log_path, "a") as file:
-            print(datetime.now(), message, file=file)
+        self.logger.info(f"{datetime.now()} {message}")
 
 
 if __name__ == "__main__":
