@@ -29,12 +29,6 @@ the parent fragment name
 - allow changing of vsite and constraint parameters this way
 - error on attempts to break constraints/vsites before running the simulation
 
-Better logging and reporting
-- T* reporters
-- reporter that reports the number of fragments
-- reporter that reports reactions (including frame id)
-- reporter that dumps T* every D/M run (including frame id)
-
 Benchmarking polyurethane - 3 variables to create different benchmarks
 - D/M frequency
 - dilution

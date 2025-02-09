@@ -400,11 +400,11 @@ class TopStar():
         for frag in frags:
             self.remove_fragment(frag)
 
-    def pre_detection(self):
+    def pre_detection(self, i):
         for rx in self.reaction_list:
             rx.global_counter = 0
         for reporter in self.reporters:
-            reporter.pre_detection()
+            reporter.pre_detection(i)
 
     def detection(self,
                   reactants: list[Fragment],
@@ -478,11 +478,11 @@ class TopStar():
         rx.global_counter += 1
         return True
 
-    def pre_modification(self, rx_list: list[(list, ReactionTemplate)]):
+    def pre_modification(self, rx_list: list[(list, ReactionTemplate)], i):
         # hook that gets called after detection, before modification
         # only called if there is any modification going on
         for reporter in self.reporters:
-            reporter.pre_modification(rx_list)
+            reporter.pre_modification(rx_list, i)
 
     def modification(self, frags: list[Fragment], rx: ReactionTemplate):
         """Modification helper for the D/M algorithm
@@ -556,11 +556,10 @@ class TopStar():
                 )
             assert product_particle_index == len(product_particles)
 
-    def post_modification(self):
+    def post_modification(self, i):
         # hook that only gets called after modification
-        self.dump("top.dump")
         for reporter in self.reporters:
-            reporter.post_modification()
+            reporter.post_modification(i)
     
     def get_init_map(self):
         init_map: dict[str, list[int]] = {}
@@ -660,8 +659,8 @@ class TopStar():
 
         return reactions, skip, False
 
-    def detection_modification(self):
-        self.pre_detection()
+    def detection_modification(self, i):
+        self.pre_detection(i)
         init_map = self.get_init_map()
         pos, box = self.system.get_positions()
         # tree of frag combinations to check
@@ -671,10 +670,10 @@ class TopStar():
 
         if len(reactions) == 0:
             return 0
-        self.pre_modification(reactions)
+        self.pre_modification(reactions, i)
         for (frags, rx) in reactions:
             self.modification(frags, rx)
-        self.post_modification()
+        self.post_modification(i)
         return len(reactions)
 
     def dump(self, path):

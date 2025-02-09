@@ -24,7 +24,6 @@ class DaemonSimulation():
     init_list: list[Fragment]
     init_map: dict[str, list[int]]
 
-    i: int = 0
     reactions: int = 0
     max_steps: int
     steps_per_step: int
@@ -86,15 +85,17 @@ class DaemonSimulation():
             self.system.add_reporter(rep)
             self.top.add_reporter(rep)
         # must set xtc path after adding reporters currently
+        self.logger.info("Writing initial positions to XTC")
         self.system.set_xtc_path(traj_path)
-        self.system.write_xtc_frame()
+        self.system.write_xtc_frame(0)
         if generate_velocities:
             self.logger.info("Generating velocities")
             self.system.generate_velocities(T)
         if minimize_energy:
             self.logger.info("Minimizing energy")
             self.system.minimize_energy()
-        self.system.write_xtc_frame()
+            self.logger.info("Writing energy minimized positions to XTC")
+            self.system.write_xtc_frame(0)
         self.max_steps = max_steps
         self.steps_per_step = steps_per_step
         self.traj_path = traj_path
@@ -104,24 +105,34 @@ class DaemonSimulation():
     def simulate(self):
         self.i = 0
         for i in range(self.max_steps):
-            self.step()
+            self.step(i, self.max_steps)
         print()
         self.system.write_gro(self.out_path)
 
-    def step(self):
+    def step(self, i=0, max_steps=0):
+        """
+            Do a step of the following:
+            - self.steps_per_step MD steps
+            - D/M algorithm
+            - reinitialize system
+            - write an XTC frame
+        """
         self.logger.info(f"step {self.i}:")
         self.logger.info("MD start")
         self.system.do_steps(self.steps_per_step)
         self.logger.info("MD finished")
-        sys.stdout.write(f"\rStep {self.i+1:8} of {self.max_steps}   "
-                         f"[reactions: {self.reactions}]")
-        self.i += 1
+        if max_steps > 0:
+            sys.stdout.write(f"\rStep {i:8} of {self.max_steps}   "
+                             f"[reactions: {self.reactions}]")
         self.logger.info("D/M start")
-        self.reactions += self.top.detection_modification()
+        self.reactions += self.top.detection_modification(i)
         self.logger.info("D/M finished")
         self.logger.info("reinitialize start")
         self.system.reinitialize()
         self.logger.info("reinitialize finished")
+        self.logger.info("XTC write start")
+        self.system.write_xtc_frame(self.steps_per_step)
+        self.logger.info("XTC write finished")
 
 
 if __name__ == "__main__":

@@ -247,8 +247,9 @@ class SysStar():
     def add_reporter(self, reporter):
         self.reporters.append(reporter)
 
-    def write_xtc_frame(self):
+    def write_xtc_frame(self, interval):
         pos, box = self.get_positions()
+        self._xtc.interval = interval
         self._xtc.writeModel(pos)
         for reporter in self.reporters:
             reporter.on_xtc_frame(pos, box, self._xtc_name)
@@ -257,9 +258,6 @@ class SysStar():
         if not self.context_initialized:
             raise Exception("Initialize the context first")
         self._integrator.step(steps)
-        if self._xtc is not None:
-            self._xtc.interval = steps
-            self.write_xtc_frame()
 
     def get_positions(self):
         if not self.context_initialized:

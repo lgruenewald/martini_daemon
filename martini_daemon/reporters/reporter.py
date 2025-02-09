@@ -3,6 +3,11 @@ class Reporter():
     def __init__(self, sysstar, topstar):
         self._sysstar = sysstar
         self._topstar = topstar
+        self.init()
+
+    def init(self):
+        # called in __init__
+        pass
 
     def on_set_xtc_path(self, xtc_name):
         # called when xtc_name is first known, before writing any xtc
@@ -20,17 +25,17 @@ class Reporter():
         # of the gro file without the .gro extension
         pass
 
-    def pre_detection(self):
+    def pre_detection(self, frame_index):
         # called before the D algorithm runs
         pass
 
-    def pre_modification(self, reactions):
+    def pre_modification(self, reactions, frame_index):
         # called before the modification algorithm with a list of reactions
         # to be processed in the modification algorithm
         # only called if len(reactions) > 0
         pass
 
-    def post_modification(self):
+    def post_modification(self, frame_index):
         # called after the modification algorithm, before the system is
         # reinitialized. Only runs if there were reactions.
         pass
