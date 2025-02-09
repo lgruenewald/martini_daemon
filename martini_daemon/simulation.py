@@ -10,9 +10,7 @@ import sys
 import openmm as mm
 from openmm.app import GromacsGroFile
 from openmm.unit import femtosecond, nanometer
-from datetime import datetime
 from .utils import backup_try
-from math import isclose
 import logging
 
 
@@ -23,7 +21,8 @@ class DaemonSimulation():
     gro: GromacsGroFile
 
     reaction_list: list[ReactionTemplate]
-    initiator_list: dict[str, list[Fragment]]
+    init_list: list[Fragment]
+    init_map: dict[str, list[int]]
 
     i: int = 0
     reactions: int = 0
@@ -71,7 +70,7 @@ class DaemonSimulation():
             self.system.add_force(mm.CMMotionRemover())
         self.logger.info("Building reaction matrix and initiator list")
         self.reaction_list = self.top.build_reaction_list()
-        self.initiator_list = self.top.get_initiator_list()
+        self.init_list, self.init_map = self.top.get_initiator_list()
         self.logger.info("Reaction matrix and initiator list built")
 
         integrator = mm.LangevinIntegrator(T, 10.0, dt)
@@ -113,104 +112,19 @@ class DaemonSimulation():
         self.system.write_gro(self.out_path)
 
     def step(self):
-        self.logger.info(f"step {self.i}, doing MD steps")
+        self.logger.info(f"step {self.i}:")
+        self.logger.info("MD start")
         self.system.do_steps(self.steps_per_step)
-        self.logger.info(f"{self.steps_per_step} MD steps performed")
+        self.logger.info("MD finished")
         sys.stdout.write(f"\rStep {self.i+1:8} of {self.max_steps}   "
                          f"[reactions: {self.reactions}]")
         self.i += 1
-
-        self.logger.info("Detection start")
-        pos, box = self.system.get_positions()
-
-        reactions = []
-        skip = set()
-        self.top.pre_detection()
-        # Detection algorithm, generic for all reacting molecule amounts
-        for rx in self.reaction_list:
-            # get a product of possible reactant combinations
-            n_reactants = len(rx.reactants)
-            n_types_per_reactant = []  # how many frags of such reactant are in the system
-            n_types = 1
-            for r in rx.reactants:
-                if self.initiator_list.get(r) is None:
-                    # reaction isn't possible, no reactant available
-                    n_types = 0
-                    break
-                n = len(self.initiator_list[r])
-                n_types_per_reactant.append(n)
-                n_types *= n
-            for i in range(n_types):
-                if i > 0 and i % 5000000 == 0:
-                    # logging for very slow D/M algos
-                    self.logger.info(f"D algorithm ({i/n_types*100.0:.1f}%): currently doing combination {i} out of {n_types}")
-                frag_ids = []
-                frags = []
-                frag_names = []
-                remainder = i
-                cont = False
-                for rid in range(n_reactants):
-                    frag_id = remainder % n_types_per_reactant[rid]
-                    frag = self.initiator_list[rx.reactants[rid]][frag_id]
-                    frag_name = frag.name
-                    remainder = remainder // n_types_per_reactant[rid]
-                    # continue if skip before skip cutoff is in skip
-                    if (rx.skip is None or rid < rx.skip) and (frag_name, frag_id) in skip:
-                        cont = True
-                        break
-                    # frag id's must be in order if the name is the same to
-                    # prevent double counting and self reaction
-                    for prev_rid, prev_frag_id in enumerate(frag_ids):
-                        # always ban self reaction
-                        if rx.reactants[rid] == rx.reactants[prev_rid] and \
-                                frag_id == prev_frag_id:
-                            cont = True
-                            break
-                        # don't cross the skip boundary here
-                        if rx.skip is not None and prev_rid < rx.skip and rid >= rx.skip:
-                            continue
-                        # order them well, if it doesn't cross a skip boundary
-                        if rx.reactants[rid] == rx.reactants[prev_rid] and \
-                                frag_id < prev_frag_id:
-                            cont = True
-                            break
-                    if cont:
-                        break
-                    frag_ids.append(frag_id)
-                    frags.append(frag)
-                    frag_names.append(frag_name)
-                if cont:
-                    continue
-                # detection
-                if self.top.detection(frags, rx, pos, box):
-                    # if rx.skip is defined, only run the modification on the
-                    # first skip atoms, and only skip the first skip atoms
-                    # the other "reactants" were there only for the detection
-                    if rx.skip is not None:
-                        frag_ids = frag_ids[:rx.skip]
-                        frags = frags[:rx.skip]
-                    for j, frag_id in enumerate(frag_ids):
-                        skip.add((frag_names[j], frag_id))
-                    reactions.append((frags, rx))
-
-        self.logger.info("Detection finished")
-        if len(reactions) == 0:
-            return
-
-        self.logger.info("Modification start")
-        self.top.pre_modification(reactions)
-        # Modification algorithm
-        for (frags, rx) in reactions:
-            self.reactions += 1
-            self.top.modification(frags, rx)
-        self.top.post_modification()
-
-        # reinitialize context, initator list
-        self.initiator_list = self.top.get_initiator_list()
-        self.logger.info("Modification finished")
-        self.logger.info("reinitializing")
+        self.logger.info("D/M start")
+        self.reactions += self.top.detection_modification()
+        self.logger.info("D/M finished")
+        self.logger.info("reinitialize start")
         self.system.reinitialize()
-        self.logger.info("reinitialized")
+        self.logger.info("reinitialize finished")
 
 
 if __name__ == "__main__":

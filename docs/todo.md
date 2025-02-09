@@ -1,6 +1,5 @@
 More flexible templates
 
-- reoptimize D algo for n reactants
 
 - allow constructing fragments based on graphs, even without explicitly mentioning
 the parent fragment name
