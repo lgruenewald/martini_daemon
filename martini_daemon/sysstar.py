@@ -244,8 +244,8 @@ class SysStar():
             self._forces_list.append(force)
             return False
 
-    def add_reporter(self, reporter_class):
-        self.reporters.append(reporter_class(self))
+    def add_reporter(self, reporter):
+        self.reporters.append(reporter)
 
     def write_xtc_frame(self):
         pos, box = self.get_positions()

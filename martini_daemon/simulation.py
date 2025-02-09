@@ -68,10 +68,6 @@ class DaemonSimulation():
             self.system.add_force(mm.MonteCarloBarostat(p, T))
         if remove_com_motion:
             self.system.add_force(mm.CMMotionRemover())
-        self.logger.info("Building reaction matrix and initiator list")
-        self.reaction_list = self.top.build_reaction_list()
-        self.init_list, self.init_map = self.top.get_initiator_list()
-        self.logger.info("Reaction matrix and initiator list built")
 
         integrator = mm.LangevinIntegrator(T, 10.0, dt)
         box = self.gro.getPeriodicBoxVectors()
@@ -86,6 +82,7 @@ class DaemonSimulation():
         self.logger.info("Setting positions")
         self.system.set_positions(self.gro.getPositions(True))
         for rep in reporters:
+            rep = rep(self.system, self.top)
             self.system.add_reporter(rep)
             self.top.add_reporter(rep)
         # must set xtc path after adding reporters currently

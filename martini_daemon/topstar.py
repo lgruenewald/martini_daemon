@@ -558,20 +558,18 @@ class TopStar():
 
     def post_modification(self):
         # hook that only gets called after modification
+        self.dump("top.dump")
         for reporter in self.reporters:
             reporter.post_modification()
     
-    def get_initiator_list(self):
-        init_list: list[Fragment] = []
+    def get_init_map(self):
         init_map: dict[str, list[int]] = {}
-        for _, frag in self.frag_list.items():
-            init_list.append(frag)
-            id = len(init_list) - 1
+        for key, frag in self.frag_list.items():
             if init_map.get(frag.name) is None:
                 init_map[frag.name] = []
-            init_map[frag.name].append(id)
+            init_map[frag.name].append(key)
 
-        return (init_list, init_map)
+        return init_map
 
     def get_reaction_tree(self):
         tree = {}
@@ -585,34 +583,53 @@ class TopStar():
                     reactant = "*" + reactant
                 if node.get(reactant) is None:
                     node[reactant] = {}
-                node = tree[reactant]
+                node = node[reactant]
             node["_reaction"] = rx
         return tree
 
     def detection_over_types(
             self,
             reactions, skip, node, previous_types, previous_indices,
-            init_list, init_map, pos, box
+            init_map, pos, box
             ):
         """
             Runs the detection algorithm over a single node in the reaction
             "tree".
 
             reactions - dynamic list of reactions that passed the D algo
-            skip - dynamic set of indices in init_list that already reacted
+            skip - dynamic set of indices in self.frag_list that already reacted
             so they cannot any more
             node - (sub)tree of reaction types left to check
             previous_types - reactant types already checked
             previous_indicies - indicies in init_map[reactant_type] that were
             already checked
-            init_list - list of all fragments
             init_map - dict of reactant_type -> list of indicies of that type
-            in init_list
+            in self.frag_list
             pos - numpy array of positions
             box - periodic box info
         """
 
         for next_reactant, next_node in node.items():
+            if next_reactant == "_reaction":
+                # convert init_map indices to init_list indices
+                frag_ids = [init_map[name.lstrip("*")][id] for name, id in 
+                            zip(previous_types, previous_indices)]
+                frags = [self.frag_list[i] for i in frag_ids]
+                rx = next_node
+                if self.detection(frags, rx, pos, box):
+                    # only until rx.skip do we add things to skip and rxs
+                    # the rest are only for self.detection but nothing after
+                    if rx.skip is not None:
+                        frag_ids = frag_ids[:rx.skip]
+                        frags = frags[:rx.skip]
+                    for frag_id in frag_ids:
+                        skip.add(frag_id)
+                    reactions.append((frags, rx))
+                    return reactions, skip, True
+
+            if init_map.get(next_reactant.lstrip("*")) is None:
+                continue
+                
             # find out where to start indexing from
             # this also works well with the * hack for rx.skip
             # this used to be the if j <= i: continue check
@@ -622,46 +639,34 @@ class TopStar():
                 if next_reactant == prev_reactant:
                     start_at = max(start_at, previous_indices[i] + 1)
             # go over all options for the next_reactant type
-            for j in range(start_at, len(init_map[next_reactant])):
+            for j in range(start_at, len(init_map[next_reactant.lstrip("*")])):
                 # skip is a set of init_list indices that already reacted
-                if init_map[next_reactant][j] in skip:
+                # only check it if the current reactant is before rx.skip => not *
+                if next_reactant[0] != "*" and init_map[next_reactant][j] in skip:
                     continue
                 previous_types.append(next_reactant)
                 previous_indices.append(j)
-                if next_reactant == "_reaction":
-                    # convert init_map indices to init_list indices
-                    frag_ids = [init_map[name][id] for name, id in 
-                                zip(previous_types, previous_indices)]
-                    frags = [init_list[i] for i in frag_ids]
-                    rx = next_node
-                    if self.detection(frags, rx, pos, box):
-                        # only until rx.skip do we add things to skip and rxs
-                        # the rest are only for self.detection but nothing after
-                        if rx.skip is not None:
-                            frag_ids = frag_ids[:rx.skip]
-                            frags = frags[:rx.skip]
-                        for frag_id in frag_ids:
-                            skip.add(frag_id)
-                        reactions.append((frags, rx))
-                else:
-                    reactions, skip = self.detection_over_types(
-                        reactions, skip, next_node,
-                        previous_types, previous_indices,
-                        init_list, init_map, pos, box
-                    )
+                reactions, skip, reacted = self.detection_over_types(
+                    reactions, skip, next_node,
+                    previous_types, previous_indices,
+                    init_map, pos, box
+                )
                 previous_types.pop(-1)
                 previous_indices.pop(-1)
+                if reacted and len(previous_indices) > 0:
+                    # there was a reaction, so previous_indices[0] is now
+                    # skipped, so we can jump up all the way to root
+                    return reactions, skip, True
 
-        return reactions, skip
+        return reactions, skip, False
 
     def detection_modification(self):
         self.pre_detection()
-        init_list, init_map = self.get_initiator_list()
+        init_map = self.get_init_map()
         pos, box = self.system.get_positions()
         # tree of frag combinations to check
-        tree = self.get_reaction_tree()
-        reactions, skip = self.detection_over_types(
-            [], set(), tree, [], [], init_list, init_map, pos, box
+        reactions, skip, _ = self.detection_over_types(
+            [], set(), self.get_reaction_tree(), [], [], init_map, pos, box
         )
 
         if len(reactions) == 0:
@@ -681,7 +686,7 @@ class TopStar():
             file.write("\n")
             print("==== TopStar / ReactionTemplates ====", file=file)
             for rx in self.reaction_list:
-                print(f"rx {rx.name} r1 {rx.r1} r2 {rx.r2} products {rx.products}", file=file)
+                print(f"rx {rx.name} reactants {rx.reactants} products {rx.products}", file=file)
             print("==== TopStar / Fragments ====", file=file)
             for id, frag in self.frag_list.items():
                 print(f"{id}: <frag {frag.name} ps {frag.particles}>", file=file)
