@@ -109,9 +109,8 @@ class DaemonSimulation():
         self.logger.info("__init__ finished")
 
     def simulate(self):
-        self.i = 0
         for i in range(self.max_steps):
-            self.step(i, self.max_steps)
+            self.step(i+1, self.max_steps)
         print()
         self.system.write_gro(self.out_path)
 
@@ -123,12 +122,14 @@ class DaemonSimulation():
             - reinitialize system
             - write an XTC frame
         """
-        self.logger.info(f"step {self.i}:")
+        percent = i/max_steps*100 if max_steps > 0 else 100
+        self.logger.info(f"step {i}/{max_steps} ({percent:.1f}%)")
         self.logger.info("MD start")
+        self.logger.info(f"doing {self.steps_per_step} MD steps")
         self.system.do_steps(self.steps_per_step)
         self.logger.info("MD finished")
         if max_steps > 0:
-            sys.stdout.write(f"\rStep {i:8} of {self.max_steps}   "
+            sys.stdout.write(f"\rStep {i:4}/{max_steps} ({percent:.1f}%) "
                              f"[reactions: {self.reactions}]")
         self.logger.info("D/M start")
         self.reactions += self.top.detection_modification(i)

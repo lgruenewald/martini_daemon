@@ -10,6 +10,7 @@ import psutil
 import subprocess
 import openmm.version
 import logging
+from datetime import datetime
 
 from martini_daemon.simulation import DaemonSimulation
 from martini_daemon.utils import backup_try
@@ -45,6 +46,7 @@ def test_daemon(reactive, data):
                            steps_per_step=data["per_step"], p=p,
                            platform=mm_platform, defines=defines)
     sim.simulate()
+    os.rename("out.log", f"out_{datetime.now()}.log".replace(" ", "_"))
 
 
 def test_gromacs(data):
@@ -127,17 +129,18 @@ for x in benchmarks:
         with open("params.json") as f:
             data = json.load(f)
 
-        n = 3
-        if data.get("category") == "slow":
-            n = 1
+        for bench in data["benchmarks"]:
+            name = bench["name"]
+            n = bench["n"]
 
-        logger.info(f"Benchmark {x}")
-        daemon_time = bench_function(test_daemon, [True, data], x, "daemon with reactions", n=n)
-        no_reaction_time = bench_function(test_daemon, [False, data], x, "daemon without reactions", n=n)
-        bench_function(test_gromacs, [data], x, "gromacs", n=n)
+            logger.info(f"Benchmark {x}")
+            logger.info(f"Parameters: {bench}")
+            daemon_time = bench_function(test_daemon, [True, bench], name, "daemon with reactions", n=n)
+            no_reaction_time = bench_function(test_daemon, [False, bench], name, "daemon without reactions", n=n)
+            bench_function(test_gromacs, [bench], name, "gromacs", n=n)
 
-        percent = (daemon_time - no_reaction_time) / no_reaction_time * 100
-        logger.info(f"Reactions cost a {percent:.1f}% slowdown")
+            percent = (daemon_time - no_reaction_time) / no_reaction_time * 100
+            logger.info(f"Reactions cost a {percent:.1f}% slowdown")
 
         os.system("../cleanup.sh")
         os.chdir("..")

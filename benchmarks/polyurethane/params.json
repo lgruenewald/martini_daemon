@@ -1,7 +1,0 @@
-{
-  "gro": "system.gro",
-  "top": "system.top",
-  "per_step": 5000,
-  "steps": 100,
-  "category": "fast"
-}
