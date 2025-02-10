@@ -1,23 +1,23 @@
-2025-02-07 09:43:42,675 == System information ==
-2025-02-07 09:43:42,677 Linux-6.8.0-52-generic-x86_64-with-glibc2.35
-2025-02-07 09:43:42,681 CPU model: Intel(R) Xeon(R) W-2235 CPU @ 3.80GHz utilization 6.2%
-2025-02-07 09:43:42,708 GPU  NVIDIA GeForce RTX 3080: GPU utilization 0 %, Total mem  10240 MiB, Used mem  601 MiB, Temperature  56C
+2025-02-10 10:52:19,849 == System information ==
+2025-02-10 10:52:19,852 Linux-6.8.0-52-generic-x86_64-with-glibc2.35
+2025-02-10 10:52:19,856 CPU model: Intel(R) Xeon(R) W-2235 CPU @ 3.80GHz utilization 6.6%
+2025-02-10 10:52:19,883 GPU  NVIDIA GeForce RTX 3080: GPU utilization 2 %, Total mem  10240 MiB, Used mem  385 MiB, Temperature  46C
 
-2025-02-07 09:43:42,708 == Software information ==
-2025-02-07 09:43:42,708 OpenMM version: 8.2.0.dev-5377094
-2025-02-07 09:43:42,708 OpenMM platform being used: CUDA
-2025-02-07 09:43:42,708 
-2025-02-07 09:43:42,710 Benchmark polyurethane
-2025-02-07 09:44:33,799 polyurethane/gromacs/0:51.09s
-2025-02-07 09:45:25,079 polyurethane/gromacs/1:51.28s
-2025-02-07 09:46:17,437 polyurethane/gromacs/2:52.36s
-2025-02-07 09:46:17,438 polyurethane/gromacs runs:3 avg:51.58s [52.36s..51.09s] std:0.56s
-2025-02-07 09:53:02,277 polyurethane/daemon with reactions/0:404.84s
-2025-02-07 09:59:55,744 polyurethane/daemon with reactions/1:413.47s
-2025-02-07 10:06:38,518 polyurethane/daemon with reactions/2:402.77s
-2025-02-07 10:06:38,518 polyurethane/daemon with reactions runs:3 avg:407.03s [413.47s..402.77s] std:4.63s
-2025-02-07 10:07:42,063 polyurethane/daemon without reactions/0:63.54s
-2025-02-07 10:08:45,641 polyurethane/daemon without reactions/1:63.58s
-2025-02-07 10:09:49,396 polyurethane/daemon without reactions/2:63.76s
-2025-02-07 10:09:49,396 polyurethane/daemon without reactions runs:3 avg:63.63s [63.76s..63.54s] std:0.09s
-2025-02-07 10:09:49,396 Reactions cost a 539.7% slowdown
+2025-02-10 10:52:19,883 == Software information ==
+2025-02-10 10:52:19,883 OpenMM version: 8.2.0.dev-5377094
+2025-02-10 10:52:19,883 OpenMM platform being used: CUDA
+2025-02-10 10:52:19,883 
+2025-02-10 10:52:19,886 Benchmark polyurethane
+2025-02-10 10:53:45,979 polyurethane daemon with reactions run 0: 86.09 s
+2025-02-10 10:55:12,240 polyurethane daemon with reactions run 1: 86.26 s
+2025-02-10 10:56:37,851 polyurethane daemon with reactions run 2: 85.61 s
+2025-02-10 10:56:37,851 polyurethane daemon with reactions runs: 3 avg: 85.99 s [86.26 s .. 85.61 s] std dev: 0.28 s
+2025-02-10 10:57:42,083 polyurethane daemon without reactions run 0: 64.23 s
+2025-02-10 10:58:45,916 polyurethane daemon without reactions run 1: 63.83 s
+2025-02-10 10:59:49,944 polyurethane daemon without reactions run 2: 64.03 s
+2025-02-10 10:59:49,945 polyurethane daemon without reactions runs: 3 avg: 64.03 s [64.23 s .. 63.83 s] std dev: 0.16 s
+2025-02-10 11:00:41,151 polyurethane gromacs run 0: 51.21 s
+2025-02-10 11:01:31,805 polyurethane gromacs run 1: 50.65 s
+2025-02-10 11:02:22,535 polyurethane gromacs run 2: 50.73 s
+2025-02-10 11:02:22,536 polyurethane gromacs runs: 3 avg: 50.86 s [51.21 s .. 50.65 s] std dev: 0.24 s
+2025-02-10 11:02:22,536 Reactions cost a 34.3% slowdown

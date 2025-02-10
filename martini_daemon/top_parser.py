@@ -13,7 +13,7 @@ import os
 import distutils
 import math
 from openmm.unit import nanometer
-import numpy as np
+import logging
 
 
 def _get_default_gromacs_include_dir():
@@ -50,13 +50,18 @@ def _get_default_gromacs_include_dir():
 
 
 def DaemonTopFile(file, include_dir=None, defines={},
-                  epsilon_r=15.0, nonbonded_cutoff=1.1*nanometer):
+                  epsilon_r=15.0, nonbonded_cutoff=1.1*nanometer,
+                  logger=None):
     """Parses a Martini Top file for Gromacs and generates T*, sys and top
     from it. Also parses .frag and .rx files included in the .top file.
     """
+
+    if logger is None:
+        logging.basicConfig("daemon.log", level=logging.INFO)
+        logger = logging.getLogger(__name__)
     # field init
-    system = SysStar(epsilon_r, nonbonded_cutoff)
-    topology = TopStar(system)
+    system = SysStar(logger, epsilon_r, nonbonded_cutoff)
+    topology = TopStar(system, logger)
 
     if include_dir is None:
         include_dir = _get_default_gromacs_include_dir()

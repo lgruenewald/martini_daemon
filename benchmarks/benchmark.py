@@ -132,9 +132,9 @@ for x in benchmarks:
             n = 1
 
         logger.info(f"Benchmark {x}")
-        bench_function(test_gromacs, [data], x, "gromacs", n=n)
         daemon_time = bench_function(test_daemon, [True, data], x, "daemon with reactions", n=n)
         no_reaction_time = bench_function(test_daemon, [False, data], x, "daemon without reactions", n=n)
+        bench_function(test_gromacs, [data], x, "gromacs", n=n)
 
         percent = (daemon_time - no_reaction_time) / no_reaction_time * 100
         logger.info(f"Reactions cost a {percent:.1f}% slowdown")

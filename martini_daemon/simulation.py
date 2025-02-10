@@ -51,12 +51,18 @@ class DaemonSimulation():
         fh = logging.FileHandler(log_path)
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
+        stream_formatter = logging.Formatter("[%(levelname)s] %(message)s")
+        sh = logging.StreamHandler(sys.stderr)
+        sh.setFormatter(stream_formatter)
+        sh.setLevel(logging.WARN)
+        self.logger.addHandler(sh)
         self.logger.info("__init__ in DaemonSimulation")
         self.logger.info("Parsing start")
         self.system, self.top = DaemonTopFile(
             top_path,
             include_dir=include_dir, defines=defines,
-            epsilon_r=epsilon_r, nonbonded_cutoff=nonbonded_cutoff
+            epsilon_r=epsilon_r, nonbonded_cutoff=nonbonded_cutoff,
+            logger=self.logger
         )
         self.logger.info("Parsing done")
         self.gro = GromacsGroFile(gro_path)

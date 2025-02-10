@@ -6,6 +6,7 @@ from openmm.unit import nanometer, picosecond, md_unit_system
 from .utils import backup_try
 from collections import OrderedDict
 import numpy as np
+import sys
 
 from .forces.combined_bending_torsion import CombinedBendingTorsion
 from .forces.constraint import Constraint
@@ -62,7 +63,7 @@ class SysStar():
     """
     reporters: list[Reporter]
 
-    def __init__(self, epsilon_r, nonbonded_cutoff):
+    def __init__(self, logger, epsilon_r, nonbonded_cutoff):
         self.epsilon_r = epsilon_r
         self.nonbonded_cutoff = nonbonded_cutoff
         self._part_list = []
@@ -110,6 +111,7 @@ class SysStar():
         self.reporters = []
 
         self.last_resid = 0
+        self.logger = logger
 
     def get_defaults(self, part_type, charge, mass):
         defaults = self._atom_types.get(part_type)
@@ -275,6 +277,13 @@ class SysStar():
         assert box[2].x == 0.
         assert box[2].y == 0.
         pos = state.getPositions(asNumpy=True).value_in_unit(nanometer)
+        if np.any(np.abs(pos) > 2147483.0):
+            # would be too large to store without remaindering, so likely
+            # the system blew up
+            self.logger.error(
+                "Particle coordinates too large, your system likely blew up. "
+                f"Largest coordinate (abs value) is {np.max(np.abs(pos))}."
+            )
         pos[:, 0] = np.remainder(pos[:, 0], box_x)
         pos[:, 1] = np.remainder(pos[:, 1], box_y)
         pos[:, 2] = np.remainder(pos[:, 2], box_z)

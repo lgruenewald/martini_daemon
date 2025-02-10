@@ -147,7 +147,7 @@ class TopStar():
 
     reporters: list[Reporter]
 
-    def __init__(self, system):
+    def __init__(self, system, logger):
         self.frag_list = {}
         self.next_frag_id = 0
         self.defrag_list = []
@@ -159,6 +159,7 @@ class TopStar():
         self.reactive_types = set()
         self.reporters = []
         self.system = system
+        self.logger = logger
 
     def add_reporter(self, reporter):
         self.reporters.append(reporter)
