@@ -16,6 +16,7 @@ BDT_dimerization
 monomer monomer
 [ rx_products ]
 dimer
+placeholder
 [ rx_conditions ]
 ; allowed distance below 0.4
 r_max 5 10 0.35
@@ -57,7 +58,7 @@ dimer 1
 [bonds]
 ; morse bond with arbitrary constants, not parametrized
 ; i j type=3 b(nm) D(kj/mol) beta(nm-1)
-  5 10   3    0.275   20        12
+  5 10   3    0.275   10        12
 
 [angles]
 1 5 10 10 120 200
@@ -67,8 +68,8 @@ dimer 1
 1 5 10 6 1 110 40 1
 
 [moleculetype]
-; placeholder type for breaking reaction product
-dimer_break 1
+; placeholder type for testing if its count matches dimer
+placeholder 1
 
 [atoms]
 1  TC5 1 BDT * 1 0 60
@@ -82,4 +83,26 @@ dimer_break 1
 9  TC6 1 BDT * 9 0 0
 10 TC6 1 BDT * 10 0 0
 
-[bonds]
+[rx]
+; reaction that will never happen to keep the # of placeholders in check
+placeholders
+[rx_reactants]
+placeholder
+[rx_conditions]
+limit 0
+
+[moleculetype]
+; placeholder type for readding dimers after dimer breakage
+dimer_break 1
+
+[atoms]
+1  TC5 1 BDT * 1 0 60
+2  TC5 1 BDT * 2 0 60
+3  U 1 BDT * 3 0 60
+4  TC6 1 BDT * 4 0 0
+5  TC6 1 BDT * 5 0 0
+6  TC5 1 BDT * 6 0 60
+7  TC5 1 BDT * 7 0 60
+8  U 1 BDT * 8 0 60
+9  TC6 1 BDT * 9 0 0
+10 TC6 1 BDT * 10 0 0

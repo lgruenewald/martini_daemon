@@ -116,23 +116,24 @@ class Fragment():
 
     name: str
     particles: list[int]
-    interactions: list[Interaction]
     frag_id: int
 
     def __init__(self, name, id):
         self.name = name
         self.particles = []
-        self.interactions = []
         self.frag_id = id
 
 
 class TopStar():
+    # ======= (1/3) Building things =======
     # T* fragment and defrag list
     frag_list: dict[int, Fragment]
     next_frag_id: int
     # for every part_id have a list of fragments it is in
+    # and a list of interactions it is in
     # type: list[list[frag_id]]
-    defrag_list: list[list[(str, int)]]
+    defrag_list: list[list[int]]
+    interaction_list: list[list[Interaction]]
 
     # type name -> list of subfrag names
     subfrag_map: dict[str, list[str]]
@@ -151,6 +152,7 @@ class TopStar():
         self.frag_list = {}
         self.next_frag_id = 0
         self.defrag_list = []
+        self.interaction_list = []
         self.frag_fragments = []
         self.mol_fragments = []
         self.reaction_list = []
@@ -239,18 +241,6 @@ class TopStar():
             if subinst.frag_id != -1:
                 self.defrag_list[part_index].append(subinst.frag_id)
 
-        # interactions get added if all participants are normal atoms
-        # TODO functionalize these checks
-        for interaction in inst.interactions:
-            members = interaction.get_members()
-            include_interaction = False
-            for member in members:
-                if member in all_indices:
-                    include_interaction = True
-                    break
-            if include_interaction:
-                subinst.interactions.append(interaction)
-
         # subfrags can contain further subfrags
         self.instantiate_subfrags(name, subinst)
 
@@ -281,13 +271,12 @@ class TopStar():
             p = self.system.add_particle(atomname, resname, type, charge, mass)
             parts.append(p)
             self.defrag_list.append([])
+            self.interaction_list.append([])
         return self.instantiate_over_existing(frag_name, parts)
 
-    def instantiate_over_existing(
-            self, frag_name, particles, reaction=False,
-            interactions=[]):
-        """Takes a name of a mol fragment, creates new particles for it in
-        the system and the corresponding interactions as well.
+    def instantiate_over_existing(self, frag_name, particles, reaction=False):
+        """Takes a name of a mol fragment, adds interactions to those particles
+        according to the mol fragment.
         Recursively instantiates all subfragments too.
         """
 
@@ -330,77 +319,42 @@ class TopStar():
         # bonds
         for (force, i, j, params) in frag.bonds:
             b = force.add(particles[i], particles[j], *params)
-            inst.interactions.append(b)
+            self.interaction_list[particles[i]].append(b)
+            self.interaction_list[particles[j]].append(b)
         # angles
         for (force, i, j, k, params) in frag.angles:
             a = force.add(particles[i], particles[j], particles[k], *params)
-            inst.interactions.append(a)
+            self.interaction_list[particles[i]].append(a)
+            self.interaction_list[particles[j]].append(a)
+            self.interaction_list[particles[k]].append(a)
         # dihedrals
         for (force, i, j, k, l, params) in frag.dihedrals:
             d = force.add(
                 particles[i], particles[j], particles[k], particles[l],
                 *params
             )
-            inst.interactions.append(d)
+            self.interaction_list[particles[i]].append(d)
+            self.interaction_list[particles[j]].append(d)
+            self.interaction_list[particles[k]].append(d)
+            self.interaction_list[particles[l]].append(d)
         # exclusions
         for i, excl in enumerate(frag.exclusions):
             for j in excl:
                 if i < j:
                     e = self.system.exclusions.add(particles[i], particles[j])
-                    inst.interactions.append(e)
+                    self.interaction_list[particles[i]].append(e)
+                    self.interaction_list[particles[j]].append(e)
         # generic interactions
         for (force, members, params) in frag.interactions:
             members = [particles[x] for x in members]
-            inst.interactions.append(force.add(members, params))
-        # interactions inherited / not added here
-        for inter in interactions:
-            inst.interactions.append(inter)
+            f = force.add(members, params)
+            for member in members:
+                self.interaction_list[member].append(f)
 
         self.instantiate_subfrags(frag_name, inst)
         return inst
 
-    def remove_fragment(self, frag: Fragment):
-        """Removes a fragment from frag_lits and defrag_list
-        """
-
-        # TODO functionalize these checks
-        for part in frag.particles:
-            defrag = self.defrag_list[part]
-            i = 0
-            while i < len(defrag):
-                if defrag[i] == frag.frag_id:
-                    del defrag[i]
-                else:
-                    i += 1
-
-        del self.frag_list[frag.frag_id]
-
-    def destroy_fragment(self, frags: list[Fragment], modified_atoms: list[int]):
-        """args:
-        frag: Fragment
-
-        removes overlapping fragments with modified_atoms,
-        then removes fragments in frags
-        """
-
-        frag_ids = {frag.frag_id for frag in frags}
-
-        # TODO functionalize these checks
-        for part in modified_atoms:
-            # "cache", since remove_fragment will change this list
-            defrag = self.defrag_list[part].copy()
-            for other_frag_id in defrag:
-                # remove self at the end, not here
-                if other_frag_id in frag_ids:
-                    continue
-                # if the other frag hasn't been removed yet, remove it
-                other_frag = self.frag_list.get(other_frag_id)
-                if other_frag is not None:
-                    self.remove_fragment(other_frag)
-
-        for frag in frags:
-            self.remove_fragment(frag)
-
+    # ======= (2/3) Detection things =======
     def pre_detection(self, i):
         for rx in self.reaction_list:
             rx.global_counter = 0
@@ -479,89 +433,6 @@ class TopStar():
         rx.global_counter += 1
         return True
 
-    def pre_modification(self, rx_list: list[(list, ReactionTemplate)], i):
-        # hook that gets called after detection, before modification
-        # only called if there is any modification going on
-        for reporter in self.reporters:
-            reporter.pre_modification(rx_list, i)
-
-    def modification(self, frags: list[Fragment], rx: ReactionTemplate):
-        """Modification helper for the D/M algorithm
-        """
-        product_particles = []
-        all_interactions = []
-        for f in frags:
-            product_particles += f.particles
-            all_interactions += f.interactions
-        modified_atoms = set()
-        i = 0
-        while i < len(all_interactions):
-            # TODO functionalize these checks
-            interaction = all_interactions[i]
-            remove = False
-            members = interaction.get_members()
-            # process rx_break
-            # if any in group not in members -> not remove candidate
-            for group in rx.break_groups:
-                all = True
-                for atom in group:
-                    if product_particles[atom] not in members:
-                        all = False
-                        break
-                if all:
-                    remove = True
-
-            # process rx_update
-            # if any in members not in group -> not remove candidate
-            for group in rx.update_groups:
-                all = True
-                for atom in members:
-                    # rx_update => remove overlapping fragments
-                    modified_atoms.add(product_particles[atom])
-                    if product_particles[atom] not in group:
-                        all = False
-                if all:
-                    remove = True
-            if remove:
-                interaction.remove()
-                del all_interactions[i]
-            else:
-                i += 1
-
-        modified_atoms = list(modified_atoms)
-        self.destroy_fragment(frags, modified_atoms)
-
-        # the index of the next particle for which a new product needs to be
-        # instantiated
-        product_particle_index = 0
-
-        for product_line in rx.products:
-            for product in product_line:
-                start = product_particle_index
-                frag = self.type_lookup.get(product)  # frag type
-                if frag is None:
-                    raise ValueError(f"Can't find mol {product}.")
-                elif not isinstance(frag, MolFragment):
-                    raise ValueError(f"Product {product}, is"
-                                     " not a mol fragment type."
-                                     f" It is: {frag}"
-                                     "Use [frag_from] to create fragments "
-                                     "in reactions.")
-
-                end = start + len(frag.atoms)
-                parts = product_particles[start:end]
-                product_particle_index = end
-                self.instantiate_over_existing(
-                    product, parts, reaction=True,
-                    interactions=all_interactions
-                )
-            assert product_particle_index == len(product_particles)
-
-    def post_modification(self, i):
-        # hook that only gets called after modification
-        for reporter in self.reporters:
-            reporter.post_modification(i)
-    
     def get_init_map(self):
         init_map: dict[str, list[int]] = {}
         for key, frag in self.frag_list.items():
@@ -629,7 +500,7 @@ class TopStar():
 
             if init_map.get(next_reactant.lstrip("*")) is None:
                 continue
-                
+
             # find out where to start indexing from
             # this also works well with the * hack for rx.skip
             # this used to be the if j <= i: continue check
@@ -660,6 +531,137 @@ class TopStar():
 
         return reactions, skip, False
 
+    # ======= (3/3) Modification things =======
+    def remove_fragment(self, frag: Fragment):
+        """Removes a fragment from frag_list and defrag_list
+        """
+
+        for part in frag.particles:
+            self.defrag_list[part] = list(filter(
+                lambda x: x != frag.frag_id,
+                self.defrag_list[part]
+            ))
+
+        del self.frag_list[frag.frag_id]
+
+    def remove_interaction(self, interaction: Interaction):
+        """Removes an interaction from interaction_list and S*
+        """
+        for part in interaction.get_members():
+            self.interaction_list[part] = list(filter(
+                lambda x: x != interaction,
+                self.interaction_list[part]
+            ))
+        interaction.remove()
+
+    def process_break(self, frags: list[Fragment], rx: ReactionTemplate,
+                      particles: list[int]):
+        """
+            Process [rx_break] in rx over frags.
+        """
+
+        for group in rx.break_groups:
+            group = [particles[i] for i in group]
+            # breaking interactions
+            # for every group in break_groups
+            # check all interactions and break if all in group are in inter
+            for inter in self.interaction_list[group[0]][:]:
+                if all(map(
+                           lambda group_member:
+                           group_member in inter.get_members(),
+                           group  # all of this
+                       )):
+                    self.remove_interaction(inter)
+            # breaking fragments, same rules as inters
+            for frag_id in self.defrag_list[group[0]][:]:
+                frag = self.frag_list[frag_id]
+                if frag in frags:
+                    # these frags get removed later anyway
+                    continue
+                if all(map(
+                           lambda member: member in group,
+                           frag.particles
+                       )):
+                    self.remove_fragment(frag)
+
+    def process_update(self, frags: list[Fragment], rx: ReactionTemplate,
+                       particles: list[int]):
+        """
+            Process [rx_update] in rx over frags.
+        """
+
+        for group in rx.update_groups:
+            group = [particles[i] for i in group]
+            # breaking interactions
+            # check that all in interaction are in group
+            for inter in self.interaction_list[group[0]][:]:
+                if all(map(
+                           lambda inter_member: inter_member in group,
+                           inter.get_members()
+                       )):
+                    self.remove_interaction(inter)
+            # breaking fragments, different rules!
+            # rx_update breaks fragments with similar rules as rx_break for now
+            # a practical use case of overlapping fragments would need to be
+            # made to make decisions based on this...
+            for frag in self.defrag_list[group[0]][:]:
+                if frag in frags:
+                    # these frags get removed later anyway
+                    continue
+                if all(map(
+                           lambda member: member in group,
+                           frag.particles
+                       )):
+                    self.remove_fragment(frag)
+
+    def pre_modification(self, rx_list: list[(list, ReactionTemplate)], i):
+        # hook that gets called after detection, before modification
+        # only called if there is any modification going on
+        for reporter in self.reporters:
+            reporter.pre_modification(rx_list, i)
+
+    def modification(self, frags: list[Fragment], rx: ReactionTemplate):
+        """Modification helper for the D/M algorithm
+        """
+        product_particles = []
+        for f in frags:
+            product_particles += f.particles
+        # [rx_break]
+        self.process_break(frags, rx, product_particles)
+        # [rx_update]
+        self.process_update(frags, rx, product_particles)
+        # only non skipped get passed to modification, so we remove them all
+        for frag in frags:
+            self.remove_fragment(frag)
+
+        # the index of the next particle for which a new product needs to be
+        # instantiated
+
+        for product_line in rx.products:
+            product_particle_index = 0
+            for product in product_line:
+                start = product_particle_index
+                frag = self.type_lookup.get(product)  # frag type
+                if frag is None:
+                    raise ValueError(f"Can't find mol {product}.")
+                elif not isinstance(frag, MolFragment):
+                    raise ValueError(f"Product {product}, is"
+                                     " not a mol fragment type."
+                                     f" It is: {frag}"
+                                     "Use [frag_from] to create fragments "
+                                     "in reactions.")
+
+                end = start + len(frag.atoms)
+                parts = product_particles[start:end]
+                product_particle_index = end
+                self.instantiate_over_existing(product, parts, reaction=True)
+            assert product_particle_index == len(product_particles)
+
+    def post_modification(self, i):
+        # hook that only gets called after modification
+        for reporter in self.reporters:
+            reporter.post_modification(i)
+
     def detection_modification(self, i):
         self.pre_detection(i)
         init_map = self.get_init_map()
@@ -676,17 +678,3 @@ class TopStar():
             self.modification(frags, rx)
         self.post_modification(i)
         return len(reactions)
-
-    def dump(self, path):
-        with open(path, "a") as file:
-            print("===== TopStar Dump =====", file=file)
-            print("==== TopStar / Fragment Types ====", file=file)
-            for k, molfrag in self.type_lookup.items():
-                file.write(f"{k} ")
-            file.write("\n")
-            print("==== TopStar / ReactionTemplates ====", file=file)
-            for rx in self.reaction_list:
-                print(f"rx {rx.name} reactants {rx.reactants} products {rx.products}", file=file)
-            print("==== TopStar / Fragments ====", file=file)
-            for id, frag in self.frag_list.items():
-                print(f"{id}: <frag {frag.name} ps {frag.particles}>", file=file)

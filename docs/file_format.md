@@ -117,8 +117,7 @@ directives work identically to how they work in [rx_conditions].
 
 The difference between the two, is how interactions that are broken are
 selected, see the section in `docs/architecture.md` for this for more
-detail. The second difference, is that any atoms included in rx_update
-will remove all fragments that contain that atom during a reaction.
+detail.
 
 The main use case for [rx_break] is to specify a pair of particles, and to
 break the molecule apart into two between those two particles. Note: if
@@ -129,6 +128,10 @@ exclusions as well, not just the bonded interactions.
 The main use case for [rx_update] is to change how a part of the molecule
 is constructed. It will break interactions within the group, but will not
 break interactions that contain particles outside the group.
+
+Both will also remove all fragments from the system that fully contain a
+whole group of atoms as specified in one of their lines, even if those
+fragments are not present in the reaction.
 
 # Defining reaction products
 

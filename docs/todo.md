@@ -1,6 +1,6 @@
 More flexible templates
 
-
+- 0 products should be valid
 - allow constructing fragments based on graphs, even without explicitly mentioning
 the parent fragment name
   - allow "negative" constraints in these graphs (e.g. not bonded to X, bonded to up to n instances of Y)
@@ -9,11 +9,9 @@ the parent fragment name
   should be ignored, if they are marked with a ?
 
 
-- interactions should be per atom, not in Fragments
+- early quits  in detection_over_types on more than 2 reactant situations when part of the conditions do not get fulfilled
 - build the sticky martini system with the more flexible templates
-- fix rx_update removal of overlapping fragments, add removal of overlapping fragments to rx_break
 - reaction name should be usable for [frag_from], frags should be spawnable as products
-- 0 products should be valid
 - overlapping fragments reacting, but all overlaps need to be explicit - [rx_overlap]
 - [atoms] should be optional, allow specifying just the number of atoms
 - allow defining new bonds, angles, etc. in reactions
@@ -21,6 +19,9 @@ the parent fragment name
 - instantiate products over a chosen ordered list of atoms instead of indexing
 - multiple reactions with the same starting materials, with equal standing (independent of their order)
 - velocity rx_condition, better rx_condition syntax
+- rename rx_... to more sane names
+- undoing reactions instead of [rx_break] and [rx_update]
+- update documentation
 
 .rx validation
 - try to match name and type match at "compile time" to catch errors early

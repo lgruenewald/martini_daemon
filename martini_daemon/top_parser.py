@@ -57,7 +57,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
     """
 
     if logger is None:
-        logging.basicConfig("daemon.log", level=logging.INFO)
+        logging.basicConfig(filename="out.log", level=logging.INFO)
         logger = logging.getLogger(__name__)
     # field init
     system = SysStar(logger, epsilon_r, nonbonded_cutoff)
