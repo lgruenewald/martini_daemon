@@ -4,6 +4,9 @@ More flexible templates
 - allow constructing fragments based on graphs, even without explicitly mentioning
 the parent fragment name
   - allow "negative" constraints in these graphs (e.g. not bonded to X, bonded to up to n instances of Y)
+- frags added as graphs (or possibly even lists) should be removed if and only if
+  after a reaction the constraints they were added on get broken
+- updating particle names during reactions
 - indexing in products, conditions should be 2D
 - fragments with variable number of atoms, out of index reads in reaction templates
   should be ignored, if they are marked with a ?

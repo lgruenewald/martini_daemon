@@ -129,10 +129,6 @@ The main use case for [rx_update] is to change how a part of the molecule
 is constructed. It will break interactions within the group, but will not
 break interactions that contain particles outside the group.
 
-Both will also remove all fragments from the system that fully contain a
-whole group of atoms as specified in one of their lines, even if those
-fragments are not present in the reaction.
-
 # Defining reaction products
 
 Currently, it is recommended to write new [moleculetype] entries that define

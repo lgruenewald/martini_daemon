@@ -1,6 +1,7 @@
 from .reporter import Reporter
 from ..utils import backup_try
 
+
 class TopStarLogger(Reporter):
     """A reporter that dumps the state of T* after every modification algorithm
     run to topstar.log. Useful for debugging.
@@ -9,7 +10,7 @@ class TopStarLogger(Reporter):
     def init(self):
         backup_try("topstar.log")
         self.post_modification(-1)
-    
+
     def post_modification(self, i):
         with open("topstar.log", "a") as file:
             print(f"===== Frame {i} =====", file=file)
@@ -23,13 +24,20 @@ class TopStarLogger(Reporter):
             print("==== TopStar / Fragments ====", file=file)
             for id, frag in self._topstar.frag_list.items():
                 print(f"{id}: <frag {frag.name} ps {frag.particles}>", file=file)
+            print("==== TopStar / defrag list ====", file=file)
+            for id, defrag in enumerate(self._topstar.defrag_list):
+                print(f"particle {id} is in fragments {defrag}", file=file)
+            print("==== TopStar / Interaction list ====", file=file)
+            for id, inter in enumerate(self._topstar.interaction_list):
+                print(f"particle {id} is in interactions {inter}", file=file)
+
 
 class ReactionReporter(Reporter):
     """A reporter that reports all reactions to reactions.log"""
 
     def init(self):
         backup_try("reactions.log")
-    
+
     def pre_modification(self, reactions, i):
         with open("reactions.log", "a") as file:
             print(f"Frame {i}", file=file)
@@ -40,13 +48,14 @@ class ReactionReporter(Reporter):
                     file=file
                 )
 
+
 class FragCountReporter(Reporter):
     """A reporter that logs the number of all fragments in T* at a given time
     to fragment_counts.log"""
 
     def init(self):
         backup_try("fragment_counts.log")
-    
+
     def pre_detection(self, i):
         with open("fragment_counts.log", "a") as file:
             init_map = self._topstar.get_init_map()

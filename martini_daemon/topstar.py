@@ -569,20 +569,9 @@ class TopStar():
                 if all(map(
                            lambda group_member:
                            group_member in inter.get_members(),
-                           group  # all of this
+                           group
                        )):
                     self.remove_interaction(inter)
-            # breaking fragments, same rules as inters
-            for frag_id in self.defrag_list[group[0]][:]:
-                frag = self.frag_list[frag_id]
-                if frag in frags:
-                    # these frags get removed later anyway
-                    continue
-                if all(map(
-                           lambda member: member in group,
-                           frag.particles
-                       )):
-                    self.remove_fragment(frag)
 
     def process_update(self, frags: list[Fragment], rx: ReactionTemplate,
                        particles: list[int]):
@@ -600,19 +589,6 @@ class TopStar():
                            inter.get_members()
                        )):
                     self.remove_interaction(inter)
-            # breaking fragments, different rules!
-            # rx_update breaks fragments with similar rules as rx_break for now
-            # a practical use case of overlapping fragments would need to be
-            # made to make decisions based on this...
-            for frag in self.defrag_list[group[0]][:]:
-                if frag in frags:
-                    # these frags get removed later anyway
-                    continue
-                if all(map(
-                           lambda member: member in group,
-                           frag.particles
-                       )):
-                    self.remove_fragment(frag)
 
     def pre_modification(self, rx_list: list[(list, ReactionTemplate)], i):
         # hook that gets called after detection, before modification

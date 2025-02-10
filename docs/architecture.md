@@ -134,9 +134,6 @@ The modification algorithm will first break interactions defined in
   atom (since single atom interactions do not exist currently, this will
   do nothing).
 
-Fragments that fully contain a whole line in [rx_break] or [rx_update] will
-be removed from the system, even if they do not show up in the reaction.
-
 Then, the modification algorithm will update the types, charge, mass of all
 atoms according to the product [moleculetype]. If the type is * in the 
 [moleculetype], the type is not updated.
