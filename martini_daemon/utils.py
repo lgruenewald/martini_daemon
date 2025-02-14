@@ -6,12 +6,13 @@ from math import isclose, pi, cos, tau
 
 
 def backup_try(path):
+    parent, filename = os.path.split(path)
     if os.path.isfile(path):
-        bkup_num = 2
-        bkup_path = f"#{path}.1#"
+        bkup_num = 0
+        bkup_path = path
         while os.path.isfile(bkup_path):
             bkup_num += 1
-            bkup_path = f"#{path}.{bkup_num}#"
+            bkup_path = os.path.join(parent, f"#{filename}.{bkup_num}#")
         os.rename(path, bkup_path)
         print(f"Backed up {path} to {bkup_path}")
 

@@ -114,13 +114,13 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     def process_atoms(tokens):
         id = unwrap(tokens, 0, "index")
-        type = unwrap(tokens, 1, {"word", "pattern"})
+        type = unwrap(tokens, 1, "pattern")
         resnum = unwrap(tokens, 2, "int")
         resname = unwrap(tokens, 3, "word")
-        atomname = unwrap(tokens, 4, {"word", "pattern"})
+        atomname = unwrap(tokens, 4, "pattern")
         charge_group_num = unwrap(tokens, 5, "int")
-        charge = unwrap(tokens, 6, "float", None)
-        mass = unwrap(tokens, 7, "float", None)
+        charge = unwrap(tokens, 6, "float") if len(tokens) > 6 else None
+        mass = unwrap(tokens, 7, "float") if len(tokens) > 7 else None
         atom_index = len(last_molecule().atoms)
         if id != atom_index:
             raise ValueError("Bad atom ID, are they out of order?"
@@ -495,8 +495,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
         nonlocal _atom_list, _frag_name
         if _frag_name is None:
             raise ValueError("Define a [frag] first.")
-        type = unwrap(tokens, 0, {"word", "pattern"})
-        name = unwrap(tokens, 1, {"word", "pattern"})
+        type = unwrap(tokens, 0, "pattern")
+        name = unwrap(tokens, 1, "pattern")
         _atom_list.append((type, name))
 
     p.add_level("frag_atoms", process_fragatoms)

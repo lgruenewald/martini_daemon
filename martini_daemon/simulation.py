@@ -12,6 +12,7 @@ from openmm.app import GromacsGroFile
 from openmm.unit import femtosecond, nanometer
 from .utils import backup_try
 import logging
+import random
 
 
 class DaemonSimulation():
@@ -24,7 +25,8 @@ class DaemonSimulation():
     init_list: list[Fragment]
     init_map: dict[str, list[int]]
 
-    reactions: int = 0
+    logger_id = 0
+    reactions: int
     max_steps: int
     steps_per_step: int
     traj_path: str  # trajectory to write
@@ -37,7 +39,8 @@ class DaemonSimulation():
                  minimize_energy=True, generate_velocities=True,
                  remove_com_motion=True, epsilon_r=15.0,
                  nonbonded_cutoff=1.1*nanometer, include_dir=None,
-                 defines={}, log_path=None, reporters=[]):
+                 defines={}, log_path=None, reporters=[],
+                 langevin_friction=10.0):
         if traj_path is None:
             traj_path = sim_name + ".xtc"
         if out_path is None:
@@ -45,7 +48,8 @@ class DaemonSimulation():
         if log_path is None:
             log_path = sim_name + ".log"
         backup_try(log_path)
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger(f"logger_{self.logger_id}_{random.random()}")
+        self.logger_id += 1
         self.logger.setLevel(logging.INFO)
         formatter = logging.Formatter("%(asctime)s %(message)s")
         fh = logging.FileHandler(log_path)
@@ -56,7 +60,11 @@ class DaemonSimulation():
         sh.setFormatter(stream_formatter)
         sh.setLevel(logging.WARN)
         self.logger.addHandler(sh)
-        self.logger.info("__init__ in DaemonSimulation")
+        self.logger.info("DaemonSimulation __init__ called")
+        self.logger.info(f"Parameters: {top_path} {gro_path} "
+                         f"T: {T} p: {p} dt: {dt} "
+                         f"max_steps: {max_steps} per_step {steps_per_step} "
+                         f"sim_name: {sim_name} platform {platform}")
         self.logger.info("Parsing start")
         self.system, self.top = DaemonTopFile(
             top_path,
@@ -64,8 +72,10 @@ class DaemonSimulation():
             epsilon_r=epsilon_r, nonbonded_cutoff=nonbonded_cutoff,
             logger=self.logger
         )
-        self.logger.info("Parsing done")
+        self.logger.info("Parsing finished")
+        self.logger.info("Coord read start")
         self.gro = GromacsGroFile(gro_path)
+        self.logger.info("Coord read finished")
         if platform is not None:
             platform = mm.Platform.getPlatformByName(platform)
 
@@ -74,15 +84,15 @@ class DaemonSimulation():
         if remove_com_motion:
             self.system.add_force(mm.CMMotionRemover())
 
-        integrator = mm.LangevinIntegrator(T, 10.0, dt)
+        integrator = mm.LangevinIntegrator(T, langevin_friction, dt)
         box = self.gro.getPeriodicBoxVectors()
 
-        self.logger.info("Building context")
+        self.logger.info("Context build start")
         if platform is not None:
             self.system.build_context(integrator, box, platform)
         else:
             self.system.build_context(integrator, box)
-        self.logger.info("Context built")
+        self.logger.info("Context build finished")
 
         self.logger.info("Setting positions")
         self.system.set_positions(self.gro.getPositions(True))
@@ -95,18 +105,21 @@ class DaemonSimulation():
         self.system.set_xtc_path(traj_path)
         self.system.write_xtc_frame(0)
         if generate_velocities:
-            self.logger.info("Generating velocities")
+            self.logger.info("genvel start")
             self.system.generate_velocities(T)
+            self.logger.info("genvel finished")
         if minimize_energy:
-            self.logger.info("Minimizing energy")
+            self.logger.info("Energy min start")
             self.system.minimize_energy()
+            self.logger.info("Energy min finished")
             self.logger.info("Writing energy minimized positions to XTC")
             self.system.write_xtc_frame(0)
         self.max_steps = max_steps
         self.steps_per_step = steps_per_step
         self.traj_path = traj_path
         self.out_path = out_path
-        self.logger.info("__init__ finished")
+        self.reactions = 0
+        self.logger.info("__init__ end")
 
     def simulate(self):
         for i in range(self.max_steps):
@@ -132,11 +145,13 @@ class DaemonSimulation():
             sys.stdout.write(f"\rStep {i:4}/{max_steps} ({percent:.1f}%) "
                              f"[reactions: {self.reactions}]")
         self.logger.info("D/M start")
-        self.reactions += self.top.detection_modification(i)
+        new_reactions = self.top.detection_modification(i)
+        self.reactions += new_reactions
         self.logger.info("D/M finished")
-        self.logger.info("reinitialize start")
-        self.system.reinitialize()
-        self.logger.info("reinitialize finished")
+        if new_reactions > 0:
+            self.logger.info("reinitialize start")
+            self.system.reinitialize()
+            self.logger.info("reinitialize finished")
         self.logger.info("XTC write start")
         self.system.write_xtc_frame(self.steps_per_step)
         self.logger.info("XTC write finished")

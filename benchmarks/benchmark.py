@@ -46,6 +46,9 @@ def test_daemon(reactive, data):
                            steps_per_step=data["per_step"], p=p,
                            platform=mm_platform, defines=defines)
     sim.simulate()
+    for h in sim.logger.handlers:
+        h.flush()
+        h.close()
     os.rename("out.log", f"out_{datetime.now()}.log".replace(" ", "_"))
 
 

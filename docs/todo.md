@@ -63,3 +63,7 @@ Compatibility
 
 Testing
 - Unit test D/M algorithm
+
+Simulation stability
+- Langevin integrator friction and stability?
+- how far can we build bonds/angles compared to equilibrium? rough guidelines?
