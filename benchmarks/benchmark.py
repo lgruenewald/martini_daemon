@@ -37,7 +37,7 @@ logger.addHandler(sh)
 def test_daemon(reactive, data):
     defines = {}
     if reactive:
-        defines["REACT"] = 1
+        defines["REACT"] = "1.0"
 
     p = data.get("p") or 1.0
     if p == 0 or p == 0.:

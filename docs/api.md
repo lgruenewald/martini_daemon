@@ -48,6 +48,8 @@ The constructor takes the following named arguments:
 - `include_dir`, default None, daemon will also look for *.itp's in this
   directory when #include-ing from .top files
 - `defines`, default {}, extra #define defines to be set during parsing
+  both keys and values in this dictionary MUST be strings. Use "1" to represent
+  true, "0" to represent false.
 - `log_path`, path to the log file to write, default is sim_name + ".log"
 - `reporters`, default [], a list of reporters (available ones are in the
   submodule martini_daemon.reporters), which can write extra information

@@ -67,7 +67,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
         include_dir = _get_default_gromacs_include_dir()
 
     # so .top files stay backwards compatible
-    defines["DAEMON"] = 1
+    defines["DAEMON"] = "1.0"
 
     # make parser
     p = TopParser()
