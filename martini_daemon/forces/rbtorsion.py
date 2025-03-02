@@ -22,3 +22,5 @@ class RBTorsion(Force):
     def update_params(self, id, theta, force, mult):
         raise NotImplementedError
 
+    def is_instance(self, filter):
+        return filter in {"dihedral", "rb_torsion"}

@@ -25,3 +25,6 @@ class HarmonicAngle(Force):
 
     def update_params(self, id, theta, force):
         raise NotImplementedError
+
+    def is_instance(self, filter):
+        return filter in {"angle", "harmonic_angle"}

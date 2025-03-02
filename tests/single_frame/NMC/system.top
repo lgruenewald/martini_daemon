@@ -1,0 +1,13 @@
+#include "../../../itp/martini_v3.0.0.itp"
+#include "../../../itp/martini_v3.0.0_ions_v1.itp"
+#include "../../../itp/martini_v3.0.0_solvents_v1.itp"
+#include "../../../itp/martini_v3.0.0_sugars_v2.itp"
+
+[system]
+400 NMC molecules and counterions with 892 water molecules
+
+[molecules]
+;moleculetype	count
+NMC	400
+NA 400
+W 892

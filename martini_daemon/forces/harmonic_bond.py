@@ -7,8 +7,6 @@ class HarmonicBond(Force):
     indices are called bond_id
     values are (i: part_id, j: part_id, length: float, force: float)"""
 
-    visualize_as_bond = True
-
     def _build(self):
         self._force_obj = mm.HarmonicBondForce()
         for (i, j, length, force) in filter(None, self._list):
@@ -28,3 +26,5 @@ class HarmonicBond(Force):
     def update_params(self, id, length, force):
         raise NotImplementedError
 
+    def is_instance(self, filter):
+        return filter in {"bond", "harmonic_bond"}

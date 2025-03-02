@@ -1,0 +1,35 @@
+#include "../../../itp/martini_v3.0.0.itp"
+
+[ moleculetype ] 
+XX 1 
+
+[ atoms ]
+  1 TC5   1 XX XX1    1 0.0  75.0
+  2 TC5   1 XX XX2    2 0.0  75.0
+  3 TC5   1 XX XX3    3 0.0  75.0
+  4 TC5   1 XX XX4    4 0.0  75.0
+  5 TC5   1 XX XX5    4 0.0  0.0
+ 
+[ constraints ]
+  1 2 1 0.2
+  2 3 1 0.2
+  3 4 1 0.2
+
+[ angles ]
+; i j k type theta k
+  1 2 3  1    90   500
+  2 3 4  1    90   500
+
+[ dihedrals ]
+; i j k l type theta k
+  1 3 2 4  2    180  1000
+
+[ virtual_sites4 ]
+; vid i j k l type a b c
+  5   1 3 2 4  2   0.5 0.5 0.4
+  
+[ system ]
+vsite4fdn test
+
+[ molecules ]
+XX 1

@@ -1,0 +1,30 @@
+[ frag ]
+tail
+[ graph ]
+; order shouldn't matter in the mandatory section, as the internals may
+; freely reorder things here
+atom 1 W W
+; regular bond's reject a match if they cannot be found
+; conditional subgraph building every time a bond? or bond! is given
+; conditionals must come after mandatory ones
+atom? 2? W W
+; bond?'s reject all ?'d atoms if they cannot be matched
+bond? 1 2?
+; negative constraints must come last
+atom! 3! W W
+; bond!'s reject the whole match if they can be found
+bond! 1 3!
+
+[ rx ]
+bonding
+[ rx_reactants ]
+tail tail
+[ rx_conditions ]
+r_max 1:1 2:1 0.51
+
+[ bonds ]
+1:1 2:1 1 0.200 1000
+
+[ angles ]
+1:2? 1:1 2:1 1 120.0 1000
+1:1 2:1 2:2? 1 120.0 1000

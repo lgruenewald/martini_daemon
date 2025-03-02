@@ -8,8 +8,6 @@ class Constraint(Force):
     _rebuild: bool
     # or when removing elements from the bond
 
-    visualize_as_bond = True
-
     def __init__(self, sysstar):
         self._list = []
         self._sysstar = sysstar
@@ -48,3 +46,6 @@ class Constraint(Force):
 
     def _interaction(self):
         return Interaction(self, len(self._list) - 1)
+
+    def is_instance(self, filter):
+        return filter in {"bond", "constraint"}

@@ -1,0 +1,10 @@
+#include "../../../itp/martini_v3.0.0.itp"
+#include "BDT.itp"
+#include "dimerize.rx"
+
+[ system ]
+BDT dimer test
+
+[ molecules ]
+BDT 2
+dimer_double 2

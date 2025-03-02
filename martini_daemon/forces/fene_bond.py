@@ -7,8 +7,6 @@ class FENEBond(Force):
     indices are called bond_id
     values are (i: part_id, j: part_id, length, D, beta: float)"""
 
-    visualize_as_bond = True
-
     def _build(self):
         self._force_obj = mm.CustomBondForce(
             "- 0.5 * k * b^2 * log(1 - r^2 / b^2)"
@@ -31,4 +29,7 @@ class FENEBond(Force):
 
     def update_params(self, id, length, kb, kcub):
         raise NotImplementedError
+
+    def is_instance(self, filter):
+        return filter in {"bond", "fene_bond"}
 

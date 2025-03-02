@@ -17,10 +17,10 @@ class Pairs(Force):
         super().__init__(sysstar)
         self.types = {}
 
-    def add_type(self, type1, type2, V, W):
+    def add_type(self, type1, type2, sigma, epsilon):
         # TODO move V,W conversion to top_parser and unify in single helper
-        c6 = 4 * W * (V ** 6)
-        c12 = 4 * W * (V ** 12)
+        c6 = 4 * epsilon * (sigma ** 6)
+        c12 = 4 * epsilon * (sigma ** 12)
         self.types[(type1, type2)] = (c6, c12)
         self.types[(type2, type1)] = (c6, c12)
 
@@ -55,19 +55,15 @@ class Pairs(Force):
         for (i, j, p1, p2) in filter(None, self._list):
             self._addbond(i, j, p1, p2)
 
-    # TODO make this "type" mess cleaner
     def add(self, members, params):
         # process params into something storeable
         i, j = members
         # default behavior is to use the [pairtypes] directive's values
-        # if type==0 this is the case, then p1 and p2 are also useless
         p1, p2 = None, None
-        # if params are specified, type==1 and p1 and p2 set the interaction
-        # LJ params
         if len(params) == 2:
-            V, W = params
-            p1 = 4 * W * (V ** 6)  # C6
-            p2 = 4 * W * (V ** 12)  # C12
+            sigma, epsilon = params
+            p1 = 4 * epsilon * (sigma ** 6)  # C6
+            p2 = 4 * epsilon * (sigma ** 12)  # C12
 
         # typical add() boilerplate
         self._list.append((i, j, p1, p2))
@@ -82,4 +78,7 @@ class Pairs(Force):
 
     def update_params(self, id, length, kb, kcub):
         raise NotImplementedError
+
+    def is_instance(self, filter):
+        return filter == "pairs"
 

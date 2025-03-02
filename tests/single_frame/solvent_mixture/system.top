@@ -1,0 +1,23 @@
+#include "../../../itp/martini_v3.0.0.itp"
+#include "../../../itp/martini_v3.0.0_small_molecules_v2.itp"
+#include "../../../itp/martini_v3.0.0_solvents_v1.itp"
+
+[ system ]
+; name
+mix of solvents
+
+[ molecules ]
+; name  number
+W 50
+ACN 50
+DCE 50
+CLF 50
+TCM 50
+MEO 50
+ETO 50
+IPO 50
+OCT 50
+HEX 50
+DMSO 50
+BENZ 50
+

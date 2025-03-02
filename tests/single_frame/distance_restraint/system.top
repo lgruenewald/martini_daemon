@@ -1,0 +1,24 @@
+#include "../../../itp/martini_v3.0.0.itp"
+
+[ moleculetype ] 
+XX 1 
+
+[ atoms ]
+  1 U   1 XX XX1    1 0.0  60.0
+  2 U   1 XX XX2    2 0.0  60.0
+  3 U    1 XX XX3    3 0.0  60.0
+  4 U   1 XX XX4    4 0.0  60.0
+ 
+[ bonds ]
+; the system.gro has distances 1.0, 0.5 and 0.1, we should try to get all regions
+  1 2 10 0.2 0.4 0.8 1000
+  2 3 10 0.2 0.4 0.8 1000
+  3 4 10 0.2 0.4 0.8 1000
+; very permissive last one to also get one in the 0 region
+  1 4 10 0.1 2.0 3.0 1000
+
+[ system ]
+distance restrait test
+
+[ molecules ]
+XX 1

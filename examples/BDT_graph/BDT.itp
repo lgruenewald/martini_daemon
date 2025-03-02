@@ -1,0 +1,35 @@
+; Benzene dithiol
+; SASA ~11% smaller
+
+[ moleculetype ] 
+BDT 1 
+
+[ atoms ]
+  1 TC5   1 BDT BNZ1    1 0.0  60.0
+  2 TC5   1 BDT BNZ2    2 0.0  60.0
+  3 U     1 BDT BNZ3    3 0.0  60.0
+  4 TC6   1 BDT BS1     4 0.0   0.0
+  5 TC6   1 BDT BS2     5 0.0   0.0
+
+[ bonds ]
+  ; connections for graph matching
+  ; connections to the relevant atom for building angles/dihedrals
+  1 5 5
+  2 4 5
+  ; connections to the central atom, used to make the graphs overlap so they
+  ; don't self react
+  3 5 5
+  3 4 5
+
+[ constraints ] 
+  1 2 1 0.183  ; BNZ1_BNZ2
+  2 3 1 0.252  ; BNZ2_BNZ3
+  3 1 1 0.252  ; BNZ3_BNZ1
+
+[ virtual_sites3 ]
+  4 2 1 3  3  37  0.360
+  5 2 1 3  3  116 0.240
+
+[ exclusions ]
+  4 1 2 3 5
+  5 1 2 3

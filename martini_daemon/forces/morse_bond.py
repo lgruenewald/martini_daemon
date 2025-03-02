@@ -7,8 +7,6 @@ class MorseBond(Force):
     indices are called bond_id
     values are (i: part_id, j: part_id, length, D, beta: float)"""
 
-    visualize_as_bond = True
-
     def _build(self):
         self._force_obj = mm.CustomBondForce(
             "D * (1 - exp(-beta * (r - b)))^2"
@@ -33,3 +31,5 @@ class MorseBond(Force):
     def update_params(self, id, length, kb, kcub):
         raise NotImplementedError
 
+    def is_instance(self, filter):
+        return filter in {"bond", "morse_bond"}

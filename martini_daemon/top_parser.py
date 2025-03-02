@@ -8,6 +8,7 @@ parser that constructs S* and T* rather than openmm's internal objects
 from .parser import TopParser, unwrap
 from .topstar import TopStar, ReactionTemplate
 from .sysstar import SysStar
+from .graph import GraphFragment, GraphAtomType
 import sys
 import os
 import distutils
@@ -100,6 +101,9 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("moleculetype", process_moltype)
 
     def process_molecule(tokens):
+        nonlocal system_defined
+        if not system_defined:
+            raise ValueError("[molecules] must come after [system]")
         name = unwrap(tokens, 0, "word")
         count = unwrap(tokens, 1, "int")
         for i in range(count):
@@ -135,11 +139,19 @@ def DaemonTopFile(file, include_dir=None, defines={},
         i = unwrap(tokens, 0, "index")
         j = unwrap(tokens, 1, "index")
         type = unwrap(tokens, 2, "int")
-        length = unwrap(tokens, 3, "float")
+        length = None
+        if type != 5:
+            # type 5 takes no length
+            length = unwrap(tokens, 3, "float")
         if type == 1 or type == 6:
             # harmonic bond / harmonic potential
             force = unwrap(tokens, 4, "float")
             last_molecule().bonds.append((system.harmonic_bond, i, j,
+                                         [length, force]))
+        elif type == 2:
+            # G96 bond
+            force = unwrap(tokens, 4, "float")
+            last_molecule().bonds.append((system.g96_bond, i, j,
                                          [length, force]))
         elif type == 3:
             # morse
@@ -153,11 +165,22 @@ def DaemonTopFile(file, include_dir=None, defines={},
             kcub = unwrap(tokens, 5, "float")
             last_molecule().bonds.append((system.cubic_bond, i, j,
                                          [length, kb, kcub]))
+        elif type == 5:
+            # connection - only generate exclusions and add a dummy interaction
+            last_molecule().bonds.append((system.connection, i, j, []))
         elif type == 7:
             # FENE (finitely extensible nonlinear elastic) bond
             force = unwrap(tokens, 4, "float")
             last_molecule().bonds.append((system.fene_bond, i, j,
                                          [length, force]))
+        elif type == 10:
+            # restraint potential
+            low = length
+            up1 = unwrap(tokens, 4, "float")
+            up2 = unwrap(tokens, 5, "float")
+            k = unwrap(tokens, 6, "float")
+            last_molecule().bonds.append((system.distance_restraint, i, j,
+                                         [low, up1, up2, k]))
         else:
             raise ValueError("Unsupported  bond function type")
         if type != 6:
@@ -172,18 +195,63 @@ def DaemonTopFile(file, include_dir=None, defines={},
         j = unwrap(tokens, 1, "index")
         k = unwrap(tokens, 2, "index")
         type = unwrap(tokens, 3, "int")
-        theta = unwrap(tokens, 4, "degree")
-        force = unwrap(tokens, 5, "float")
-        match type:
-            case 1:
-                force_obj = system.harmonic_angle
-            case 2:
-                force_obj = system.g96_angle
-            case 10:
-                force_obj = system.restricted_angle
-            case _:
-                raise ValueError(f"Unsupported angle type {type}.")
-        last_molecule().angles.append((force_obj, i, j, k, [theta, force]))
+        if type == 1:
+            # Harmonic angle
+            theta = unwrap(tokens, 4, "degree")
+            force = unwrap(tokens, 5, "float")
+            last_molecule().angles.append((system.harmonic_angle, i, j, k,
+                                          [theta, force]))
+        elif type == 2:
+            # G96 angle
+            theta = unwrap(tokens, 4, "degree")
+            force = unwrap(tokens, 5, "float")
+            last_molecule().angles.append((system.g96_angle, i, j, k,
+                                          [theta, force]))
+        elif type == 3:
+            # cross bond bond
+            r1 = unwrap(tokens, 4, "float")
+            r2 = unwrap(tokens, 5, "float")
+            force = unwrap(tokens, 6, "float")
+            last_molecule().angles.append((system.cross_bond_bond, i, j, k,
+                                          [r1, r2, force]))
+        elif type == 4:
+            # cross bond angle
+            r1 = unwrap(tokens, 4, "float")
+            r2 = unwrap(tokens, 5, "float")
+            r3 = unwrap(tokens, 6, "float")
+            force = unwrap(tokens, 7, "float")
+            last_molecule().angles.append((system.cross_bond_angle, i, j, k,
+                                          [r1, r2, r3, force]))
+        elif type == 5:
+            # Urey-Bradley
+            theta = unwrap(tokens, 4, "degree")
+            force = unwrap(tokens, 5, "float")
+            r13 = unwrap(tokens, 6, "float")
+            k_UB = unwrap(tokens, 7, "float")
+            last_molecule().angles.append((system.urey_bradley, i, j, k,
+                                          [theta, force, r13, k_UB]))
+        elif type == 6:
+            # Quartic angle
+            # theta
+            params = [unwrap(tokens, 4, "degree")]
+            # C0 to C4
+            for x in range(5):
+                params.append(unwrap(tokens, 5+x, "float"))
+            last_molecule().angles.append((system.quartic_angle, i, j, k,
+                                          params))
+        elif type == 9:
+            # Linear angle
+            a = unwrap(tokens, 4, "float")
+            force = unwrap(tokens, 5, "float")
+            last_molecule().angles.append((system.linear_angle, i, j, k,
+                                          [a, force]))
+        elif type == 10:
+            theta = unwrap(tokens, 4, "degree")
+            force = unwrap(tokens, 5, "float")
+            last_molecule().angles.append((system.restricted_angle, i, j, k,
+                                          [theta, force]))
+        else:
+            raise ValueError(f"Unsupported angle type {type}.")
 
     p.add_level("angles", process_angles)
 
@@ -238,6 +306,13 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 last_molecule().dihedrals.append(
                     (system.rb_torsion, i, j, k, l, rb_params)
                 )
+            case 10:
+                # restricted dihedral
+                theta = unwrap(tokens, 5, "degree")
+                force = unwrap(tokens, 6, "float")
+                last_molecule().dihedrals.append(
+                    (system.restricted_dihedral, i, j, k, l, [theta, force])
+                )
             case 11:
                 # combined bending-torsion potential
                 force = unwrap(tokens, 5, "float")
@@ -284,9 +359,9 @@ def DaemonTopFile(file, include_dir=None, defines={},
         type = unwrap(tokens, 2, "int")
         if type != 1:
             raise ValueError("Unsupported pairs type")
-        V = unwrap(tokens, 3, "float")
-        W = unwrap(tokens, 4, "float")
-        system.pairs.add_type(t1, t2, V, W)
+        sigma = unwrap(tokens, 3, "float")
+        epsilon = unwrap(tokens, 4, "float")
+        system.pairs.add_type(t1, t2, sigma, epsilon)
 
     p.add_level("pairtypes", process_pairtypes)
 
@@ -297,10 +372,10 @@ def DaemonTopFile(file, include_dir=None, defines={},
         if type != 1:
             raise ValueError("Unsupported pairs type")
         if len(tokens) >= 5:
-            V = unwrap(tokens, 3, "float")
-            W = unwrap(tokens, 4, "float")
+            sigma = unwrap(tokens, 3, "float")
+            epsilon = unwrap(tokens, 4, "float")
             last_molecule().interactions.append(
-                (system.pairs, [i, j], [V, W])
+                (system.pairs, [i, j], [sigma, epsilon])
             )
         else:
             last_molecule().interactions.append((system.pairs, [i, j], []))
@@ -310,17 +385,17 @@ def DaemonTopFile(file, include_dir=None, defines={},
     def process_atomtypes(tokens):
         if len(tokens) != 6:
             raise ValueError("Only atomtypes lines formatted as type, m, q,"
-                             "particle_type, V, W are supported.")
+                             "particle_type, sigma, epsilon are supported.")
         type = unwrap(tokens, 0, "word")
         mass = unwrap(tokens, 1, "float")
         charge = unwrap(tokens, 2, "float")
         particle_type = unwrap(tokens, 3, "word")
         if particle_type != "A":
             raise ValueError("Only A particle type expected in [atomtypes]")
-        V = unwrap(tokens, 4, "float")
-        W = unwrap(tokens, 5, "float")
-        if V != 0.0 or W != 0.0:
-            raise ValueError("Only zero V and W are expected in [atomtypes]")
+        sigma = unwrap(tokens, 4, "float")
+        epsilon = unwrap(tokens, 5, "float")
+        if sigma != 0.0 or epsilon != 0.0:
+            raise ValueError("Only zero sigma and epsilon are expected in [atomtypes]")
         system.add_atom_type(type, charge, mass)
 
     p.add_level("atomtypes", process_atomtypes)
@@ -330,10 +405,10 @@ def DaemonTopFile(file, include_dir=None, defines={},
         type2 = unwrap(tokens, 1, "word")
         funct = unwrap(tokens, 2, "int")
         if funct != 1:
-            raise ValueError("Only LJ (V/W) non bond params accepted")
-        V = unwrap(tokens, 3, "float")
-        W = unwrap(tokens, 4, "float")
-        system.add_nb_type(type1, type2, V, W)
+            raise ValueError("Only LJ (sigma/epsilon) non bond params accepted")
+        sigma = unwrap(tokens, 3, "float")
+        epsilon = unwrap(tokens, 4, "float")
+        system.add_nb_type(type1, type2, sigma, epsilon)
 
     p.add_level("nonbond_params", process_nonbond_params)
 
@@ -522,6 +597,49 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     p.add_level("frag_from", process_fragfrom)
 
+    last_graph: GraphFragment = None
+
+    def graph_start():
+        nonlocal last_graph
+        if _frag_name is None:
+            raise ValueError("[graph] must come after [frag].")
+        last_graph = GraphFragment(_frag_name)
+
+    def process_graph(tokens):
+        nonlocal last_graph
+        keyword = unwrap(tokens, 0, "word")
+        if keyword == "atom":
+            part_id = unwrap(tokens, 1, "word")
+            name_pat = unwrap(tokens, 2, "pattern")
+            type_pat = unwrap(tokens, 3, "pattern")
+            type = GraphAtomType.NORMAL
+            last_graph.atoms.append((part_id, name_pat, type_pat, type))
+        elif keyword == "atom?":
+            part_id = unwrap(tokens, 1, "word")
+            name_pat = unwrap(tokens, 2, "pattern")
+            type_pat = unwrap(tokens, 3, "pattern")
+            type = GraphAtomType.OPT
+            last_graph.atoms.append((part_id, name_pat, type_pat, type))
+        elif keyword == "atom!":
+            part_id = unwrap(tokens, 1, "word")
+            name_pat = unwrap(tokens, 2, "pattern")
+            type_pat = unwrap(tokens, 3, "pattern")
+            type = GraphAtomType.NOT
+            last_graph.atoms.append((part_id, name_pat, type_pat, type))
+        elif keyword == "molecule":
+            mols = [unwrap(tokens, n, "word") for n in range(1, len(tokens))]
+            last_graph.molecules += mols
+        else:
+            parts = [unwrap(tokens, i, "word") for i in range(1, len(tokens))]
+            last_graph.interactions.append((keyword, parts))
+
+    def graph_end():
+        nonlocal last_graph, topology
+        topology.new_graph_fragment(last_graph)
+        last_graph = None
+
+    p.add_level("graph", process_graph, start=graph_start, end=graph_end)
+
     # TODO this is terrible, the current callback architecture is really
     # unsuitable for this
     last_reaction: ReactionTemplate = None
@@ -646,19 +764,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
     # run parser
     ok = p.parse(file, include_dir, defines)
     if not ok:
-        raise ValueError("Parsing error")
+        raise ValueError("Failed to parse input files.")
+    if not system_defined:
+        raise ValueError("The [system] directive is mandatory!")
 
     return (system, topology)
-
-
-if __name__ == "__main__":
-    argv = sys.argv
-    argc = len(argv)
-    if argc != 2:
-        print("Usage: ./martini_top_parser.py <file>")
-        quit(1)
-    path = argv[1]
-
-    sys, top = DaemonTopFile(path)
-    sys.dump()
-    top.dump()

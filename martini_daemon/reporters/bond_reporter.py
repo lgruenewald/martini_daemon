@@ -21,7 +21,7 @@ class BondReporter(Reporter):
 
         bonds = [[] for _ in range(n)]
         for force in self._sysstar.modular_forces:
-            if not force.visualize_as_bond:
+            if not force.is_instance("bond"):
                 continue
             for entry in filter(None, force._list):
                 i, j, *_ = entry

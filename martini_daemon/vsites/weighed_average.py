@@ -71,3 +71,5 @@ class VSiteWeighedAverage(Force):
     def _interaction(self):
         return Interaction(self, len(self._list) - 1)
 
+    def is_instance(self, filter):
+        return filter in {"vsite", "weighed_average"}

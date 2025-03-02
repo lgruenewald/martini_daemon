@@ -87,12 +87,16 @@ class TopParser:
 
     # list of functions to call with data lines in each level
     _levels: dict
+    _start: dict
+    _end: dict
     # list of directives we already complained about
     _complained_directives: dict
 
     def __init__(self):
         self._complained_directives = {}
         self._levels = {}
+        self._start = {}
+        self._end = {}
 
     def parse(self, path, include_dir, defines={}):
         """The main interface for using a TopParser class
@@ -238,7 +242,11 @@ class TopParser:
                     # directives
                     if line[-1] != "]":
                         self.error("Invalid directive: no ]")
+                    end_hook = self._end.get(self._current_level)
+                    end_hook and end_hook()
                     self._current_level = line.strip("[] \t")
+                    start_hook = self._start.get(self._current_level)
+                    start_hook and start_hook()
                     if self._levels.get(self._current_level) is None:
                         if self._complained_directives.get(self._current_level):
                             self._haderror = True
@@ -311,7 +319,11 @@ class TopParser:
             self.error("Unmatched #ifdef or #ifndef")
         self._path = oldpath
 
-    def add_level(self, name, handler):
+    def add_level(self, name, handler, start=None, end=None):
         """Add a new level to this TopParser
         """
         self._levels[name] = handler
+        if start is not None:
+            self._start[name] = start
+        if end is not None:
+            self._end[name] = end

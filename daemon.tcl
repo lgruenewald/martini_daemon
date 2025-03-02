@@ -6,16 +6,7 @@ proc decode_list {filename} {
 	fconfigure $fd -translation binary
 	set binary [read $fd]
 	close $fd
-
-	set result {}
-	set length [string length $binary]
-
-	for {set i 0} {$i < $length} {incr i 4} {
-		set chunk [string range $binary $i [expr {$i + 3}]]
-		binary scan $chunk i value
-		lappend result $value
-	}
-
+	binary scan $binary "i*" result
 	return $result
 }
 

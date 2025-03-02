@@ -1,9 +1,9 @@
-#include "../../tests/martini_v3.0.0.itp"
-#include "../../tests/martini_v3.0.0_solvents_v1.itp"
-#include "../../tests/martini_v3.0.0_small_molecules_v2.itp"
-#include "BDT.itp"
+#include "../../itp/martini_v3.0.0.itp"
+#include "../../itp/martini_v3.0.0_solvents_v1.itp"
+#include "../../itp/martini_v3.0.0_small_molecules_v2.itp"
+#include "../BDT_in_BENZ/BDT.itp"
 #ifdef DAEMON
-#include "dimerize.rx"
+#include "../BDT_in_BENZ/dimerize.rx"
 #endif
 
 [ system ]

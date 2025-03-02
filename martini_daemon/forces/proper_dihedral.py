@@ -26,3 +26,6 @@ class ProperDihedral(Force):
 
     def update_params(self, id, theta, force, mult):
         raise NotImplementedError
+
+    def is_instance(self, filter):
+        return filter in {"dihedral", "proper_dihedral"}

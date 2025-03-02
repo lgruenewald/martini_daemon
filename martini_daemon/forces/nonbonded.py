@@ -13,7 +13,7 @@ class NonBonded(Force):
     """
 
     """Non bonded parameters are for building the C6/C12 table
-    values are (type1: string, type2: string), (V: float, W: float)
+    values are (type1: string, type2: string), (sigma: float, epsilon: float)
     """
     _nb_types: dict[(str, str), (float, float)]
     _used_atom_types: OrderedDict[str, int]
@@ -51,8 +51,8 @@ class NonBonded(Force):
     def _build(self):
         self._force_obj = mm.CustomNonbondedForce(
             "step(rcut-r)*(LJ - corr + ES);"
-            "LJ = (W(type1, type2) / r^12 - V(type1, type2) / r^6);"
-            "corr = (W(type1, type2) / rcut^12 - V(type1, type2) / rcut^6);"
+            "LJ = (C12(type1, type2) / r^12 - C6(type1, type2) / r^6);"
+            "corr = (C12(type1, type2) / rcut^12 - C6(type1, type2) / rcut^6);"
             "ES = f/epsilon_r*q1*q2 * (1/r + krf * r^2 - crf);"
             "crf = 1 / rcut + krf * rcut^2;"
             "krf = 1 / (2 * rcut^3);"
@@ -86,16 +86,16 @@ class NonBonded(Force):
             for t2, j in self._used_atom_types.items():
                 nb_params = self._nb_types.get((t1, t2)) or\
                             self._nb_types.get((t2, t1)) or (0., 0.)
-                V, W = nb_params
-                c6 = 4 * W * (V ** 6)
-                c12 = 4 * W * (V ** 12)
+                sigma, epsilon = nb_params
+                c6 = 4 * epsilon * (sigma ** 6)
+                c12 = 4 * epsilon * (sigma ** 12)
                 C6.append(c6)
                 C12.append(c12)
         self._force_obj.addTabulatedFunction(
-            "V", mm.Discrete2DFunction(n, n, C6)
+            "C6", mm.Discrete2DFunction(n, n, C6)
         )
         self._force_obj.addTabulatedFunction(
-            "W", mm.Discrete2DFunction(n, n, C12)
+            "C12", mm.Discrete2DFunction(n, n, C12)
         )
 
     def build(self):
@@ -139,6 +139,9 @@ class NonBonded(Force):
             self._used_atom_types[part_type] = id
             self._rebuild = True
         return id
+
+    def is_instance(self, filter):
+        return False
 
 
 class ExclusionHelper(Force):
@@ -248,3 +251,6 @@ class ExclusionHelper(Force):
 
     def _interaction(self):
         return Interaction(self, len(self._list) - 1)
+
+    def is_instance(self, filter):
+        return False

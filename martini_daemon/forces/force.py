@@ -12,8 +12,6 @@ class Force():
     # rebuild is True for example before force_obj is built in the first place,
     # or when removing elements from the bond
 
-    visualize_as_bond = False
-
     def __init__(self, sysstar):
         self._list = []
         self._sysstar = sysstar
@@ -21,16 +19,16 @@ class Force():
         self._force_obj = None
 
     def _build(self):
-        pass
+        raise NotImplementedError
 
     def add(self, *params):
-        pass
+        raise NotImplementedError
 
     def get_members(self, i):
-        pass
+        raise NotImplementedError
 
     def update_params(self, i, *params):
-        pass
+        raise NotImplementedError
 
     def remove(self, i):
         self._list[i] = None
@@ -60,6 +58,9 @@ class Force():
     def _interaction(self):
         return Interaction(self, len(self._list) - 1)
 
+    def is_instance(self, filter: str):
+        raise NotImplementedError
+
 
 @dataclass
 class Interaction():
@@ -74,6 +75,9 @@ class Interaction():
 
     def remove(self):
         self._force.remove(self._index)
+
+    def is_instance(self, filter: str):
+        return self._force.is_instance(filter)
 
     def __hash__(self):
         return hash((self._index, self._force.__class__))

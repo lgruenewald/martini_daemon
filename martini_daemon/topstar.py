@@ -6,10 +6,13 @@ from fnmatch import fnmatch
 from .utils import pdist, pcos_angle, pdihedral
 import random
 from .reporters.reporter import Reporter
+from .graph import GraphFragment, GraphMatch
+from .fragment import Fragment
 
 random.seed()
 
 
+# TODO: rename this to NumberedFragment
 @dataclass
 class FragFragment:
     name: str  # when instantiated it has this name (e.g. in [ rx ])
@@ -103,27 +106,6 @@ class ReactionTemplate:
         )
 
 
-class Fragment():
-    """Helper class for building and storing fragment information
-    fragment name is used for its type
-    fragment name can be molname (from .itps) or fragname (from .frag)
-
-    Constructed by either DaemonTopology (when instantiating fragments)
-
-    or constructed by the D/M algorithm (when dynamically generating complete
-    fragments)
-    """
-
-    name: str
-    particles: list[int]
-    frag_id: int
-
-    def __init__(self, name, id):
-        self.name = name
-        self.particles = []
-        self.frag_id = id
-
-
 class TopStar():
     # ======= (1/3) Building things =======
     # T* fragment and defrag list
@@ -136,9 +118,14 @@ class TopStar():
     interaction_list: list[list[Interaction]]
 
     # type name -> list of subfrag names
+    # TODO rename FragFragment to numbered fragment
+    # TODO change this to dict[str, FragFragment]
     subfrag_map: dict[str, list[str]]
 
-    # type name -> type
+    graph_fragment_list: list[GraphFragment]
+
+    # type name -> type, used for instantiation
+    # TODO only use it for MolFragment
     type_lookup: dict[str, FragFragment | MolFragment]
 
     reaction_list: list[ReactionTemplate]
@@ -160,6 +147,7 @@ class TopStar():
         self.subfrag_map = {}
         self.reactive_types = set()
         self.reporters = []
+        self.graph_fragment_list = []
         self.system = system
         self.logger = logger
 
@@ -187,12 +175,15 @@ class TopStar():
             self.subfrag_map[parent] = [name_id]
         return frag_fragment
 
+    def new_graph_fragment(self, frag: GraphFragment):
+        self.graph_fragment_list.append(frag)
+
     def new_reaction(self, reaction: ReactionTemplate):
         self.reaction_list.append(reaction)
         for r in reaction.reactants:
             self.reactive_types.add(r)
 
-    def add_frag_to_list(self, name: str):
+    def add_frag_to_list(self, name: str) -> Fragment:
         if name in self.reactive_types:
             inst = Fragment(name, self.next_frag_id)
             self.frag_list[self.next_frag_id] = inst
@@ -200,6 +191,51 @@ class TopStar():
             return inst
         else:
             return Fragment(name, -1)
+
+    # Graph helpers
+
+    def try_match_graphs(self, particles: set[int], molname=None):
+        """
+            Graph version of instantiate subfrag.
+
+            Tries to match all known graphs at all particles in a list.
+            Should be called after interactions (self.interaction_list) have
+            been updated. Particles should be all affected particles, and
+            all their neighbors (during reactions) or all particles
+            (at the start).
+
+            Will add graphs to self.frag_list, if the same match/graph doesn't
+            already exist.
+
+            If molname is specified, it means that we can be assured that
+            the same matches are going to happen when we call it with the
+            same molname again, so we can cache the results and speed up
+            this function call later.
+        """
+
+        matches: list[GraphMatch] = []
+        for graph in self.graph_fragment_list:
+            # for each possible graph to match
+            # don't match if it's only the specific molecule
+            if len(graph.molecules) > 0:
+                if molname not in graph.molecules:
+                    continue
+            matches += graph.match_particles(
+                particles, self.system,
+                self.interaction_list
+            )
+
+        for m in matches:
+            inst = self.add_frag_to_list(m.graph.name)
+            inst.graph = m.graph
+            for i in range(1, len(m.atoms)+1):
+                key = f"{i}"
+                part = m.atoms.get(key)
+                if part is None:
+                    raise ValueError("We don't support non integer atom names yet")
+                inst.particles.append(part)
+                if inst.frag_id != -1:
+                    self.defrag_list[part].append(inst.frag_id)
 
     def instantiate_subfrag(self, name_id, inst):
         """Instantiates a subfragment subfrag, with forces in S* as seen in
@@ -254,13 +290,15 @@ class TopStar():
                 self.instantiate_subfrag(subfrag, inst)
 
     def instantiate(self, frag_name):
-        frag = self.type_lookup.get(frag_name)  # frag type
+        # frag_name must refer to a MolFragment type
+        frag = self.type_lookup.get(frag_name)
         if frag is None:
             raise ValueError(f"Can't find mol {frag_name}")
         elif not isinstance(frag, MolFragment):
             raise ValueError(f"Attempt to instantiate {frag_name}, but it's"
                              " not a mol fragment type."
                              f" It is: {frag}")
+        # add particles to S*
         parts = []
         prev_resnum = 0
         for in_frag_id, atom in enumerate(frag.atoms):
@@ -272,7 +310,11 @@ class TopStar():
             parts.append(p)
             self.defrag_list.append([])
             self.interaction_list.append([])
-        return self.instantiate_over_existing(frag_name, parts)
+        # instantiate interactions
+        res = self.instantiate_over_existing(frag_name, parts)
+        # add graphs to system
+        self.try_match_graphs(set(parts), frag_name)
+        return res
 
     def instantiate_over_existing(self, frag_name, particles, reaction=False):
         """Takes a name of a mol fragment, adds interactions to those particles
@@ -483,7 +525,7 @@ class TopStar():
         for next_reactant, next_node in node.items():
             if next_reactant == "_reaction":
                 # convert init_map indices to init_list indices
-                frag_ids = [init_map[name.lstrip("*")][id] for name, id in 
+                frag_ids = [init_map[name.lstrip("*")][id] for name, id in
                             zip(previous_types, previous_indices)]
                 frags = [self.frag_list[i] for i in frag_ids]
                 rx = next_node
@@ -578,6 +620,8 @@ class TopStar():
         """
             Process [rx_update] in rx over frags.
         """
+        # TODO: consider if we really need this or if there are better ways
+        # to remove interactions
 
         for group in rx.update_groups:
             group = [particles[i] for i in group]
@@ -589,6 +633,22 @@ class TopStar():
                            inter.get_members()
                        )):
                     self.remove_interaction(inter)
+
+    def populate_neighbors(self, particles: set[int]) -> set[int]:
+        res = set()
+        for part in particles:
+            res.add(part)
+            for inter in self.interaction_list[part]:
+                for member in inter.get_members():
+                    res.add(member)
+        return res
+    
+    def remove_overlapping_graphs(self, particles: set[int]):
+        for part in particles:
+            for frag_id in self.defrag_list[part][:]:
+                frag = self.frag_list.get(frag_id)
+                if frag is not None and frag.graph is not None:
+                    self.remove_fragment(frag)
 
     def pre_modification(self, rx_list: list[(list, ReactionTemplate)], i):
         # hook that gets called after detection, before modification
@@ -606,13 +666,17 @@ class TopStar():
         self.process_break(frags, rx, product_particles)
         # [rx_update]
         self.process_update(frags, rx, product_particles)
-        # only non skipped get passed to modification, so we remove them all
+        # (only non skipped get passed here) remove non graph fragment reactants
         for frag in frags:
-            self.remove_fragment(frag)
+            if frag.graph is None:
+                self.remove_fragment(frag)
 
-        # the index of the next particle for which a new product needs to be
-        # instantiated
+        # which particles to recalculate graphs over
+        graph_recalc = self.populate_neighbors(set(product_particles))
+        # graphs get recalculated later over the same particles
+        self.remove_overlapping_graphs(graph_recalc)
 
+        # change the interactions
         for product_line in rx.products:
             product_particle_index = 0
             for product in product_line:
@@ -632,6 +696,8 @@ class TopStar():
                 product_particle_index = end
                 self.instantiate_over_existing(product, parts, reaction=True)
             assert product_particle_index == len(product_particles)
+
+        self.try_match_graphs(graph_recalc)
 
     def post_modification(self, i):
         # hook that only gets called after modification

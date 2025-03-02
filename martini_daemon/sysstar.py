@@ -23,6 +23,15 @@ from .forces.pairs import Pairs
 from .forces.proper_dihedral import ProperDihedral
 from .forces.rbtorsion import RBTorsion
 from .forces.restricted_angle import RestrictedAngle
+from .forces.restricted_dihedral import RestrictedDihedral
+from .forces.g96bond import G96Bond
+from .forces.connection import Connection
+from .forces.distance_restraint import DistanceRestraint
+from .forces.urey_bradley import UreyBradley
+from .forces.cross_bond_bond import CrossBondBond
+from .forces.cross_bond_angle import CrossBondAngle
+from .forces.quartic_angle import QuarticAngle
+from .forces.linear_angle import LinearAngle
 from .vsites.two_fd import VSite2fd
 from .vsites.three_fd import VSite3fd
 from .vsites.three_fad import VSite3fad
@@ -84,6 +93,15 @@ class SysStar():
         self.restricted_angle = RestrictedAngle(self)
         self.combined_bending_torsion = CombinedBendingTorsion(self)
         self.rb_torsion = RBTorsion(self)
+        self.g96_bond = G96Bond(self)
+        self.connection = Connection(self)
+        self.distance_restraint = DistanceRestraint(self)
+        self.urey_bradley = UreyBradley(self)
+        self.restricted_dihedral = RestrictedDihedral(self)
+        self.cross_bond_bond = CrossBondBond(self)
+        self.cross_bond_angle = CrossBondAngle(self)
+        self.quartic_angle = QuarticAngle(self)
+        self.linear_angle = LinearAngle(self)
         self.pairs = Pairs(self)
         self.vsite_2fd = VSite2fd(self)
         self.vsite_3fd = VSite3fd(self)
@@ -101,6 +119,10 @@ class SysStar():
             self.g96_angle, self.restricted_angle,
             self.combined_bending_torsion, self.rb_torsion,
             self.morse_bond, self.cubic_bond, self.fene_bond,
+            self.g96_bond, self.connection, self.distance_restraint,
+            self.urey_bradley, self.restricted_dihedral,
+            self.cross_bond_bond, self.cross_bond_angle,
+            self.quartic_angle, self.linear_angle,
             self.vsite_2fd, self.vsite_3fd, self.vsite_4fdn,
             self.vsite_avg, self.vsite_3fad, self.vsite_3out, self.vsite_com,
             self.nonbonded_force, self.exclusions, self.pairs

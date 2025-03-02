@@ -1,0 +1,14 @@
+#include "../../../itp/martini_v3.0.0.itp"
+#include "../../../itp/martini_v3.0.0_solvents_v1.itp"
+#include "../../../itp/martini_v3.0.0_ions_v1.itp"
+
+[ system ]
+; name
+NACL and WAT
+
+[ molecules ]
+; name  number
+NA 8
+CL 8
+W 388
+

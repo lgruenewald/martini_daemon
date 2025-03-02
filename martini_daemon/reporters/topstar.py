@@ -1,5 +1,30 @@
 from .reporter import Reporter
 from ..utils import backup_try
+import sys
+
+
+def dump_topstar(topstar, file=sys.stdout):
+    print("==== TopStar / Fragment Types ====", file=file)
+    for k, molfrag in topstar.type_lookup.items():
+        file.write(f"{k} ")
+    file.write("\n")
+    print("==== TopStar / GraphFragments ====", file=file)
+    for g in topstar.graph_fragment_list:
+        file.write(f"{g.name}: ({[name for (name, _, _, _) in g.atoms]}) ")
+    file.write("\n")
+    print("==== TopStar / ReactionTemplates ====", file=file)
+    for rx in topstar.reaction_list:
+        print(f"rx {rx.name} reactants {rx.reactants} products {rx.products}",
+              file=file)
+    print("==== TopStar / Fragments ====", file=file)
+    for id, frag in topstar.frag_list.items():
+        print(f"{id}: <frag {frag.name} ps {frag.particles}>", file=file)
+    print("==== TopStar / defrag list ====", file=file)
+    for id, defrag in enumerate(topstar.defrag_list):
+        print(f"particle {id} is in fragments {defrag}", file=file)
+#    print("==== TopStar / Interaction list ====", file=file)
+#    for id, inter in enumerate(topstar.interaction_list):
+#        print(f"particle {id} is in interactions {inter}", file=file)
 
 
 class TopStarLogger(Reporter):
@@ -14,22 +39,7 @@ class TopStarLogger(Reporter):
     def post_modification(self, i):
         with open("topstar.log", "a") as file:
             print(f"===== Frame {i} =====", file=file)
-            print("==== TopStar / Fragment Types ====", file=file)
-            for k, molfrag in self._topstar.type_lookup.items():
-                file.write(f"{k} ")
-            file.write("\n")
-            print("==== TopStar / ReactionTemplates ====", file=file)
-            for rx in self._topstar.reaction_list:
-                print(f"rx {rx.name} reactants {rx.reactants} products {rx.products}", file=file)
-            print("==== TopStar / Fragments ====", file=file)
-            for id, frag in self._topstar.frag_list.items():
-                print(f"{id}: <frag {frag.name} ps {frag.particles}>", file=file)
-            print("==== TopStar / defrag list ====", file=file)
-            for id, defrag in enumerate(self._topstar.defrag_list):
-                print(f"particle {id} is in fragments {defrag}", file=file)
-            print("==== TopStar / Interaction list ====", file=file)
-            for id, inter in enumerate(self._topstar.interaction_list):
-                print(f"particle {id} is in interactions {inter}", file=file)
+            dump_topstar(self._topstar, file)
 
 
 class ReactionReporter(Reporter):
