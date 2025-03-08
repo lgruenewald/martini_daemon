@@ -16,7 +16,9 @@ class FENEBond(Force):
         for (i, j, length, k) in filter(None, self._list):
             self._force_obj.addBond(i, j, [length, k])
 
-    def add(self, i, j, length, k):
+    def add(self, members, params):
+        i, j = members
+        length, k = params
         self._list.append((i, j, length, k))
         if not self._rebuild:
             self._force_obj.addBond(i, j, [length, k])

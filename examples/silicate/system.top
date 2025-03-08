@@ -1,10 +1,7 @@
-#include "../../tests/martini_v3.0.0.itp"
-#include "../../tests/martini_v3.0.0_solvents_v1.itp"
-#include "../../tests/martini_v3.0.0_small_molecules_v2.itp"
-#include "silicid_acid.itp"
-#ifdef DAEMON
+#include "../../itp/martini_v3.0.0.itp"
+#include "../../itp/martini_v3.0.0_solvents_v1.itp"
+#include "../../itp/martini_v3.0.0_small_molecules_v2.itp"
 #include "sticky.rx"
-#endif
 
 [ system ]
 SIAC polymerization

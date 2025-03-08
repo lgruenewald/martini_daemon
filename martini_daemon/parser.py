@@ -13,7 +13,6 @@ import math
 @dataclass
 class Token:
     content: str
-#    type: str
     path: str
     line: int
 
@@ -22,6 +21,7 @@ int_pat = re.compile("[-+]?[0-9]+")
 float_pat = re.compile("[-+]?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?")
 word_pat = re.compile("[a-zA-Z0-9_.]+")
 pattern_pat = re.compile("[a-zA-Z0-9_?!*{}]+")
+pair_pat = re.compile(r"[0-9]+:[a-zA-Z0-9_.]+")
 
 
 def unwrap(tokens, index, type_filter, default="default placeholder"):
@@ -52,6 +52,11 @@ def unwrap(tokens, index, type_filter, default="default placeholder"):
         case "pattern":
             if pattern_pat.match(tok):
                 return tok.replace("{", "[").replace("}", "]")
+        case "pair":
+            # specialized index:word construct for [reaction] stuff
+            if pair_pat.match(tok):
+                items = tok.split(":")
+                return (int(items[0])-1, items[1])
 
     raise ValueError(f"Token {tok}: "
                      f"expected {type_filter}.")

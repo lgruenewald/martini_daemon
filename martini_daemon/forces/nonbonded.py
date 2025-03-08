@@ -29,7 +29,7 @@ class NonBonded(Force):
         self._nb_types = {}
         self._exclusions = ExclusionHelper(self, sysstar)
 
-    def add(self, *params):
+    def add(self, members, params):
         """Particle types are listed in S*, not here"""
         raise NotImplementedError
 

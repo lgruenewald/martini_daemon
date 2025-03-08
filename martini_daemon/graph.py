@@ -18,28 +18,29 @@ class GraphMatch():
     atoms: dict[str, int]
     # interaction matches, lists of None or Interaction
     interactions: list[None | Interaction]
-    matched_atoms: set[int]
+    # reverse of atoms
+    rev_atoms: dict[int, str]
     matched_inter: set[Interaction]
 
     def __init__(self, graph: GraphFragment):
         self.graph = graph
         self.atoms = {}
         self.interactions = [None for _ in graph.interactions]
-        self.matched_atoms = set()
+        self.rev_atoms = {}
         self.matched_inter = set()
 
     def copy(self) -> GraphMatch:
         res = GraphMatch(self.graph)
         res.atoms = self.atoms.copy()
         res.interactions = self.interactions.copy()
-        res.matched_atoms = self.matched_atoms.copy()
+        res.rev_atoms = self.rev_atoms.copy()
         res.matched_inter = self.matched_inter.copy()
         return res
 
     def add_atom(self, name: str, part_num: int):
-        assert self.atoms.get(name) is None and part_num not in self.matched_atoms
+        assert self.atoms.get(name) is None and part_num not in self.rev_atoms
         self.atoms[name] = part_num
-        self.matched_atoms.add(part_num)
+        self.rev_atoms[part_num] = name
 
     def add_inter(self, id: int, inter: Interaction):
         assert self.interactions[id] is None and inter not in self.matched_inter
@@ -67,15 +68,25 @@ class GraphMatch():
                 return False
         return True
 
-    def is_equal(self, other):
+    def is_equal(self, other: GraphMatch) -> bool:
         # also see note for is_acceptable -> only checks atoms
+        # equivalent atoms in graph are exchangeable
         if self.graph != other.graph:
             return False
         if len(self.atoms) != len(other.atoms):
             return False
         for name, id in self.atoms.items():
-            if other.atoms.get(name) != id:
+            other_name = other.rev_atoms.get(id)
+            if other_name is None:
                 return False
+            if other_name != name:
+                if all(
+                    map(
+                        lambda eqs: name not in eqs or other_name not in eqs,
+                        self.graph.equivalents
+                    )
+                ):
+                    return False
         return True
 
 
@@ -86,15 +97,17 @@ class GraphFragment():
     # if empty, all molecules and during reactions too
     molecules: list[str]
     # list[(part_id, name_pat, type_pat, type)]
-    atoms: list[(str, str, str, GraphAtomType)]
+    atoms: list[tuple[str, str, str, GraphAtomType]]
     # list[(interaction_type, list[part_id])]
-    interactions: list[(str, list[str])]
+    interactions: list[tuple[str, list[str]]]
+    equivalents: list[set[str]]
 
     def __init__(self, name):
         self.name = name
         self.molecules = []
         self.atoms = []
         self.interactions = []
+        self.equivalents = []
 
     def get_neighbors(self, part: int, interactions: list[list[Interaction]]):
         neighbors = set()
@@ -125,7 +138,7 @@ class GraphFragment():
                 continue
             # if there is a missing member, then it's too early to check
             part_nums = [partial.atoms.get(ipart) for ipart in inter_parts]
-            if any([x is None for x in part_nums]):
+            if any(map(lambda x: x is None, part_nums)):
                 continue
             part_nums = set(part_nums)
             found = False
@@ -183,7 +196,7 @@ class GraphFragment():
 
         # filter through particles and collect new recursions
         for part_num in particles:
-            if part_num in partial.matched_atoms:
+            if part_num in partial.rev_atoms.keys():
                 continue
             name, type = sysstar.get_particle_name_type(part_num)
             keep_this = False
@@ -220,7 +233,7 @@ class GraphFragment():
                                          interactions)
             # don't add duplicates
             for m in new_matches:
-                if all([not m.is_equal(x) for x in res]):
+                if all(map(lambda x: not m.is_equal(x), res)):
                     res.append(m)
 
         # greedy algorithm => only check if the current graph match is

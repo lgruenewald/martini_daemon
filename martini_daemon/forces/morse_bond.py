@@ -17,7 +17,9 @@ class MorseBond(Force):
         for (i, j, length, D, beta) in filter(None, self._list):
             self._force_obj.addBond(i, j, [length, D, beta])
 
-    def add(self, i, j, length, D, beta):
+    def add(self, members, params):
+        i, j = members
+        length, D, beta = params
         self._list.append((i, j, length, D, beta))
         if not self._rebuild:
             self._force_obj.addBond(i, j, [length, D, beta])

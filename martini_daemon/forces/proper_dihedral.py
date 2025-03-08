@@ -13,7 +13,9 @@ class ProperDihedral(Force):
         for (i, j, k, l, theta, force, mult) in filter(None, self._list):
             self._force_obj.addTorsion(i, j, k, l, mult, theta, force)
 
-    def add(self, i, j, k, l, theta, force, mult):
+    def add(self, members, params):
+        i, j, k, l = members
+        theta, force, mult = params
         self._list.append((i, j, k, l, theta, force, mult))
         if not self._rebuild:
             self._force_obj.addTorsion(i, j, k, l, mult, theta, force)

@@ -17,7 +17,9 @@ class LinearAngle(Force):
         for (i, j, k, a, force) in filter(None, self._list):
             self._force_obj.addBond((i, j, k), (a, force))
 
-    def add(self, i, j, k, a, force):
+    def add(self, members, params):
+        i, j, k = members
+        a, force = params
         self._list.append((i, j, k, a, force))
         if not self._rebuild:
             self._force_obj.addBond((i, j, k), (a, force))

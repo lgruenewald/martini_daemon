@@ -18,10 +18,12 @@ def dump_topstar(topstar, file=sys.stdout):
               file=file)
     print("==== TopStar / Fragments ====", file=file)
     for id, frag in topstar.frag_list.items():
-        print(f"{id}: <frag {frag.name} ps {frag.particles}>", file=file)
+        print(f"{id}: <frag {frag.name} ps {frag.particles} opt {frag.opt}>", file=file)
     print("==== TopStar / defrag list ====", file=file)
     for id, defrag in enumerate(topstar.defrag_list):
         print(f"particle {id} is in fragments {defrag}", file=file)
+        if id > 100:
+            break
 #    print("==== TopStar / Interaction list ====", file=file)
 #    for id, inter in enumerate(topstar.interaction_list):
 #        print(f"particle {id} is in interactions {inter}", file=file)

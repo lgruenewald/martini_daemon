@@ -1,49 +1,27 @@
-A sunday's worth of work
-
-- test and write examples
-
-- optimization: the same graphs per molecule type when doing it at the start
-	- cache results for this and reuse
-
-Fragment atoms to ordered maps
-
-- atoms inside a fragment shouldn't be just ordered, it should be a hashmap
-	with optional names
-- indexing in reaction should be 2D and allow these names
-- instantiate products over a chosen ordered list of atoms instead of only indexing
-
-Adding bonds without making new molecule types
-
-- 0 products should be valid
-- allow defining new bonds, angles, etc. in reactions
-
-More flexible templates
-- updating particle names during reactions
-- early quits in detection_over_types on more than 2 reactant situations when part of the conditions do not get fulfilled
-- reaction name should be usable for [frag_from], frags should be spawnable as products
-- [atoms] should be optional, allow specifying just the number of atoms
-- simplified [atoms] with less columns
+- D/M unit testing
+	- detection testing - single run of D algo
+		- json recipe for list of reactions and list of atoms involved
+	- modification testing - single run of D/M algo
+		- fragment list similar to how graphs do it
 - multiple reactions with the same starting materials, with equal standing (independent of their order)
 - velocity rx_condition, better rx_condition syntax
-- rename rx_..., frag_... to more sane names
 - undoing reactions instead of [rx_break] and [rx_update]
 - update documentation
-- build the sticky martini system with the more flexible templates
 
 Optimizations
+- early quits in detection_over_types on more than 2 reactant situations when part of the conditions do not get fulfilled
+- optimization: the same graphs per molecule type when doing it at the start
+	- cache results for this and reuse
 - do not add S* forces that are never going to change (reduced memory usage when dilute systems)
 - S* should try to update forces instead of remove/adding when possible
   - allow this for vsites, constraints
+- neighborlist for the D algorithm
+- cythonize and parallelize bottlenecks
 
-Rate correctness
+Correctness
 - limiter should not depend on the order of atoms in the topology
+- verification for the "equivalent" keyword
 - reaction rates should be independent of how often the D/M algorithm is done
-
-Behavior
-- better rx_break, rx_update, constraits to updating atom types (only when rx_update?)
-
-Testing
-- Unit test D/M algorithm
 
 Simulation stability
 - Langevin integrator friction and stability?

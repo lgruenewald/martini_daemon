@@ -21,13 +21,13 @@ class Force():
     def _build(self):
         raise NotImplementedError
 
-    def add(self, *params):
+    def add(self, members, params):
         raise NotImplementedError
 
     def get_members(self, i):
         raise NotImplementedError
 
-    def update_params(self, i, *params):
+    def update_params(self, i, params):
         raise NotImplementedError
 
     def remove(self, i):

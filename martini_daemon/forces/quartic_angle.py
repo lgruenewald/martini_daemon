@@ -20,7 +20,9 @@ class QuarticAngle(Force):
         for (i, j, k, angle, c0, c1, c2, c3, c4) in filter(None, self._list):
             self._force_obj.addAngle(i, j, k, (angle, c0, c1, c2, c3, c4))
 
-    def add(self, i, j, k, angle, c0, c1, c2, c3, c4):
+    def add(self, members, params):
+        i, j, k = members
+        angle, c0, c1, c2, c3, c4 = params
         self._list.append((i, j, k, angle, c0, c1, c2, c3, c4))
         if not self._rebuild:
             self._force_obj.addAngle(i, j, k, (angle, c0, c1, c2, c3, c4))

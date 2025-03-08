@@ -14,7 +14,7 @@ def rootdir(request):
 
 
 tests = [
-    "single", "square", "star", "BDT", "opt"
+    "single", "square", "star", "BDT", "opt", "equiv"
 ]
 
 
@@ -46,9 +46,13 @@ class TestGraph():
     def try_match(self, frag: Fragment, name: str, parts: list[int]):
         if frag.name != name:
             return False
-        if len(frag.particles) != len(parts):
+        frag_parts = (
+            [] + list(frag.particles.values()) +
+            list(filter(None, frag.opt.values()))
+        )
+        if len(frag_parts) != len(parts):
             return False
-        for i, atom in enumerate(frag.particles):
+        for i, atom in enumerate(frag_parts):
             if atom != parts[i]:
                 return False
         return True

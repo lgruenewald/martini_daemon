@@ -17,7 +17,9 @@ class CubicBond(Force):
         for (i, j, length, kb, kcub) in filter(None, self._list):
             self._force_obj.addBond(i, j, [length, kb, kcub])
 
-    def add(self, i, j, length, kb, kcub):
+    def add(self, members, params):
+        i, j = members
+        length, kb, kcub = params
         self._list.append((i, j, length, kb, kcub))
         if not self._rebuild:
             self._force_obj.addBond(i, j, [length, kb, kcub])

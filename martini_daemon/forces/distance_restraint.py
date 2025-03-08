@@ -17,7 +17,9 @@ class DistanceRestraint(Force):
         for (i, j, low, up1, up2, force) in filter(None, self._list):
             self._force_obj.addBond(i, j, [low, up1, up2, force])
 
-    def add(self, i, j, low, up1, up2, force):
+    def add(self, members, params):
+        i, j = members
+        low, up1, up2, force = params
         self._list.append((i, j, low, up1, up2, force))
         if not self._rebuild:
             self._force_obj.addBond(i, j, [low, up1, up2, force])

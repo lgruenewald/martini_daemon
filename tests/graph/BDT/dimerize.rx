@@ -19,5 +19,5 @@ bond 1 4
 
 [ rx ]
 BDT_dimerization
-[ rx_reactants ]
+[ reactants ]
 monomer

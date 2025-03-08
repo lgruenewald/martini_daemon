@@ -155,21 +155,36 @@ class SysStar():
         self._part_list.append((part_name, self.last_resid, resname, part_type, charge, mass))
         return len(self._part_list) - 1
 
-    def update_particle(self, part_id, part_type, charge, mass):
-        name, resid, resname, old_type, old_charge, old_mass = self._part_list[part_id]
-        charge, mass = self.get_defaults(part_type, charge, mass)
-        self._part_list[part_id] = (name, resid, resname, part_type, charge, mass)
-        if not self.context_initialized:
-            return
-        if old_type != part_type or old_charge != charge:
-            # Change of LJ params plus self correction force (called by nb)
+    def rename(self, part_id, new_name):
+        self._part_list[part_id][0] = new_name
+
+    def retype(self, part_id, new_type):
+        _, _, _, old_type, charge, _ = self._part_list[part_id]
+        self._part_list[part_id][3] = new_type
+        if self.context_initialized and old_type != new_type:
             self.nonbonded_force.update_params(
-                part_id, part_type, charge, old_charge != charge
+                part_id, new_type, charge, False
             )
 
-        if old_mass != mass:
-            self._system.setParticleMass(part_id, mass)
-        self._reinitialize = True
+    def recharge(self, part_id, new_charge):
+        _, _, _, type, old_charge, _ = self._part_list[part_id]
+        self._part_list[part_id][4] = new_charge
+        if self.context_initialized and old_charge != new_charge:
+            self.nonbonded_force.update_params(
+                part_id, type, new_charge, True
+            )
+
+    def remass(self, part_id, new_mass):
+        old_mass = self._part_list[part_id][5]
+        self._part_list[part_id][5] = new_mass
+        if self.context_initialized and new_mass != old_mass:
+            self._system.setParticleMass(part_id, new_mass)
+            self._reinitialize = True
+
+    def update_particle(self, part_id, part_type, charge, mass):
+        self.retype(part_id, part_type)
+        self.recharge(part_id, charge)
+        self.remass(part_id, mass)
 
     def build_system(self):
         self._system = mm.System()

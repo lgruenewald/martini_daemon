@@ -25,7 +25,7 @@ bond 1 2
 ; without a rx fragments never actually get added to the system (optimization)
 [ rx ]
 placeholder
-[ rx_reactants ]
+[ reactants ]
 aa
 
 [ system ]

@@ -8,7 +8,9 @@ class RBTorsion(Force):
         for (i, j, k, l, c0, c1, c2, c3, c4, c5) in filter(None, self._list):
             self._force_obj.addTorsion(i, j, k, l, c0, c1, c2, c3, c4, c5)
 
-    def add(self, i, j, k, l, c0, c1, c2, c3, c4, c5):
+    def add(self, members, params):
+        i, j, k, l = members
+        c0, c1, c2, c3, c4, c5 = params
         self._list.append((i, j, k, l, c0, c1, c2, c3, c4, c5))
         if not self._rebuild:
             self._force_obj.addTorsion(i, j, k, l, c0, c1, c2, c3, c4, c5)

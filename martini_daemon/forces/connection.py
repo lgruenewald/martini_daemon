@@ -6,7 +6,8 @@ class Connection(Force):
     def _build(self):
         self._force_obj = None
 
-    def add(self, i, j):
+    def add(self, members, params):
+        i, j = members
         self._list.append((i, j))
         return self._interaction()
 

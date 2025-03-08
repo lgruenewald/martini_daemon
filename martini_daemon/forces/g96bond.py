@@ -13,7 +13,9 @@ class G96Bond(Force):
         for (i, j, length, force) in filter(None, self._list):
             self._force_obj.addBond(i, j, [length, force])
 
-    def add(self, i, j, length, force):
+    def add(self, members, params):
+        i, j = members
+        length, force = params
         self._list.append((i, j, length, force))
         if not self._rebuild:
             self._force_obj.addBond(i, j, [length, force])

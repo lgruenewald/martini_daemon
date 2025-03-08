@@ -17,11 +17,12 @@ class Constraint(Force):
         for (i, j, length) in filter(None, self._list):
             self._sysstar._system.addConstraint(i, j, length)
 
-    def add(self, *params):
+    def add(self, members, params):
         if not self._rebuild:
             raise Exception("Can't add constraints after starting the run due"
                             " to periodic boundary conditions")
-        i, j, length = params
+        i, j = members
+        length = params[0]
         self._list.append((i, j, length))
         return self._interaction()
 
