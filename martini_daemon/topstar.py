@@ -421,7 +421,7 @@ class TopStar():
                 if p in pset:
                     return False
                 pset.add(p)
-            for p in filter(None, r.opt.values()):
+            for p in filter(lambda x: x is not None, r.opt.values()):
                 if p in pset:
                     return False
                 pset.add(p)
@@ -602,15 +602,21 @@ class TopStar():
         return reactions, skip, False
 
     # ======= (3/3) Modification things =======
+    def clean_defrag(self, frag: Fragment, part: int) -> None:
+        self.defrag_list[part] = list(filter(
+            lambda x: x != frag.frag_id,
+            self.defrag_list[part]
+        ))
+
     def remove_fragment(self, frag: Fragment) -> None:
         """Removes a fragment from frag_list and defrag_list
         """
 
         for part in frag.particles.values():
-            self.defrag_list[part] = list(filter(
-                lambda x: x != frag.frag_id,
-                self.defrag_list[part]
-            ))
+            self.clean_defrag(frag, part)
+
+        for part in filter(lambda x: x is not None, frag.opt.values()):
+            self.clean_defrag(frag, part)
 
         del self.frag_list[frag.frag_id]
 
@@ -694,7 +700,7 @@ class TopStar():
                 for member in inter.get_members():
                     res.add(member)
         return res
-    
+
     def remove_overlapping_graphs(self, particles: set[int]) -> None:
         for part in particles:
             for frag_id in self.defrag_list[part][:]:
@@ -720,7 +726,7 @@ class TopStar():
         for f in frags:
             product_particles += list(f.particles.values())
             graph_recalc |= set(f.particles.values())
-            graph_recalc |= set(filter(None, f.opt.values()))
+            graph_recalc |= set(filter(lambda x: x is not None, f.opt.values()))
         # add neighbors since those can be changed too (opt/not atoms)
         graph_recalc = self.populate_neighbors(set(product_particles))
 

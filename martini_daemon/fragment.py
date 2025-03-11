@@ -75,6 +75,7 @@ class Fragments():
         return self.frags[index].get_atom(part_name)
 
     def particles(self):
+        """Returns an iterator over all non-optional particles in child fragments."""
         class FragmentsIterator():
             def __init__(self, fragments: Fragments):
                 self.frags = fragments

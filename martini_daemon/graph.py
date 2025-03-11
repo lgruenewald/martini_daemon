@@ -129,8 +129,9 @@ class GraphFragment():
         """
         part_num = partial.atoms[part_name]
         inters = interactions[part_num]
+        # enumerate over interactions in GraphFragment
         for i, (inter_type, inter_parts) in enumerate(self.interactions):
-            # only consider unfulfilled interactions in graph
+            # only consider unfulfilled interactions in graph (PartialMatch)
             if partial.interactions[i] is not None:
                 continue
             # only consider interactions containing the particle
@@ -199,7 +200,6 @@ class GraphFragment():
             if part_num in partial.rev_atoms.keys():
                 continue
             name, type = sysstar.get_particle_name_type(part_num)
-            keep_this = False
             neighbors = self.get_neighbors(part_num, interactions)
             for (part_name, name_pat, type_pat, _) in self.atoms:
                 # ignore graph atoms already matched
@@ -214,16 +214,17 @@ class GraphFragment():
                 if not self.check_atom_interactions(part_name, cpartial,
                                                     interactions):
                     continue
-                keep_this = True
+
+                # this algorithm always finishes because during each
+                # recursion we must always add one atom to the matched list
+
+                # this particle can stay in particles if we can still grow the
+                # graph this way in one of the recursions
+                keep.add(part_num)
                 partials.append(cpartial)
                 # beware, multiple copies of the same set
                 new_particles.append(neighbors)
                 part_nums.append(part_num)
-
-            # a particle can stay in particles if we can still grow the graph
-            # that way in the future
-            if keep_this:
-                keep.add(part_num)
 
         res = []
         for i in range(len(partials)):

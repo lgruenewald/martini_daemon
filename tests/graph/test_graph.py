@@ -14,7 +14,7 @@ def rootdir(request):
 
 
 tests = [
-    "single", "square", "star", "BDT", "opt", "equiv"
+    "single", "square", "star", "BDT", "opt", "equiv", "v_shape", "bicycle"
 ]
 
 
@@ -47,8 +47,9 @@ class TestGraph():
         if frag.name != name:
             return False
         frag_parts = (
-            [] + list(frag.particles.values()) +
-            list(filter(None, frag.opt.values()))
+            list(frag.particles.values()) +
+            # 0 is falsey
+            list(filter(lambda x: x is not None, frag.opt.values()))
         )
         if len(frag_parts) != len(parts):
             return False
