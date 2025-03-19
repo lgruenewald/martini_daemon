@@ -41,7 +41,7 @@ class DaemonSimulation():
                  remove_com_motion=True, epsilon_r=15.0,
                  nonbonded_cutoff=1.1*nanometer, include_dir=None,
                  defines={}, log_path=None, reporters=[],
-                 langevin_friction=10.0):
+                 friction=2.0, T_type="langevin"):
         if traj_path is None:
             traj_path = sim_name + ".xtc"
         if out_path is None:
@@ -80,12 +80,22 @@ class DaemonSimulation():
         if platform is not None:
             platform = mm.Platform.getPlatformByName(platform)
 
+        if T is not None and T_type not in {"andersen", "langevin"}:
+            raise ValueError("Unknown T_type")
+
+        if T is not None and T_type == "andersen":
+            self.system.add_force(mm.AndersenThermostat(T, friction))
+
         if p is not None:
             self.system.add_force(mm.MonteCarloBarostat(p, T))
         if remove_com_motion:
             self.system.add_force(mm.CMMotionRemover())
 
-        integrator = mm.LangevinIntegrator(T, langevin_friction, dt)
+        integrator = None
+        if T_type == "langevin":
+            integrator = mm.LangevinIntegrator(T, friction, dt)
+        else:
+            integrator = mm.VerletIntegrator(dt)
         box = self.gro.getPeriodicBoxVectors()
 
         self.logger.info("Context build start")
@@ -167,7 +177,10 @@ class DaemonSimulation():
         self.system.write_xtc_frame(self.steps_per_step)
         self.logger.info("XTC write finished")
         end_time = time.time()
-        self.last_step_time = end_time - start_time
+        self.last_step_time = (
+            0.97 * self.last_step_time + 0.03 * (end_time - start_time)
+            if self.last_step_time > 0. else (end_time - start_time)
+        )
 
 
 if __name__ == "__main__":

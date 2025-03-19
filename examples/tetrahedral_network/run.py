@@ -5,7 +5,7 @@ from martini_daemon.reporters.bond_reporter import BondReporter
 from martini_daemon.reporters.topstar import TopStarLogger, ReactionReporter, FragCountReporter
 
 sim = simulation.DaemonSimulation("system.top", "system.gro", sim_name="out",
-                                  p=1., langevin_friction=2.0,
+                                  p=1., friction=2.0,
                                   reporters=[BondReporter, TopStarLogger,
                                              ReactionReporter,
                                              FragCountReporter],

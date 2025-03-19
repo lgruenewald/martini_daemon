@@ -15,15 +15,16 @@ SIAC 1
 1 5 5
 
 ; [constraints]
-; tetrahedron
-; 0.263 in sticky martini
-; 0.164 for the 0.1 cube
-2 3 1 0.3 1.25E+4
-2 4 1 0.3 1.25E+4
-2 5 1 0.3 1.25E+4
-3 4 1 0.3 1.25E+4
-3 5 1 0.3 1.25E+4
-4 5 1 0.3 1.25E+4
+; tetrahedron inspired by sticky martini
+; dummy particle construction
+#define EDGE_r 0.263
+#define EDGE_k 1.25E+4
+2 3 1 EDGE_r EDGE_k 
+2 4 1 EDGE_r EDGE_k 
+2 5 1 EDGE_r EDGE_k 
+3 4 1 EDGE_r EDGE_k 
+3 5 1 EDGE_r EDGE_k 
+4 5 1 EDGE_r EDGE_k 
 
 [virtual_sitesn]
 1 1 2 3 4 5
@@ -60,16 +61,23 @@ Si Si
 r_max 1:1 2:1 0.25
 
 [bonds]
-1:1 2:1 3 0.0 2500 1.0
+;i   j  t   r      D   beta
+1:1 2:1 3 0.165 2500 1.0
 
 [angles]
+1:2 1:1 2:1 1 180.0 200.0
+1:1 2:1 2:2 1 180.0 200.0
+
+[dihedrals]
+; improper dihedral for linearity
+;1:2 1:1 2:1 2:2 2 180.0 200.0
 
 [reaction]
 bond_break
 [reactants]
 bond
 [conditions]
-r_min 1:1 1:2 0.3
+r_min 1:1 1:2 0.26
 [break]
 1:1 1:2
 #endif

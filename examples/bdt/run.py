@@ -6,6 +6,6 @@ from martini_daemon.reporters.topstar import ReactionReporter
 
 sim = simulation.DaemonSimulation("system.top", "system.gro", sim_name="out",
                                   reporters=[BondReporter, ReactionReporter],
-                                  max_steps=50000, steps_per_step=100,
-                                  langevin_friction=1.0)
+                                  max_steps=250, steps_per_step=5000,
+                                  friction=1.0, T_type="langevin")
 sim.simulate()

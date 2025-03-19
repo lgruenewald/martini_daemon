@@ -287,7 +287,7 @@ class TopParser:
                             key = tokens[1].content
                             val = "1.0"
                             if len(tokens) == 3:
-                                if tokens[2][0] in '"<':
+                                if tokens[2].content[0] in '"<':
                                     self.error("Cannot #define strings/paths")
                                 val = tokens[2].content
                             self._defines[key] = val
