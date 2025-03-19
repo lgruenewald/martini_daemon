@@ -23,6 +23,8 @@ banned_angle 1:1 1:5 2:5 140 180
 banned_angle 2:1 2:5 1:5 0 100
 banned_angle 2:1 2:5 1:5 140 180
 
+#define OLD
+#ifdef OLD
 [bonds]
 ; morse bond with arbitrary constants, not parametrized
 ; i j type=3 b(nm) D(kj/mol) beta(nm-1)
@@ -31,6 +33,19 @@ banned_angle 2:1 2:5 1:5 140 180
 [angles]
 1:1 1:5 2:5 10 120 200
 2:1 2:5 1:5 10 120 200
+#else
+[bonds]
+; connection to visualize
+1:5 2:5 5
+
+[angles]
+; morse bond coupled angle
+2:5 1:5 1:1 101 120 200 0.275 5 12
+1:5 2:5 2:1 101 120 200 0.275 5 12
+
+[ exclusions ]
+1:5 2:5
+#endif
 
 [dihedrals]
 1:1 1:5 2:5 2:1 1 110 40 1

@@ -41,6 +41,9 @@ from .vsites.weighed_average import VSiteWeighedAverage
 from .vsites.center_of_mass import VSiteCenterOfMass
 from .reporters.reporter import Reporter
 
+# custom non gromacs interactions
+from .forces.morse_angle import MorseAngle
+
 
 class SysStar():
 
@@ -112,6 +115,9 @@ class SysStar():
         self.vsite_com = VSiteCenterOfMass(self)
         self.nonbonded_force = NonBonded(self)
         self.exclusions = self.nonbonded_force.get_exclusion_helper()
+        # custom non gromacs
+        self.morse_angle = MorseAngle(self)
+
         self.modular_forces = [
             self.constraint,
             self.harmonic_bond, self.harmonic_angle,
@@ -125,7 +131,9 @@ class SysStar():
             self.quartic_angle, self.linear_angle,
             self.vsite_2fd, self.vsite_3fd, self.vsite_4fdn,
             self.vsite_avg, self.vsite_3fad, self.vsite_3out, self.vsite_com,
-            self.nonbonded_force, self.exclusions, self.pairs
+            self.nonbonded_force, self.exclusions, self.pairs,
+            # custom non gromacs
+            self.morse_angle
         ]
 
         self.vsites = []

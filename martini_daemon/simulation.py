@@ -9,10 +9,11 @@ from .topstar import TopStar, ReactionTemplate, Fragment
 import sys
 import openmm as mm
 from openmm.app import GromacsGroFile
-from openmm.unit import femtosecond, nanometer
+from openmm.unit import femtosecond, nanometer, nanosecond
 from .utils import backup_try
 import logging
 import random
+import time
 
 
 class DaemonSimulation():
@@ -119,6 +120,8 @@ class DaemonSimulation():
         self.traj_path = traj_path
         self.out_path = out_path
         self.reactions = 0
+        self.last_step_time = 0
+        self.step_ns = steps_per_step * dt.value_in_unit(nanosecond)
         self.logger.info("__init__ end")
 
     def simulate(self):
@@ -135,6 +138,7 @@ class DaemonSimulation():
             - reinitialize system
             - write an XTC frame
         """
+        start_time = time.time()
         percent = i/max_steps*100 if max_steps > 0 else 100
         self.logger.info(f"step {i}/{max_steps} ({percent:.1f}%)")
         self.logger.info("MD start")
@@ -142,8 +146,15 @@ class DaemonSimulation():
         self.system.do_steps(self.steps_per_step)
         self.logger.info("MD finished")
         if max_steps > 0:
-            sys.stdout.write(f"\rStep {i:4}/{max_steps} ({percent:.1f}%) "
-                             f"[reactions: {self.reactions}]")
+            ns_so_far = self.step_ns * i
+            ns_total = self.step_ns * max_steps
+            time_left = self.last_step_time * (max_steps - i)
+            time_left_fmt = time.strftime("%H:%M:%S", time.gmtime(time_left))
+            sys.stdout.write(f"\rStep {i}/{max_steps}\t"
+                             f"{ns_so_far:.2f}/{ns_total:.2f}ns\t"
+                             f"{percent:.1f}%\t"
+                             f"ETL {time_left_fmt}\t"
+                             f"{self.reactions} reactions")
         self.logger.info("D/M start")
         new_reactions = self.top.detection_modification(i)
         self.reactions += new_reactions
@@ -155,6 +166,8 @@ class DaemonSimulation():
         self.logger.info("XTC write start")
         self.system.write_xtc_frame(self.steps_per_step)
         self.logger.info("XTC write finished")
+        end_time = time.time()
+        self.last_step_time = end_time - start_time
 
 
 if __name__ == "__main__":

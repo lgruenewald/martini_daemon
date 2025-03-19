@@ -1,9 +1,12 @@
-#include "../../tests/martini_v3.0.0.itp"
-#include "../../tests/martini_v3.0.0_solvents_v1.itp"
+#include "../../itp/martini_v3.0.0.itp"
+#include "../../itp/martini_v3.0.0_solvents_v1.itp"
+#ifdef DAEMON
+#include "interconvert.rx"
+#endif
 
 [ system ]
 ; name
-WATER 
+Test system where water and chloroform can interconvert
 
 [ molecules ]
 ; name  number

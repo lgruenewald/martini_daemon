@@ -1,10 +1,7 @@
-In this example, a box with n particles is generated. Initially, there are no
-bonds in the system, but if two particles come within a cutoff distance, a
-harmonic bond is formed. Every particle can form bonds with 2 atoms (not just
-one like in liquid.py). Bond angles are set to 180 degrees, with a weak force.
+Single bead monomer polymerization. Here because it demonstrates that
+polymerization reaction mechanisms can help intuitively build templates
+for reactions in daemon. This is used to model the current bond order of
+single particle reactants (they can form up to two bonds).
 
-Run using
-python chain.py > traj.xyz
-
-Visualize using Pymol
-pymol traj.xyz vis.pml
+- `./run.py` to run
+- `vmd -e vis.tcl` to visualize

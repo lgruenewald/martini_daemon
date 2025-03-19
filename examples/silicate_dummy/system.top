@@ -1,14 +1,11 @@
 #include "../../itp/martini_v3.0.0.itp"
 #include "../../itp/martini_v3.0.0_solvents_v1.itp"
 #include "../../itp/martini_v3.0.0_small_molecules_v2.itp"
-#include "../BDT_in_BENZ/BDT.itp"
-#ifdef DAEMON
-#include "../BDT_in_BENZ/dimerize.rx"
-#endif
+#include "sticky.rx"
 
 [ system ]
-BDT dimerization
+SIAC polymerization
 
 [ molecules ]
-BDT 500
-W 2571
+SIAC 1000
+W 7983

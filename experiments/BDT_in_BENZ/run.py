@@ -9,5 +9,5 @@ sim = simulation.DaemonSimulation("system.top", "system.gro", sim_name="out",
                                   reporters=[BondReporter, TopStarLogger,
                                              ReactionReporter,
                                              FragCountReporter],
-                                  max_steps=1000, steps_per_step=100)
+                                  max_steps=2000, steps_per_step=100)
 sim.simulate()

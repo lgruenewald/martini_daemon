@@ -28,7 +28,7 @@ tests = [
     "polyurethane",
     # small molecule tests
     "NMC", "CHOL_in_W", "AEA", "NAPH", "nacl+waterbox", "solvent_mixture",
-    "waterbox", "DPPC_DIPC_in_W", "CAFF", "BDT", "BZTF_CLPR",
+    "waterbox", "DPPC_DIPC_in_W", "CAFF", "BDT", "BZTF_CLPR", "benzbox",
     # specific interaction tests
     "morse", "vsite4fdn", "quartic_angle", "pairs_VW", "pairs_type",
     "cross_bond_bond", "vsiten2", "urey_bradley", "fourier_dihedral",

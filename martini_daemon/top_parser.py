@@ -256,6 +256,14 @@ def DaemonTopFile(file, include_dir=None, defines={},
             force = unwrap(tokens, 5, "float")
             last_molecule().interactions.append((system.restricted_angle,
                                                 [i, j, k], [theta, force]))
+        elif type == 101:
+            theta = unwrap(tokens, 4, "degree")
+            force = unwrap(tokens, 5, "float")
+            beta = unwrap(tokens, 6, "float")
+            r0 = unwrap(tokens, 7, "float")
+            last_molecule().interactions.append((system.morse_angle,
+                                                 [i, j, k],
+                                                 [theta, force, beta, r0]))
         else:
             raise ValueError(f"Unsupported angle type {type}.")
 
