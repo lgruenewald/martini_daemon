@@ -1,3 +1,23 @@
+- analysis scripts
+fragment neighbor list:
+for now this is per reaction, bimolecular only, r_max 1:x 2:x only
+these reactions should have
+1. filter out all atoms with a distance cutoff, and their fragment
+	(for now only pick the first r_max distance cutoff atom if present,
+	atom 1 if no r_max)
+2. build freud neighbor lists with a generous cutoff (lets say 2 nm)
+4. only call detection() based on the neighbor list
+
+better graph:
+1. convert interactions to a graph
+2. build neighbor lists for all atoms involved, when involving new atoms always
+update neighbor list
+3. find starting matches
+4. graph informed new neighbor picking on all starting matches
+5. remove duplicates
+
+- coupled morse/angle attempt 2
+
 - D/M unit testing
 	- detection testing - single run of D algo
 		- json recipe for list of reactions and list of atoms involved
@@ -5,7 +25,6 @@
 		- fragment list similar to how graphs do it
 - multiple reactions with the same starting materials, with equal standing (independent of their order)
 - velocity rx_condition, better rx_condition syntax
-- undoing reactions instead of [rx_break] and [rx_update]
 - update documentation
 
 Optimizations
@@ -15,13 +34,12 @@ Optimizations
 - do not add S* forces that are never going to change (reduced memory usage when dilute systems)
 - S* should try to update forces instead of remove/adding when possible
   - allow this for vsites, constraints
-- neighborlist for the D algorithm
 - cythonize and parallelize bottlenecks
 
 Correctness
 - limiter should not depend on the order of atoms in the topology
 - verification for the "equivalent" keyword
-- reaction rates should be independent of how often the D/M algorithm is done
+- reaction rates should be independent of how often the D/M algorithm is done within reasonable bounds
 
 Simulation stability
 - Langevin integrator friction and stability?

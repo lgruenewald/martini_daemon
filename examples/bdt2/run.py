@@ -8,5 +8,5 @@ sim = simulation.DaemonSimulation("system.top", "system.gro", sim_name="out",
                                   reporters=[BondReporter, ReactionReporter],
                                   max_steps=40000, steps_per_step=250,
                                   friction=1.0, T_type="langevin",
-                                  xtc_every=100)
+                                  xtc_every=50)
 sim.simulate()

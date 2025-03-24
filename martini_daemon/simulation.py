@@ -41,7 +41,7 @@ class DaemonSimulation():
                  remove_com_motion=True, epsilon_r=15.0,
                  nonbonded_cutoff=1.1*nanometer, include_dir=None,
                  defines={}, log_path=None, reporters=[],
-                 friction=2.0, T_type="langevin"):
+                 friction=2.0, T_type="langevin", xtc_every=1):
         if traj_path is None:
             traj_path = sim_name + ".xtc"
         if out_path is None:
@@ -131,6 +131,7 @@ class DaemonSimulation():
         self.out_path = out_path
         self.reactions = 0
         self.last_step_time = 0
+        self.xtc_every = xtc_every
         self.step_ns = steps_per_step * dt.value_in_unit(nanosecond)
         self.logger.info("__init__ end")
 
@@ -173,9 +174,10 @@ class DaemonSimulation():
             self.logger.info("reinitialize start")
             self.system.reinitialize()
             self.logger.info("reinitialize finished")
-        self.logger.info("XTC write start")
-        self.system.write_xtc_frame(self.steps_per_step)
-        self.logger.info("XTC write finished")
+        if i % self.xtc_every == 0:
+            self.logger.info("XTC write start")
+            self.system.write_xtc_frame(self.steps_per_step)
+            self.logger.info("XTC write finished")
         end_time = time.time()
         self.last_step_time = (
             0.97 * self.last_step_time + 0.03 * (end_time - start_time)
