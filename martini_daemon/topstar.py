@@ -635,9 +635,10 @@ class TopStar():
             for j in range(start_at, len(init_map[next_reactant.lstrip("*")])):
                 # skip is a set of init_list indices that already reacted
                 # only check it if the current reactant is before rx.skip => not *
-                if next_reactant[0] != "*" and init_map[next_reactant][j] in skip:
+                frag_id = init_map[next_reactant.lstrip("*")][j]
+                if next_reactant[0] != "*" and frag_id in skip:
                     continue
-                if neighbors is not None and j not in neighbors:
+                if neighbors is not None and frag_id not in neighbors:
                     continue
                 previous_types.append(next_reactant)
                 previous_indices.append(j)
