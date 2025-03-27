@@ -3,7 +3,7 @@
 #include "CGM_DesmodurN.itp"
 #include "CGM_PEG.itp"
 #ifdef REACT
-#include "poly.rx"
+#include "../poly.rx"
 #endif
 
 [ system ]

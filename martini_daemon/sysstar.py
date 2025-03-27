@@ -86,6 +86,7 @@ class SysStar():
         self._forces_list = []
         self.constraint = Constraint(self)
         self.harmonic_bond = HarmonicBond(self)
+        self.harmonic_bond2 =HarmonicBond(self)
         self.morse_bond = MorseBond(self)
         self.cubic_bond = CubicBond(self)
         self.fene_bond = FENEBond(self)
@@ -93,6 +94,7 @@ class SysStar():
         self.proper_dihedral = ProperDihedral(self)
         self.improper_dihedral = ImproperDihedral(self)
         self.g96_angle = G96Angle(self)
+        self.g96_angle2 = G96Angle(self)
         self.restricted_angle = RestrictedAngle(self)
         self.combined_bending_torsion = CombinedBendingTorsion(self)
         self.rb_torsion = RBTorsion(self)
@@ -133,7 +135,7 @@ class SysStar():
             self.vsite_avg, self.vsite_3fad, self.vsite_3out, self.vsite_com,
             self.nonbonded_force, self.exclusions, self.pairs,
             # custom non gromacs
-            self.morse_angle
+            self.morse_angle, self.g96_angle2, self.harmonic_bond2
         ]
 
         self.vsites = []
