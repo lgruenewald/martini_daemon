@@ -1,7 +1,7 @@
 {
   "benchmarks": [
     {
-      "name": "polyurethane_5000_200_200x",
+      "name": "polyurethane_200_5000",
       "n": 1,
       "gro": "system.gro",
       "top": "system.top",
@@ -9,15 +9,15 @@
       "steps": 30
     },
     {
-      "name": "polyurethane_2500_200_200x",
+      "name": "polyurethane_200_500",
       "n": 1,
       "gro": "system.gro",
       "top": "system.top",
-      "per_step": 2500,
+      "per_step": 500,
       "steps": 30
     },
     {
-      "name": "polyurethane_1000_200_200x",
+      "name": "polyurethane_200_100",
       "n": 1,
       "gro": "system.gro",
       "top": "system.top",
@@ -25,7 +25,7 @@
       "steps": 30
     },
     {
-      "name": "polyurethane_250_200_200x",
+      "name": "polyurethane_200_250",
       "n": 1,
       "gro": "system.gro",
       "top": "system.top",

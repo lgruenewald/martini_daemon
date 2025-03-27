@@ -1,0 +1,12 @@
+{
+  "benchmarks": [
+    {
+      "name": "polyurethane_300",
+      "n": 1,
+      "gro": "system.gro",
+      "top": "system.top",
+      "per_step": 5000,
+      "steps": 30
+    }
+  ]
+}

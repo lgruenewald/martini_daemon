@@ -1,0 +1,31 @@
+[ frag ]
+coh_end
+[ from ]
+PEG 1 2
+PEG 46 45
+
+[ frag ]
+nco_end
+[ from ]
+DesmodurN 1 2
+DesmodurN 9 8
+DesmodurN 14 13
+
+[ reaction ]
+coh_nco_bond
+[ reactants ]
+coh_end nco_end
+[ conditions ]
+r_max 1:1 2:1 0.6
+
+[ retype ]
+1:1 TN3
+2:1 SP4
+
+[ bonds ]
+  1:1 2:1   1   0.300  15000
+
+[ angles ]
+  2:2 2:1 1:1   2    140   100
+  1:2 1:1 2:1   2    120   80
+

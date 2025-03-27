@@ -1,7 +1,7 @@
 {
   "benchmarks": [
     {
-      "name": "polyurethane_5000_400_200x",
+      "name": "polyurethane_1000",
       "n": 1,
       "gro": "system.gro",
       "top": "system.top",
