@@ -7,30 +7,6 @@
       "top": "system.top",
       "per_step": 5000,
       "steps": 30
-    },
-    {
-      "name": "polyurethane_2000_300_200x",
-      "n": 1,
-      "gro": "system.gro",
-      "top": "system.top",
-      "per_step": 2000,
-      "steps": 30
-    },
-    {
-      "name": "polyurethane_500_300_200x",
-      "n": 1,
-      "gro": "system.gro",
-      "top": "system.top",
-      "per_step": 500,
-      "steps": 30
-    },
-    {
-      "name": "polyurethane_100_300_200x",
-      "n": 1,
-      "gro": "system.gro",
-      "top": "system.top",
-      "per_step": 100,
-      "steps": 30
     }
   ]
 }

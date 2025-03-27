@@ -167,8 +167,8 @@ class SysStar():
         self._part_list[part_id][0] = new_name
 
     def retype(self, part_id, new_type):
-        _, _, _, old_type, charge, _ = self._part_list[part_id]
-        self._part_list[part_id][3] = new_type
+        a, b, c, old_type, charge, d = self._part_list[part_id]
+        self._part_list[part_id] = (a, b, c, new_type, charge, d)
         if self.context_initialized and old_type != new_type:
             self.nonbonded_force.update_params(
                 part_id, new_type, charge, False

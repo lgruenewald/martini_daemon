@@ -2,12 +2,14 @@
 #include "../../itp/martini_v3.0.0_solvents_v1.itp"
 #include "CGM_DesmodurN.itp"
 #include "CGM_PEG.itp"
+#ifdef DAEMON
 #include "poly.rx"
+#endif
 
 [ system ]
 polysmart test_case
 
 [ molecules ]
-PEG 60
 DesmodurN 40
-W 7828
+PEG 60
+W 49104

@@ -2,34 +2,34 @@
   "benchmarks": [
     {
       "name": "polyurethane_5000_200_200x",
-      "n": 3,
+      "n": 1,
       "gro": "system.gro",
       "top": "system.top",
       "per_step": 5000,
       "steps": 30
     },
     {
-      "name": "polyurethane_2000_200_200x",
-      "n": 3,
+      "name": "polyurethane_2500_200_200x",
+      "n": 1,
       "gro": "system.gro",
       "top": "system.top",
-      "per_step": 2000,
+      "per_step": 2500,
       "steps": 30
     },
     {
-      "name": "polyurethane_500_200_200x",
-      "n": 3,
+      "name": "polyurethane_1000_200_200x",
+      "n": 1,
       "gro": "system.gro",
       "top": "system.top",
-      "per_step": 500,
+      "per_step": 1000,
       "steps": 30
     },
     {
-      "name": "polyurethane_100_200_200x",
-      "n": 3,
+      "name": "polyurethane_250_200_200x",
+      "n": 1,
       "gro": "system.gro",
       "top": "system.top",
-      "per_step": 100,
+      "per_step": 250,
       "steps": 30
     }
   ]

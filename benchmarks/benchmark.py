@@ -44,7 +44,8 @@ def test_daemon(reactive, data):
         p = None
     sim = DaemonSimulation(data["top"], data["gro"], max_steps=data["steps"],
                            steps_per_step=data["per_step"], p=p,
-                           platform=mm_platform, defines=defines)
+                           platform=mm_platform, defines=defines,
+                           friction=5.0)
     sim.simulate()
     for h in sim.logger.handlers:
         h.flush()

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 from dataclasses import dataclass
 import random
+from freud.box import Box
+from freud.locality import NeighborList, AABBQuery
+import numpy as np
 from typing import Optional
 from .sysstar import SysStar
 from .forces.force import Force, Interaction
@@ -348,17 +351,33 @@ class TopStar():
                     self.system.remass(part_id, mass)
         # new system: re* overrides everything though
         if template is not None:
-            for (i, part_name, new_name) in template.renames:
-                part_id = frags.get(i, part_name)
+            for (pair, new_name) in template.renames:
+                found, part_id = frags.get(pair)
+                if not found:
+                    raise ValueError(f"Index out of range {pair}")
+                if part_id is None:
+                    continue
                 self.system.rename(part_id, new_name)
-            for (i, part_name, new_type) in template.retypes:
-                part_id = frags.get(i, part_name)
+            for (pair, new_type) in template.retypes:
+                found, part_id = frags.get(pair)
+                if not found:
+                    raise ValueError(f"Index out of range {pair}")
+                if part_id is None:
+                    continue
                 self.system.retype(part_id, new_type)
-            for (i, part_name, new_charge) in template.recharges:
-                part_id = frags.get(i, part_name)
+            for (pair, new_charge) in template.recharges:
+                found, part_id = frags.get(pair)
+                if not found:
+                    raise ValueError(f"Index out of range {pair}")
+                if part_id is None:
+                    continue
                 self.system.recharge(part_id, new_charge)
-            for (i, part_name, new_mass) in template.remasses:
-                part_id, frags.get(i, part_name)
+            for (pair, new_mass) in template.remasses:
+                found, part_id = frags.get(pair)
+                if not found:
+                    raise ValueError(f"Index out of range {pair}")
+                if part_id is None:
+                    continue
                 self.system.remass(part_id, new_charge)
         # exclusions
         for (i, j) in molfrag.exclusions:
@@ -507,6 +526,25 @@ class TopStar():
 
         return init_map
 
+    def get_neighbor_list(self, box, pos) -> \
+            tuple[NeighborList, dict[int, int], dict[int, int]]:
+        if len(self.frag_list) == 0:
+            return None, {}, {}
+        pos_filtered = []
+        frag_to_nlist = {}
+        nlist_to_frag = {}
+        for id, frag in self.frag_list.items():
+            filtered_id = len(pos_filtered)
+            frag_to_nlist[id] = filtered_id
+            nlist_to_frag[filtered_id] = id
+            part_id = frag.index_atom(0)
+            pos_filtered.append(pos[part_id])
+        pos_filtered = np.array(pos_filtered)
+        box = Box(box[0], box[1], box[2])
+        query = NeighborList()
+        query = AABBQuery(box, pos_filtered)
+        return query, frag_to_nlist, nlist_to_frag
+
     def get_reaction_tree(self) -> dict:
         tree = {}
         for rx in self.reaction_list:
@@ -531,7 +569,8 @@ class TopStar():
             node: dict,
             previous_types: list[str],
             previous_indices: list[int],
-            init_map, pos, box
+            init_map, pos, box, query: AABBQuery,
+            frag_to_nlist: dict[int, int], nlist_to_frag: dict[int, int]
             ) -> tuple[bool, list, set]:
         """
             Runs the detection algorithm over a single node in the reaction
@@ -580,17 +619,32 @@ class TopStar():
                 if next_reactant == prev_reactant:
                     start_at = max(start_at, previous_indices[i] + 1)
             # go over all options for the next_reactant type
+            # TODO rewrite this function completely with a more elegant
+            # neighbor list
+            neighbors = None
+            if len(previous_indices) > 0:
+                last_type = previous_types[-1]
+                last_index = init_map[last_type][previous_indices[-1]]
+                last_frag = self.frag_list[last_index]
+                last_part = last_frag.index_atom(0)
+                last_pos = np.array([pos[last_part]])
+                nlist = query.query(last_pos, {"r_max": 3.}).toNeighborList()
+                neighbors = set()
+                for _, j in nlist[:]:
+                    neighbors.add(nlist_to_frag[j])
             for j in range(start_at, len(init_map[next_reactant.lstrip("*")])):
                 # skip is a set of init_list indices that already reacted
                 # only check it if the current reactant is before rx.skip => not *
                 if next_reactant[0] != "*" and init_map[next_reactant][j] in skip:
+                    continue
+                if neighbors is not None and j not in neighbors:
                     continue
                 previous_types.append(next_reactant)
                 previous_indices.append(j)
                 reactions, skip, reacted = self.detection_over_types(
                     reactions, skip, next_node,
                     previous_types, previous_indices,
-                    init_map, pos, box
+                    init_map, pos, box, query, frag_to_nlist, nlist_to_frag
                 )
                 previous_types.pop(-1)
                 previous_indices.pop(-1)
@@ -772,9 +826,11 @@ class TopStar():
         self.pre_detection(i)
         init_map = self.get_init_map()
         pos, box = self.system.get_positions()
+        query, frag_to_nlist, nlist_to_frag = self.get_neighbor_list(box, pos)
         # tree of frag combinations to check
         reactions, skip, _ = self.detection_over_types(
-            [], set(), self.get_reaction_tree(), [], [], init_map, pos, box
+            [], set(), self.get_reaction_tree(), [], [], init_map, pos, box,
+            query, frag_to_nlist, nlist_to_frag
         )
 
         if len(reactions) == 0:

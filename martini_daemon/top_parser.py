@@ -767,6 +767,14 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     p.add_level("update", process_update)
 
+    def process_retype(tokens):
+        nonlocal last_reaction
+        i = unwrap(tokens, 0, "pair")
+        ntype = unwrap(tokens, 1, "word")
+        last_reaction.retypes.append((i, ntype))
+
+    p.add_level("retype", process_retype)
+
     def process_system(tokens):
         nonlocal system_defined
         require_complete_reaction()

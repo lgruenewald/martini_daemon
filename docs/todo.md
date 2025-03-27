@@ -1,4 +1,3 @@
-- analysis scripts
 fragment neighbor list:
 for now this is per reaction, bimolecular only, r_max 1:x 2:x only
 these reactions should have
@@ -16,7 +15,10 @@ update neighbor list
 4. graph informed new neighbor picking on all starting matches
 5. remove duplicates
 
-- coupled morse/angle attempt 2
+fixed reaction rates:
+- remove limiter, probability, add energy barrier / velocity
+- benchmark reaction rate vs D/M frequency, make sure it's constant at the default D/M frequency
+- make sure energy barrier controls reaction rate completely
 
 - D/M unit testing
 	- detection testing - single run of D algo
