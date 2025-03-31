@@ -15,15 +15,6 @@ from .fragment import Fragment, Fragments
 random.seed()
 
 
-@dataclass
-class NumberedFragment:
-    name: str  # when instantiated it has this name (e.g. in [ rx ])
-    mol: str
-    name_id: str  # internally it has this name for subfrag mapping
-    # list[in_itp_id]
-    atoms: list[int]
-
-
 # TODO move this to its own file and move all the per fragment type helpers
 # (e.g.) instantiate to their files, break up T* monolithicness a bit...
 class MolFragment:
@@ -121,7 +112,7 @@ class TopStar():
 
     # type name -> type, used for instantiation
     # TODO only use it for MolFragment
-    type_lookup: dict[str, NumberedFragment | MolFragment]
+    type_lookup: dict[str, MolFragment]
 
     reactions: dict[tuple[str, str], list[ReactionTemplate]]
     reactive_types: set[str]
@@ -155,20 +146,6 @@ class TopStar():
         mol_fragment = MolFragment(name)
         self.type_lookup[name] = mol_fragment
         return mol_fragment
-
-    def new_numbered_fragment(self, name: str, parent: str,
-                              particles: list[int]) -> None:
-        name_id = name
-        i = 0
-        while self.type_lookup.get(name_id):
-            name_id = name + str(i)
-            i += 1
-        frag = NumberedFragment(name, parent, name_id, particles)
-        self.type_lookup[name_id] = frag
-        if self.subfrag_map.get(parent):
-            self.subfrag_map[parent].append(name_id)
-        else:
-            self.subfrag_map[parent] = [name_id]
 
     def new_graph_fragment(self, frag: GraphFragment) -> None:
         self.graph_fragment_list.append(frag)
@@ -248,51 +225,6 @@ class TopStar():
                 if inst.frag_id != -1:
                     self.defrag_list[val].append(inst.frag_id)
 
-    def instantiate_subfrag(self, name_id: str, inst: Fragment) -> None:
-        """Instantiates a subfragment subfrag, with forces in S* as seen in
-        inst.
-
-        args: subfrag: name_id, inst: Fragment"""
-        frag: NumberedFragment = self.type_lookup.get(name_id)
-        name = frag.name
-        if frag is None:
-            raise ValueError(f"Can't find frag {name_id}")
-        elif not isinstance(frag, NumberedFragment):
-            raise ValueError(f"Attempt to recursively instantiate {name_id}, "
-                             "but it's not a frag fragment type."
-                             f"It is: {name_id}")
-        subinst = self.add_frag_to_list(name)
-        all_indices = set()
-        # particles
-        for i, parent_id in enumerate(frag.atoms):
-            # remapping of parent_id's to frag_id's
-            # parent_id must be i range
-            if parent_id < 0 or parent_id >= len(inst.particles):
-                raise ValueError("Parent particle ID out of range")
-            part_index = inst.index_atom(parent_id)
-            # build up these sets that are used for constructing the forces
-            # prevent double inclusion of the same atom
-            if part_index in all_indices:
-                raise ValueError("Double inclusion of atom in subfrag")
-            all_indices.add(part_index)
-            # build up subinst
-            subinst.particles[f"{i+1}"] = part_index
-            # frag_id, in_frag_id
-            if subinst.frag_id != -1:
-                self.defrag_list[part_index].append(subinst.frag_id)
-
-        # subfrags can contain further subfrags
-        self.instantiate_subfrags(name, subinst)
-
-    def instantiate_subfrags(self, frag_name, inst) -> None:
-        """Instantiates all subfrags of frag_name.
-        inst is a Fragment instance that contains the reference to all forces
-        in S*."""
-        subfrags = self.subfrag_map.get(frag_name)
-        if subfrags is not None:
-            for subfrag in subfrags:
-                self.instantiate_subfrag(subfrag, inst)
-
     def instantiate(self, frag_name: str) -> Fragment:
         # frag_name must refer to a MolFragment type
         frag = self.type_lookup.get(frag_name)
@@ -328,7 +260,6 @@ class TopStar():
                                   ) -> Fragment:
         """Takes a name of a mol fragment, adds interactions to those particles
         according to the mol fragment.
-        Recursively instantiates all subfragments too.
         """
 
         inst = self.add_frag_to_list(molfrag.molecule_name)
@@ -410,7 +341,6 @@ class TopStar():
             for member in member_parts:
                 self.interaction_list[member].append(f)
 
-        self.instantiate_subfrags(molfrag.molecule_name, inst)
         return inst
 
     # ======= (2/3) Detection things =======
@@ -421,12 +351,10 @@ class TopStar():
         for reporter in self.reporters:
             reporter.pre_detection(i)
 
-    def detection(self,
-                  reactants: list[Fragment],
+    def detection(self, reactants: list[Fragment],
                   rx: ReactionTemplate,
-                  pos,
-                  box
-                  ):
+                  pos, box
+                  ) -> bool:
         """Returns True if frag1 and frag2 fulfill constraints specified in rx
 
         Returns False if they should not react

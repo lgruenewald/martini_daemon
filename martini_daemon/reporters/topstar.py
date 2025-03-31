@@ -70,6 +70,13 @@ class FragCountReporter(Reporter):
 
     def pre_detection(self, i):
         with open("fragment_counts.log", "a") as file:
-            init_map = self._topstar.get_init_map()
-            counts = [f"{key}: {len(values)}" for key, values in init_map.items()]
+            nums = {}
+            for _, v in self._topstar.frag_list.items():
+                name = v.name
+                if nums.get(name) is None:
+                    nums[name] = 1
+                else:
+                    nums[name] += 1
+
+            counts = [f"{key}: {count}" for key, count in nums.items()]
             print(f"Frame {i} {counts}", file=file)

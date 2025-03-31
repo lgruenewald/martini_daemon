@@ -590,39 +590,20 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("virtual_sitesn", process_virtual_sitesn)
 
     # custom additions: rx and frag
-    _frag_name = None
-
-    def process_frag(tokens):
-        nonlocal _frag_name
-        _frag_name = unwrap(tokens, 0, "word")
-
-    p.add_level("frag", process_frag)
-    p.add_level("fragment", process_frag)
-
-    def process_fragfrom(tokens):
-        nonlocal _frag_name
-        if _frag_name is None:
-            raise ValueError("Define a [frag] first.")
-        mol = unwrap(tokens, 0, "word")
-        parent_ids = [
-            unwrap(tokens, i, "index") for i in range(1, len(tokens))
-        ]
-        topology.new_numbered_fragment(_frag_name, mol, parent_ids)
-
-    p.add_level("from", process_fragfrom)
-
     last_graph: GraphFragment = None
 
     def graph_start():
         nonlocal last_graph
-        if _frag_name is None:
-            raise ValueError("[graph] must come after [frag].")
-        last_graph = GraphFragment(_frag_name)
+        last_graph = GraphFragment(None)
 
     def process_graph(tokens):
         nonlocal last_graph
         keyword = unwrap(tokens, 0, "word")
-        if keyword == "atom":
+        if keyword == "name":
+            if last_graph.name is not None:
+                raise ValueError("redefinition of name")
+            last_graph.name = unwrap(tokens, 1, "word")
+        elif keyword == "atom":
             part_id = unwrap(tokens, 1, "word")
             name_pat = unwrap(tokens, 2, "pattern")
             type_pat = unwrap(tokens, 3, "pattern")
@@ -646,19 +627,21 @@ def DaemonTopFile(file, include_dir=None, defines={},
         elif keyword == "equivalent":
             parts = set(unwrap(tokens, n, "word") for n in range(1, len(tokens)))
             last_graph.equivalents.append(parts)
+        # TODO construct a list of filters and validate against typos
         else:
             parts = [unwrap(tokens, i, "word") for i in range(1, len(tokens))]
             last_graph.interactions.append((keyword, parts))
 
     def graph_end():
         nonlocal last_graph, topology
+        if last_graph.name is None:
+            raise ValueError("name is mandatory")
         topology.new_graph_fragment(last_graph)
         last_graph = None
 
+    p.add_level("frag", process_graph, start=graph_start, end=graph_end)
     p.add_level("graph", process_graph, start=graph_start, end=graph_end)
 
-    # TODO this is terrible, the current callback architecture is really
-    # unsuitable for this
     last_reaction: ReactionTemplate = None
 
     def require_complete_reaction():
