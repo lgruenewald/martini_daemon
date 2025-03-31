@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-import openmm as mm
-import openmm.app as mmapp
-from openmm.unit import nanometer, picosecond, md_unit_system
+import openmm as mm  # type: ignore[import-untyped]
+import openmm.app as mmapp  # type: ignore[import-untyped]
+from openmm.unit import nanometer, picosecond, md_unit_system  # type: ignore[import-untyped]
 from .utils import backup_try
 from collections import OrderedDict
 import numpy as np

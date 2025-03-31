@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 from dataclasses import dataclass
 import random
-from freud.box import Box
-from freud.locality import NeighborList, AABBQuery
+from freud.box import Box  # type: ignore[import-untyped]
+from freud.locality import NeighborList, AABBQuery  # type: ignore[import-untyped]
 import numpy as np
 from typing import Optional
 from .sysstar import SysStar
@@ -70,10 +70,10 @@ class ReactionTemplate:
     update_groups: list[list[tuple[int, str]]]
     skip: int
     product: MolFragment
-    renames: list[tuple[int, str, str]]
-    retypes: list[tuple[int, str, str]]
-    recharges: list[tuple[int, str, float]]
-    remasses: list[tuple[int, str, float]]
+    renames: list[tuple[tuple[int, str], str]]
+    retypes: list[tuple[tuple[int, str], str]]
+    recharges: list[tuple[tuple[int, str], float]]
+    remasses: list[tuple[tuple[int, str], float]]
 
     def __init__(self, name):
         self.name = name
@@ -628,7 +628,7 @@ class TopStar():
                 last_frag = self.frag_list[last_index]
                 last_part = last_frag.index_atom(0)
                 last_pos = np.array([pos[last_part]])
-                nlist = query.query(last_pos, {"r_max": 3.}).toNeighborList()
+                nlist = query.query(last_pos, {"r_max": 1.}).toNeighborList()
                 neighbors = set()
                 for _, j in nlist[:]:
                     neighbors.add(nlist_to_frag[j])

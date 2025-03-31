@@ -10,9 +10,9 @@ from .topstar import TopStar, ReactionTemplate, MolFragment
 from .sysstar import SysStar
 from .graph import GraphFragment, GraphAtomType
 import os
-import distutils
+import distutils  # type: ignore[import-untyped, import-not-found]
 import math
-from openmm.unit import nanometer
+from openmm.unit import nanometer  # type: ignore[import-untyped]
 import logging
 
 

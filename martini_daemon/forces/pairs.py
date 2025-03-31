@@ -1,6 +1,6 @@
 from .force import Force
-import openmm as mm
-from openmm.unit import nanometer
+import openmm as mm  # type: ignore[import-untyped]
+from openmm.unit import nanometer  # type: ignore[import-untyped]
 
 
 class Pairs(Force):
@@ -11,7 +11,7 @@ class Pairs(Force):
 
     if type is 1 param1 and param2 are c6 and c12"""
 
-    types: dict[(str, str), (float, float)]
+    types: dict[tuple[str, str], tuple[float, float]]
 
     def __init__(self, sysstar):
         super().__init__(sysstar)

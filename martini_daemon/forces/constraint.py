@@ -1,5 +1,5 @@
 from .force import Force, Interaction
-import openmm as mm
+import openmm as mm  # type: ignore[import-untyped]
 
 
 class Constraint(Force):

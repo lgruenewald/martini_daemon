@@ -8,9 +8,9 @@ from .sysstar import SysStar
 from .topstar import TopStar, ReactionTemplate, Fragment
 from .reporters.reporter import Reporter
 import sys
-import openmm as mm
-from openmm.app import GromacsGroFile
-from openmm.unit import femtosecond, nanometer, nanosecond
+import openmm as mm  # type: ignore[import-untyped]
+from openmm.app import GromacsGroFile  # type: ignore[import-untyped]
+from openmm.unit import femtosecond, nanometer, nanosecond  # type: ignore[import-untyped]
 from .utils import backup_try
 import logging
 import random
@@ -136,7 +136,7 @@ class DaemonSimulation():
         self.traj_path = traj_path
         self.out_path = out_path
         self.reactions = 0
-        self.last_step_time = 0
+        self.last_step_time = 0.
         self.xtc_every = xtc_every
         self.step_ns = steps_per_step * dt.value_in_unit(nanosecond)
         self.logger.info("__init__ end")

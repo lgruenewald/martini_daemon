@@ -1,6 +1,6 @@
 from __future__ import annotations
-import openmm as mm
-from openmm.unit import nanometer
+import openmm as mm  # type: ignore[import-untyped]
+from openmm.unit import nanometer  # type: ignore[import-untyped]
 from .force import Force, Interaction
 from collections import OrderedDict
 
@@ -15,7 +15,7 @@ class NonBonded(Force):
     """Non bonded parameters are for building the C6/C12 table
     values are (type1: string, type2: string), (sigma: float, epsilon: float)
     """
-    _nb_types: dict[(str, str), (float, float)]
+    _nb_types: dict[tuple[str, str], tuple[float, float]]
     _used_atom_types: OrderedDict[str, int]
     _exclusions: ExclusionHelper
     _rebuild: bool
@@ -160,7 +160,7 @@ class ExclusionHelper(Force):
     # exclusions could return the same one
     # does returning an existing exclusion create any problems? what if that
     # exclusion gets removed in a reaction?
-    _list: list[(int, int)]
+    _list: list[tuple[int, int]]
     _nb: NonBonded
     _rebuild: bool
     _force_obj: mm.Force

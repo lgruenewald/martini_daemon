@@ -1,4 +1,4 @@
-import openmm as mm
+import openmm as mm  # type: ignore[import-untyped]
 from .force import Force
 
 

@@ -1,4 +1,4 @@
-from .force import Force
+from .force import Force  # type: ignore[import-untyped]
 
 
 class Connection(Force):
