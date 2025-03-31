@@ -6,6 +6,7 @@ from datetime import datetime
 import sys
 import os
 from martini_daemon.utils import backup_try
+import numpy as np
 
 date_format = "%Y-%m-%d %H:%M:%S,%f"
 
@@ -18,6 +19,7 @@ path = len(sys.argv) > 1 and sys.argv[1] or "."
 def extract(path):
     categories_starts = {}
     categories_sums = {}
+    categories_values = {}
     md_steps = ""
     try:
         with open(path, "r") as f:
@@ -35,7 +37,10 @@ def extract(path):
                         continue
                     diff = parsed_date - prev_start
                     prev_diff = categories_sums.get(category) or 0.0
+                    if categories_values.get(category) is None:
+                        categories_values[category] = []
                     categories_sums[category] = diff.total_seconds() + prev_diff
+                    categories_values[category].append(diff.total_seconds())
                 if "MD steps" in content:
                     md_steps = content.replace("doing ", "").replace(" MD steps", "").strip()
     except (UnicodeDecodeError, ValueError):
@@ -48,6 +53,9 @@ def extract(path):
     print(f"MD steps per step: {md_steps}")
     for category, seconds in categories_sums.items():
         print(f"{category}: total of {seconds} s")
+        print(f"{category} n {len(categories_values[category])}")
+        print(f"{category} avg {np.mean(np.array(categories_values[category]))}")
+        print(f"{category} std {np.mean(np.std(categories_values[category]))}")
     print(f"== End of {path} ==")
     return True
 

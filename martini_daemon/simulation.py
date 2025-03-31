@@ -6,6 +6,7 @@ the D/M algorithm + wrappers
 from .top_parser import DaemonTopFile
 from .sysstar import SysStar
 from .topstar import TopStar, ReactionTemplate, Fragment
+from .reporters.reporter import Reporter
 import sys
 import openmm as mm
 from openmm.app import GromacsGroFile
@@ -108,7 +109,12 @@ class DaemonSimulation():
         self.logger.info("Setting positions")
         self.system.set_positions(self.gro.getPositions(True))
         for rep in reporters:
-            rep = rep(self.system, self.top)
+            # TODO only take instances
+            if isinstance(rep, Reporter):
+                rep._sysstar = self.system
+                rep._topstar = self.top
+            else:
+                rep = rep(self.system, self.top)
             self.system.add_reporter(rep)
             self.top.add_reporter(rep)
         # must set xtc path after adding reporters currently

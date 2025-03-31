@@ -1,3 +1,8 @@
+potential bugs:
+- bug in bond reporter
+- better quitting behavior in benchmarking
+- some form of restarting existing files?
+
 fragment neighbor list:
 for now this is per reaction, bimolecular only, r_max 1:x 2:x only
 these reactions should have
@@ -57,6 +62,3 @@ What would we need to get support for all .top files? Most to least important.
 - fix vsite1
 - position restraints
 - dihedral type 4
-- tabulated potentials
-- pbc that are not 90 degree angle
-- cmap, just because martini_openmm can do it

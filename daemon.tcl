@@ -1,46 +1,26 @@
 # Advanced visualization script for martini_daemon
 
 # decodes a int32 list that was written to a file, returns a Tcl list of ints
-proc decode_list {filename} {
+proc decode_list {filename {compressed 1}} {
 	set fd [open $filename r]
 	fconfigure $fd -translation binary
 	set binary [read $fd]
 	close $fd
+	if {$compressed} {
+		set binary [zlib decompress $binary]
+	}
 	binary scan $binary "i*" result
 	return $result
 }
 
-# decodes a list of lists, of variable length that was written to a file
-# i32 of -1 (FFFFFFFF in hex) is used as a list separator, so this is not a
-# valid value the lists can contain
-proc decode_nested_list {filename} {
+# decodes any tcl obj by a string representation (compressed)
+proc decode_compressed {filename} {
 	set fd [open $filename r]
 	fconfigure $fd -translation binary
 	set binary [read $fd]
 	close $fd
-
-	set result {}
-	set length [string length $binary]
-
-	set i 0
-	set c {}
-
-	while {$i < $length} {
-		set chunk [string range $binary $i [expr {$i + 3}]]
-		binary scan $chunk i value
-
-		if {$value == -1} {
-			lappend result $c
-			set c {}
-		} else {
-			lappend c $value
-		}
-		incr i 4
-	}
-	lappend result $c
-
+	set result [zlib decompress $binary]
 	return $result
-	
 }
 
 # opens a .gro and .xtc with CPK that can be used for visualizing e.g. the bonds
@@ -51,16 +31,14 @@ proc daemon_open {gro xtc {molid 0}} {
 	mol new $gro
 	mol addfile $xtc waitfor all
 	animate delete  beg 0 end 0 skip 0 $molid
-#	mol modstyle 0 $molid CPK 3.0 1.5 12.0 12.0
-#	animate pause
 }
 
 # colors molecule molid according to the daemon reporter output file npy
-proc daemon_color {npy {molid 0}} {
+proc daemon_color {npy {molid 0} {compressed 1}} {
 	
 	set asel [ atomselect $molid all ]
 	set n [ $asel num ]
-	set all_frames [ decode_list $npy ]
+	set all_frames [ decode_list $npy $compressed ]
 	set len [ llength $all_frames ]
 	# number of atoms, assumed to be costant
 	set n_frames [expr $len / $n]
@@ -123,10 +101,13 @@ proc adj_bonds { name element op } {
 proc daemon_bonds {npy {molid 0}} {
 	global vmd_frame
 	global all_bonds
-	set all_bonds [ decode_nested_list $npy ]
+	set all_bonds [ decode_compressed $npy ]
+	set llen [ llength $all_bonds ]
+	set clen [ string length $all_bonds ]
+	puts "daemon_bonds all_bonds: $llen lists $clen chars."
 
 	trace add variable vmd_frame write adj_bonds
-	puts "daemon_bonds: vmd_frame trace added"
+	puts "daemon_bonds: vmd_frame trace added."
 
 	adj_bonds a a a
 }
