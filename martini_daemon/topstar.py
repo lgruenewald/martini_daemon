@@ -68,7 +68,6 @@ class ReactionTemplate:
     global_limit: int
     break_groups: list[list[tuple[int, str]]]
     update_groups: list[list[tuple[int, str]]]
-    skip: int
     product: MolFragment
     renames: list[tuple[tuple[int, str], str]]
     retypes: list[tuple[tuple[int, str], str]]
@@ -88,7 +87,6 @@ class ReactionTemplate:
         self.global_limit = None
         self.break_groups = []
         self.update_groups = []
-        self.skip = None
         self.product = MolFragment(name)
         self.product.index_type = "pair"
         self.renames = []
@@ -125,7 +123,7 @@ class TopStar():
     # TODO only use it for MolFragment
     type_lookup: dict[str, NumberedFragment | MolFragment]
 
-    reaction_list: list[ReactionTemplate]
+    reactions: dict[tuple[str, str], list[ReactionTemplate]]
     reactive_types: set[str]
 
     system: SysStar
@@ -139,7 +137,7 @@ class TopStar():
         self.interaction_list = []
         self.frag_fragments = []
         self.mol_fragments = []
-        self.reaction_list = []
+        self.reactions = {}
         self.type_lookup = {}
         self.subfrag_map = {}
         self.reactive_types = set()
@@ -176,7 +174,11 @@ class TopStar():
         self.graph_fragment_list.append(frag)
 
     def new_reaction(self, reaction: ReactionTemplate) -> MolFragment:
-        self.reaction_list.append(reaction)
+        key = (reaction.reactants[0],
+               reaction.reactants[1] if len(reaction.reactants) == 2 else None)
+        if self.reactions.get(key) is None:
+            self.reactions[key] = []
+        self.reactions[key].append(reaction)
         for r in reaction.reactants:
             self.reactive_types.add(r)
         if self.type_lookup.get(reaction.name):
@@ -413,8 +415,9 @@ class TopStar():
 
     # ======= (2/3) Detection things =======
     def pre_detection(self, i):
-        for rx in self.reaction_list:
-            rx.global_counter = 0
+        for _, rxs in self.reactions.items():
+            for rx in rxs:
+                rx.global_counter = 0
         for reporter in self.reporters:
             reporter.pre_detection(i)
 
@@ -517,15 +520,6 @@ class TopStar():
         rx.global_counter += 1
         return True
 
-    def get_init_map(self):
-        init_map: dict[str, list[int]] = {}
-        for key, frag in self.frag_list.items():
-            if init_map.get(frag.name) is None:
-                init_map[frag.name] = []
-            init_map[frag.name].append(key)
-
-        return init_map
-
     def get_neighbor_list(self, box, pos) -> \
             tuple[NeighborList, dict[int, int], dict[int, int]]:
         if len(self.frag_list) == 0:
@@ -545,116 +539,50 @@ class TopStar():
         query = AABBQuery(box, pos_filtered)
         return query, frag_to_nlist, nlist_to_frag
 
-    def get_reaction_tree(self) -> dict:
-        tree = {}
-        for rx in self.reaction_list:
-            reactants = rx.reactants
-            node = tree
-            for j, reactant in enumerate(reactants):
-                if rx.skip is not None and j >= rx.skip:
-                    # unelegant way of adding enum-like info in the k/v mapping
-                    # ideally this would be possible at the type level
-                    reactant = "*" + reactant
-                if node.get(reactant) is None:
-                    node[reactant] = {}
-                node = node[reactant]
-            node["_reaction"] = rx
-        return tree
-
-    # TODO type this better
-    def detection_over_types(
-            self,
-            reactions: list[tuple[list[Fragment], ReactionTemplate]],
-            skip: set[int],
-            node: dict,
-            previous_types: list[str],
-            previous_indices: list[int],
-            init_map, pos, box, query: AABBQuery,
+    def detection_all(
+            self, pos, box, query: AABBQuery,
             frag_to_nlist: dict[int, int], nlist_to_frag: dict[int, int]
-            ) -> tuple[bool, list, set]:
-        """
-            Runs the detection algorithm over a single node in the reaction
-            "tree".
+            ) -> list[tuple[list[Fragment], ReactionTemplate]]:
 
-            reactions - dynamic list of reactions that passed the D algo
-            skip - dynamic set of indices in self.frag_list that already reacted
-            so they cannot any more
-            node - (sub)tree of reaction types left to check
-            previous_types - reactant types already checked
-            previous_indicies - indicies in init_map[reactant_type] that were
-            already checked
-            init_map - dict of reactant_type -> list of indicies of that type
-            in self.frag_list
-            pos - numpy array of positions
-            box - periodic box info
-        """
+        reactions: list[tuple[list[Fragment], ReactionTemplate]] = []
+        skip: set[int] = set()
 
-        for next_reactant, next_node in node.items():
-            if next_reactant == "_reaction":
-                # convert init_map indices to init_list indices
-                frag_ids = [init_map[name.lstrip("*")][id] for name, id in
-                            zip(previous_types, previous_indices)]
-                frags = [self.frag_list[i] for i in frag_ids]
-                rx = next_node
-                if self.detection(frags, rx, pos, box):
-                    # only until rx.skip do we add things to skip and rxs
-                    # the rest are only for self.detection but nothing after
-                    if rx.skip is not None:
-                        frag_ids = frag_ids[:rx.skip]
-                        frags = frags[:rx.skip]
-                    for frag_id in frag_ids:
-                        skip.add(frag_id)
-                    reactions.append((frags, rx))
-                    return reactions, skip, True
-
-            if init_map.get(next_reactant.lstrip("*")) is None:
+        for i, frag_i in self.frag_list.items():
+            if i in skip:
                 continue
-
-            # find out where to start indexing from
-            # this also works well with the * hack for rx.skip
-            # this used to be the if j <= i: continue check
-            # prevents both self reactions and double counting
-            start_at = 0
-            for i, prev_reactant in enumerate(previous_types):
-                if next_reactant == prev_reactant:
-                    start_at = max(start_at, previous_indices[i] + 1)
-            # go over all options for the next_reactant type
-            # TODO rewrite this function completely with a more elegant
-            # neighbor list
-            neighbors = None
-            if len(previous_indices) > 0:
-                last_type = previous_types[-1]
-                last_index = init_map[last_type][previous_indices[-1]]
-                last_frag = self.frag_list[last_index]
-                last_part = last_frag.index_atom(0)
-                last_pos = np.array([pos[last_part]])
-                nlist = query.query(last_pos, {"r_max": 1.}).toNeighborList()
-                neighbors = set()
-                for _, j in nlist[:]:
-                    neighbors.add(nlist_to_frag[j])
-            for j in range(start_at, len(init_map[next_reactant.lstrip("*")])):
-                # skip is a set of init_list indices that already reacted
-                # only check it if the current reactant is before rx.skip => not *
-                frag_id = init_map[next_reactant.lstrip("*")][j]
-                if next_reactant[0] != "*" and frag_id in skip:
+            uni_rx = self.reactions.get((frag_i.name, None))
+            if uni_rx is not None and len(uni_rx) > 0:
+                for rx in uni_rx:
+                    if self.detection([frag_i], rx, pos, box):
+                        skip.add(i)
+                        reactions.append(([i], rx))
+                        break
+                if i in skip:
                     continue
-                if neighbors is not None and frag_id not in neighbors:
+            pos_i = np.array([pos[frag_i.index_atom(0)]])
+            nlist = query.query(pos_i, {"r_max": 1.}).toNeighborList()
+            for _, neigh_j in nlist[:]:
+                j = nlist_to_frag[neigh_j]
+                if j in skip:
                     continue
-                previous_types.append(next_reactant)
-                previous_indices.append(j)
-                reactions, skip, reacted = self.detection_over_types(
-                    reactions, skip, next_node,
-                    previous_types, previous_indices,
-                    init_map, pos, box, query, frag_to_nlist, nlist_to_frag
-                )
-                previous_types.pop(-1)
-                previous_indices.pop(-1)
-                if reacted and len(previous_indices) > 0:
-                    # there was a reaction, so previous_indices[0] is now
-                    # skipped, so we can jump up all the way to root
-                    return reactions, skip, True
+                if i == j:
+                    continue
+                frag_j = self.frag_list[j]
+                if frag_i.name == frag_j.name and j < i:
+                    # don't double count self reactions
+                    continue
+                bi_rx = self.reactions.get((frag_i.name, frag_j.name))
+                if bi_rx is not None and len(bi_rx) > 0:
+                    for rx in bi_rx:
+                        if self.detection([frag_i, frag_j], rx, pos, box):
+                            skip.add(i)
+                            skip.add(j)
+                            reactions.append(([frag_i, frag_j], rx))
+                            break
+                    if i in skip:
+                        break
 
-        return reactions, skip, False
+        return reactions
 
     # ======= (3/3) Modification things =======
     def clean_defrag(self, frag: Fragment, part: int) -> None:
@@ -825,13 +753,11 @@ class TopStar():
 
     def detection_modification(self, i: int) -> int:
         self.pre_detection(i)
-        init_map = self.get_init_map()
         pos, box = self.system.get_positions()
         query, frag_to_nlist, nlist_to_frag = self.get_neighbor_list(box, pos)
         # tree of frag combinations to check
-        reactions, skip, _ = self.detection_over_types(
-            [], set(), self.get_reaction_tree(), [], [], init_map, pos, box,
-            query, frag_to_nlist, nlist_to_frag
+        reactions = self.detection_all(
+            pos, box, query, frag_to_nlist, nlist_to_frag
         )
 
         if len(reactions) == 0:

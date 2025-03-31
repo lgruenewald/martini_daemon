@@ -687,6 +687,10 @@ def DaemonTopFile(file, include_dir=None, defines={},
     def process_reactants(tokens):
         nonlocal last_reaction
         rxs = [unwrap(tokens, i, "word") for i in range(len(tokens))]
+        if len(tokens) > 2:
+            raise ValueError("Only up to 2 reactants are allowed.")
+        if len(last_reaction.reactants) > 0:
+            raise ValueError("Only one set of reactants per reaction.")
         last_reaction.reactants = rxs
 
     p.add_level("reactants", process_reactants)
@@ -750,9 +754,6 @@ def DaemonTopFile(file, include_dir=None, defines={},
             case "limit":
                 limit = unwrap(tokens, 1, "int")
                 last_reaction.global_limit = limit
-            case "skip":
-                skip = unwrap(tokens, 1, "int")
-                last_reaction.skip = skip
             case _:
                 raise ValueError(f"Unknown key {key} in [rx_conditions]")
 
