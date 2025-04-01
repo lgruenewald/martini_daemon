@@ -1,8 +1,7 @@
 ; reaction template file for BDT dithiol formation and breakage, with graphs
 
 [frag]
-monomer
-[graph]
+name monomer
 ; the reacting atom
 atom 1 BS* R_BEAD
 ; the atom used for building angles/dihedrals
@@ -18,8 +17,7 @@ atom! 4 BS* R_BEAD
 bond 1 4
 
 [frag]
-dimer
-[graph]
+name dimer
 atom 1 BS* R_BEAD
 atom 2 BS* R_BEAD
 bond 1 2
@@ -37,7 +35,7 @@ banned_angle 1:2 1:1 2:1 135 180
 banned_angle 2:2 2:1 1:1 0   105
 banned_angle 2:2 2:1 1:1 135 180
 ; allowed dihedral near 110 deg +- 20 deg
-banned_dihedral 2:2 2:1 1:1 1:2 130 90
+banned_dihedral 1:2 1:1 2:1 2:2 130 90
 
 [bonds]
 ; morse bond

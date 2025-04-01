@@ -42,7 +42,7 @@ def pcos_angle(p1, p2, p3, box):
     return np.dot(v1, v2) / np.sqrt(v1.dot(v1)) / np.sqrt(v2.dot(v2))
 
 
-def pdihedral(p1, p2, p3, p4, box):
+def pdihedral(p4, p3, p2, p1, box):
     """
         Returns the dihedral between the four particles, in radians
     """
