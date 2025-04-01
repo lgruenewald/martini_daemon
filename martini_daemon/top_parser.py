@@ -16,7 +16,7 @@ from openmm.unit import nanometer  # type: ignore[import-untyped]
 import logging
 
 
-def _get_default_gromacs_include_dir():
+def _get_default_gromacs_include_dir() -> str:
     """Find the location where gromacs #include files are referenced from, by
     searching for (1) gromacs environment variables, (2) for the gromacs binary
     'pdb2gmx' or 'gmx' in the PATH, or (3) just using the default gromacs
@@ -51,7 +51,7 @@ def _get_default_gromacs_include_dir():
 
 def DaemonTopFile(file, include_dir=None, defines={},
                   epsilon_r=15.0, nonbonded_cutoff=1.1*nanometer,
-                  logger=None):
+                  logger=None) -> tuple[SysStar, TopStar]:
     """Parses a Martini Top file for Gromacs and generates T*, sys and top
     from it. Also parses .frag and .rx files included in the .top file.
     """
@@ -678,15 +678,6 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     p.add_level("reactants", process_reactants)
     p.add_level("reactant", process_reactants)
-
-    def process_products(tokens):
-        nonlocal last_reaction
-        prod = unwrap(tokens, 0, "word")
-        sel = [unwrap(tokens, i, "pair") for i in range(1, len(tokens))]
-        last_reaction.products.append((prod, sel))
-
-    p.add_level("products", process_products)
-    p.add_level("product", process_products)
 
     def process_conditions(tokens):
         nonlocal last_reaction

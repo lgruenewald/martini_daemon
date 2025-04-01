@@ -42,6 +42,10 @@ class GraphMatch():
         self.atoms[name] = part_num
         self.rev_atoms[part_num] = name
 
+        # TODO -> have a neighbor list in GraphMatch and update it when add_atom
+        # TODO -> convert interactions involved to a graph, keep it updated when
+        # adding atoms
+
     def add_inter(self, id: int, inter: Interaction):
         assert self.interactions[id] is None and inter not in self.matched_inter
         self.interactions[id] = inter
@@ -118,6 +122,7 @@ class GraphFragment():
 
     def check_atom_interactions(self, part_name: str, partial: GraphMatch,
                                 interactions: list[list[Interaction]]):
+        # TODO accelerate this using the partial's built in interaction graph
         """
             Goes through all interactions of part_name in the partial match.
             Adds all interactions that it can to partial (mutating it).
@@ -164,6 +169,8 @@ class GraphFragment():
     def try_match(self, particles: set[int], partial: GraphMatch,
                   sysstar: SysStar, interactions: list[list[Interaction]],
                   ) -> list[GraphMatch]:
+        # TODO rewrite documentation strings
+        # TODO interaction graph informed new neighbor picking
         """
             Please use match_particles() from outside
 
@@ -249,6 +256,9 @@ class GraphFragment():
                         sysstar: SysStar,
                         interactions: list[list[Interaction]],
                         ) -> list[GraphMatch]:
+        # TODO find starting matches of a single atom separately here
+        # then call try_match on all
+        # TODO remove duplicates here
         """
             Friendly wrapper around try_match + filter out results with NOT
 

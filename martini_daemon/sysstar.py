@@ -41,9 +41,6 @@ from .vsites.weighed_average import VSiteWeighedAverage
 from .vsites.center_of_mass import VSiteCenterOfMass
 from .reporters.reporter import Reporter
 
-# custom non gromacs interactions
-from .forces.morse_angle import MorseAngle
-
 
 class SysStar():
 
@@ -56,18 +53,18 @@ class SysStar():
     _forces_list: list[mm.Force]  # to keep track of indices
     context_initialized: bool
     # name, resid, resname, type, charge, mass
-    _part_list: list[(str, int, str, str, float, float)]
+    _part_list: list[tuple[str, int, str, str, float, float]]
 
     """All the constraints in the system
     indices are called constraint_id
     values are (i: part_id, j: part_id, length: float)
     """
-    _constraint_list: list[(int, int, float)]
+    _constraint_list: list[tuple[int, int, float]]
 
     """Atom types to look up default charges and default masses
     values are atom_type: string, (mass: float, charge: float)
     """
-    _atom_types: dict[str, (float, float)]
+    _atom_types: dict[str, tuple[float, float]]
 
     modular_forces: list[Force]
 
@@ -86,7 +83,6 @@ class SysStar():
         self._forces_list = []
         self.constraint = Constraint(self)
         self.harmonic_bond = HarmonicBond(self)
-        self.harmonic_bond2 =HarmonicBond(self)
         self.morse_bond = MorseBond(self)
         self.cubic_bond = CubicBond(self)
         self.fene_bond = FENEBond(self)
@@ -94,7 +90,6 @@ class SysStar():
         self.proper_dihedral = ProperDihedral(self)
         self.improper_dihedral = ImproperDihedral(self)
         self.g96_angle = G96Angle(self)
-        self.g96_angle2 = G96Angle(self)
         self.restricted_angle = RestrictedAngle(self)
         self.combined_bending_torsion = CombinedBendingTorsion(self)
         self.rb_torsion = RBTorsion(self)
@@ -117,8 +112,6 @@ class SysStar():
         self.vsite_com = VSiteCenterOfMass(self)
         self.nonbonded_force = NonBonded(self)
         self.exclusions = self.nonbonded_force.get_exclusion_helper()
-        # custom non gromacs
-        self.morse_angle = MorseAngle(self)
 
         self.modular_forces = [
             self.constraint,
@@ -134,8 +127,6 @@ class SysStar():
             self.vsite_2fd, self.vsite_3fd, self.vsite_4fdn,
             self.vsite_avg, self.vsite_3fad, self.vsite_3out, self.vsite_com,
             self.nonbonded_force, self.exclusions, self.pairs,
-            # custom non gromacs
-            self.morse_angle, self.g96_angle2, self.harmonic_bond2
         ]
 
         self.vsites = []

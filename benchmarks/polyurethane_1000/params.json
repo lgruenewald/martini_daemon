@@ -5,7 +5,7 @@
       "n": 1,
       "gro": "system.gro",
       "top": "system.top",
-      "per_step": 5000,
+      "per_step": 100,
       "steps": 30
     }
   ]

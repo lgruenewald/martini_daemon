@@ -1,24 +1,15 @@
+code quality:
+- mypy type checker
+- linter - pylint, flake8, black
+- naming conventions
+- atoms vs particles - stick to one name - atoms, rename all "part, particles"
+- coverage.py for coverage
+- scalene for benchmarking
+- cython
+
 potential bugs:
-- bug in bond reporter
+- bug in bond reporter?
 - better quitting behavior in benchmarking
-- some form of restarting existing files?
-
-fragment neighbor list:
-for now this is per reaction, bimolecular only, r_max 1:x 2:x only
-these reactions should have
-1. filter out all atoms with a distance cutoff, and their fragment
-	(for now only pick the first r_max distance cutoff atom if present,
-	atom 1 if no r_max)
-2. build freud neighbor lists with a generous cutoff (lets say 2 nm)
-4. only call detection() based on the neighbor list
-
-better graph:
-1. convert interactions to a graph
-2. build neighbor lists for all atoms involved, when involving new atoms always
-update neighbor list
-3. find starting matches
-4. graph informed new neighbor picking on all starting matches
-5. remove duplicates
 
 fixed reaction rates:
 - remove limiter, probability, add energy barrier / velocity
