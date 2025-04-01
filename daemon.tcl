@@ -19,8 +19,7 @@ proc decode_compressed {filename} {
 	fconfigure $fd -translation binary
 	set binary [read $fd]
 	close $fd
-	set result [zlib decompress $binary]
-	return $result
+	return [zlib decompress $binary]
 }
 
 # opens a .gro and .xtc with CPK that can be used for visualizing e.g. the bonds

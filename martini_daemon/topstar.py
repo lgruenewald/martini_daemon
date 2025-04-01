@@ -10,7 +10,7 @@ from .forces.force import Force, Interaction
 from .utils import pdist, pcos_angle, pdihedral
 from .reporters.reporter import Reporter
 from .graph import GraphFragment, GraphMatch, GraphAtomType
-from .fragment import Fragment, Fragments
+from .fragment import Fragment, index_pair, GotAtom
 
 random.seed()
 
@@ -47,7 +47,6 @@ class MolFragment:
 class ReactionTemplate:
     name: str
     reactants: list[str]
-    products: list[tuple[str, Optional[list[tuple[int, str]]]]]
     distance_max: list[tuple[tuple[int, str], tuple[int, str], float]]
     distance_min: list[tuple[tuple[int, str], tuple[int, str], float]]
     angle_limits: list[tuple[tuple[int, str], tuple[int, str], tuple[int, str],
@@ -68,7 +67,6 @@ class ReactionTemplate:
     def __init__(self, name):
         self.name = name
         self.reactants = []
-        self.products = []
         self.distance_max = []
         self.distance_min = []
         self.angle_limits = []
@@ -159,7 +157,9 @@ class TopStar():
         for r in reaction.reactants:
             self.reactive_types.add(r)
         if self.type_lookup.get(reaction.name):
-            raise ValueError(f"Second definition of fragment type / reaction {name}")
+            raise ValueError(
+                f"Second definition of molfragment type {reaction.name}"
+            )
         self.type_lookup[reaction.name] = reaction.product
         return reaction.product
 
@@ -246,80 +246,28 @@ class TopStar():
             parts.append(p)
             self.defrag_list.append([])
             self.interaction_list.append([])
+
         # instantiate interactions
-        res = self.instantiate_over_existing(frag,
-                                             Fragments.from_parts(parts))
+        res = self.instantiate_over_existing(frag, parts)
         # add graphs to system
         self.try_match_graphs(set(parts), frag_name)
         return res
 
     def instantiate_over_existing(self, molfrag: MolFragment,
-                                  frags: Fragments,
-                                  reaction: bool = False,
-                                  template: Optional[ReactionTemplate] = None
-                                  ) -> Fragment:
+                                  frags: list[Fragment] | list[int],
+                                  ):
         """Takes a name of a mol fragment, adds interactions to those particles
-        according to the mol fragment.
+        according to the mol fragment, or optionally a reaction template.
         """
 
-        inst = self.add_frag_to_list(molfrag.molecule_name)
-        # particles
-        for in_frag_id, part_id in enumerate(frags.particles()):
-            inst.particles[f"{in_frag_id+1}"] = part_id
-            # defrag
-            if inst.frag_id != -1:
-                self.defrag_list[part_id].append(inst.frag_id)
-            if reaction:
-                # old system:
-                # products also change type, charge, mass but not name
-                type, _, _, _, _, charge, mass = \
-                    molfrag.atoms[in_frag_id]
-                # Atom names are not updated.
-                # The * is only here as an option not to update types.
-                if type != "*":
-                    self.system.retype(part_id, type)
-                if charge is not None:
-                    self.system.recharge(part_id, charge)
-                if mass is not None:
-                    self.system.remass(part_id, mass)
-        # new system: re* overrides everything though
-        if template is not None:
-            for (pair, new_name) in template.renames:
-                found, part_id = frags.get(pair)
-                if not found:
-                    raise ValueError(f"Index out of range {pair}")
-                if part_id is None:
-                    continue
-                self.system.rename(part_id, new_name)
-            for (pair, new_type) in template.retypes:
-                found, part_id = frags.get(pair)
-                if not found:
-                    raise ValueError(f"Index out of range {pair}")
-                if part_id is None:
-                    continue
-                self.system.retype(part_id, new_type)
-            for (pair, new_charge) in template.recharges:
-                found, part_id = frags.get(pair)
-                if not found:
-                    raise ValueError(f"Index out of range {pair}")
-                if part_id is None:
-                    continue
-                self.system.recharge(part_id, new_charge)
-            for (pair, new_mass) in template.remasses:
-                found, part_id = frags.get(pair)
-                if not found:
-                    raise ValueError(f"Index out of range {pair}")
-                if part_id is None:
-                    continue
-                self.system.remass(part_id, new_charge)
         # exclusions
         for (i, j) in molfrag.exclusions:
-            foundi, pi = frags.get(i)
-            foundj, pj = frags.get(j)
-            if not foundi or not foundj:
+            foundi, pi = index_pair(frags, i)
+            foundj, pj = index_pair(frags, j)
+            if GotAtom.NotFound in {foundi, foundj}:
                 # wrong atom name
                 raise ValueError("Exclusion index out of range")
-            if pi is None or pj is None:
+            if GotAtom.MissingOptional in {foundi, foundj}:
                 # optional atom missing
                 continue
             if pi < pj:
@@ -329,19 +277,21 @@ class TopStar():
         # generic interactions
         for (force, members, params) in molfrag.interactions:
             member_parts = []
+            missing_opt = False
             for x in members:
-                found, part = frags.get(x)
-                if not found:
+                found, part = index_pair(frags, x)
+                if GotAtom.NotFound == found:
                     raise ValueError("Wrong atom name")
+                elif GotAtom.MissingOptional == found:
+                    missing_opt = True
+                    break
                 member_parts.append(part)
-            if any(map(lambda x: x is None, member_parts)):
+            if missing_opt:
                 # optional missing => skip
                 continue
             f = force.add(member_parts, params)
             for member in member_parts:
                 self.interaction_list[member].append(f)
-
-        return inst
 
     # ======= (2/3) Detection things =======
     def pre_detection(self, i):
@@ -383,41 +333,41 @@ class TopStar():
             return False
 
         # position dependent checks
-        for ((moli, idi), (molj, idj), rmax) in rx.distance_max:
-            found1, init1 = reactants[moli].get_atom(idi)
-            found2, init2 = reactants[molj].get_atom(idj)
-            if not found1 or not found2:
+        for (idi, idj, rmax) in rx.distance_max:
+            found1, init1 = index_pair(reactants, idi)
+            found2, init2 = index_pair(reactants, idj)
+            if GotAtom.NotFound in {found1, found2}:
                 # wrong atom names
                 raise ValueError("Bad atom name in reaction condition")
-            if init1 is None or init2 is None:
+            if GotAtom.MissingOptional in {found1, found2}:
                 # missing optional atoms
                 continue
             dist = pdist(pos[init1], pos[init2], box)
             if dist > rmax:
                 return False
 
-        for ((moli, idi), (molj, idj), rmin) in rx.distance_min:
-            found1, init1 = reactants[moli].get_atom(idi)
-            found2, init2 = reactants[molj].get_atom(idj)
-            if not found1 or not found2:
+        for (idi, idj, rmin) in rx.distance_min:
+            found1, init1 = index_pair(reactants, idi)
+            found2, init2 = index_pair(reactants, idj)
+            if GotAtom.NotFound in {found1, found2}:
                 # wrong atom names
                 raise ValueError("Bad atom name in reaction condition")
-            if init1 is None or init2 is None:
+            if GotAtom.MissingOptional in {found1, found2}:
                 # missing optional atoms
                 continue
             dist = pdist(pos[init1], pos[init2], box)
             if dist < rmin:
                 return False
 
-        for ((moli, idi), (molj, idj), (molk, idk), cos_min, cos_max) in \
+        for (idi, idj, idk, cos_min, cos_max) in \
                 rx.angle_limits:
-            found1, p1 = reactants[moli].get_atom(idi)
-            found2, p2 = reactants[molj].get_atom(idj)
-            found3, p3 = reactants[molk].get_atom(idk)
-            if not found1 or not found2 or not found3:
+            found1, p1 = index_pair(reactants, idi)
+            found2, p2 = index_pair(reactants, idj)
+            found3, p3 = index_pair(reactants, idk)
+            if GotAtom.NotFound in {found1, found2, found3}:
                 # wrong atom names
                 raise ValueError("Bad atom name in reaction condition")
-            if p1 is None or p2 is None or p3 is None:
+            if GotAtom.MissingOptional in {found1, found2, found3}:
                 # missing optional atoms
                 continue
             # the particle positions of particle i, j, k
@@ -428,17 +378,17 @@ class TopStar():
                 # cos_max is the maximum angle => min cosine value
                 return False
 
-        for ((moli, idi), (molj, idj), (molk, idk), (moll, idl), min, max) in \
+        for (idi, idj, idk, idl, min, max) in \
                 rx.dihedral_limits:
             # particle positions
-            found1, p1 = reactants[moli].get_atom(idi)
-            found2, p2 = reactants[molj].get_atom(idj)
-            found3, p3 = reactants[molk].get_atom(idk)
-            found4, p4 = reactants[moll].get_atom(idl)
-            if not found1 or not found2 or not found3 or not found4:
+            found1, p1 = index_pair(reactants, idi)
+            found2, p2 = index_pair(reactants, idj)
+            found3, p3 = index_pair(reactants, idk)
+            found4, p4 = index_pair(reactants, idl)
+            if GotAtom.NotFound in {found1, found2, found3, found4}:
                 # wrong atom names
                 raise ValueError("Bad atom name in reaction condition")
-            if p1 is None or p2 is None or p3 is None or p4 is None:
+            if GotAtom.MissingOptional in {found1, found2, found3, found4}:
                 # missing optional atoms
                 continue
             theta = pdihedral(pos[p1], pos[p2], pos[p3], pos[p4], box)
@@ -550,11 +500,11 @@ class TopStar():
         for group in rx.break_groups:
             group_atoms = []
             all_found = True
-            for moli, idi in group:
-                found, part = frags[moli].get_atom(idi)
-                if not found:
+            for pair in group:
+                found, part = index_pair(frags, pair)
+                if found == GotAtom.NotFound:
                     raise ValueError("Unknown part name")
-                if part is None:
+                if found == GotAtom.MissingOptional:
                     all_found = False
                     break
                 group_atoms.append(part)
@@ -583,11 +533,11 @@ class TopStar():
         for group in rx.update_groups:
             group_atoms = []
             all_found = True
-            for moli, idi in group:
-                found, part = frags[moli].get_atom(idi)
-                if not found:
+            for pair in group:
+                found, part = index_pair(frags, pair)
+                if found == GotAtom.NotFound:
                     raise ValueError("Unknown part name")
-                if part is None:
+                if found == GotAtom.MissingOptional:
                     all_found = False
                     break
                 group_atoms.append(part)
@@ -619,6 +569,39 @@ class TopStar():
                 if frag is not None and frag.graph is not None:
                     self.remove_fragment(frag)
 
+    def template_update_atoms(
+                              self, frags: list[Fragment], rx: ReactionTemplate
+                             ) -> None:
+        # re* overrides everything
+        for (pair, new_name) in rx.renames:
+            found, part_id = index_pair(frags, pair)
+            if found == GotAtom.NotFound:
+                raise ValueError(f"Index out of range {pair}")
+            if found == GotAtom.MissingOptional:
+                continue
+            self.system.rename(part_id, new_name)
+        for (pair, new_type) in rx.retypes:
+            found, part_id = index_pair(frags, pair)
+            if found == GotAtom.NotFound:
+                raise ValueError(f"Index out of range {pair}")
+            if found == GotAtom.MissingOptional:
+                continue
+            self.system.retype(part_id, new_type)
+        for (pair, new_charge) in rx.recharges:
+            found, part_id = index_pair(frags, pair)
+            if found == GotAtom.NotFound:
+                raise ValueError(f"Index out of range {pair}")
+            if found == GotAtom.MissingOptional:
+                continue
+            self.system.recharge(part_id, new_charge)
+        for (pair, new_mass) in rx.remasses:
+            found, part_id = index_pair(frags, pair)
+            if found == GotAtom.NotFound:
+                raise ValueError(f"Index out of range {pair}")
+            if found == GotAtom.MissingOptional:
+                continue
+            self.system.remass(part_id, new_charge)
+
     def pre_modification(self, rx_list: list[(list, ReactionTemplate)], i
                          ) -> None:
         # hook that gets called after detection, before modification
@@ -646,6 +629,8 @@ class TopStar():
         # [rx_update]
         self.process_update(frags, rx)
         # (only non skipped get passed here) remove non graph fragment reactants
+        # this only happens when a [moleculetype] can directly react since
+        # the removal of numbered fragments
         for frag in frags:
             if frag.graph is None:
                 self.remove_fragment(frag)
@@ -653,24 +638,8 @@ class TopStar():
         # graphs get recalculated later over the same particles
         self.remove_overlapping_graphs(graph_recalc)
 
-        frags = Fragments.from_frags(frags)
-        # change the interactions - TODO fix it, allow choosing the particles
-        for product, selection in rx.products:
-            selected = [frags.get((i, name)) for i, name in selection]
-            if len(selection) == 0:
-                selected = product_particles
-            frag = self.type_lookup.get(product)  # frag type
-            if frag is None:
-                raise ValueError(f"Can't find mol {product}.")
-            elif not isinstance(frag, MolFragment):
-                raise ValueError(f"Product {product}, is"
-                                 " not a mol fragment type."
-                                 f" It is: {frag}"
-                                 "Use [frag_from] to create fragments "
-                                 "in reactions.")
-
-            self.instantiate_over_existing(frag, selected, reaction=True)
-        self.instantiate_over_existing(rx.product, frags, template=rx)
+        self.template_update_atoms(frags, rx)
+        self.instantiate_over_existing(rx.product, frags)
 
         self.try_match_graphs(graph_recalc)
 
