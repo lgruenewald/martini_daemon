@@ -21,7 +21,7 @@ class TypeReporter(Reporter):
             type, _, _ = self._sysstar.get_particle_details(i)
             type_id = self._sysstar.nonbonded_force.use_atom_type(type)
             types.append(type_id)
-        types = np.array(types, np.int32)
+        types_nd = np.array(types, np.int32)
         with open(bonds_name, "ab") as file:
-            types.tofile(file)
+            types_nd.tofile(file)
 

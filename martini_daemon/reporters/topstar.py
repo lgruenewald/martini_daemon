@@ -1,9 +1,10 @@
 from .reporter import Reporter
 from ..utils import backup_try
 import sys
+from ..topstar import TopStar
 
 
-def dump_topstar(topstar, file=sys.stdout):
+def dump_topstar(topstar: TopStar, file=sys.stdout) -> None:
     print("==== TopStar / Fragment Types ====", file=file)
     for k, molfrag in topstar.type_lookup.items():
         file.write(f"{k} ")
@@ -13,9 +14,9 @@ def dump_topstar(topstar, file=sys.stdout):
         file.write(f"{g.name}: ({[name for (name, _, _, _) in g.atoms]}) ")
     file.write("\n")
     print("==== TopStar / ReactionTemplates ====", file=file)
-    for rx in topstar.reaction_list:
-        print(f"rx {rx.name} reactants {rx.reactants} products {rx.products}",
-              file=file)
+    for _, rl in topstar.reactions.items():
+        for rx in rl:
+            print(f"rx {rx.name} reactants {rx.reactants}", file=file)
     print("==== TopStar / Fragments ====", file=file)
     for id, frag in topstar.frag_list.items():
         print(f"{id}: <frag {frag.name} ps {frag.particles} opt {frag.opt}>", file=file)
@@ -24,9 +25,6 @@ def dump_topstar(topstar, file=sys.stdout):
         print(f"particle {id} is in fragments {defrag}", file=file)
         if id > 100:
             break
-#    print("==== TopStar / Interaction list ====", file=file)
-#    for id, inter in enumerate(topstar.interaction_list):
-#        print(f"particle {id} is in interactions {inter}", file=file)
 
 
 class TopStarLogger(Reporter):
@@ -38,7 +36,7 @@ class TopStarLogger(Reporter):
         backup_try("topstar.log")
         self.post_modification(-1)
 
-    def post_modification(self, i):
+    def post_modification(self, i) -> None:
         with open("topstar.log", "a") as file:
             print(f"===== Frame {i} =====", file=file)
             dump_topstar(self._topstar, file)
@@ -50,7 +48,7 @@ class ReactionReporter(Reporter):
     def init(self):
         backup_try("reactions.log")
 
-    def pre_modification(self, reactions, i):
+    def pre_modification(self, reactions, i) -> None:
         with open("reactions.log", "a") as file:
             print(f"Frame {i}", file=file)
             for (frags, rx) in reactions:
@@ -68,9 +66,9 @@ class FragCountReporter(Reporter):
     def init(self):
         backup_try("fragment_counts.log")
 
-    def pre_detection(self, i):
+    def pre_detection(self, i) -> None:
         with open("fragment_counts.log", "a") as file:
-            nums = {}
+            nums: dict[str, int] = {}
             for _, v in self._topstar.frag_list.items():
                 name = v.name
                 if nums.get(name) is None:

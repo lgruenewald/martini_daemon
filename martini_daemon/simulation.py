@@ -10,11 +10,12 @@ from .reporters.reporter import Reporter
 import sys
 import openmm as mm  # type: ignore[import-untyped]
 from openmm.app import GromacsGroFile  # type: ignore[import-untyped]
-from openmm.unit import femtosecond, nanometer, nanosecond  # type: ignore[import-untyped]
 from .utils import backup_try
 import logging
-import random
+from random import random
 import time
+from typing import Any
+import math
 
 
 class DaemonSimulation():
@@ -29,32 +30,61 @@ class DaemonSimulation():
 
     logger_id = 0
     reactions: int
-    max_steps: int
-    steps_per_step: int
+    md_steps: int
+    dm_freq: int
+    xtc_freq: int
     traj_path: str  # trajectory to write
     out_path: str  # final geometry to write
 
-    def __init__(self, top_path, gro_path, T=300., p=1., dt=20*femtosecond,
-                 max_steps=100, steps_per_step=5000,
-                 sim_name="out", traj_path=None,
-                 out_path=None, platform=None,
-                 minimize_energy=True, generate_velocities=True,
-                 remove_com_motion=True, epsilon_r=15.0,
-                 nonbonded_cutoff=1.1*nanometer, include_dir=None,
-                 defines={}, log_path=None, reporters=[],
-                 friction=2.0, T_type="langevin", xtc_every=1):
-        if traj_path is None:
-            traj_path = sim_name + ".xtc"
-        if out_path is None:
-            out_path = sim_name + ".gro"
-        if log_path is None:
-            log_path = sim_name + ".log"
-        backup_try(log_path)
-        self.logger = logging.getLogger(f"logger_{self.logger_id}_{random.random()}")
+    def __init__(self, top_path: str, gro_path: str,
+                 md_steps: int, dm_frequency: int,
+                 xtc_frequency: int = 5000,
+                 sim_name: str = "out",
+                 T_kelvin: float | None = 300., T_type: str = "langevin",
+                 p_bar: float = 1., dt_ps: float = 0.02,
+                 platform: str | None | mm.Platform = None,
+                 minimize_energy: bool = True,
+                 generate_velocities: bool = True,
+                 remove_com_motion: bool = True,
+                 epsilon_r: float = 15.0,
+                 nonbonded_cutoff_nm: float = 1.1,
+                 include_dir: str | None = None,
+                 defines: dict[str, str] = {},
+                 reporters: list[Any] = [],
+                 friction_ps_1: float = 2.0,
+                 ):
+
+        # Self initialization
+        self.md_steps: int = md_steps
+        self.traj_path: str = sim_name + ".xtc"
+        self.out_path: str = sim_name + ".gro"
+        self.log_path: str = sim_name + ".log"
+        self.reactions: int = 0
+        self.last_step_time: int = 0.
+        self.xtc_freq: int = xtc_frequency
+        self.dm_freq: int = dm_frequency
+        if T_kelvin is None and T_type != "none":
+            raise ValueError("No valid T temperature given")
+        if T_type not in {"andersen", "langevin", "none"}:
+            raise ValueError("Unknown T_type")
+        T = T_kelvin * mm.unit.kelvin if T_type != "none" else None
+        p = p_bar * mm.unit.bar if p_bar is not None else None
+        if p is None and T_type == "none":
+            raise ValueError("Must couple T for p coupling")
+        dt = dt_ps * mm.unit.picosecond
+        self.dt_ns: float = dt.value_in_unit(mm.unit.nanosecond)
+        nonbonded_cutoff = nonbonded_cutoff_nm * mm.unit.nanometer
+        friction = friction_ps_1 / mm.unit.picosecond
+        if type(platform) is str:
+            platform = mm.Platform.getPlatformByName(platform)
+
+        # Logging setup
+        backup_try(self.log_path)
+        self.logger = logging.getLogger(f"logger_{self.logger_id}_{random()}")
         self.logger_id += 1
         self.logger.setLevel(logging.INFO)
         formatter = logging.Formatter("%(asctime)s %(message)s")
-        fh = logging.FileHandler(log_path)
+        fh = logging.FileHandler(self.log_path)
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
         stream_formatter = logging.Formatter("[%(levelname)s] %(message)s")
@@ -65,8 +95,11 @@ class DaemonSimulation():
         self.logger.info("DaemonSimulation __init__ called")
         self.logger.info(f"Parameters: {top_path} {gro_path} "
                          f"T: {T} p: {p} dt: {dt} "
-                         f"max_steps: {max_steps} per_step {steps_per_step} "
-                         f"sim_name: {sim_name} platform {platform}")
+                         f"steps: {md_steps} dm_freq: {dm_frequency} "
+                         f"xtc_freq: {xtc_frequency} "
+                         f"sim_name: {sim_name} platform: {platform}")
+
+        # Parsing
         self.logger.info("Parsing start")
         self.system, self.top = DaemonTopFile(
             top_path,
@@ -74,17 +107,14 @@ class DaemonSimulation():
             epsilon_r=epsilon_r, nonbonded_cutoff=nonbonded_cutoff,
             logger=self.logger
         )
-        self.logger.info("Parsing finished")
-        self.logger.info("Coord read start")
         self.gro = GromacsGroFile(gro_path)
-        self.logger.info("Coord read finished")
-        if platform is not None:
-            platform = mm.Platform.getPlatformByName(platform)
+        box = self.gro.getPeriodicBoxVectors()
+        pos = self.gro.getPositions(asNumpy=True)
+        self.logger.info("Parsing finished")
 
-        if T is not None and T_type not in {"andersen", "langevin"}:
-            raise ValueError("Unknown T_type")
-
-        if T is not None and T_type == "andersen":
+        # Coupling and integrators
+        self.logger.info("Setup integrator and coupling start")
+        if T_type == "andersen":
             self.system.add_force(mm.AndersenThermostat(T, friction))
 
         if p is not None:
@@ -92,24 +122,25 @@ class DaemonSimulation():
         if remove_com_motion:
             self.system.add_force(mm.CMMotionRemover())
 
-        integrator = None
+        integrator: mm.Integrator
         if T_type == "langevin":
             integrator = mm.LangevinIntegrator(T, friction, dt)
         else:
             integrator = mm.VerletIntegrator(dt)
-        box = self.gro.getPeriodicBoxVectors()
+        self.logger.info("Setup integrator and coupling finished")
 
+        # Context build and reporter initialization
         self.logger.info("Context build start")
         if platform is not None:
             self.system.build_context(integrator, box, platform)
         else:
             self.system.build_context(integrator, box)
-        self.logger.info("Context build finished")
+        self.system.set_positions(pos)
+#        self.system._context.setVelocities() TODO from the .gro file
 
-        self.logger.info("Setting positions")
-        self.system.set_positions(self.gro.getPositions(True))
         for rep in reporters:
             # TODO only take instances
+            # TODO rewrite of all reporters, vsites and forces to be unified
             if isinstance(rep, Reporter):
                 rep._sysstar = self.system
                 rep._topstar = self.top
@@ -117,10 +148,13 @@ class DaemonSimulation():
                 rep = rep(self.system, self.top)
             self.system.add_reporter(rep)
             self.top.add_reporter(rep)
-        # must set xtc path after adding reporters currently
-        self.logger.info("Writing initial positions to XTC")
-        self.system.set_xtc_path(traj_path)
+
+        self.system.set_xtc_path(self.traj_path)
         self.system.write_xtc_frame(0)
+        self.logger.info("Initial geometry XTC frame written")
+        self.logger.info("Context build finished")
+
+        # Genvel, energy min
         if generate_velocities:
             self.logger.info("genvel start")
             self.system.generate_velocities(T)
@@ -128,66 +162,77 @@ class DaemonSimulation():
         if minimize_energy:
             self.logger.info("Energy min start")
             self.system.minimize_energy()
-            self.logger.info("Energy min finished")
-            self.logger.info("Writing energy minimized positions to XTC")
             self.system.write_xtc_frame(0)
-        self.max_steps = max_steps
-        self.steps_per_step = steps_per_step
-        self.traj_path = traj_path
-        self.out_path = out_path
-        self.reactions = 0
-        self.last_step_time = 0.
-        self.xtc_every = xtc_every
-        self.step_ns = steps_per_step * dt.value_in_unit(nanosecond)
+            self.logger.info("Energy minimized XTC frame written")
+            self.logger.info("Energy min finished")
+
         self.logger.info("__init__ end")
 
     def simulate(self):
-        for i in range(self.max_steps):
-            self.step(i+1, self.max_steps)
+        # Greatest common divisor
+        sim_ns = self.md_steps * self.dt_ns
+        print(f"Simulation of {self.md_steps} steps ({sim_ns} ns)")
+        gcd = math.gcd(self.xtc_freq, self.dm_freq)
+        print(f"D/M freq {self.dm_freq} XTC freq {self.xtc_freq} gcd {gcd}")
+        for i in range(0, self.md_steps, gcd):
+            self.step(
+                gcd, xtc=i % self.xtc_freq == 0,
+                dm=i % self.dm_freq == 0,
+                i=i, max_steps=self.md_steps
+            )
         print()
         self.system.write_gro(self.out_path)
 
-    def step(self, i=0, max_steps=0):
+    def step(self, steps=1, xtc=True, dm=True, i=0, max_steps=0):
         """
             Do a step of the following:
-            - self.steps_per_step MD steps
-            - D/M algorithm
-            - reinitialize system
-            - write an XTC frame
+            - steps MD steps
+            - D/M algorithm if dm is true
+            - reinitialize system if reactions happened
+            - write an XTC frame if xtc is True
+            - display info to logs and screen, % info given by i and max_steps
         """
         start_time = time.time()
         percent = i/max_steps*100 if max_steps > 0 else 100
-        self.logger.info(f"step {i}/{max_steps} ({percent:.1f}%)")
+        self.logger.info(f"step {i}")
         self.logger.info("MD start")
-        self.logger.info(f"doing {self.steps_per_step} MD steps")
-        self.system.do_steps(self.steps_per_step)
+        self.system.do_steps(steps)
         self.logger.info("MD finished")
         if max_steps > 0:
-            ns_so_far = self.step_ns * i
-            ns_total = self.step_ns * max_steps
+            ns_so_far = self.dt_ns * i
             time_left = self.last_step_time * (max_steps - i)
-            time_left_fmt = time.strftime("%H:%M:%S", time.gmtime(time_left))
-            sys.stdout.write(f"\rStep {i}/{max_steps}\t"
-                             f"{ns_so_far:.2f}/{ns_total:.2f}ns\t"
-                             f"{percent:.1f}%\t"
-                             f"ETL {time_left_fmt}\t"
+            time_fmt: str
+            if time_left < 3600:
+                time_fmt = time.strftime("%M:%S", time.gmtime(time_left))
+            elif time_left < 3600 * 24:
+                time_fmt = time.strftime("%H:%M:%S", time.gmtime(time_left))
+            elif time_left < 3600 * 24 * 30:
+                time_fmt = time.strftime("%dd %H:%M:%S", time.gmtime(time_left))
+            else:
+                time_fmt = f"Longer than a month ({time_left} seconds)"
+            sys.stdout.write(f"\033[2K\rstep {i}"
+                             f"({ns_so_far:.2f} ns, "
+                             f"{percent:.1f}%)\t"
+                             f"{time_fmt}\t"
                              f"{self.reactions} reactions")
-        self.logger.info("D/M start")
-        new_reactions = self.top.detection_modification(i)
-        self.reactions += new_reactions
-        self.logger.info("D/M finished")
-        if new_reactions > 0:
-            self.logger.info("reinitialize start")
-            self.system.reinitialize()
-            self.logger.info("reinitialize finished")
-        if i % self.xtc_every == 0:
+        if dm:
+            self.logger.info("D/M start")
+            new_reactions = self.top.detection_modification(i)
+            self.reactions += new_reactions
+            self.logger.info("D/M finished")
+            if new_reactions > 0:
+                self.logger.info("reinitialize start")
+                self.system.reinitialize()
+                self.logger.info("reinitialize finished")
+        if xtc:
             self.logger.info("XTC write start")
-            self.system.write_xtc_frame(self.steps_per_step)
+            self.system.write_xtc_frame(self.xtc_freq)
             self.logger.info("XTC write finished")
         end_time = time.time()
+        step_time = (end_time - start_time) / steps
         self.last_step_time = (
-            0.97 * self.last_step_time + 0.03 * (end_time - start_time)
-            if self.last_step_time > 0. else (end_time - start_time)
+            0.99 * self.last_step_time + 0.01 * (step_time)
+            if self.last_step_time > 0. else (step_time)
         )
 
 

@@ -184,11 +184,6 @@ def DaemonTopFile(file, include_dir=None, defines={},
             k = unwrap(tokens, 6, "float")
             last_molecule().interactions.append((system.distance_restraint,
                                                 [i, j], [low, up1, up2, k]))
-        elif type == 101:
-            # harmonic bond / harmonic potential
-            force = unwrap(tokens, 4, "float")
-            last_molecule().interactions.append((system.harmonic_bond2, [i, j],
-                                                 [length, force]))
         else:
             raise ValueError("Unsupported  bond function type")
         if type != 6:
@@ -261,19 +256,6 @@ def DaemonTopFile(file, include_dir=None, defines={},
             force = unwrap(tokens, 5, "float")
             last_molecule().interactions.append((system.restricted_angle,
                                                 [i, j, k], [theta, force]))
-        elif type == 101:
-            theta = unwrap(tokens, 4, "degree")
-            force = unwrap(tokens, 5, "float")
-            beta = unwrap(tokens, 6, "float")
-            r0 = unwrap(tokens, 7, "float")
-            last_molecule().interactions.append((system.morse_angle,
-                                                 [i, j, k],
-                                                 [theta, force, beta, r0]))
-        elif type == 102:
-            theta = unwrap(tokens, 4, "degree")
-            force = unwrap(tokens, 5, "float")
-            last_molecule().interactions.append((system.g96_angle2, [i, j, k],
-                                                [theta, force]))
         else:
             raise ValueError(f"Unsupported angle type {type}.")
 

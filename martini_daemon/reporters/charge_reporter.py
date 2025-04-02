@@ -20,7 +20,7 @@ class ChargeReporter(Reporter):
         for i in range(n):
             _, charge, _ = self._sysstar.get_particle_details(i)
             charges.append(charge)
-        charges = np.array(charges, np.int32)
+        charges_nd = np.array(charges, np.int32)
         with open(filename, "ab") as file:
-            charges.tofile(filename)
+            charges_nd.tofile(file)
 

@@ -6,7 +6,6 @@ from openmm.unit import nanometer, picosecond, md_unit_system  # type: ignore[im
 from .utils import backup_try
 from collections import OrderedDict
 import numpy as np
-import sys
 
 from .forces.combined_bending_torsion import CombinedBendingTorsion
 from .forces.constraint import Constraint
@@ -389,13 +388,3 @@ class SysStar():
             )
         for reporter in self.reporters:
             reporter.on_write_gro(pos, box, path[:-4])
-
-    def dump(self):
-        backup_try("sys.dump")
-        with open("sys.dump", "w") as file:
-            print("==== SysStar Dump ====", file=file)
-            print("Particles:", self._part_list, file=file)
-            for force in self.modular_forces:
-                print(force.__class__.__name__, force._list, file=file)
-            print("Exclusions:", self._exclusion_list, file=file)
-            print("Constraints:", self._constraint_list, file=file)
