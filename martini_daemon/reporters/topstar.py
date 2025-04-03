@@ -32,9 +32,12 @@ class TopStarLogger(Reporter):
     run to topstar.log. Useful for debugging.
     """
 
-    def init(self):
+    def __init__(self):
         backup_try("topstar.log")
-        self.post_modification(-1)
+
+    def pre_detection(self, i) -> None:
+        if i == 0:
+            self.post_modification(i)
 
     def post_modification(self, i) -> None:
         with open("topstar.log", "a") as file:
@@ -45,7 +48,7 @@ class TopStarLogger(Reporter):
 class ReactionReporter(Reporter):
     """A reporter that reports all reactions to reactions.log"""
 
-    def init(self):
+    def __init__(self):
         backup_try("reactions.log")
 
     def pre_modification(self, reactions, i) -> None:
@@ -63,7 +66,7 @@ class FragCountReporter(Reporter):
     """A reporter that logs the number of all fragments in T* at a given time
     to fragment_counts.log"""
 
-    def init(self):
+    def __init__(self):
         backup_try("fragment_counts.log")
 
     def pre_detection(self, i) -> None:

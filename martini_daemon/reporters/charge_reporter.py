@@ -8,12 +8,15 @@ class ChargeReporter(Reporter):
         Reporter that reports on the charge
     """
 
+    def __init__(self):
+        pass
+
     def on_set_xtc_path(self, xtc_name):
-        filename = xtc_name + "_charges.npy"
+        filename = xtc_name + ".charges"
         backup_try(filename)
 
     def on_xtc_frame(self, pos, box, xtc_name):
-        filename = xtc_name + "_charges.npy"
+        filename = xtc_name + ".charges"
         n = self._sysstar.len_particles()
 
         charges = []

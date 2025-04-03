@@ -139,13 +139,8 @@ class DaemonSimulation():
 #        self.system._context.setVelocities() TODO from the .gro file
 
         for rep in reporters:
-            # TODO only take instances
-            # TODO rewrite of all reporters, vsites and forces to be unified
-            if isinstance(rep, Reporter):
-                rep._sysstar = self.system
-                rep._topstar = self.top
-            else:
-                rep = rep(self.system, self.top)
+            rep._sysstar = self.system
+            rep._topstar = self.top
             self.system.add_reporter(rep)
             self.top.add_reporter(rep)
 

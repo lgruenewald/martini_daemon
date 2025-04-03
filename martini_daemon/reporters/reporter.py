@@ -1,13 +1,6 @@
 class Reporter():
-
-    def __init__(self, sysstar, topstar):
-        self._sysstar = sysstar
-        self._topstar = topstar
-        self.init()
-
-    def init(self):
-        # called in __init__
-        pass
+    """Placeholder / base class for reporters. _sysstar and _topstar are
+    added as fields when a reporter is added to a DaemonSimulation."""
 
     def on_set_xtc_path(self, xtc_name):
         # called when xtc_name is first known, before writing any xtc

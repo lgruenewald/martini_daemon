@@ -13,6 +13,9 @@ class VMDBondReporter(Reporter):
 
     handle = None
 
+    def __init__(self):
+        pass
+
     def on_set_xtc_path(self, xtc_name):
         self.bonds_name = xtc_name + ".bonds"
         backup_try(self.bonds_name)

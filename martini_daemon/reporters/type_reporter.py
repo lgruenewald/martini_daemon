@@ -8,6 +8,9 @@ class TypeReporter(Reporter):
         Reporter that reports on the LJ types (with numerical indices)
     """
 
+    def __init__(self):
+        pass
+
     def on_set_xtc_path(self, xtc_name):
         bonds_name = xtc_name + "_types.npy"
         backup_try(bonds_name)

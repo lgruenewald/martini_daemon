@@ -5,9 +5,16 @@ from martini_daemon.reporters.bond_reporter import BondReporter
 from martini_daemon.reporters.all_bond_reporter import AllBondReporter
 from martini_daemon.reporters.topstar import ReactionReporter
 
-sim = simulation.DaemonSimulation("system.top", "system.gro", sim_name="out",
-                                  reporters=[BondReporter, ReactionReporter, AllBondReporter],
-                                  max_steps=1000000, steps_per_step=100,
-                                  friction=2.0, T_type="langevin",
-                                  xtc_every=50, platform="CUDA")
+sim = simulation.DaemonSimulation(top_path="system.top", gro_path="system.gro",
+                                  sim_name="out",
+                                  reporters=[
+                                      BondReporter(),
+                                      ReactionReporter(),
+                                      AllBondReporter()
+                                  ],
+                                  md_steps=100000000, dm_freq=100,
+                                  xtc_freq=5000,
+                                  friction=2.0,
+                                  platform="CUDA"
+                                  )
 sim.simulate()
