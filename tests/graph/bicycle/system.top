@@ -38,8 +38,7 @@ XX 1
 1 7 1 1.0 1.0
 
 [ frag ]
-aa
-[ graph ]
+name aa
 atom 1 * *
 atom? 2 * *
 atom? 3 * *

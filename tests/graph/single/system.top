@@ -10,8 +10,7 @@ XX 1
 4 TC4 1 XX dd 4 0.0 60.0
 
 [ frag ]
-aa
-[ graph ]
+name aa
 atom 1 aa TC5
 
 ; without a rx fragments never actually get added to the system (optimization)

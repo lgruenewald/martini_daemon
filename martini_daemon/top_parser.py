@@ -618,6 +618,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
         nonlocal last_graph, topology
         if last_graph.name is None:
             raise ValueError("name is mandatory")
+        last_graph.finish_init()
         topology.new_graph_fragment(last_graph)
         last_graph = None
 
@@ -675,7 +676,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 j = unwrap(tokens, 2, "pair")
                 cutoff = unwrap(tokens, 3, "float")
                 last_reaction.distance_min.append((i, j, cutoff))
-            case "banned_angle":
+            case "angle_not":
                 i = unwrap(tokens, 1, "pair")
                 j = unwrap(tokens, 2, "pair")
                 k = unwrap(tokens, 3, "pair")
@@ -684,13 +685,61 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 last_reaction.angle_limits.append(
                     (i, j, k, math.cos(theta_min), math.cos(theta_max))
                 )
-            case "banned_dihedral":
+            case "angle_min":
+                i = unwrap(tokens, 1, "pair")
+                j = unwrap(tokens, 2, "pair")
+                k = unwrap(tokens, 3, "pair")
+                theta_min = unwrap(tokens, 4, "degree")
+                last_reaction.angle_limits.append(
+                    (i, j, k, math.cos(theta_min), math.cos(math.pi))
+                )
+            case "angle_max":
+                i = unwrap(tokens, 1, "pair")
+                j = unwrap(tokens, 2, "pair")
+                k = unwrap(tokens, 3, "pair")
+                theta_max = unwrap(tokens, 4, "degree")
+                last_reaction.angle_limits.append(
+                    (i, j, k, math.cos(0.), math.cos(theta_max))
+                )
+            case "angle_between":
+                i = unwrap(tokens, 1, "pair")
+                j = unwrap(tokens, 2, "pair")
+                k = unwrap(tokens, 3, "pair")
+                theta_min = unwrap(tokens, 4, "degree")
+                theta_max = unwrap(tokens, 5, "degree")
+                last_reaction.angle_limits.append(
+                    (i, j, k, math.cos(0.), math.cos(theta_min))
+                )
+                last_reaction.angle_limits.append(
+                    (i, j, k, math.cos(theta_max), math.cos(math.pi))
+                )
+            case "dihedral_not":
                 i = unwrap(tokens, 1, "pair")
                 j = unwrap(tokens, 2, "pair")
                 k = unwrap(tokens, 3, "pair")
                 l = unwrap(tokens, 4, "pair")
                 theta_min = unwrap(tokens, 5, "degree")
                 theta_max = unwrap(tokens, 6, "degree")
+                # periodicity consideration
+                if theta_max > theta_min:
+                    last_reaction.dihedral_limits.append(
+                        (i, j, k, l, theta_min, theta_max)
+                    )
+                else:
+                    # minus one / add one for inclusive ranges
+                    last_reaction.dihedral_limits.append(
+                        (i, j, k, l, -1., theta_max)
+                    )
+                    last_reaction.dihedral_limits.append(
+                        (i, j, k, l, theta_min, math.tau + 1.)
+                    )
+            case "dihedral_between":
+                i = unwrap(tokens, 1, "pair")
+                j = unwrap(tokens, 2, "pair")
+                k = unwrap(tokens, 3, "pair")
+                l = unwrap(tokens, 4, "pair")
+                theta_max = unwrap(tokens, 5, "degree")
+                theta_min = unwrap(tokens, 6, "degree")
                 # periodicity consideration
                 if theta_max > theta_min:
                     last_reaction.dihedral_limits.append(

@@ -1,8 +1,7 @@
 ; Rx file for BDT dithiol formation and breakage, with graphs
 
 [frag]
-monomer
-[graph]
+name monomer
 ; the reacting atom
 atom 1 BS* TC6
 ; the atom used for building angles/dihedrals

@@ -37,8 +37,7 @@ SIAC 1
 
 #ifdef DAEMON
 [frag]
-Si
-[graph]
+name Si
 atom 1 SV* *
 atom 2 SI1 *
 connection 1 2
@@ -46,8 +45,7 @@ atom! 3 SV* *
 morse_bond 1 3
 
 [frag]
-bond
-[graph]
+name bond
 atom 1 SV* *
 atom 2 SV* *
 morse_bond 1 2

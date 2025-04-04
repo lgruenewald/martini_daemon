@@ -32,7 +32,7 @@ class Fragment():
             # None is a valid value, signaling a missing optional
             opt_got = self.opt.get(id)
             got_atom = opt_got is None and GotAtom.MissingOptional or GotAtom.Found
-            return (got_atom, opt_got or -1)
+            return (got_atom, -1 if opt_got is None else opt_got)
         else:
             return (GotAtom.NotFound, -1)
 

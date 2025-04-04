@@ -9,7 +9,7 @@ from .sysstar import SysStar
 from .forces.force import Force, Interaction
 from .utils import pdist, pcos_angle, pdihedral
 from .reporters.reporter import Reporter
-from .graph import GraphFragment, GraphMatch, GraphAtomType
+from .graph import GraphFragment, GraphMatch, GraphAtomType, match_particles
 from .fragment import Fragment, index_pair, GotAtom
 
 random.seed()
@@ -200,8 +200,8 @@ class TopStar():
             if len(graph.molecules) > 0:
                 if molname not in graph.molecules:
                     continue
-            matches += graph.match_particles(
-                particles, self.system,
+            matches += match_particles(
+                graph, particles, self.system,
                 self.interaction_list
             )
 
@@ -372,7 +372,7 @@ class TopStar():
                 continue
             # the particle positions of particle i, j, k
             cos = pcos_angle(pos[p1], pos[p2], pos[p3], box)
-            if cos < cos_min and cos > cos_max:
+            if cos <= cos_min and cos >= cos_max:
                 # inverted comparison because cosine is a constantly decreasing
                 # function, cos_min is the minimum angle => max cosine value
                 # cos_max is the maximum angle => min cosine value
@@ -392,7 +392,7 @@ class TopStar():
                 # missing optional atoms
                 continue
             theta = pdihedral(pos[p1], pos[p2], pos[p3], pos[p4], box)
-            if theta > min and theta < max:
+            if theta >= min and theta <= max:
                 return False
 
         rx.global_counter += 1
@@ -433,7 +433,7 @@ class TopStar():
                 for rx in uni_rx:
                     if self.detection([frag_i], rx, pos, box):
                         skip.add(i)
-                        reactions.append(([i], rx))
+                        reactions.append(([frag_i], rx))
                         break
                 if i in skip:
                     continue

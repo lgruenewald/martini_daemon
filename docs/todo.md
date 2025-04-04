@@ -1,15 +1,17 @@
-code quality:
-- mypy type checker
-- linter - pylint, flake8, black
-- naming conventions
-- atoms vs particles - stick to one name - atoms, rename all "part, particles"
-- coverage.py for coverage
-- scalene for benchmarking
-- cython
 
-potential bugs:
-- bug in bond reporter?
+- cython for bottlenecks
+- up to 4 reactants
 - better quitting behavior in benchmarking
+- rework VMD bond reporter to use all bond reporter results
+
+- linting, type checking
+- everything should use "atoms", not "particles"
+
+- optimization: the same graphs per molecule type when doing it at the start
+	- cache results for this and reuse
+
+- S* should try to update forces instead of remove/adding when possible
+  - allow this for vsites, constraints
 
 fixed reaction rates:
 - remove limiter, probability, add energy barrier / velocity
@@ -25,14 +27,13 @@ fixed reaction rates:
 - velocity rx_condition, better rx_condition syntax
 - update documentation
 
-Optimizations
-- early quits in detection_over_types on more than 2 reactant situations when part of the conditions do not get fulfilled
-- optimization: the same graphs per molecule type when doing it at the start
-	- cache results for this and reuse
-- do not add S* forces that are never going to change (reduced memory usage when dilute systems)
-- S* should try to update forces instead of remove/adding when possible
-  - allow this for vsites, constraints
-- cythonize and parallelize bottlenecks
+Benchmarking logs:
+% slowdown of MD steps, and how long each MD step took (and their distribution)
+D/M cost in milliseconds (most transparent and isolated way to do it)
+average number of reactions per D/M step
+% cost of each component in both reaction and non reaction case
+% slowdown in total
+temperature or other variables over time
 
 Correctness
 - limiter should not depend on the order of atoms in the topology

@@ -13,8 +13,7 @@ XX 1
 2 3 1 1.0 1.0
 
 [ frag ]
-aa
-[ graph ]
+name aa
 atom 1 * TC5
 atom? 2 * TC4
 atom? 3 * TC4
