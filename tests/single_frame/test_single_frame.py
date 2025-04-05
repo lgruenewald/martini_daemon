@@ -30,11 +30,12 @@ tests = [
     "NMC", "CHOL_in_W", "AEA", "NAPH", "nacl+waterbox", "solvent_mixture",
     "waterbox", "DPPC_DIPC_in_W", "CAFF", "BDT", "BZTF_CLPR", "benzbox",
     # specific interaction tests
-    "morse", "vsite4fdn", "quartic_angle", "pairs_VW", "pairs_type",
+    "vsite1", "pairs", "pairs_VW", "pairs_VWQ", "pairs_type",
+    "morse", "vsite4fdn", "quartic_angle",
     "cross_bond_bond", "vsiten2", "urey_bradley", "fourier_dihedral",
     "linear_angle", "fene", "cubic", "distance_restraint",
-    "connection", "rbtorsion", "vsite1", "vsiten3", "vsite2fd",
-    "cross_bond_angle", "pairs_VWQ", "vsite3fd", "g96_bond",
+    "connection", "rbtorsion", "vsiten3", "vsite2fd",
+    "cross_bond_angle", "vsite3fd", "g96_bond",
     "restricted_dihedral", "restricted_angle", "combined_bending_torsion",
 ]
 

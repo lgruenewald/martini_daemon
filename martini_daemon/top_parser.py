@@ -366,7 +366,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     def process_pairtypes(tokens):
         t1 = unwrap(tokens, 0, "word")
-        t2 = unwrap(tokens, 0, "word")
+        t2 = unwrap(tokens, 1, "word")
         type = unwrap(tokens, 2, "int")
         if type != 1:
             raise ValueError("Unsupported pairs type")
@@ -433,6 +433,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
         last_molecule().interactions.append(
             (system.vsite_avg, [vid, member], [1.])
         )
+        # OpenMM does not like overlapping particles otherwise
+        last_molecule().add_exclusion(vid, member)
 
     p.add_level("virtual_sites1", process_virtual_sites1)
 
