@@ -35,18 +35,14 @@ class Pairs(Force):
         self._force_obj.addBond(i, j, [qprod, p1, p2])
 
     def _build(self):
-        nb_cutoff = self._sysstar.nonbonded_cutoff.value_in_unit(nanometer)
         epsilon_r = self._sysstar.epsilon_r
         self._force_obj = mm.CustomBondForce(
-            "step(rcut-r)*(LJ - corr + ES);"
+            "LJ + ES;"
             "LJ = (C12 / r^12 - C6 / r^6);"
             "corr = (C12 / rcut^12 - C6 / rcut^6);"
-            "ES = f/epsilon_r*qprod * (1/r + krf * r^2 - crf);"
-            "crf = 1 / rcut + krf * rcut^2;"
-            "krf = 1 / (2 * rcut^3);"
+            "ES = f*qprod/epsilon_r/r;"
             f"epsilon_r = {epsilon_r};"
             "f = 138.935458;"
-            f"rcut={nb_cutoff};"
         )
         self._force_obj.addPerBondParameter("qprod")
         self._force_obj.addPerBondParameter("C6")

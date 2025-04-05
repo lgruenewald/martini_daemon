@@ -27,10 +27,3 @@ martini_daemon/**/*.c
 build
 martini_daemon.egg-info
 dist
-
-# temporary
-plot.py
-analysis.py
-plot.png
-conv.png
-abonds.npy
