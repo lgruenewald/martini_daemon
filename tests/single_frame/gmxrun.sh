@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-source /usr/local/gromacs-2021.7-double/bin/GMXRC
+source /usr/local/gromacs-2024.1-double/bin/GMXRC
 gmx_d grompp -f ../md.mdp -c system.gro -p system.top -o run.tpr >>log.txt &>> log.txt
 gmx_d mdrun -deffnm run -rerun system.gro -nt 1 -v >>log.txt &>> log.txt
 echo pot | gmx_d energy -f run.edr >>log.txt &>> log.txt

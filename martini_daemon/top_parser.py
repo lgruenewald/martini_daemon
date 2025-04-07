@@ -9,48 +9,14 @@ from .parser import TopParser, unwrap
 from .topstar import TopStar, ReactionTemplate, MolFragment
 from .sysstar import SysStar
 from .graph import GraphFragment, GraphAtomType
-import os
-import distutils  # type: ignore[import-untyped, import-not-found]
 import math
 from openmm.unit import nanometer  # type: ignore[import-untyped]
 import logging
 
 
-def _get_default_gromacs_include_dir() -> str:
-    """Find the location where gromacs #include files are referenced from, by
-    searching for (1) gromacs environment variables, (2) for the gromacs binary
-    'pdb2gmx' or 'gmx' in the PATH, or (3) just using the default gromacs
-    install location, /usr/local/gromacs/share/gromacs/top
-
-    Directly taken from openmm GromacsTopParser
-    https://github.com/openmm/openmm/blob/master/wrappers/python/openmm/app/gromacstopfile.py
-    """
-    if "GMXDATA" in os.environ:
-        return os.path.join(os.environ["GMXDATA"], "top")
-    if "GMXBIN" in os.environ:
-        return os.path.abspath(
-            os.path.join(os.environ["GMXBIN"], "..", "share", "gromacs", "top")
-        )
-
-    pdb2gmx_path = distutils.spawn.find_executable("pdb2gmx")
-    if pdb2gmx_path is not None:
-        return os.path.abspath(
-            os.path.join(os.path.dirname(pdb2gmx_path), "..", "share",
-                         "gromacs", "top")
-        )
-    else:
-        gmx_path = distutils.spawn.find_executable("gmx")
-        if gmx_path is not None:
-            return os.path.abspath(
-                os.path.join(os.path.dirname(gmx_path), "..", "share",
-                             "gromacs", "top")
-            )
-
-    return "/usr/local/gromacs/share/gromacs/top"
-
-
 def DaemonTopFile(file, include_dir=None, defines={},
                   epsilon_r=15.0, nonbonded_cutoff=1.1*nanometer,
+                  nlist_cutoff=1.5,
                   logger=None) -> tuple[SysStar, TopStar]:
     """Parses a Martini Top file for Gromacs and generates T*, sys and top
     from it. Also parses .frag and .rx files included in the .top file.
@@ -61,10 +27,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
         logger = logging.getLogger(__name__)
     # field init
     system = SysStar(logger, epsilon_r, nonbonded_cutoff)
-    topology = TopStar(system, logger)
-
-    if include_dir is None:
-        include_dir = _get_default_gromacs_include_dir()
+    topology = TopStar(system, logger, nlist_cutoff)
 
     # so .top files stay backwards compatible
     defines["DAEMON"] = "1.0"
@@ -655,8 +618,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
     def process_reactants(tokens):
         nonlocal last_reaction
         rxs = [unwrap(tokens, i, "word") for i in range(len(tokens))]
-        if len(tokens) > 2:
-            raise ValueError("Only up to 2 reactants are allowed.")
+        if len(tokens) > 4:
+            raise ValueError("Only up to 4 reactants are allowed.")
         if len(last_reaction.reactants) > 0:
             raise ValueError("Only one set of reactants per reaction.")
         last_reaction.reactants = rxs

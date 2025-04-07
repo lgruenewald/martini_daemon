@@ -107,19 +107,26 @@ class TopStar():
     subfrag_map: dict[str, list[str]]
 
     graph_fragment_list: list[GraphFragment]
+    graph_fragment_map: dict[str, GraphFragment]
 
     # type name -> type, used for instantiation
     # TODO only use it for MolFragment
     type_lookup: dict[str, MolFragment]
 
-    reactions: dict[tuple[str, str], list[ReactionTemplate]]
+    # reactant type -> reactions map
+    reactions: dict[tuple[str, str, str, str], list[ReactionTemplate]]
+    # reactant type -> are there any higher order reactions with this combo map
+    r_continue: dict[tuple[str, str, str], bool]
+    # reactant type -> are there any reactions with this reactant map
     reactive_types: set[str]
+    # reactant type -> neighbor list atom index map
+    neighbor_atom_map: dict[str, int]
 
     system: SysStar
 
     reporters: list[Reporter]
 
-    def __init__(self, system, logger):
+    def __init__(self, system, logger, nlist_cutoff):
         self.frag_list = {}
         self.next_frag_id = 0
         self.defrag_list = []
@@ -127,13 +134,17 @@ class TopStar():
         self.frag_fragments = []
         self.mol_fragments = []
         self.reactions = {}
+        self.r_continue = {}
+        self.neighbor_atom_map = {}
         self.type_lookup = {}
         self.subfrag_map = {}
         self.reactive_types = set()
         self.reporters = []
         self.graph_fragment_list = []
+        self.graph_fragment_map = {}
         self.system = system
         self.logger = logger
+        self.nlist_cutoff = nlist_cutoff
 
     def add_reporter(self, reporter) -> None:
         self.reporters.append(reporter)
@@ -146,16 +157,92 @@ class TopStar():
         return mol_fragment
 
     def new_graph_fragment(self, frag: GraphFragment) -> None:
+        # TODO unify
         self.graph_fragment_list.append(frag)
+        self.graph_fragment_map[frag.name] = frag
 
     def new_reaction(self, reaction: ReactionTemplate) -> MolFragment:
-        key = (reaction.reactants[0],
-               reaction.reactants[1] if len(reaction.reactants) == 2 else None)
+        # reactant names
+        r1 = reaction.reactants[0]
+        r2 = reaction.reactants[1] if len(reaction.reactants) >= 2 else None
+        r3 = reaction.reactants[2] if len(reaction.reactants) >= 3 else None
+        r4 = reaction.reactants[3] if len(reaction.reactants) >= 4 else None
+        key = (r1, r2, r3, r4)
+        # r_max validation
+        if len(reaction.reactants) >= 2:
+            r_max_connected = []
+            for i in range(len(reaction.reactants)):
+                r_max_connected.append({i})
+            for pair1, pair2, dist in reaction.distance_max:
+                i1, aname1 = pair1  # reactant index and atom name
+                i2, aname2 = pair2
+                if i1 > len(reaction.reactants) or i2 > len(reaction.reactants):
+                    raise ValueError("r_max with index higher than the number of reactants")
+                name1 = key[i1]
+                name2 = key[i2]
+                if i1 == i2:
+                    continue
+                # distance warning
+                if dist * 2. > self.nlist_cutoff:
+                    self.logger.warn(
+                        f"Warning: r_max for reaction {reaction.name}"
+                        f" has a r_max between reactant {i1} and {i2}"
+                        f" atoms {aname1} {aname2} of {dist},"
+                        f" which is too large relative to the"
+                        f" neighborlist cutoff of {self.nlist_cutoff}."
+                    )
+                # graph 1 and 2
+                graph1 = self.graph_fragment_map[name1]
+                graph2 = self.graph_fragment_map[name2]
+                # atom indices in graphs
+                aindex1 = graph1.atom_name_to_index[aname1]
+                aindex2 = graph2.atom_name_to_index[aname2]
+                # index to type
+                _, _, _, type1 = graph1.atoms[aindex1]
+                _, _, _, type2 = graph2.atoms[aindex2]
+                # we only care about r_max that's guaranteed to be there
+                if not (type1 == type2 and type1 == GraphAtomType.NORMAL):
+                    continue
+                # save this as a valid r_max
+                r_max_connected[i1].add(i2)
+                r_max_connected[i2].add(i1)
+                prev1, dist1 = self.neighbor_atom_map.get(name1) or (0, 0.)
+                prev2, dist2 = self.neighbor_atom_map.get(name2) or (0, 0.)
+                if dist > dist1:
+                    self.neighbor_atom_map[name1] = (aname1, dist)
+                if dist > dist2:
+                    self.neighbor_atom_map[name2] = (aname2, dist)
+            # graph traversal to see all reactants have a distance cutoff
+            marked = set()
+
+            def mark(n):
+                if n in marked:
+                    return
+                marked.add(n)
+                for i in r_max_connected[n]:
+                    mark(i)
+            mark(0)
+            if len(marked) != len(reaction.reactants):
+                marked_p1 = {x+1 for x in marked}
+                raise ValueError("Not all reactants are connected via an r_max"
+                                 f"condition of non-optional atoms, "
+                                 " therefore reaction "
+                                 f"{reaction.name} is invalid. "
+                                 f"{marked_p1} are connected to reactant 1.")
+        # reactant info buildup
+        if r2 is not None:
+            self.r_continue[(r1, None, None)] = True
+        if r3 is not None:
+            self.r_continue[(r1, r2, None)] = True
+        if r4 is not None:
+            self.r_continue[(r1, r2, r3)] = True
+
         if self.reactions.get(key) is None:
             self.reactions[key] = []
         self.reactions[key].append(reaction)
         for r in reaction.reactants:
             self.reactive_types.add(r)
+        # reaction product buildup
         if self.type_lookup.get(reaction.name):
             raise ValueError(
                 f"Second definition of molfragment type {reaction.name}"
@@ -398,28 +485,32 @@ class TopStar():
         rx.global_counter += 1
         return True
 
-    def get_neighbor_list(self, box, pos) -> \
-            tuple[NeighborList, dict[int, int], dict[int, int]]:
+    def update_query(self, box, pos) -> None:
         if len(self.frag_list) == 0:
-            return None, {}, {}
+            return
         pos_filtered = []
-        frag_to_nlist = {}
         nlist_to_frag = {}
         for id, frag in self.frag_list.items():
             filtered_id = len(pos_filtered)
-            frag_to_nlist[id] = filtered_id
             nlist_to_frag[filtered_id] = id
-            part_id = frag.index_atom(0)
-            pos_filtered.append(pos[part_id])
+            atom_map_entry = self.neighbor_atom_map.get(frag.name)
+            if atom_map_entry is not None:
+                name, _ = atom_map_entry
+                got, part_id = frag.get_atom(name)
+                if got != GotAtom.Found:
+                    raise ValueError(f"Internal error: invalid r_max nlist atom for {frag.name}: {name}.")
+                pos_filtered.append(pos[part_id])
+            else:
+                pos_filtered.append(pos[frag.index_atom(0)])
         pos_filtered = np.array(pos_filtered)
         box = Box(box[0], box[1], box[2])
         query = NeighborList()
         query = AABBQuery(box, pos_filtered)
-        return query, frag_to_nlist, nlist_to_frag
+        self.query = query
+        self.nlist_to_frag = nlist_to_frag
 
     def detection_all(
-            self, pos, box, query: AABBQuery,
-            frag_to_nlist: dict[int, int], nlist_to_frag: dict[int, int]
+            self, pos, box
             ) -> list[tuple[list[Fragment], ReactionTemplate]]:
 
         reactions: list[tuple[list[Fragment], ReactionTemplate]] = []
@@ -428,7 +519,7 @@ class TopStar():
         for i, frag_i in self.frag_list.items():
             if i in skip:
                 continue
-            uni_rx = self.reactions.get((frag_i.name, None))
+            uni_rx = self.reactions.get((frag_i.name, None, None, None))
             if uni_rx is not None and len(uni_rx) > 0:
                 for rx in uni_rx:
                     if self.detection([frag_i], rx, pos, box):
@@ -437,19 +528,28 @@ class TopStar():
                         break
                 if i in skip:
                     continue
-            pos_i = np.array([pos[frag_i.index_atom(0)]])
-            nlist = query.query(pos_i, {"r_max": 1.}).toNeighborList()
+            if not self.r_continue.get((frag_i.name, None, None)):
+                continue
+            name, _ = self.neighbor_atom_map[frag_i.name]
+            got, part_id = frag_i.get_atom(name)
+            if got != GotAtom.Found:
+                raise ValueError("Internal error: not found in detection_all")
+            pos_i = np.array([pos[part_id]])
+            nlist = self.query.query(
+                pos_i, {"r_max": self.nlist_cutoff}
+            ).toNeighborList()
             for _, neigh_j in nlist[:]:
-                j = nlist_to_frag[neigh_j]
-                if j in skip:
-                    continue
-                if i == j:
+                j = self.nlist_to_frag[neigh_j]
+                # i can become skipped during a nested call
+                if i in skip:
+                    break
+                if j in skip or i == j:
                     continue
                 frag_j = self.frag_list[j]
                 if frag_i.name == frag_j.name and j < i:
-                    # don't double count self reactions
+                    # don't double count same-type reactions
                     continue
-                bi_rx = self.reactions.get((frag_i.name, frag_j.name))
+                bi_rx = self.reactions.get((frag_i.name, frag_j.name, None, None))
                 if bi_rx is not None and len(bi_rx) > 0:
                     for rx in bi_rx:
                         if self.detection([frag_i, frag_j], rx, pos, box):
@@ -457,8 +557,53 @@ class TopStar():
                             skip.add(j)
                             reactions.append(([frag_i, frag_j], rx))
                             break
-                    if i in skip:
+                if not self.r_continue.get((frag_i.name, frag_j.name, None)):
+                    continue
+                for _, neigh_k in nlist[:]:
+                    k = self.nlist_to_frag[neigh_k]
+                    if i in skip or j in skip:
                         break
+                    if k in skip or i == k or j == k:
+                        continue
+                    frag_k = self.frag_list[k]
+                    if frag_i.name == frag_k.name and k < i:
+                        continue
+                    if frag_j.name == frag_k.name and k < j:
+                        continue
+                    tri_rx = self.reactions.get((frag_i.name, frag_j.name, frag_k.name, None))
+                    if tri_rx is not None and len(tri_rx) > 0:
+                        for rx in tri_rx:
+                            if self.detection([frag_i, frag_j, frag_k], rx, pos, box):
+                                skip.add(i)
+                                skip.add(j)
+                                skip.add(k)
+                                reactions.append([frag_i, frag_j, frag_k], rx)
+                                break
+                    if not self.r_continue.get((frag_i.name, frag_j.name, frag_k.name)):
+                        continue
+                    for _, neigh_l in nlist[:]:
+                        l = self.nlist_to_frag[neigh_l]
+                        if i in skip or j in skip or k in skip:
+                            break
+                        if l in skip or i == l or j == l or k == l:
+                            continue
+                        frag_l = self.frag_list[l]
+                        if frag_i.name == frag_l.name and l < i:
+                            continue
+                        if frag_j.name == frag_l.name and l < j:
+                            continue
+                        if frag_k.name == frag_l.name and l < k:
+                            continue
+                        tetra_rx = self.reactions.get((frag_i.name, frag_j.name, frag_k.name, frag_l.name))
+                        if tetra_rx is not None and len(tetra_rx) > 0:
+                            for rx in tetra_rx:
+                                if self.detection([frag_i, frag_j, frag_k, frag_l], rx, pos, box):
+                                    skip.add(i)
+                                    skip.add(j)
+                                    skip.add(k)
+                                    skip.add(l)
+                                    reactions.append([frag_i, frag_j, frag_k, frag_l], rx)
+                                    break
 
         return reactions
 
@@ -628,12 +773,10 @@ class TopStar():
         self.process_break(frags, rx)
         # [rx_update]
         self.process_update(frags, rx)
-        # (only non skipped get passed here) remove non graph fragment reactants
-        # this only happens when a [moleculetype] can directly react since
-        # the removal of numbered fragments
-        for frag in frags:
-            if frag.graph is None:
-                self.remove_fragment(frag)
+        # we no longer have numbered fragments -> commented
+        # for frag in frags:
+        #     if frag.graph is None:
+        #         self.remove_fragment(frag)
 
         # graphs get recalculated later over the same particles
         self.remove_overlapping_graphs(graph_recalc)
@@ -648,19 +791,20 @@ class TopStar():
         for reporter in self.reporters:
             reporter.post_modification(i)
 
-    def detection_modification(self, i: int) -> int:
-        self.pre_detection(i)
-        pos, box = self.system.get_positions()
-        query, frag_to_nlist, nlist_to_frag = self.get_neighbor_list(box, pos)
-        # tree of frag combinations to check
-        reactions = self.detection_all(
-            pos, box, query, frag_to_nlist, nlist_to_frag
-        )
+    # TODO public API should be named "detection" and "modification"
+    def dm_detection(
+            self, i: int, box, pos
+            ) -> list[tuple[list[Fragment], ReactionTemplate]]:
 
-        if len(reactions) == 0:
-            return 0
+        self.pre_detection(i)
+        self.update_query(box, pos)
+        return self.detection_all(pos, box)
+
+    def dm_modification(
+            self, i: int,
+            reactions: list[tuple[list[Fragment], ReactionTemplate]]) -> None:
+
         self.pre_modification(reactions, i)
         for (frags, rx) in reactions:
             self.modification(frags, rx)
         self.post_modification(i)
-        return len(reactions)

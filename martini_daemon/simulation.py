@@ -16,6 +16,7 @@ from random import random
 import time
 from typing import Any
 import math
+import os
 
 
 class DaemonSimulation():
@@ -52,6 +53,7 @@ class DaemonSimulation():
                  defines: dict[str, str] = {},
                  reporters: list[Any] = [],
                  friction_ps_1: float = 2.0,
+                 neighbor_cutoff: float = 1.5,
                  ):
 
         # Self initialization
@@ -63,6 +65,7 @@ class DaemonSimulation():
         self.last_step_time: int = 0.
         self.xtc_freq: int = xtc_frequency
         self.dm_freq: int = dm_frequency
+        self.neighbor_cutoff = neighbor_cutoff
         if T_kelvin is None and T_type != "none":
             raise ValueError("No valid T temperature given")
         if T_type not in {"andersen", "langevin", "none"}:
@@ -77,6 +80,13 @@ class DaemonSimulation():
         friction = friction_ps_1 / mm.unit.picosecond
         if type(platform) is str:
             platform = mm.Platform.getPlatformByName(platform)
+        include_dir = include_dir or (
+            "GMXDATA" in os.environ and
+            os.path.join(os.environ["GMXDATA"], "top")
+        ) or (
+            "GMXBIN" in os.environ and
+            os.path.join(os.environ["GMXBIN"], "..", "share", "gromacs", "top")
+        ) or "/usr/local/gromacs/share/gromacs/top"
 
         # Logging setup
         backup_try(self.log_path)
@@ -105,6 +115,7 @@ class DaemonSimulation():
             top_path,
             include_dir=include_dir, defines=defines,
             epsilon_r=epsilon_r, nonbonded_cutoff=nonbonded_cutoff,
+            nlist_cutoff=neighbor_cutoff,
             logger=self.logger
         )
         self.gro = GromacsGroFile(gro_path)
@@ -178,7 +189,7 @@ class DaemonSimulation():
         print()
         self.system.write_gro(self.out_path)
 
-    def step(self, steps=1, xtc=True, dm=True, i=0, max_steps=0):
+    def step(self, steps=1, xtc=True, dm=True, neighbor=True, i=0, max_steps=0):
         """
             Do a step of the following:
             - steps MD steps
@@ -211,14 +222,20 @@ class DaemonSimulation():
                              f"{time_fmt}\t"
                              f"{self.reactions} reactions")
         if dm:
-            self.logger.info("D/M start")
-            new_reactions = self.top.detection_modification(i)
-            self.reactions += new_reactions
-            self.logger.info("D/M finished")
-            if new_reactions > 0:
-                self.logger.info("reinitialize start")
+            self.logger.info("Detection start")
+            pos, box = self.system.get_positions()
+            reactions = self.top.dm_detection(
+                i, box, pos
+            )
+            self.logger.info("Detection finished")
+            if len(reactions) > 0:
+                self.logger.info("Modification start")
+                self.reactions += len(reactions)
+                self.top.dm_modification(i, reactions)
+                self.logger.info("Modification finished")
+                self.logger.info("Reinitialize start")
                 self.system.reinitialize()
-                self.logger.info("reinitialize finished")
+                self.logger.info("Reinitialize finished")
         if xtc:
             self.logger.info("XTC write start")
             self.system.write_xtc_frame(self.xtc_freq)

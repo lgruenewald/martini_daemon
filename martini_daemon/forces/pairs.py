@@ -1,6 +1,5 @@
 from .force import Force
 import openmm as mm  # type: ignore[import-untyped]
-from openmm.unit import nanometer  # type: ignore[import-untyped]
 
 
 class Pairs(Force):
@@ -39,7 +38,6 @@ class Pairs(Force):
         self._force_obj = mm.CustomBondForce(
             "LJ + ES;"
             "LJ = (C12 / r^12 - C6 / r^6);"
-            "corr = (C12 / rcut^12 - C6 / rcut^6);"
             "ES = f*qprod/epsilon_r/r;"
             f"epsilon_r = {epsilon_r};"
             "f = 138.935458;"
