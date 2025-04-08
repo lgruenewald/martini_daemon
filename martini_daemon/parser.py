@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Martini Topology + fragments and reaction templates parser
 
 import re

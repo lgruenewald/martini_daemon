@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import openmm as mm  # type: ignore[import-untyped]
 import openmm.app as mmapp  # type: ignore[import-untyped]
 from openmm.unit import nanometer, picosecond, md_unit_system  # type: ignore[import-untyped]

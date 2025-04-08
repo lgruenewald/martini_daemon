@@ -1,7 +1,14 @@
+cythonization
+1. index_pair solution for instantiate_over_existing
+2. update topstar to use new rx templates and number only fragments
+3. update detection.pyx
+4. debug python <=> cython interface
+
+
+
 helper folder:
 all bond -> vmd bond
 pbc whole
-- up to 4 reactants
 Benchmarking logs:
 % slowdown of MD steps, and how long each MD step took (and their distribution)
 D/M cost in milliseconds (most transparent and isolated way to do it)
@@ -11,7 +18,6 @@ average number of reactions per D/M step
 temperature or other variables over time
 
 
-- cython for bottlenecks
 - better quitting behavior in benchmarking
 - linting, type checking
 - everything should use "atoms", not "particles"

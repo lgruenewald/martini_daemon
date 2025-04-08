@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """
 A more modular
 parser that constructs S* and T* rather than openmm's internal objects
@@ -627,96 +625,114 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("reactants", process_reactants)
     p.add_level("reactant", process_reactants)
 
+    def parse_pair(pair):
+        nonlocal last_reaction
+        n_reac = len(last_reaction.reactants)
+        idi, namei = pair
+        if idi < 0 or idi >= n_reac:
+            raise ValueError(f"Pair {idi}:{namei} index {idi} out of range: 1 to {n_reac}.")
+        graph = topology.graph_fragment_map.get(last_reaction.reactants[idi])
+        if graph is None:
+            raise ValueError(f"Pair {idi}:{atomi} graph {last_reaction.reactants[idi]} not found.")
+        atomi = graph.atom_name_to_index.get(namei)
+        if atomi is None:
+            raise ValueError(f"Pair {idi}:{atomi} atom name {atomi} not found.")
+        return idi, atomi
+
+
     def process_conditions(tokens):
         nonlocal last_reaction
+        n_reac = len(last_reaction.reactants)
+        if n_reac == 0:
+            raise ValueError("[reactants] must come before [conditions]")
         key = unwrap(tokens, 0, "word")
         match key:
             case "r_max":
-                i = unwrap(tokens, 1, "pair")
-                j = unwrap(tokens, 2, "pair")
-                cutoff = unwrap(tokens, 3, "float")
-                last_reaction.distance_max.append((i, j, cutoff))
+                idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
+                idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
+                cutoff = unwrap(tokens, 3, "float")                
+                last_reaction.distance_max.append((idi, atomi, idj, atomj, cutoff))
             case "r_min":
-                i = unwrap(tokens, 1, "pair")
-                j = unwrap(tokens, 2, "pair")
+                idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
+                idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
                 cutoff = unwrap(tokens, 3, "float")
-                last_reaction.distance_min.append((i, j, cutoff))
+                last_reaction.distance_min.append((idi, atomi, idj, atomj, cutoff))
             case "angle_not":
-                i = unwrap(tokens, 1, "pair")
-                j = unwrap(tokens, 2, "pair")
-                k = unwrap(tokens, 3, "pair")
+                idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
+                idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
+                idk, atomk = parse_pair(unwrap(tokens, 3, "pair"))
                 theta_min = unwrap(tokens, 4, "degree")
                 theta_max = unwrap(tokens, 5, "degree")
                 last_reaction.angle_limits.append(
-                    (i, j, k, math.cos(theta_min), math.cos(theta_max))
+                    (idi, atomi, idj, atomj, idk, atomk, math.cos(theta_min), math.cos(theta_max))
                 )
             case "angle_min":
-                i = unwrap(tokens, 1, "pair")
-                j = unwrap(tokens, 2, "pair")
-                k = unwrap(tokens, 3, "pair")
+                idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
+                idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
+                idk, atomk = parse_pair(unwrap(tokens, 3, "pair"))
                 theta_min = unwrap(tokens, 4, "degree")
                 last_reaction.angle_limits.append(
-                    (i, j, k, math.cos(theta_min), math.cos(math.pi))
+                    (idi, atomi, idj, atomj, idk, atomk, math.cos(theta_min), math.cos(math.pi))
                 )
             case "angle_max":
-                i = unwrap(tokens, 1, "pair")
-                j = unwrap(tokens, 2, "pair")
-                k = unwrap(tokens, 3, "pair")
+                idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
+                idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
+                idk, atomk = parse_pair(unwrap(tokens, 3, "pair"))
                 theta_max = unwrap(tokens, 4, "degree")
                 last_reaction.angle_limits.append(
-                    (i, j, k, math.cos(0.), math.cos(theta_max))
+                    (idi, atomi, idj, atomj, idk, atomk, math.cos(0.), math.cos(theta_max))
                 )
             case "angle_between":
-                i = unwrap(tokens, 1, "pair")
-                j = unwrap(tokens, 2, "pair")
-                k = unwrap(tokens, 3, "pair")
+                idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
+                idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
+                idk, atomk = parse_pair(unwrap(tokens, 3, "pair"))
                 theta_min = unwrap(tokens, 4, "degree")
                 theta_max = unwrap(tokens, 5, "degree")
                 last_reaction.angle_limits.append(
-                    (i, j, k, math.cos(0.), math.cos(theta_min))
+                    (idi, atomi, idj, atomj, idk, atomk, math.cos(0.), math.cos(theta_min))
                 )
                 last_reaction.angle_limits.append(
-                    (i, j, k, math.cos(theta_max), math.cos(math.pi))
+                    (idi, atomi, idj, atomj, idk, atomk, math.cos(theta_max), math.cos(math.pi))
                 )
             case "dihedral_not":
-                i = unwrap(tokens, 1, "pair")
-                j = unwrap(tokens, 2, "pair")
-                k = unwrap(tokens, 3, "pair")
-                l = unwrap(tokens, 4, "pair")
+                idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
+                idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
+                idk, atomk = parse_pair(unwrap(tokens, 3, "pair"))
+                idl, atoml = parse_pair(unwrap(tokens, 4, "pair"))
                 theta_min = unwrap(tokens, 5, "degree")
                 theta_max = unwrap(tokens, 6, "degree")
                 # periodicity consideration
                 if theta_max > theta_min:
                     last_reaction.dihedral_limits.append(
-                        (i, j, k, l, theta_min, theta_max)
+                        (idi, atomi, idj, atomj, idk, atomk, idl, atoml, theta_min, theta_max)
                     )
                 else:
                     # minus one / add one for inclusive ranges
                     last_reaction.dihedral_limits.append(
-                        (i, j, k, l, -1., theta_max)
+                        (idi, atomi, idj, atomj, idk, atomk, idl, atoml, -1., theta_max)
                     )
                     last_reaction.dihedral_limits.append(
-                        (i, j, k, l, theta_min, math.tau + 1.)
+                        (idi, atomi, idj, atomj, idk, atomk, idl, atoml, theta_min, math.tau + 1.)
                     )
             case "dihedral_between":
-                i = unwrap(tokens, 1, "pair")
-                j = unwrap(tokens, 2, "pair")
-                k = unwrap(tokens, 3, "pair")
-                l = unwrap(tokens, 4, "pair")
+                idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
+                idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
+                idk, atomk = parse_pair(unwrap(tokens, 3, "pair"))
+                idl, atoml = parse_pair(unwrap(tokens, 4, "pair"))
                 theta_max = unwrap(tokens, 5, "degree")
                 theta_min = unwrap(tokens, 6, "degree")
                 # periodicity consideration
                 if theta_max > theta_min:
                     last_reaction.dihedral_limits.append(
-                        (i, j, k, l, theta_min, theta_max)
+                        (idi, atomi, idj, atomj, idk, atomk, idl, atoml, theta_min, theta_max)
                     )
                 else:
                     # minus one / add one for inclusive ranges
                     last_reaction.dihedral_limits.append(
-                        (i, j, k, l, -1., theta_max)
+                        (idi, atomi, idj, atomj, idk, atomk, idl, atoml, -1., theta_max)
                     )
                     last_reaction.dihedral_limits.append(
-                        (i, j, k, l, theta_min, math.tau + 1.)
+                        (idi, atomi, idj, atomj, idk, atomk, idl, atoml, theta_min, math.tau + 1.)
                     )
             case "p":
                 probability = unwrap(tokens, 1, "float")
@@ -732,29 +748,77 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     def process_break(tokens):
         nonlocal last_reaction
+        n_reac = len(last_reaction.reactants)
+        if n_reac == 0:
+            raise ValueError("[reactants] must come before [break]")
+
         atoms = []
         for i in range(len(tokens)):
-            atoms.append(unwrap(tokens, i, "pair"))
+            atoms.append(parse_pair(unwrap(tokens, i, "pair")))
         last_reaction.break_groups.append(atoms)
 
     p.add_level("break", process_break)
 
     def process_update(tokens):
         nonlocal last_reaction
+        n_reac = len(last_reaction.reactants)
+        if n_reac == 0:
+            raise ValueError("[reactants] must come before [update]")
+
         atoms = []
         for i in range(len(tokens)):
-            atoms.append(unwrap(tokens, i, "pair"))
+            atoms.append(parse_pair(unwrap(tokens, i, "pair")))
         last_reaction.update_groups.append(atoms)
 
     p.add_level("update", process_update)
 
     def process_retype(tokens):
         nonlocal last_reaction
-        i = unwrap(tokens, 0, "pair")
+        n_reac = len(last_reaction.reactants)
+        if n_reac == 0:
+            raise ValueError("[reactants] must come before [retype]")
+
+        i, j = parse_pair(unwrap(tokens, 0, "pair"))
         ntype = unwrap(tokens, 1, "word")
-        last_reaction.retypes.append((i, ntype))
+        last_reaction.retypes.append((i, j, ntype))
 
     p.add_level("retype", process_retype)
+
+    def process_rename(tokens):
+        nonlocal last_reaction
+        n_reac = len(last_reaction.reactants)
+        if n_reac == 0:
+            raise ValueError("[reactants] must come before [rename]")
+
+        i, j = parse_pair(unwrap(tokens, 0, "pair"))
+        nname = unwrap(tokens, 1, "word")
+        last_reaction.renames.append((i, j, nname))
+
+    p.add_level("rename", process_rename)
+
+    def process_remass(tokens):
+        nonlocal last_reaction
+        n_reac = len(last_reaction.reactants)
+        if n_reac == 0:
+            raise ValueError("[reactants] must come before [remass]")
+
+        i, j = parse_pair(unwrap(tokens, 0, "pair"))
+        nmass = unwrap(tokens, 1, "float")
+        last_reaction.remasses.append((i, j, nmass))
+
+    p.add_level("remass", process_remass)
+
+    def process_recharge(tokens):
+        nonlocal last_reaction
+        n_reac = len(last_reaction.reactants)
+        if n_reac == 0:
+            raise ValueError("[reactants] must come before [recharge]")
+
+        i, j = parse_pair(unwrap(tokens, 0, "pair"))
+        ncharge = unwrap(tokens, 1, "float")
+        last_reaction.recharges.append((i, j, ncharge))
+
+    p.add_level("recharge", process_recharge)
 
     def process_system(tokens):
         nonlocal system_defined

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Daemon Simulation object (prototype)
 the D/M algorithm + wrappers
 """
@@ -11,6 +10,7 @@ import sys
 import openmm as mm  # type: ignore[import-untyped]
 from openmm.app import GromacsGroFile  # type: ignore[import-untyped]
 from .utils import backup_try
+from .detection import detection
 import logging
 from random import random
 import time
@@ -224,14 +224,14 @@ class DaemonSimulation():
         if dm:
             self.logger.info("Detection start")
             pos, box = self.system.get_positions()
-            reactions = self.top.dm_detection(
-                i, box, pos
+            reactions = detection(
+                self.top, i, box, pos
             )
             self.logger.info("Detection finished")
             if len(reactions) > 0:
                 self.logger.info("Modification start")
                 self.reactions += len(reactions)
-                self.top.dm_modification(i, reactions)
+                self.top.modification(i, reactions)
                 self.logger.info("Modification finished")
                 self.logger.info("Reinitialize start")
                 self.system.reinitialize()
@@ -246,18 +246,3 @@ class DaemonSimulation():
             0.99 * self.last_step_time + 0.01 * (step_time)
             if self.last_step_time > 0. else (step_time)
         )
-
-
-if __name__ == "__main__":
-    argv = sys.argv
-    argc = len(sys.argv)
-
-    if argc != 3:
-        print("Usage: ./main.py <top file> <gro file>")
-        quit(1)
-
-    top_path = argv[1]
-    gro_path = argv[2]
-
-    sim = DaemonSimulation(top_path, gro_path)
-    sim.simulate()

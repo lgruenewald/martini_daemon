@@ -19,10 +19,6 @@ def test_pbc():
     assert isclose(pdist(v1, v3, box), np.sqrt(2))
     assert isclose(pdist(v3, v4, box2), 0.5)
 
-    # testing crossbox
-    assert cross_box(v1, v2, box)
-    assert not cross_box(v1, v3, box)
-
     # testing pcos_angle
     assert isclose(pcos_angle(v1, origin, v3, box), 0.)  # 90 degrees
     assert isclose(pcos_angle(v1, origin, v2, box), -1.)  # 180 degrees
@@ -83,3 +79,7 @@ def test_pbc():
     assert isclose(pdihedral(d1, d2, d3, d4_180, box), pi)
     assert isclose(pdihedral(d1, d2, d3, d4_225, box), 5 * pi / 4)
     assert isclose(pdihedral(d1, d2, d3, d4_270, box), 3 * pi / 2)
+
+    # testing crossbox
+    assert cross_box(v1, v2, box)
+    assert not cross_box(v1, v3, box)

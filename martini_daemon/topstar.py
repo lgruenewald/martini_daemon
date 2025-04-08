@@ -1,96 +1,16 @@
-#!/usr/bin/env python3
-from dataclasses import dataclass
 import random
 from freud.box import Box  # type: ignore[import-untyped]
 from freud.locality import NeighborList, AABBQuery  # type: ignore[import-untyped]
 import numpy as np
-from typing import Optional
 from .sysstar import SysStar
 from .forces.force import Force, Interaction
-from .utils import pdist, pcos_angle, pdihedral
 from .reporters.reporter import Reporter
 from .graph import GraphFragment, GraphMatch, GraphAtomType, match_particles
-from .fragment import Fragment, index_pair, GotAtom
+from .fragment import Fragment
+from .reaction_template import ReactionTemplate
+from .mol_fragment import MolFragment
 
 random.seed()
-
-
-# TODO move this to its own file and move all the per fragment type helpers
-# (e.g.) instantiate to their files, break up T* monolithicness a bit...
-class MolFragment:
-    molecule_name: str
-    # atoms: type, resnum, resname, atomname, chargegr, charge, mass
-    atoms: list[tuple[str, int, str, str, int, float, float]]
-    # tuple[int, str] instead of int when reaction TODO
-    exclusions: set[tuple[int, int]]
-    # interactions: generic members and params
-    # tuple[int, str] instead of int when reaction
-    interactions: list[tuple[Force, list[int], list[float]]]
-    index_type = "index"
-
-    def __init__(self, name):
-        self.molecule_name = name
-        self.atoms = []
-        self.exclusions = set()
-        self.interactions = []
-        self.renames = []
-        self.retypes = []
-
-    def add_exclusion(self, i, j) -> None:
-        """Adds an exclusion to the list of exclusions
-        Does not add duplicate exclusions."""
-
-        self.exclusions.add((i, j))
-        self.exclusions.add((j, i))
-
-
-class ReactionTemplate:
-    name: str
-    reactants: list[str]
-    distance_max: list[tuple[tuple[int, str], tuple[int, str], float]]
-    distance_min: list[tuple[tuple[int, str], tuple[int, str], float]]
-    angle_limits: list[tuple[tuple[int, str], tuple[int, str], tuple[int, str],
-                       float, float]]
-    dihedral_limits: list[tuple[tuple[int, str], tuple[int, str],
-                          tuple[int, str], tuple[int, str], float, float]]
-    probability: float
-    global_counter: int
-    global_limit: int
-    break_groups: list[list[tuple[int, str]]]
-    update_groups: list[list[tuple[int, str]]]
-    product: MolFragment
-    renames: list[tuple[tuple[int, str], str]]
-    retypes: list[tuple[tuple[int, str], str]]
-    recharges: list[tuple[tuple[int, str], float]]
-    remasses: list[tuple[tuple[int, str], float]]
-
-    def __init__(self, name):
-        self.name = name
-        self.reactants = []
-        self.distance_max = []
-        self.distance_min = []
-        self.angle_limits = []
-        self.dihedral_limits = []
-        self.probability = 1.0
-        self.global_counter = 0
-        self.global_limit = None
-        self.break_groups = []
-        self.update_groups = []
-        self.product = MolFragment(name)
-        self.product.index_type = "pair"
-        self.renames = []
-        self.retypes = []
-        self.recharges = []
-        self.remasses = []
-
-    def is_complete(self) -> bool:
-        # when a reaction is finished parsing, if this returns False
-        # it is considered an error
-
-        return (
-            len(self.reactants) > 0
-        )
-
 
 class TopStar():
     # ======= (1/3) Building things =======
@@ -127,13 +47,16 @@ class TopStar():
     reporters: list[Reporter]
 
     def __init__(self, system, logger, nlist_cutoff):
+        # TODO better suite the bookkeeping to the algorithm used and remove
+        # the other ones
         self.frag_list = {}
         self.next_frag_id = 0
         self.defrag_list = []
         self.interaction_list = []
         self.frag_fragments = []
         self.mol_fragments = []
-        self.reactions = {}
+        self.reactions: dict[tuple[str, str, str, str], list[ReactionTemplate]] = {}
+        self.reaction_list: list[ReactionTemplate] = []
         self.r_continue = {}
         self.neighbor_atom_map = {}
         self.type_lookup = {}
@@ -240,6 +163,7 @@ class TopStar():
         if self.reactions.get(key) is None:
             self.reactions[key] = []
         self.reactions[key].append(reaction)
+        self.reaction_list.append(reaction)
         for r in reaction.reactants:
             self.reactive_types.add(r)
         # reaction product buildup
@@ -346,7 +270,7 @@ class TopStar():
         """Takes a name of a mol fragment, adds interactions to those particles
         according to the mol fragment, or optionally a reaction template.
         """
-
+        # TODO good index_pair solution for this one
         # exclusions
         for (i, j) in molfrag.exclusions:
             foundi, pi = index_pair(frags, i)
@@ -381,231 +305,13 @@ class TopStar():
                 self.interaction_list[member].append(f)
 
     # ======= (2/3) Detection things =======
+    # see detection.pyx
     def pre_detection(self, i):
         for _, rxs in self.reactions.items():
             for rx in rxs:
                 rx.global_counter = 0
         for reporter in self.reporters:
             reporter.pre_detection(i)
-
-    def detection(self, reactants: list[Fragment],
-                  rx: ReactionTemplate,
-                  pos, box
-                  ) -> bool:
-        """Returns True if frag1 and frag2 fulfill constraints specified in rx
-
-        Returns False if they should not react
-        """
-        # the order of checks should be from fastest to slowest to maximize
-        # performance
-        # simple rules check
-        # fragments that were removed cannot react any more
-
-        # overlapping fragments can never react:
-        pset = set()
-        for r in reactants:
-            for p in r.particles.values():
-                if p in pset:
-                    return False
-                pset.add(p)
-            for p in filter(lambda x: x is not None, r.opt.values()):
-                if p in pset:
-                    return False
-                pset.add(p)
-
-        # limiter checks, first for performance
-        if rx.global_limit is not None and rx.global_counter >= rx.global_limit:
-            return False
-        if random.random() > rx.probability:
-            return False
-
-        # position dependent checks
-        for (idi, idj, rmax) in rx.distance_max:
-            found1, init1 = index_pair(reactants, idi)
-            found2, init2 = index_pair(reactants, idj)
-            if GotAtom.NotFound in {found1, found2}:
-                # wrong atom names
-                raise ValueError("Bad atom name in reaction condition")
-            if GotAtom.MissingOptional in {found1, found2}:
-                # missing optional atoms
-                continue
-            dist = pdist(pos[init1], pos[init2], box)
-            if dist > rmax:
-                return False
-
-        for (idi, idj, rmin) in rx.distance_min:
-            found1, init1 = index_pair(reactants, idi)
-            found2, init2 = index_pair(reactants, idj)
-            if GotAtom.NotFound in {found1, found2}:
-                # wrong atom names
-                raise ValueError("Bad atom name in reaction condition")
-            if GotAtom.MissingOptional in {found1, found2}:
-                # missing optional atoms
-                continue
-            dist = pdist(pos[init1], pos[init2], box)
-            if dist < rmin:
-                return False
-
-        for (idi, idj, idk, cos_min, cos_max) in \
-                rx.angle_limits:
-            found1, p1 = index_pair(reactants, idi)
-            found2, p2 = index_pair(reactants, idj)
-            found3, p3 = index_pair(reactants, idk)
-            if GotAtom.NotFound in {found1, found2, found3}:
-                # wrong atom names
-                raise ValueError("Bad atom name in reaction condition")
-            if GotAtom.MissingOptional in {found1, found2, found3}:
-                # missing optional atoms
-                continue
-            # the particle positions of particle i, j, k
-            cos = pcos_angle(pos[p1], pos[p2], pos[p3], box)
-            if cos <= cos_min and cos >= cos_max:
-                # inverted comparison because cosine is a constantly decreasing
-                # function, cos_min is the minimum angle => max cosine value
-                # cos_max is the maximum angle => min cosine value
-                return False
-
-        for (idi, idj, idk, idl, min, max) in \
-                rx.dihedral_limits:
-            # particle positions
-            found1, p1 = index_pair(reactants, idi)
-            found2, p2 = index_pair(reactants, idj)
-            found3, p3 = index_pair(reactants, idk)
-            found4, p4 = index_pair(reactants, idl)
-            if GotAtom.NotFound in {found1, found2, found3, found4}:
-                # wrong atom names
-                raise ValueError("Bad atom name in reaction condition")
-            if GotAtom.MissingOptional in {found1, found2, found3, found4}:
-                # missing optional atoms
-                continue
-            theta = pdihedral(pos[p1], pos[p2], pos[p3], pos[p4], box)
-            if theta >= min and theta <= max:
-                return False
-
-        rx.global_counter += 1
-        return True
-
-    def update_query(self, box, pos) -> None:
-        if len(self.frag_list) == 0:
-            return
-        pos_filtered = []
-        nlist_to_frag = {}
-        for id, frag in self.frag_list.items():
-            filtered_id = len(pos_filtered)
-            nlist_to_frag[filtered_id] = id
-            atom_map_entry = self.neighbor_atom_map.get(frag.name)
-            if atom_map_entry is not None:
-                name, _ = atom_map_entry
-                got, part_id = frag.get_atom(name)
-                if got != GotAtom.Found:
-                    raise ValueError(f"Internal error: invalid r_max nlist atom for {frag.name}: {name}.")
-                pos_filtered.append(pos[part_id])
-            else:
-                pos_filtered.append(pos[frag.index_atom(0)])
-        pos_filtered = np.array(pos_filtered)
-        box = Box(box[0], box[1], box[2])
-        query = NeighborList()
-        query = AABBQuery(box, pos_filtered)
-        self.query = query
-        self.nlist_to_frag = nlist_to_frag
-
-    def detection_all(
-            self, pos, box
-            ) -> list[tuple[list[Fragment], ReactionTemplate]]:
-
-        reactions: list[tuple[list[Fragment], ReactionTemplate]] = []
-        skip: set[int] = set()
-
-        for i, frag_i in self.frag_list.items():
-            if i in skip:
-                continue
-            uni_rx = self.reactions.get((frag_i.name, None, None, None))
-            if uni_rx is not None and len(uni_rx) > 0:
-                for rx in uni_rx:
-                    if self.detection([frag_i], rx, pos, box):
-                        skip.add(i)
-                        reactions.append(([frag_i], rx))
-                        break
-                if i in skip:
-                    continue
-            if not self.r_continue.get((frag_i.name, None, None)):
-                continue
-            name, _ = self.neighbor_atom_map[frag_i.name]
-            got, part_id = frag_i.get_atom(name)
-            if got != GotAtom.Found:
-                raise ValueError("Internal error: not found in detection_all")
-            pos_i = np.array([pos[part_id]])
-            nlist = self.query.query(
-                pos_i, {"r_max": self.nlist_cutoff}
-            ).toNeighborList()
-            for _, neigh_j in nlist[:]:
-                j = self.nlist_to_frag[neigh_j]
-                # i can become skipped during a nested call
-                if i in skip:
-                    break
-                if j in skip or i == j:
-                    continue
-                frag_j = self.frag_list[j]
-                if frag_i.name == frag_j.name and j < i:
-                    # don't double count same-type reactions
-                    continue
-                bi_rx = self.reactions.get((frag_i.name, frag_j.name, None, None))
-                if bi_rx is not None and len(bi_rx) > 0:
-                    for rx in bi_rx:
-                        if self.detection([frag_i, frag_j], rx, pos, box):
-                            skip.add(i)
-                            skip.add(j)
-                            reactions.append(([frag_i, frag_j], rx))
-                            break
-                if not self.r_continue.get((frag_i.name, frag_j.name, None)):
-                    continue
-                for _, neigh_k in nlist[:]:
-                    k = self.nlist_to_frag[neigh_k]
-                    if i in skip or j in skip:
-                        break
-                    if k in skip or i == k or j == k:
-                        continue
-                    frag_k = self.frag_list[k]
-                    if frag_i.name == frag_k.name and k < i:
-                        continue
-                    if frag_j.name == frag_k.name and k < j:
-                        continue
-                    tri_rx = self.reactions.get((frag_i.name, frag_j.name, frag_k.name, None))
-                    if tri_rx is not None and len(tri_rx) > 0:
-                        for rx in tri_rx:
-                            if self.detection([frag_i, frag_j, frag_k], rx, pos, box):
-                                skip.add(i)
-                                skip.add(j)
-                                skip.add(k)
-                                reactions.append([frag_i, frag_j, frag_k], rx)
-                                break
-                    if not self.r_continue.get((frag_i.name, frag_j.name, frag_k.name)):
-                        continue
-                    for _, neigh_l in nlist[:]:
-                        l = self.nlist_to_frag[neigh_l]
-                        if i in skip or j in skip or k in skip:
-                            break
-                        if l in skip or i == l or j == l or k == l:
-                            continue
-                        frag_l = self.frag_list[l]
-                        if frag_i.name == frag_l.name and l < i:
-                            continue
-                        if frag_j.name == frag_l.name and l < j:
-                            continue
-                        if frag_k.name == frag_l.name and l < k:
-                            continue
-                        tetra_rx = self.reactions.get((frag_i.name, frag_j.name, frag_k.name, frag_l.name))
-                        if tetra_rx is not None and len(tetra_rx) > 0:
-                            for rx in tetra_rx:
-                                if self.detection([frag_i, frag_j, frag_k, frag_l], rx, pos, box):
-                                    skip.add(i)
-                                    skip.add(j)
-                                    skip.add(k)
-                                    skip.add(l)
-                                    reactions.append([frag_i, frag_j, frag_k, frag_l], rx)
-                                    break
-
-        return reactions
 
     # ======= (3/3) Modification things =======
     def clean_defrag(self, frag: Fragment, part: int) -> None:
@@ -645,11 +351,9 @@ class TopStar():
         for group in rx.break_groups:
             group_atoms = []
             all_found = True
-            for pair in group:
-                found, part = index_pair(frags, pair)
-                if found == GotAtom.NotFound:
-                    raise ValueError("Unknown part name")
-                if found == GotAtom.MissingOptional:
+            for id, atom in group:
+                part = frags[id].atom
+                if part == -1:
                     all_found = False
                     break
                 group_atoms.append(part)
@@ -678,11 +382,9 @@ class TopStar():
         for group in rx.update_groups:
             group_atoms = []
             all_found = True
-            for pair in group:
-                found, part = index_pair(frags, pair)
-                if found == GotAtom.NotFound:
-                    raise ValueError("Unknown part name")
-                if found == GotAtom.MissingOptional:
+            for id, atom in group:
+                part = frags[id].atoms[atom]
+                if part == -1:
                     all_found = False
                     break
                 group_atoms.append(part)
@@ -718,34 +420,26 @@ class TopStar():
                               self, frags: list[Fragment], rx: ReactionTemplate
                              ) -> None:
         # re* overrides everything
-        for (pair, new_name) in rx.renames:
-            found, part_id = index_pair(frags, pair)
-            if found == GotAtom.NotFound:
-                raise ValueError(f"Index out of range {pair}")
-            if found == GotAtom.MissingOptional:
+        for (id, atom, new_name) in rx.renames:
+            part_id = frags[id].atoms[atom]
+            if part_id == -1:
                 continue
             self.system.rename(part_id, new_name)
-        for (pair, new_type) in rx.retypes:
-            found, part_id = index_pair(frags, pair)
-            if found == GotAtom.NotFound:
-                raise ValueError(f"Index out of range {pair}")
-            if found == GotAtom.MissingOptional:
+        for (id, atom, new_type) in rx.retypes:
+            part_id = frags[id].atoms[atom]
+            if part_id == -1:
                 continue
             self.system.retype(part_id, new_type)
-        for (pair, new_charge) in rx.recharges:
-            found, part_id = index_pair(frags, pair)
-            if found == GotAtom.NotFound:
-                raise ValueError(f"Index out of range {pair}")
-            if found == GotAtom.MissingOptional:
+        for (id, atom, new_charge) in rx.recharges:
+            part_id = frags[id].atoms[atom]
+            if part_id == -1:
                 continue
             self.system.recharge(part_id, new_charge)
-        for (pair, new_mass) in rx.remasses:
-            found, part_id = index_pair(frags, pair)
-            if found == GotAtom.NotFound:
-                raise ValueError(f"Index out of range {pair}")
-            if found == GotAtom.MissingOptional:
+        for (id, atom, new_mass) in rx.remasses:
+            part_id = frags[id].atoms[atom]
+            if part_id == -1:
                 continue
-            self.system.remass(part_id, new_charge)
+            self.system.remass(part_id, new_mass)
 
     def pre_modification(self, rx_list: list[(list, ReactionTemplate)], i
                          ) -> None:
@@ -754,57 +448,46 @@ class TopStar():
         for reporter in self.reporters:
             reporter.pre_modification(rx_list, i)
 
-    def modification(self, frags: list[Fragment], rx: ReactionTemplate
-                     ) -> None:
+    def modification(
+        self, 
+        i: int,
+        reactions: list[tuple[list[Fragment], ReactionTemplate]]
+    ) -> None:
         """Modification helper for the D/M algorithm
         """
-        # just normal particles to instantiate products over
-        product_particles = []
-        # which particles to recalculate graphs over
-        graph_recalc = set()
-        for f in frags:
-            product_particles += list(f.particles.values())
-            graph_recalc |= set(f.particles.values())
-            graph_recalc |= set(filter(lambda x: x is not None, f.opt.values()))
-        # add neighbors since those can be changed too (opt/not atoms)
-        graph_recalc = self.populate_neighbors(set(product_particles))
 
-        # [rx_break]
-        self.process_break(frags, rx)
-        # [rx_update]
-        self.process_update(frags, rx)
-        # we no longer have numbered fragments -> commented
-        # for frag in frags:
-        #     if frag.graph is None:
-        #         self.remove_fragment(frag)
+        self.pre_modification(reactions, i)
 
-        # graphs get recalculated later over the same particles
-        self.remove_overlapping_graphs(graph_recalc)
+        for (frags, rx) in reactions:
+            # just normal particles to instantiate products over
+            product_particles = []
+            # which particles to recalculate graphs over
+            graph_recalc = set()
+            for f in frags:
+                product_particles += list(f.particles.values())
+                graph_recalc |= set(f.particles.values())
+                graph_recalc |= set(filter(lambda x: x is not None, f.opt.values()))
+            # add neighbors since those can be changed too (opt/not atoms)
+            graph_recalc = self.populate_neighbors(set(product_particles))
 
-        self.template_update_atoms(frags, rx)
-        self.instantiate_over_existing(rx.product, frags)
+            # [rx_break]
+            self.process_break(frags, rx)
+            # [rx_update]
+            self.process_update(frags, rx)
 
-        self.try_match_graphs(graph_recalc)
+            # graphs get recalculated later over the same particles
+            self.remove_overlapping_graphs(graph_recalc)
+
+            self.template_update_atoms(frags, rx)
+            self.instantiate_over_existing(rx.product, frags)
+
+            self.try_match_graphs(graph_recalc)
+
+            
+        self.post_modification(i)
+
 
     def post_modification(self, i: int) -> None:
         # hook that only gets called after modification
         for reporter in self.reporters:
             reporter.post_modification(i)
-
-    # TODO public API should be named "detection" and "modification"
-    def dm_detection(
-            self, i: int, box, pos
-            ) -> list[tuple[list[Fragment], ReactionTemplate]]:
-
-        self.pre_detection(i)
-        self.update_query(box, pos)
-        return self.detection_all(pos, box)
-
-    def dm_modification(
-            self, i: int,
-            reactions: list[tuple[list[Fragment], ReactionTemplate]]) -> None:
-
-        self.pre_modification(reactions, i)
-        for (frags, rx) in reactions:
-            self.modification(frags, rx)
-        self.post_modification(i)
