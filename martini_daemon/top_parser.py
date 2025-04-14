@@ -4,7 +4,8 @@ parser that constructs S* and T* rather than openmm's internal objects
 """
 
 from .parser import TopParser, unwrap
-from .topstar import TopStar, ReactionTemplate, MolFragment
+from .topstar import TopStar, MolFragment
+from .reaction_template import ReactionTemplate
 from .sysstar import SysStar
 from .graph import GraphFragment, GraphAtomType
 import math
@@ -33,7 +34,33 @@ def DaemonTopFile(file, include_dir=None, defines={},
     # make parser
     p = TopParser()
 
+    # state of the parser
     system_defined = False  # whether the [system] happened yet
+    _last_molecule = None
+    last_graph: GraphFragment = None
+    last_reaction: ReactionTemplate = None
+
+    # parsers
+    def parse_pair(pair: int | tuple[int, str]) -> int | tuple[int, int]:
+        nonlocal last_reaction
+        if type(pair) is int:  # for scenarios when pair or int can come, int shouldn't be processed
+            return pair
+        if last_reaction is None:
+            raise ValueError("Attempt to pair-index before a [reaction] was defined")
+        n_reac = len(last_reaction.reactants)
+        idi, namei = pair
+        if idi < 0 or idi >= n_reac:
+            raise ValueError(f"Pair {idi}:{namei} index {idi} out of range: 1 to {n_reac}.")
+        graph = topology.graph_fragment_map.get(last_reaction.reactants[idi])
+        if graph is None:
+            raise ValueError(f"Pair {idi}:{namei} graph {last_reaction.reactants[idi]} not found.")
+        atomi = graph.atom_name_to_index.get(namei)
+        if atomi is None:
+            raise ValueError(f"Pair {idi}:{namei} atom name {namei} not found.")
+        if graph.atoms[atomi][3] not in {GraphAtomType.NORMAL, GraphAtomType.OPT}:
+            raise ValueError(f"Pair {idi}:{namei} references an atom!, which is not valid.")
+        return idi, atomi
+
 
     def process_defaults(tokens):
         nb_type = unwrap(tokens, 0, "int")
@@ -47,8 +74,6 @@ def DaemonTopFile(file, include_dir=None, defines={},
             raise ValueError("Too many fields in [ defaults ] directive")
 
     p.add_level("defaults", process_defaults)
-
-    _last_molecule = None
 
     def process_moltype(tokens):
         nonlocal _last_molecule
@@ -99,8 +124,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     def process_bonds(tokens):
         index_type = last_molecule().index_type
-        i = unwrap(tokens, 0, index_type)
-        j = unwrap(tokens, 1, index_type)
+        i = parse_pair(unwrap(tokens, 0, index_type))
+        j = parse_pair(unwrap(tokens, 1, index_type))
         type = unwrap(tokens, 2, "int")
         length = None
         if type != 5:
@@ -156,9 +181,9 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     def process_angles(tokens):
         index_type = last_molecule().index_type
-        i = unwrap(tokens, 0, index_type)
-        j = unwrap(tokens, 1, index_type)
-        k = unwrap(tokens, 2, index_type)
+        i = parse_pair(unwrap(tokens, 0, index_type))
+        j = parse_pair(unwrap(tokens, 1, index_type))
+        k = parse_pair(unwrap(tokens, 2, index_type))
         type = unwrap(tokens, 3, "int")
         if type == 1:
             # Harmonic angle
@@ -224,10 +249,10 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     def process_dihedrals(tokens):
         index_type = last_molecule().index_type
-        i = unwrap(tokens, 0, index_type)
-        j = unwrap(tokens, 1, index_type)
-        k = unwrap(tokens, 2, index_type)
-        l = unwrap(tokens, 3, index_type)
+        i = parse_pair(unwrap(tokens, 0, index_type))
+        j = parse_pair(unwrap(tokens, 1, index_type))
+        k = parse_pair(unwrap(tokens, 2, index_type))
+        l = parse_pair(unwrap(tokens, 3, index_type))
         type = unwrap(tokens, 4, "int")
         match type:
             case 1 | 9:
@@ -298,8 +323,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     def process_exclusions(tokens):
         index_type = last_molecule().index_type
-        i = unwrap(tokens, 0, index_type)
-        j = unwrap(tokens, 1, index_type)
+        i = parse_pair(unwrap(tokens, 0, index_type))
+        j = parse_pair(unwrap(tokens, 1, index_type))
         last_molecule().add_exclusion(i, j)
         for k in range(2, len(tokens)):
             c = unwrap(tokens, k, "index")
@@ -309,8 +334,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     def process_constraints(tokens):
         index_type = last_molecule().index_type
-        i = unwrap(tokens, 0, index_type)
-        j = unwrap(tokens, 1, index_type)
+        i = parse_pair(unwrap(tokens, 0, index_type))
+        j = parse_pair(unwrap(tokens, 1, index_type))
         type = unwrap(tokens, 2, "int")
         length = unwrap(tokens, 3, "float")
         if type == 1 or type == 2:
@@ -339,8 +364,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     def process_pairs(tokens):
         index_type = last_molecule().index_type
-        i = unwrap(tokens, 0, index_type)
-        j = unwrap(tokens, 1, index_type)
+        i = parse_pair(unwrap(tokens, 0, index_type))
+        j = parse_pair(unwrap(tokens, 1, index_type))
         type = unwrap(tokens, 2, "int")
         if type != 1:
             raise ValueError("Unsupported pairs type")
@@ -386,8 +411,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("nonbond_params", process_nonbond_params)
 
     def process_virtual_sites1(tokens):
-        vid = unwrap(tokens, 0, last_molecule().index_type)
-        member = unwrap(tokens, 1, last_molecule().index_type)
+        vid = parse_pair(unwrap(tokens, 0, last_molecule().index_type))
+        member = parse_pair(unwrap(tokens, 1, last_molecule().index_type))
         type = unwrap(tokens, 2, "int")
         if type != 1:
             raise ValueError(f"Virtual site 1 type {type} not implemented.")
@@ -401,9 +426,9 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     def process_virtual_sites2(tokens):
         index_type = last_molecule().index_type
-        vid = unwrap(tokens, 0, index_type)
-        i = unwrap(tokens, 1, index_type)
-        j = unwrap(tokens, 2, index_type)
+        vid = parse_pair(unwrap(tokens, 0, index_type))
+        i = parse_pair(unwrap(tokens, 1, index_type))
+        j = parse_pair(unwrap(tokens, 2, index_type))
         members = [vid, i, j]
         type = unwrap(tokens, 3, "int")
         match type:
@@ -427,10 +452,10 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     def process_virtual_sites3(tokens):
         index_type = last_molecule().index_type
-        vid = unwrap(tokens, 0, index_type)
-        i = unwrap(tokens, 1, index_type)
-        j = unwrap(tokens, 2, index_type)
-        k = unwrap(tokens, 3, index_type)
+        vid = parse_pair(unwrap(tokens, 0, index_type))
+        i = parse_pair(unwrap(tokens, 1, index_type))
+        j = parse_pair(unwrap(tokens, 2, index_type))
+        k = parse_pair(unwrap(tokens, 3, index_type))
         members = [vid, i, j, k]
         type = unwrap(tokens, 4, "int")
         match type:
@@ -473,11 +498,11 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     def process_virtual_sites4(tokens):
         index_type = last_molecule().index_type
-        vid = unwrap(tokens, 0, index_type)
-        i = unwrap(tokens, 1, index_type)
-        j = unwrap(tokens, 2, index_type)
-        k = unwrap(tokens, 3, index_type)
-        l = unwrap(tokens, 4, index_type)
+        vid = parse_pair(unwrap(tokens, 0, index_type))
+        i = parse_pair(unwrap(tokens, 1, index_type))
+        j = parse_pair(unwrap(tokens, 2, index_type))
+        k = parse_pair(unwrap(tokens, 3, index_type))
+        l = parse_pair(unwrap(tokens, 4, index_type))
         members = [vid, i, j, k, l]
         type = unwrap(tokens, 5, "int")
         match type:
@@ -493,13 +518,13 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     def process_virtual_sitesn(tokens):
         index_type = last_molecule().index_type
-        vid = unwrap(tokens, 0, index_type)
+        vid = parse_pair(unwrap(tokens, 0, index_type))
         members = [vid]
         type = unwrap(tokens, 1, "int")
         match type:
             case 1:
                 for c in range(2, len(tokens)):
-                    members.append(unwrap(tokens, c, index_type))
+                    members.append(parse_pair(unwrap(tokens, c, index_type)))
                 n = len(members) - 1
                 weights = [1/n] * n
                 last_molecule().interactions.append(
@@ -507,7 +532,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 )
             case 2:
                 for c in range(2, len(tokens)):
-                    members.append(unwrap(tokens, c, index_type))
+                    members.append(parse_pair(unwrap(tokens, c, index_type)))
                 n = len(members) - 1
                 last_molecule().interactions.append(
                     (system.vsite_com, members, [])
@@ -518,7 +543,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 if len(tokens) % 2 != 0:
                     raise ValueError("Must have an even number of arguments")
                 for c in range(2, len(tokens), 2):
-                    index = unwrap(tokens, c, index_type)
+                    index = parse_pair(unwrap(tokens, c, index_type))
                     weight = unwrap(tokens, c+1, "float")
                     members.append(index)
                     weights.append(weight)
@@ -533,9 +558,6 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 )
 
     p.add_level("virtual_sitesn", process_virtual_sitesn)
-
-    # custom additions: rx and frag
-    last_graph: GraphFragment = None
 
     def graph_start():
         nonlocal last_graph
@@ -588,8 +610,6 @@ def DaemonTopFile(file, include_dir=None, defines={},
     p.add_level("frag", process_graph, start=graph_start, end=graph_end)
     p.add_level("graph", process_graph, start=graph_start, end=graph_end)
 
-    last_reaction: ReactionTemplate = None
-
     def require_complete_reaction():
         nonlocal last_reaction
         if last_reaction is None:
@@ -624,21 +644,6 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     p.add_level("reactants", process_reactants)
     p.add_level("reactant", process_reactants)
-
-    def parse_pair(pair):
-        nonlocal last_reaction
-        n_reac = len(last_reaction.reactants)
-        idi, namei = pair
-        if idi < 0 or idi >= n_reac:
-            raise ValueError(f"Pair {idi}:{namei} index {idi} out of range: 1 to {n_reac}.")
-        graph = topology.graph_fragment_map.get(last_reaction.reactants[idi])
-        if graph is None:
-            raise ValueError(f"Pair {idi}:{atomi} graph {last_reaction.reactants[idi]} not found.")
-        atomi = graph.atom_name_to_index.get(namei)
-        if atomi is None:
-            raise ValueError(f"Pair {idi}:{atomi} atom name {atomi} not found.")
-        return idi, atomi
-
 
     def process_conditions(tokens):
         nonlocal last_reaction
@@ -823,7 +828,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
     def process_system(tokens):
         nonlocal system_defined
         require_complete_reaction()
-        system_defined = True  # hack so that reactions are complete
+        system_defined = True  # for a hack so that reactions are complete
 
     p.add_level("system", process_system)
 

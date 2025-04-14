@@ -46,11 +46,7 @@ class TestGraph():
     def try_match(self, frag: Fragment, name: str, parts: list[int]):
         if frag.name != name:
             return False
-        frag_parts = (
-            list(frag.particles.values()) +
-            # 0 is falsey
-            list(filter(lambda x: x is not None, frag.opt.values()))
-        )
+        frag_parts = list(filter(lambda x: x != -1, frag.atoms))
         if len(frag_parts) != len(parts):
             return False
         for i, atom in enumerate(frag_parts):

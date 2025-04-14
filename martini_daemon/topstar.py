@@ -1,14 +1,12 @@
 import random
-from freud.box import Box  # type: ignore[import-untyped]
-from freud.locality import NeighborList, AABBQuery  # type: ignore[import-untyped]
-import numpy as np
 from .sysstar import SysStar
-from .forces.force import Force, Interaction
+from .forces.force import Interaction
 from .reporters.reporter import Reporter
 from .graph import GraphFragment, GraphMatch, GraphAtomType, match_particles
 from .fragment import Fragment
 from .reaction_template import ReactionTemplate
 from .mol_fragment import MolFragment
+from .detection import detection_all
 
 random.seed()
 
@@ -37,8 +35,6 @@ class TopStar():
     reactions: dict[tuple[str, str, str, str], list[ReactionTemplate]]
     # reactant type -> are there any higher order reactions with this combo map
     r_continue: dict[tuple[str, str, str], bool]
-    # reactant type -> are there any reactions with this reactant map
-    reactive_types: set[str]
     # reactant type -> neighbor list atom index map
     neighbor_atom_map: dict[str, int]
 
@@ -61,7 +57,6 @@ class TopStar():
         self.neighbor_atom_map = {}
         self.type_lookup = {}
         self.subfrag_map = {}
-        self.reactive_types = set()
         self.reporters = []
         self.graph_fragment_list = []
         self.graph_fragment_map = {}
@@ -96,9 +91,7 @@ class TopStar():
             r_max_connected = []
             for i in range(len(reaction.reactants)):
                 r_max_connected.append({i})
-            for pair1, pair2, dist in reaction.distance_max:
-                i1, aname1 = pair1  # reactant index and atom name
-                i2, aname2 = pair2
+            for i1, aindex1, i2, aindex2, dist in reaction.distance_max:
                 if i1 > len(reaction.reactants) or i2 > len(reaction.reactants):
                     raise ValueError("r_max with index higher than the number of reactants")
                 name1 = key[i1]
@@ -110,16 +103,13 @@ class TopStar():
                     self.logger.warn(
                         f"Warning: r_max for reaction {reaction.name}"
                         f" has a r_max between reactant {i1} and {i2}"
-                        f" atoms {aname1} {aname2} of {dist},"
+                        f" atoms {aindex1} {aindex2} of {dist},"
                         f" which is too large relative to the"
                         f" neighborlist cutoff of {self.nlist_cutoff}."
                     )
                 # graph 1 and 2
                 graph1 = self.graph_fragment_map[name1]
                 graph2 = self.graph_fragment_map[name2]
-                # atom indices in graphs
-                aindex1 = graph1.atom_name_to_index[aname1]
-                aindex2 = graph2.atom_name_to_index[aname2]
                 # index to type
                 _, _, _, type1 = graph1.atoms[aindex1]
                 _, _, _, type2 = graph2.atoms[aindex2]
@@ -129,12 +119,12 @@ class TopStar():
                 # save this as a valid r_max
                 r_max_connected[i1].add(i2)
                 r_max_connected[i2].add(i1)
-                prev1, dist1 = self.neighbor_atom_map.get(name1) or (0, 0.)
-                prev2, dist2 = self.neighbor_atom_map.get(name2) or (0, 0.)
+                _, dist1 = self.neighbor_atom_map.get(name1) or (0, 0.)
+                _, dist2 = self.neighbor_atom_map.get(name2) or (0, 0.)
                 if dist > dist1:
-                    self.neighbor_atom_map[name1] = (aname1, dist)
+                    self.neighbor_atom_map[name1] = (aindex1, dist)
                 if dist > dist2:
-                    self.neighbor_atom_map[name2] = (aname2, dist)
+                    self.neighbor_atom_map[name2] = (aindex2, dist)
             # graph traversal to see all reactants have a distance cutoff
             marked = set()
 
@@ -164,8 +154,6 @@ class TopStar():
             self.reactions[key] = []
         self.reactions[key].append(reaction)
         self.reaction_list.append(reaction)
-        for r in reaction.reactants:
-            self.reactive_types.add(r)
         # reaction product buildup
         if self.type_lookup.get(reaction.name):
             raise ValueError(
@@ -173,15 +161,6 @@ class TopStar():
             )
         self.type_lookup[reaction.name] = reaction.product
         return reaction.product
-
-    def add_frag_to_list(self, name: str) -> Fragment:
-        if name in self.reactive_types:
-            inst = Fragment(name, self.next_frag_id)
-            self.frag_list[self.next_frag_id] = inst
-            self.next_frag_id += 1
-            return inst
-        else:
-            return Fragment(name, -1)
 
     # Graph helpers
 
@@ -217,23 +196,18 @@ class TopStar():
             )
 
         for m in matches:
-            inst = self.add_frag_to_list(m.graph.name)
-            inst.graph = m.graph
+            inst = Fragment(m.graph, self.next_frag_id)
+            self.frag_list[self.next_frag_id] = inst
+            self.next_frag_id += 1
+
             for key, _, _, type in m.graph.atoms:
                 val = m.atoms.get(key)
                 # key - name in the graph
                 # val - particle id
                 if val is None:
-                    if type == GraphAtomType.OPT:
-                        inst.opt[key] = None
-                    continue
-                if type == GraphAtomType.NORMAL:
-                    inst.particles[key] = val
-                elif type == GraphAtomType.OPT:
-                    inst.opt[key] = val
+                    inst.atoms.append(-1)
                 else:
-                    raise NotImplementedError
-                if inst.frag_id != -1:
+                    inst.atoms.append(val)
                     self.defrag_list[val].append(inst.frag_id)
 
     def instantiate(self, frag_name: str) -> Fragment:
@@ -270,15 +244,18 @@ class TopStar():
         """Takes a name of a mol fragment, adds interactions to those particles
         according to the mol fragment, or optionally a reaction template.
         """
+        def index_pair(frags: list[int] | list[Fragment], index: int | tuple[int, int]) -> int:
+            if type(index) is int:
+                return frags[index]
+            else:
+                idi, atomi = index
+                return frags[idi].atoms[atomi]
         # TODO good index_pair solution for this one
         # exclusions
         for (i, j) in molfrag.exclusions:
-            foundi, pi = index_pair(frags, i)
-            foundj, pj = index_pair(frags, j)
-            if GotAtom.NotFound in {foundi, foundj}:
-                # wrong atom name
-                raise ValueError("Exclusion index out of range")
-            if GotAtom.MissingOptional in {foundi, foundj}:
+            pi = index_pair(frags, i)
+            pj = index_pair(frags, j)
+            if pi == -1 or pj == -1:
                 # optional atom missing
                 continue
             if pi < pj:
@@ -290,10 +267,8 @@ class TopStar():
             member_parts = []
             missing_opt = False
             for x in members:
-                found, part = index_pair(frags, x)
-                if GotAtom.NotFound == found:
-                    raise ValueError("Wrong atom name")
-                elif GotAtom.MissingOptional == found:
+                part = index_pair(frags, x)
+                if part == -1:
                     missing_opt = True
                     break
                 member_parts.append(part)
@@ -306,12 +281,16 @@ class TopStar():
 
     # ======= (2/3) Detection things =======
     # see detection.pyx
-    def pre_detection(self, i):
+    def pre_detection(self, step: int) -> None:
         for _, rxs in self.reactions.items():
             for rx in rxs:
                 rx.global_counter = 0
         for reporter in self.reporters:
-            reporter.pre_detection(i)
+            reporter.pre_detection(step)
+    
+    def detection(self, step: int, box, pos) -> list[tuple[list[Fragment], ReactionTemplate]]:
+        self.pre_detection(step)
+        return detection_all(self, box, pos)
 
     # ======= (3/3) Modification things =======
     def clean_defrag(self, frag: Fragment, part: int) -> None:
@@ -324,11 +303,9 @@ class TopStar():
         """Removes a fragment from frag_list and defrag_list
         """
 
-        for part in frag.particles.values():
-            self.clean_defrag(frag, part)
-
-        for part in filter(lambda x: x is not None, frag.opt.values()):
-            self.clean_defrag(frag, part)
+        for part in frag.atoms:
+            if part != -1:
+                self.clean_defrag(frag, part)
 
         del self.frag_list[frag.frag_id]
 
@@ -352,7 +329,7 @@ class TopStar():
             group_atoms = []
             all_found = True
             for id, atom in group:
-                part = frags[id].atom
+                part = frags[id].atoms[atom]
                 if part == -1:
                     all_found = False
                     break
@@ -464,9 +441,8 @@ class TopStar():
             # which particles to recalculate graphs over
             graph_recalc = set()
             for f in frags:
-                product_particles += list(f.particles.values())
-                graph_recalc |= set(f.particles.values())
-                graph_recalc |= set(filter(lambda x: x is not None, f.opt.values()))
+                product_particles += list(filter(lambda x: x != -1, f.atoms))
+                graph_recalc |= set(filter(lambda x: x != -1, f.atoms))
             # add neighbors since those can be changed too (opt/not atoms)
             graph_recalc = self.populate_neighbors(set(product_particles))
 

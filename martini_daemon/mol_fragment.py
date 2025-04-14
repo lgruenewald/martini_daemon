@@ -4,11 +4,10 @@ class MolFragment:
     molecule_name: str
     # atoms: type, resnum, resname, atomname, chargegr, charge, mass
     atoms: list[tuple[str, int, str, str, int, float, float]]
-    # tuple[int, str] instead of int when reaction TODO
-    exclusions: set[tuple[int, int]]
+    # exclusions
+    exclusions: set[tuple[int | tuple[int, int], int | tuple[int, int]]]
     # interactions: generic members and params
-    # tuple[int, str] instead of int when reaction
-    interactions: list[tuple[Force, list[int], list[float]]]
+    interactions: list[tuple[Force, list[int | tuple[int, int]], list[float]]]
     index_type = "index"
 
     def __init__(self, name):

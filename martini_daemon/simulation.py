@@ -10,7 +10,6 @@ import sys
 import openmm as mm  # type: ignore[import-untyped]
 from openmm.app import GromacsGroFile  # type: ignore[import-untyped]
 from .utils import backup_try
-from .detection import detection
 import logging
 from random import random
 import time
@@ -224,9 +223,7 @@ class DaemonSimulation():
         if dm:
             self.logger.info("Detection start")
             pos, box = self.system.get_positions()
-            reactions = detection(
-                self.top, i, box, pos
-            )
+            reactions = self.top.detection(i, box, pos)
             self.logger.info("Detection finished")
             if len(reactions) > 0:
                 self.logger.info("Modification start")

@@ -19,7 +19,7 @@ def dump_topstar(topstar: TopStar, file=sys.stdout) -> None:
             print(f"rx {rx.name} reactants {rx.reactants}", file=file)
     print("==== TopStar / Fragments ====", file=file)
     for id, frag in topstar.frag_list.items():
-        print(f"{id}: <frag {frag.name} ps {frag.particles} opt {frag.opt}>", file=file)
+        print(f"{id}: <frag {frag.name} ps {frag.atoms}>", file=file)
     print("==== TopStar / defrag list ====", file=file)
     for id, defrag in enumerate(topstar.defrag_list):
         print(f"particle {id} is in fragments {defrag}", file=file)
@@ -55,7 +55,7 @@ class ReactionReporter(Reporter):
         with open("reactions.log", "a") as file:
             print(f"Frame {i}", file=file)
             for (frags, rx) in reactions:
-                frags = [(frag.name, frag.frag_id, frag.particles) for frag in frags]
+                frags = [(frag.name, frag.frag_id, frag.atoms) for frag in frags]
                 print(
                     f"Reaction {rx.name} reactants {frags}",
                     file=file

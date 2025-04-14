@@ -1,8 +1,7 @@
 from .mol_fragment import MolFragment
-from .utils cimport i64
 
 
-cdef class ReactionTemplate:
+class ReactionTemplate:
     name: str
     reactants: list[str]
     distance_max: list[tuple[int, int, int, int, float]]

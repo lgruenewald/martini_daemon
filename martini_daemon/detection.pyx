@@ -5,23 +5,11 @@ import numpy as np
 from freud.box import Box
 from freud.locality import NeighborList, AABBQuery
 import random
+import cython
 
-cdef i64 get_atom(frag, atom_name) except -2:
-    if atom_name in frag.particles:
-        return frag.particles[atom_name]
-    elif atom_name in frag.opt:
-        if frag.opt[atom_name] is None:
-            return -1
-        else:
-            return frag.opt[atom_name]
-    else:
-        raise ValueError(f"Invalid atom name {atom_name} for frag {frag.name}")
-
-cdef i64 index_pair(frags, i64 frag_index, atom_name) except -2:
-    return get_atom(frags[frag_index], atom_name)
-
-cdef bint detection_fragments(
-    top, 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef bint detection_one(
     reactants: list[Fragment],
     rx,
     double[:, :] pos,
@@ -37,14 +25,13 @@ cdef bint detection_fragments(
     # fragments that were removed cannot react any more
 
     # overlapping fragments can never react:
-    cdef set[int] pset = set()
+    # TODO skiplists?
+    cdef set[i64] pset = set()
     # TODO further cythonize
     for r in reactants:
-        for p in r.particles.values():
-            if p in pset:
-                return False
-            pset.add(p)
-        for p in filter(lambda x: x is not None, r.opt.values()):
+        for p in r.atoms:
+            if p == -1:
+                continue
             if p in pset:
                 return False
             pset.add(p)
@@ -55,64 +42,64 @@ cdef bint detection_fragments(
     if random.random() > rx.probability:
         return False
 
+    # all the variables we actually want typed
     cdef double dist
-    cdef long idi
-    cdef long idj
-    cdef double rmax
+    cdef double min
+    cdef double max
+    cdef double theta
+    cdef double cos_theta
+    cdef i64 p1
+    cdef i64 p2
+    cdef i64 p3
+    cdef i64 p4
+
     # position dependent checks
     # writing it in this style to avoid using iterators
     for i in range(len(rx.distance_max)):
-        (idi, namei), (idj, namej), rmax = rx.distance_max[i]
-        init1 = index_pair(reactants, idi, namei)
-        init2 = index_pair(reactants, idj, namej)
-        if init1 == -1 or init2 == -1:
+        idi, atomi, idj, atomj, max = rx.distance_max[i]
+        p1 = reactants[idi].atoms[atomi]
+        p2 = reactants[idj].atoms[atomj]
+        if p1 == -1 or p2 == -1:
             # missing optional atoms
             continue
-        dist = pdist(pos[init1], pos[init2], box)
-        if dist > rmax:
+        dist = pdist(pos[p1], pos[p2], box)
+        if dist > max:
             return False
 
-    cdef double rmin
     for i in range(len(rx.distance_min)):
-        (idi, namei), (idj, namej), rmin = rx.distance_min[i]
-        init1 = index_pair(reactants, idi, namei)
-        init2 = index_pair(reactants, idj, namej)
-        if init1 == -1 or init2 == -1:
+        idi, atomi, idj, atomj, min = rx.distance_min[i]
+        p1 = reactants[idi].atoms[atomi]
+        p2 = reactants[idj].atoms[atomj]
+        if p1 == -1 or p2 == -1:
             # missing optional atoms
             continue
-        dist = pdist(pos[init1], pos[init2], box)
-        if dist < rmin:
+        dist = pdist(pos[p1], pos[p2], box)
+        if dist < min:
             return False
 
-    cdef long idk
-    cdef double cos_min
-    cdef double cos_max
     for i in range(len(rx.angle_limits)):
-        (idi, namei), (idj, namej), (idk, namek), cos_min, cos_max = rx.angle_limits[i]
-        p1 = index_pair(reactants, idi, namei)
-        p2 = index_pair(reactants, idj, namej)
-        p3 = index_pair(reactants, idk, namek)
+        idi, atomi, idj, atomj, idk, atomk, min, max = rx.angle_limits[i]
+        p1 = reactants[idi].atoms[atomi]
+        p2 = reactants[idj].atoms[atomj]
+        p3 = reactants[idk].atoms[atomk]
         if p1 == -1 or p2 == -1 or p3 == -1:
             # missing optional atoms
             continue
         # the particle positions of particle i, j, k
-        cos = pcos_angle(pos[p1], pos[p2], pos[p3], box)
-        if cos <= cos_min and cos >= cos_max:
+        cos_theta = pcos_angle(pos[p1], pos[p2], pos[p3], box)
+        if cos_theta <= min and cos_theta >= max:
             # inverted comparison because cosine is a constantly decreasing
             # function, cos_min is the minimum angle => max cosine value
             # cos_max is the maximum angle => min cosine value
             return False
 
-    cdef long idl
-    cdef double min
-    cdef double max
     for i in range(len(rx.dihedral_limits)):
-        (idi, namei), (idj, namej), (idk, namek), (idl, namel), min, max = rx.dihedral_limits[i]
+        idi, atomi, idj, atomj, idk, atomk, idl, atoml, min, max = rx.dihedral_limits[i]
         # particle positions
-        p1 = index_pair(reactants, idi, namei)
-        p2 = index_pair(reactants, idj, namej)
-        p3 = index_pair(reactants, idk, namek)
-        p4 = index_pair(reactants, idl, namel)
+        p1 = reactants[idi].atoms[atomi]
+        p2 = reactants[idj].atoms[atomj]
+        p3 = reactants[idk].atoms[atomk]
+        p4 = reactants[idl].atoms[atoml]
         if p1 == -1 or p2 == -1 or p3 == -1 or p4 == -1:
             # missing optional atoms
             continue
@@ -135,10 +122,10 @@ cdef update_query(top, double[:] box, double[:, :] pos):
         nlist_to_frag[filtered_id] = id
         atom_map_entry = top.neighbor_atom_map.get(frag.name)
         if atom_map_entry is not None:
-            name, _ = atom_map_entry
-            part_id = get_atom(frag, name)
+            atomi, _ = atom_map_entry
+            part_id = frag.atoms[atomi]
             if part_id == -1:
-                raise ValueError(f"Internal error: invalid r_max nlist atom for {frag.name}: {name}.")
+                raise ValueError(f"Internal error: invalid r_max nlist atom for {frag.name}: {atomi}.")
             pos_filtered.append(pos[part_id])
         else:
             pos_filtered.append(pos[frag.index_atom(0)])
@@ -149,17 +136,15 @@ cdef update_query(top, double[:] box, double[:, :] pos):
     top.query = query
     top.nlist_to_frag = nlist_to_frag
 
-cpdef detection(
+cpdef detection_all(
 top,
-int i,
 double[:] box,
 double[:, :] pos,
 ):
-    top.pre_detection(i)
     update_query(top, box, pos)
 
     reactions = []
-    skip: set[int] = set()
+    skip: set[i64] = set()
 
     for i, frag_i in top.frag_list.items():
         if i in skip:
@@ -167,7 +152,7 @@ double[:, :] pos,
         uni_rx = top.reactions.get((frag_i.name, None, None, None))
         if uni_rx is not None and len(uni_rx) > 0:
             for rx in uni_rx:
-                if top.detection([frag_i], rx, pos, box):
+                if detection_one([frag_i], rx, pos, box):
                     skip.add(i)
                     reactions.append(([frag_i], rx))
                     break
@@ -175,8 +160,8 @@ double[:, :] pos,
                 continue
         if not top.r_continue.get((frag_i.name, None, None)):
             continue
-        name, _ = top.neighbor_atom_map[frag_i.name]
-        part_id = get_atom(frag_i, name)
+        atomi, _ = top.neighbor_atom_map[frag_i.name]
+        part_id = frag_i.atoms[atomi]
         if part_id == -1:
             raise ValueError("Internal error: not found in detection_all")
         pos_i = np.array([pos[part_id]])
@@ -197,7 +182,7 @@ double[:, :] pos,
             bi_rx = top.reactions.get((frag_i.name, frag_j.name, None, None))
             if bi_rx is not None and len(bi_rx) > 0:
                 for rx in bi_rx:
-                    if top.detection([frag_i, frag_j], rx, pos, box):
+                    if detection_one([frag_i, frag_j], rx, pos, box):
                         skip.add(i)
                         skip.add(j)
                         reactions.append(([frag_i, frag_j], rx))
@@ -218,7 +203,7 @@ double[:, :] pos,
                 tri_rx = top.reactions.get((frag_i.name, frag_j.name, frag_k.name, None))
                 if tri_rx is not None and len(tri_rx) > 0:
                     for rx in tri_rx:
-                        if top.detection([frag_i, frag_j, frag_k], rx, pos, box):
+                        if detection_one([frag_i, frag_j, frag_k], rx, pos, box):
                             skip.add(i)
                             skip.add(j)
                             skip.add(k)
@@ -242,7 +227,7 @@ double[:, :] pos,
                     tetra_rx = top.reactions.get((frag_i.name, frag_j.name, frag_k.name, frag_l.name))
                     if tetra_rx is not None and len(tetra_rx) > 0:
                         for rx in tetra_rx:
-                            if top.detection([frag_i, frag_j, frag_k, frag_l], rx, pos, box):
+                            if detection_one([frag_i, frag_j, frag_k, frag_l], rx, pos, box):
                                 skip.add(i)
                                 skip.add(j)
                                 skip.add(k)

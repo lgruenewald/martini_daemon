@@ -10,7 +10,7 @@ COMPILE_ARGS = ["-O3", "-flto", "-fno-math-errno", "-fno-trapping-math"]
 LIBRARIES = ["m"]
 
 
-pyx_files = ["utils", "fragment", "reaction_template", "detection"]
+pyx_files = ["utils", "detection"]
 
 ext_modules = [
     Extension(
