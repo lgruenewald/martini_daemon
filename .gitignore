@@ -13,6 +13,8 @@ out*
 tests/**/*.xvg
 # exclude logs
 *.log
+# exclude benchmark results
+benchmarks/results
 # exclude python cache
 **/__pycache__/
 # exclude backed up files

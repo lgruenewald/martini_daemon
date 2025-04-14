@@ -1,0 +1,42 @@
+[
+    {
+        "name": "dm every 100",
+        "top": "polyurethane_200.top",
+        "gro": "polyurethane_200.gro",
+        "md_steps": 1000000,
+        "freq": 100,
+        "n": 1
+    },
+    {
+        "name": "dm every 250",
+        "top": "polyurethane_200.top",
+        "gro": "polyurethane_200.gro",
+        "md_steps": 1000000,
+        "freq": 250,
+        "n": 1
+    },
+    {
+        "name": "dm every 500",
+        "top": "polyurethane_200.top",
+        "gro": "polyurethane_200.gro",
+        "md_steps": 1000000,
+        "freq": 500,
+        "n": 1
+    },
+    {
+        "name": "dm every 1000",
+        "top": "polyurethane_200.top",
+        "gro": "polyurethane_200.gro",
+        "md_steps": 1000000,
+        "freq": 1000,
+        "n": 1
+    },
+    {
+        "name": "dm every 5000",
+        "top": "polyurethane_200.top",
+        "gro": "polyurethane_200.gro",
+        "md_steps": 1000000,
+        "freq": 5000,
+        "n": 1
+    }
+]

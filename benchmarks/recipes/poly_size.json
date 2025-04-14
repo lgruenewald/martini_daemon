@@ -1,0 +1,42 @@
+[
+    {
+        "name": "100 monomers",
+        "top": "polyurethane_100.top",
+        "gro": "polyurethane_100.gro",
+        "md_steps": 1000000,
+        "freq": 100,
+        "n": 1
+    },
+    {
+        "name": "200 monomers",
+        "top": "polyurethane_200.top",
+        "gro": "polyurethane_200.gro",
+        "md_steps": 1000000,
+        "freq": 100,
+        "n": 1
+    },
+    {
+        "name": "300 monomers",
+        "top": "polyurethane_300.top",
+        "gro": "polyurethane_300.gro",
+        "md_steps": 1000000,
+        "freq": 100,
+        "n": 1
+    },
+    {
+        "name": "400 monomers",
+        "top": "polyurethane_400.top",
+        "gro": "polyurethane_400.gro",
+        "md_steps": 1000000,
+        "freq": 100,
+        "n": 1
+    },
+    {
+        "name": "1000 monomers",
+        "top": "polyurethane_1000.top",
+        "gro": "polyurethane_1000.gro",
+        "md_steps": 1000000,
+        "freq": 100,
+        "n": 1
+    }
+]

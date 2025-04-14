@@ -52,7 +52,7 @@ class DaemonSimulation():
                  defines: dict[str, str] = {},
                  reporters: list[Any] = [],
                  friction_ps_1: float = 2.0,
-                 neighbor_cutoff: float = 1.5,
+                 neighbor_cutoff: float = 1.1,
                  ):
 
         # Self initialization
@@ -200,6 +200,7 @@ class DaemonSimulation():
         start_time = time.time()
         percent = i/max_steps*100 if max_steps > 0 else 100
         self.logger.info(f"step {i}")
+        self.logger.info(f"md_steps {steps}")
         self.logger.info("MD start")
         self.system.do_steps(steps)
         self.logger.info("MD finished")

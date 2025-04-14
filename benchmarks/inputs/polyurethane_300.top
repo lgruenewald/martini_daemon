@@ -3,13 +3,13 @@
 #include "CGM_DesmodurN.itp"
 #include "CGM_PEG.itp"
 #ifdef REACT
-#include "../poly.rx"
+#include "poly.rx"
 #endif
 
 [ system ]
 polysmart test_case
 
 [ molecules ]
-DesmodurN 80
-PEG 120
-W 40170
+DesmodurN 120
+PEG 180
+W 60254

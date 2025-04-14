@@ -20,10 +20,8 @@ coh_nco_bond
 coh_end nco_end
 [ conditions ]
 r_max 1:1 2:1 0.4
-banned_angle 2:2 2:1 1:1 0 120
-banned_angle 2:2 2:1 1:1 160 180
-banned_angle 1:2 1:1 2:1 0 100
-banned_angle 1:2 1:1 2:1 140 180
+angle_between 2:2 2:1 1:1 120 160
+angle_between 1:2 1:1 2:1 100 140
 
 [ retype ]
 1:1 TN3

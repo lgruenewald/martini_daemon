@@ -1,10 +1,6 @@
-cythonization
-1. index_pair solution for instantiate_over_existing
-2. update topstar to use new rx templates and number only fragments
-3. update detection.pyx
-4. debug python <=> cython interface
-
-
+mol_fragment -> molecule
+graph_fragment -> graph
+particles -> atoms
 
 helper folder:
 all bond -> vmd bond
@@ -17,10 +13,7 @@ average number of reactions per D/M step
 % slowdown in total
 temperature or other variables over time
 
-
 - better quitting behavior in benchmarking
-- linting, type checking
-- everything should use "atoms", not "particles"
 
 - optimization: the same graphs per molecule type when doing it at the start
 	- cache results for this and reuse
