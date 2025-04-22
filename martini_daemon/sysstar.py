@@ -236,12 +236,12 @@ class SysStar():
             self._context = mm.Context(self._system, integrator, platform)
         self._context.setPeriodicBoxVectors(*periodicBoxVectors)
 
-    def reinitialize(self):
+    def reinitialize(self, force=False):
         if not self.context_initialized:
             raise Exception("Initialize the context first")
         for modular_force in self.modular_forces:
             modular_force.build()
-        if self._reinitialize:
+        if self._reinitialize or force:
             self._context.reinitialize(preserveState=True)
 
     def set_positions(self, positions):

@@ -1,3 +1,17 @@
+- Sn2
+	- PrI parametrize
+		- SASA
+		- umbrella sampling
+	find bead type:
+	- Phenolate
+	- EtO-
+
+fixed reaction rates:
+- remove limiter, probability, add energy barrier / velocity
+- benchmark reaction rate vs D/M frequency, make sure it's constant at the default D/M frequency
+- make sure energy barrier controls reaction rate completely
+- reaction rates should be independent of how often the D/M algorithm is done within reasonable bounds
+
 mol_fragment -> molecule
 graph_fragment -> graph
 particles -> atoms
@@ -5,13 +19,6 @@ particles -> atoms
 helper folder:
 all bond -> vmd bond
 pbc whole
-Benchmarking logs:
-% slowdown of MD steps, and how long each MD step took (and their distribution)
-D/M cost in milliseconds (most transparent and isolated way to do it)
-average number of reactions per D/M step
-% cost of each component in both reaction and non reaction case
-% slowdown in total
-temperature or other variables over time
 
 - better quitting behavior in benchmarking
 
@@ -21,11 +28,6 @@ temperature or other variables over time
 - S* should try to update forces instead of remove/adding when possible
   - allow this for vsites, constraints
 
-fixed reaction rates:
-- remove limiter, probability, add energy barrier / velocity
-- benchmark reaction rate vs D/M frequency, make sure it's constant at the default D/M frequency
-- make sure energy barrier controls reaction rate completely
-- reaction rates should be independent of how often the D/M algorithm is done within reasonable bounds
 
 - D/M unit testing
 	- detection testing - single run of D algo

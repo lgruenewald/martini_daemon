@@ -53,6 +53,7 @@ class DaemonSimulation():
                  reporters: list[Any] = [],
                  friction_ps_1: float = 2.0,
                  neighbor_cutoff: float = 1.1,
+                 force_reinitialize: bool = False
                  ):
 
         # Self initialization
@@ -86,6 +87,7 @@ class DaemonSimulation():
             "GMXBIN" in os.environ and
             os.path.join(os.environ["GMXBIN"], "..", "share", "gromacs", "top")
         ) or "/usr/local/gromacs/share/gromacs/top"
+        self.force_reinitialize = force_reinitialize
 
         # Logging setup
         backup_try(self.log_path)
@@ -231,9 +233,12 @@ class DaemonSimulation():
                 self.reactions += len(reactions)
                 self.top.modification(i, reactions)
                 self.logger.info("Modification finished")
+            if len(reactions) > 0 or self.force_reinitialize:
                 self.logger.info("Reinitialize start")
-                self.system.reinitialize()
+                self.system.reinitialize(self.force_reinitialize)
                 self.logger.info("Reinitialize finished")
+            self.logger.info(f"reactions {len(reactions)}")
+
         if xtc:
             self.logger.info("XTC write start")
             self.system.write_xtc_frame(self.xtc_freq)

@@ -21,6 +21,9 @@ benchmarks/results
 \#*
 # exclude hidden files
 .*
+# include specific hidden files
+!.gitignore
+!.gitattributes
 # exclude build products
 build/*
 martini_daemon.egg-info/*
