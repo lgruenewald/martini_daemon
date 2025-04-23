@@ -1,6 +1,6 @@
 source ../../daemon.tcl
 daemon_open out.gro out.xtc
-daemon_bonds out_bonds.npy
+daemon_bonds out.bonds
 
 mol modstyle 0 0 CPK 1.5 1.2 12.0 12.0
 mol modselect 0 0 resname BDT

@@ -30,12 +30,12 @@ monomer monomer
 [ conditions ]
 r_max 1:1 2:1 0.37
 ; allowed angle near 120 deg, +- 15 deg
-banned_angle 1:2 1:1 2:1 0   105
-banned_angle 1:2 1:1 2:1 135 180
-banned_angle 2:2 2:1 1:1 0   105
-banned_angle 2:2 2:1 1:1 135 180
+angle_not 1:2 1:1 2:1 0   105
+angle_not 1:2 1:1 2:1 135 180
+angle_not 2:2 2:1 1:1 0   105
+angle_not 2:2 2:1 1:1 135 180
 ; allowed dihedral near 110 deg +- 20 deg
-banned_dihedral 1:2 1:1 2:1 2:2 130 90
+dihedral_not 1:2 1:1 2:1 2:2 130 90
 
 [bonds]
 ; morse bond
