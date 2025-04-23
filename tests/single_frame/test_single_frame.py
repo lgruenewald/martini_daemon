@@ -22,6 +22,7 @@ def rootdir(request):
 
 
 tests = [
+    "proper_dihedral",
     # biomolecule tests
     "trypsin",
     # polymer tests

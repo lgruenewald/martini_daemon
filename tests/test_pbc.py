@@ -80,6 +80,14 @@ def test_pbc():
     assert isclose(pdihedral(d1, d2, d3, d4_225, box), 5 * pi / 4)
     assert isclose(pdihedral(d1, d2, d3, d4_270, box), 3 * pi / 2)
 
+    # IUPAC convention
+    e1 = np.array([4., 0., 1.])
+    e2 = np.array([3., 0., 0.])
+    e3 = np.array([2., 0., 0.])
+    e4 = np.array([1., 1., 1.])
+
+    assert isclose(pdihedral(e1, e2, e3, e4, box), pi / 4)
+
     # testing crossbox
     assert cross_box(v1, v2, box)
     assert not cross_box(v1, v3, box)

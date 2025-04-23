@@ -44,7 +44,12 @@ def unwrap(tokens, index, type_filter, default="default placeholder"):
                 return int(tok) - 1
         case "degree":
             if float_pat.match(tok):
-                return float(tok) * math.pi / 180.0
+                angle = float(tok) * math.pi / 180.0
+                while angle < 0.:
+                    angle += math.tau
+                while angle > math.tau:
+                    angle -= math.tau
+                return angle
         case "word":
             if word_pat.match(tok):
                 return tok
