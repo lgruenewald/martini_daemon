@@ -52,4 +52,4 @@ class VSite3fd(Force):
         return Interaction(self, len(self._list) - 1)
 
     def is_instance(self, filter):
-        return filter in {"vsite", "3fd"}
+        return filter in {"virtual_site", "vsite", "3fd"}

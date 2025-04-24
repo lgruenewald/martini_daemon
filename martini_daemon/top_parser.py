@@ -445,7 +445,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 )
             case _:
                 raise ValueError(
-                    f"Virtua site 2 type {type} not implemented."
+                    f"Virtual site 2 type {type} not implemented."
                 )
 
     p.add_level("virtual_sites2", process_virtual_sites2)
@@ -512,6 +512,10 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 c = unwrap(tokens, 8, "float")
                 last_molecule().interactions.append(
                     (system.vsite_4fdn, members, [a, b, c])
+                )
+            case _:
+                raise ValueError(
+                    f"Virtual site 4 type {type} not implemented."
                 )
 
     p.add_level("virtual_sites4", process_virtual_sites4)

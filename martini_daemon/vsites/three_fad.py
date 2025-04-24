@@ -57,4 +57,4 @@ class VSite3fad(Force):
         return Interaction(self, len(self._list) - 1)
 
     def is_instance(self, filter):
-        return filter in {"vsite", "3fad"}
+        return filter in {"virtual_site", "vsite", "3fad"}

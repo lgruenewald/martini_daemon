@@ -50,4 +50,4 @@ class VSite3out(Force):
         return Interaction(self, len(self._list) - 1)
 
     def is_instance(self, filter):
-        return filter in {"vsite", "3out"}
+        return filter in {"virtual_site", "vsite", "3out"}

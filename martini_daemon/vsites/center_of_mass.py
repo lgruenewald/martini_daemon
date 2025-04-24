@@ -60,5 +60,5 @@ class VSiteCenterOfMass(Force):
         return Interaction(self, len(self._list) - 1)
 
     def is_instance(self, filter):
-        return filter in {"vsite", "com"}
+        return filter in {"virtual_site", "vsite", "com"}
 

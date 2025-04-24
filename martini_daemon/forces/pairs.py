@@ -74,5 +74,5 @@ class Pairs(Force):
         raise NotImplementedError
 
     def is_instance(self, filter):
-        return filter == "pairs"
+        return filter == "pair"
 
