@@ -1,27 +1,34 @@
-; propyl iodide
+; ==== Substrates ====
+; == Propyl iodide ==
+; based on a reference swissparam / charmm all atom simulation
+; SASA: 8% smaller than all atom
+; Mapping: (CH3-CH2)-(CH2-I) = (TC2)-(SX1)
 [moleculetype]
 PRI 1
 [atoms]
 1 SX1 1 PRI I1 1 0 79.9
-2 SC2 1 PRI R2 2 0
+2 TC2 1 PRI R2 2 0
 
 [bonds]
-; completely guessed bond length and strength
-1 2 1 0.3337 4000
+1 2 1 0.2507 64000
 
-; ethanolate
+; ==== Nucleophiles + counterion ====
+; == Ethanolate anion ==
+; source: modified ethanol from martini v3 solvents
 [moleculetype]
 ETA 1
 [atoms]
 1 SQ5n 1 ETA ETA 1 -1
 
-; acetate -> ACE, SQ5n as well, directly from martini v3 ions
+; == Acetate Anion ==
+; source: martini v3 ions
 [moleculetype]
 ACE 1
 [atoms]
 1 SQ5n 1 ACE ACE 1 -1 59.044
 
-; phenolate - modified phenol from martini v3 small molecules
+; == Phenolate anion ==
+; source: modified phenol from martini v3 small molecules
 [moleculetype]
 PHEA 1
 [atoms]
@@ -34,27 +41,35 @@ PHEA 1
 2 3 1 0.295
 1 3 1 0.295
 
-; sodium+ counterion
+; == Sodium cation ==
+; source: martini v3 ions
 [moleculetype]
 NA 1
 [atoms]
 1 TQ5 1 ION NA 1 1.0
 
-; iodide
+; ==== Leaving group ====
+; == Iodide anion ==
+; source: martini v3 ions
 [moleculetype]
 IOD 1
 [atoms]
 1 SQ2 1 ION ID 1 -1 79.9
 
-; ethanol
+; ==== Solvents ====
+; == Ethanol ==
+; source: martini v3 solvents
 [moleculetype]
 ETO 1
 [atoms]
 1 SP1 1 ETO ETO 1 0
 
-; water
+; == Water ==
+; source: martini v3 solvents
 [moleculetype]
 W 1
 [atoms]
 1 W 1 W W 1 0
 
+; ==== Products ====
+; todo

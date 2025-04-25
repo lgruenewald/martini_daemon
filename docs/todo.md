@@ -1,10 +1,7 @@
-- Sn2
-	- PrI parametrize
-		- SASA
-		- umbrella sampling
-	find bead type:
-	- Phenolate
-	- EtO-
+- warn user if no fragments
+- fragment reporter, reaction reporter etc. should add things to the active command line
+- bug - what if the same interaction gets matched multiple times in the graph
+- alternative friendlier dihedral/angle syntax ?
 
 fixed reaction rates:
 - remove limiter, probability, add energy barrier / velocity

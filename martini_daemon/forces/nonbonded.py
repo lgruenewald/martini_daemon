@@ -1,6 +1,6 @@
 from __future__ import annotations
-import openmm as mm  # type: ignore[import-untyped]
-from openmm.unit import nanometer  # type: ignore[import-untyped]
+import openmm as mm
+from openmm.unit import nanometer
 from .force import Force, Interaction
 from collections import OrderedDict
 
@@ -84,11 +84,8 @@ class NonBonded(Force):
         n = len(self._used_atom_types)
         for t1, i in self._used_atom_types.items():
             for t2, j in self._used_atom_types.items():
-                nb_params = self._nb_types.get((t1, t2)) or\
+                c6, c12 = self._nb_types.get((t1, t2)) or\
                             self._nb_types.get((t2, t1)) or (0., 0.)
-                sigma, epsilon = nb_params
-                c6 = 4 * epsilon * (sigma ** 6)
-                c12 = 4 * epsilon * (sigma ** 12)
                 C6.append(c6)
                 C12.append(c12)
         self._force_obj.addTabulatedFunction(
@@ -119,9 +116,6 @@ class NonBonded(Force):
                 self._sysstar._reinitialize = True
                 return True
         return False
-
-    def _interaction(self):
-        raise NotImplementedError
 
     def get_exclusion_helper(self):
         return self._exclusions
@@ -212,13 +206,10 @@ class ExclusionHelper(Force):
             self._nb._force_obj.addExclusion(i, j)
             self._sysstar._reinitialize = True
 
-        return self._interaction()
+        return Interaction(self, len(self._list) - 1)
 
     def get_members(self, i):
         return self._list[i]
-
-    def update_params(self, i, *params):
-        raise NotImplementedError
 
     def remove(self, i):
         self._list[i] = None
@@ -248,9 +239,6 @@ class ExclusionHelper(Force):
                 self._sysstar._reinitialize = True
                 return True
         return False
-
-    def _interaction(self):
-        return Interaction(self, len(self._list) - 1)
 
     def is_instance(self, filter):
         return False

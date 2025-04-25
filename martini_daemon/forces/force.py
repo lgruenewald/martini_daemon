@@ -1,50 +1,61 @@
-import openmm as mm  # type: ignore[import-untyped]
+import openmm as mm
 from dataclasses import dataclass
 
 
 class Force():
-    _force_obj: mm.Force
-    _list: list
-    _rebuild: bool
     # if rebuild is set to True, it means that the force object _force_obj is
     # no longer valid, or does not exist. If rebuild is false, as much effort
     # should be done to keep _force_obj updated as possible
     # rebuild is True for example before force_obj is built in the first place,
-    # or when removing elements from the bond
+    # or when removing interactions
 
     def __init__(self, sysstar):
         self._list = []
         self._sysstar = sysstar
-        self._rebuild = True
-        self._force_obj = None
+        self._rebuild: bool = True
+        self._force_obj: mm.Force = None
 
-    def _build(self):
+    # classes inheriting force must set these three functions and one int
+    def _set_force_obj(self) -> None:
+        raise NotImplementedError(f"_set_force_obj is not implemented for {self}")
+
+    def _add_to_force_obj(self, params) -> None:
         raise NotImplementedError
 
-    def add(self, members, params):
+    def is_instance(self, filter: str) -> bool:
         raise NotImplementedError
 
-    def get_members(self, i):
-        raise NotImplementedError
+    _members: int
 
-    def update_params(self, i, params):
-        raise NotImplementedError
+    def add(self, members: list[int] | tuple[int], params: list[float] | tuple[float]) -> None:
+        params = tuple(members) + tuple(params)
+        self._list.append(params)
+        if not self._rebuild:
+            self._add_to_force_obj(params)
+            self._sysstar._reinitialize = True
+        return Interaction(self, len(self._list) - 1)
 
-    def remove(self, i):
+    def get_members(self, i: int) -> list[int]:
+        params = self._list[i]
+        return params[:self._members]
+
+    def remove(self, i: int) -> None:
         self._list[i] = None
         self._rebuild = True
 
-    def build(self):
+    def build(self) -> None:
         if self._rebuild:
             self.destroy()
-            self._build()
+            self._set_force_obj()
+            for params in filter(None, self._list):
+                self._add_to_force_obj(params)
             self._force_obj.setUsesPeriodicBoundaryConditions(True)
             self._rebuild = False
             self._sysstar._forces_list.append(self._force_obj)
             self._sysstar._system.addForce(self._force_obj)
             self._sysstar._reinitialize = True
 
-    def destroy(self):
+    def destroy(self) -> bool:
         if self._force_obj is None:
             return False
         for i, f in enumerate(self._sysstar._forces_list):
@@ -55,28 +66,19 @@ class Force():
                 return True
         return False
 
-    def _interaction(self):
-        return Interaction(self, len(self._list) - 1)
-
-    def is_instance(self, filter: str):
-        raise NotImplementedError
-
 
 @dataclass
 class Interaction():
     _force: Force
     _index: int
 
-    def get_members(self):
+    def get_members(self) -> list[int]:
         return self._force.get_members(self._index)
 
-    def update_params(self, *params):
-        return self._force.update_params(self._index, params)
-
-    def remove(self):
+    def remove(self) -> None:
         self._force.remove(self._index)
 
-    def is_instance(self, filter: str):
+    def is_instance(self, filter: str) -> bool:
         return self._force.is_instance(filter)
 
     def __hash__(self):

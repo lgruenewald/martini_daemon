@@ -13,6 +13,12 @@ from openmm.unit import nanometer  # type: ignore[import-untyped]
 import logging
 
 
+def sigma_epsilon_to_c6_c12(sigma, epsilon):
+    c6 = 4 * epsilon * (sigma ** 6)
+    c12 = 4 * epsilon * (sigma ** 12)
+    return c6, c12
+
+
 def DaemonTopFile(file, include_dir=None, defines={},
                   epsilon_r=15.0, nonbonded_cutoff=1.1*nanometer,
                   nlist_cutoff=1.5,
@@ -358,7 +364,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
             raise ValueError("Unsupported pairs type")
         sigma = unwrap(tokens, 3, "float")
         epsilon = unwrap(tokens, 4, "float")
-        system.pairs.add_type(t1, t2, sigma, epsilon)
+        c6, c12 = sigma_epsilon_to_c6_c12(sigma, epsilon)
+        system.pairs.add_type(t1, t2, c6, c12)
 
     p.add_level("pairtypes", process_pairtypes)
 
@@ -372,8 +379,9 @@ def DaemonTopFile(file, include_dir=None, defines={},
         if len(tokens) >= 5:
             sigma = unwrap(tokens, 3, "float")
             epsilon = unwrap(tokens, 4, "float")
+            c6, c12 = sigma_epsilon_to_c6_c12(sigma, epsilon)
             last_molecule().interactions.append(
-                (system.pairs, [i, j], [sigma, epsilon])
+                (system.pairs, [i, j], [c6, c12])
             )
         else:
             last_molecule().interactions.append((system.pairs, [i, j], []))
@@ -406,7 +414,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
             raise ValueError("Only LJ (sigma/epsilon) non bond params accepted")
         sigma = unwrap(tokens, 3, "float")
         epsilon = unwrap(tokens, 4, "float")
-        system.add_nb_type(type1, type2, sigma, epsilon)
+        c6, c12 = sigma_epsilon_to_c6_c12(sigma, epsilon)
+        system.add_nb_type(type1, type2, c6, c12)
 
     p.add_level("nonbond_params", process_nonbond_params)
 

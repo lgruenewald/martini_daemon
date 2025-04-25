@@ -1,9 +1,11 @@
-import openmm as mm  # type: ignore[import-untyped]
+import openmm as mm
 from .force import Force
 
 
 class LinearAngle(Force):
-    def _build(self):
+    _members = 3
+
+    def _set_force_obj(self):
         self._force_obj = mm.CustomCompoundBondForce(
             3,  # 3 particles per compund bond force
             "0.5*k*distj2; "
@@ -14,24 +16,10 @@ class LinearAngle(Force):
         )
         self._force_obj.addPerBondParameter("a")
         self._force_obj.addPerBondParameter("k")
-        for (i, j, k, a, force) in filter(None, self._list):
-            self._force_obj.addBond((i, j, k), (a, force))
 
-    def add(self, members, params):
-        i, j, k = members
-        a, force = params
-        self._list.append((i, j, k, a, force))
-        if not self._rebuild:
-            self._force_obj.addBond((i, j, k), (a, force))
-            self._sysstar._reinitialize = True
-        return self._interaction()
-
-    def get_members(self, id):
-        i, j, k, *_ = self._list[id]
-        return [i, j, k]
-
-    def update_params(self, id, theta, force):
-        raise NotImplementedError
+    def _add_to_force_obj(self, params):
+        i, j, k, a, force = params
+        self._force_obj.addBond((i, j, k), (a, force))
 
     def is_instance(self, filter):
         return filter in {"angle", "linear_angle"}

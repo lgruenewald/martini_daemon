@@ -1,28 +1,20 @@
-from .force import Force  # type: ignore[import-untyped]
+from .force import Force
 
 
 class Connection(Force):
-    # Dummy force that is only there for graphs and exclusions
-    def _build(self):
-        self._force_obj = None
+    _members = 2
 
-    def add(self, members, params):
-        i, j = members
-        self._list.append((i, j))
-        return self._interaction()
+    def _set_force_obj(self):
+        pass
 
-    def get_members(self, id):
-        i, j = self._list[id]
-        return [i, j]
-
-    def update_params(self, id):
-        raise NotImplementedError
+    def _add_to_force_obj(self, params):
+        pass
 
     def build(self):
         pass
 
     def destroy(self):
-        pass
+        return False
 
     def is_instance(self, filter):
         return filter in {"bond", "connection"}
