@@ -426,7 +426,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
         if type != 1:
             raise ValueError(f"Virtual site 1 type {type} not implemented.")
         last_molecule().interactions.append(
-            (system.vsite_avg, [vid, member], [1.])
+            (system.vsite1, [vid, member], [])
         )
         # OpenMM does not like overlapping particles otherwise
         last_molecule().add_exclusion(vid, member)
@@ -445,7 +445,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 a = unwrap(tokens, 4, "float")
                 weights = [1-a, a]
                 last_molecule().interactions.append(
-                    (system.vsite_avg, members, weights)
+                    (system.vsite2, members, weights)
                 )
             case 2:
                 d = unwrap(tokens, 4, "float")
@@ -474,7 +474,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 b = unwrap(tokens, 6, "float")
                 weights = [1 - a - b, a, b]
                 last_molecule().interactions.append(
-                    (system.vsite_avg, members, weights)
+                    (system.vsite3, members, weights)
                 )
             case 2:
                 # 3fd

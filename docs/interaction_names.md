@@ -40,17 +40,16 @@ Also doubles as a list of interactions implemented in martini_daemon.
 
 - `virtual_site` - any virtual site, matches the virtual particle as well as constructing particles
 - `vsite` - alias for virtual_site
+- `vsite1` - virtual_sites1 type 1
+- `vsite2` - virtual_sites2 type 1
 - `2fd` - virtual_sites2 type 2
+- `vsite3` - virtual_sites3 type 1
 - `3fd` - virtual_sites3 type 2
 - `3fad` - virtual_sites3 type 3
 - `3out` - virtual_sites3 type 4
 - `4fdn` - virtual_sites4 type 2
 - `com` - virtual_sitesn type 2
-- `weighed_average`:
-  - virtual_sites1
-  - virtual_sites2 type 1
-  - virtual_sites3 type 1
-  - virtual_sitesn type 1 and 3
+- `weighed_average` - virtual_sitesn type 1 and 3
 
 ## Other
 

@@ -30,8 +30,7 @@ class Pairs(Force):
 
     def _add_to_force_obj(self, params):
         if len(params) == 2:
-            params.append(None)
-            params.append(None)
+            params = (*params, None, None)
 
         i, j, p1, p2 = params
         t1, q1, _ = self._sysstar.get_particle_details(i)

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import openmm as mm
 from dataclasses import dataclass
 
@@ -27,7 +28,7 @@ class Force():
 
     _members: int
 
-    def add(self, members: list[int] | tuple[int], params: list[float] | tuple[float]) -> None:
+    def add(self, members: list[int] | tuple[int], params: list[float] | tuple[float]) -> Interaction:
         params = tuple(members) + tuple(params)
         self._list.append(params)
         if not self._rebuild:

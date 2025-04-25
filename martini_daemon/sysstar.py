@@ -29,7 +29,10 @@ from .forces.cross_bond_bond import CrossBondBond
 from .forces.cross_bond_angle import CrossBondAngle
 from .forces.quartic_angle import QuarticAngle
 from .forces.linear_angle import LinearAngle
+from .vsites.one import VSiteOne
+from .vsites.two import VSiteTwo
 from .vsites.two_fd import VSite2fd
+from .vsites.three import VSiteThree
 from .vsites.three_fd import VSite3fd
 from .vsites.three_fad import VSite3fad
 from .vsites.three_out import VSite3out
@@ -100,7 +103,10 @@ class SysStar():
         self.quartic_angle = QuarticAngle(self)
         self.linear_angle = LinearAngle(self)
         self.pairs = Pairs(self)
+        self.vsite1 = VSiteOne(self)
+        self.vsite2 = VSiteTwo(self)
         self.vsite_2fd = VSite2fd(self)
+        self.vsite3 = VSiteThree(self)
         self.vsite_3fd = VSite3fd(self)
         self.vsite_3fad = VSite3fad(self)
         self.vsite_3out = VSite3out(self)
@@ -121,6 +127,7 @@ class SysStar():
             self.urey_bradley, self.restricted_dihedral,
             self.cross_bond_bond, self.cross_bond_angle,
             self.quartic_angle, self.linear_angle,
+            self.vsite1, self.vsite2, self.vsite3,
             self.vsite_2fd, self.vsite_3fd, self.vsite_4fdn,
             self.vsite_avg, self.vsite_3fad, self.vsite_3out, self.vsite_com,
             self.nonbonded_force, self.exclusions, self.pairs,
