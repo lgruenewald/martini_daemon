@@ -569,6 +569,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 raise ValueError(
                     f"Virtua site n type {type} not implemented."
                 )
+        if len(members) == 2:
+            last_molecule().add_exclusion(members[0], members[1])
 
     p.add_level("virtual_sitesn", process_virtual_sitesn)
 
