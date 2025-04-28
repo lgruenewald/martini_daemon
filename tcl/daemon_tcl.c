@@ -79,7 +79,10 @@ ssize_t decompress(ssize_t file_len, Bytef *compressed, char **out) {
   }
 
   int ret;
+  ssize_t chunk_counter = 0;
   do {
+    printf("Decompressing chunk %li.\n", chunk_counter);
+    chunk_counter += 1;
     // decompress a chunk's worth
     strm.avail_out = SIZE;
     strm.next_out = &chunk[0];
@@ -102,6 +105,7 @@ ssize_t decompress(ssize_t file_len, Bytef *compressed, char **out) {
     // copy to output buffer
     ssize_t new = SIZE - strm.avail_out;
     if (out_len + new > out_cap) {
+      printf("Reallocing out buffer.\n");
       out_cap += SIZE;
       if (!(*out = realloc(*out, out_cap))) {
         inflateEnd(&strm);
@@ -109,12 +113,14 @@ ssize_t decompress(ssize_t file_len, Bytef *compressed, char **out) {
         ERROR("Error allocating memory.");
       }
     }
-    memcpy(&(*out[out_len]), &chunk[0], new);
+    memcpy(*out + out_len, chunk, new);
     out_len += new;
+    printf("out_cap is %li, out_len is not %li.\n", out_cap, out_len);
   } while (ret != Z_STREAM_END);
   // cleanup
   inflateEnd(&strm);
   free(chunk);
+  printf("Shrinking out buffer.\n");
   if (!(*out = realloc(*out, out_len))) {
     ERROR("Error shrinking allocation.");
   }
@@ -160,6 +166,9 @@ BondsInfo parse(ssize_t n_atoms, ssize_t n_frames, char *source) {
           // start of a frame
           frame_index++;
           res.frames[frame_index] = c;
+          if (frame_index % 100 == 0) {
+            printf("Doing frame %li out of %li.\n", frame_index, n_frames);
+          }
         }
         break;
       case '}':
