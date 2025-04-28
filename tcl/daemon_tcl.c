@@ -1,5 +1,4 @@
 #include <assert.h>
-#include <bits/types/siginfo_t.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <tcl/tcl.h>

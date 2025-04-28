@@ -3,10 +3,11 @@ Prerequisites:
 
 1. Install a C compiler
 2. Install a version of Tcl compatible with your VMD installation (8.5 or 8.6), including development files (tcl8.6-dev on ubuntu for tcl 8.6, may need to build from source for tcl 8.5)
-3. Install zlib (must have zlib.h)
+3. Install zlib (must have zlib.h), note: likely it is already installed
 4. Update compile.sh to match the tcl version (8.5 or 8.6)
-5. run ./compile.sh
-6. hope everything works?
+5. check the includes in the .c file - maybe you need <tcl.h> instead of <tcl/tcl.h> in the includes (e.g. on fedora)
+6. run ./compile.sh
+7. hope everything works?
 
 Compiling and installing any Tcl version
 ----------------------------------------
@@ -16,4 +17,4 @@ TODO: not sure if this is the best way
 1. get the tcl source code
 2. cd into the directory `unix`
 3. run `autoconf`, then `make`, then `sudo make install`
-4. run VMD with `LD_LIBRARY_PATH=/usr/local/lib vmd (other args)` when using the .so file
+4. run VMD with `LD_LIBRARY_PATH=/usr/local/lib vmd (other args)` when using the .so file, if compiling tcl from source
