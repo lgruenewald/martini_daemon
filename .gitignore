@@ -32,3 +32,4 @@ martini_daemon/**/*.c
 build
 martini_daemon.egg-info
 dist
+*.so
