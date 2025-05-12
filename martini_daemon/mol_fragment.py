@@ -1,4 +1,4 @@
-from .forces.force import Force, Interaction
+from .forces.force import Force
 
 class MolFragment:
     molecule_name: str
@@ -24,3 +24,29 @@ class MolFragment:
 
         self.exclusions.add((i, j))
         self.exclusions.add((j, i))
+
+    def save(self, f) -> None:
+        f.dump(self.molecule_name)
+        f.dump(self.atoms)
+        f.dump(self.exclusions)
+        f.dump(self.index_type)
+
+        f.dump(len(self.interactions))
+        for force, indices, params in self.interactions:
+            f.dump(force.get_index())
+            f.dump(force.get_class_name())
+            f.dump(indices)
+            f.dump(params)
+
+    def load(self, f, sys) -> None:
+        self.molecule_name = f.load()
+        self.atoms = f.load()
+        self.exclusions = f.load()
+        self.index_type = f.load()
+
+        for i in range(f.load()):
+            force = sys.modular_forces[f.load()]
+            assert f.load() == force.get_class_name(), "Attempt to load a checkpoint from a different version of daemon."
+            indices = f.load()
+            params = f.load()
+            self.interactions.append((force, indices, params))

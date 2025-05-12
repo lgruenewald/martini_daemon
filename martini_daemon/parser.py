@@ -39,8 +39,15 @@ def unwrap(tokens, index, type_filter, default="default placeholder"):
         case "float":
             if float_pat.match(tok):
                 return float(tok)
+        case "positive":
+            if float_pat.match(tok):
+                if float(tok) <= 0.:
+                    raise ValueError("Expected a positive non-zero real number.")
+                return float(tok)
         case "index":
             if int_pat.match(tok):
+                if int(tok) <= 0:
+                    raise ValueError("Expected index, got an integer 0 or smaller. Note: indexing in .itp/.top files is usually 1 based.")
                 return int(tok) - 1
         case "degree":
             if float_pat.match(tok):

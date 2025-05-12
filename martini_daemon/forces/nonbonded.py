@@ -28,6 +28,7 @@ class NonBonded(Force):
         self._used_atom_types = {}
         self._nb_types = {}
         self._exclusions = ExclusionHelper(self, sysstar)
+        self._list = None
 
     def add(self, members, params):
         """Particle types are listed in S*, not here"""
@@ -136,6 +137,14 @@ class NonBonded(Force):
 
     def is_instance(self, filter):
         return False
+
+    def _additional_save(self, f):
+        f.dump(self._nb_types)
+        f.dump(self._used_atom_types)
+
+    def _additional_load(self, f):
+        self._nb_types = f.load()
+        self._used_atom_types = f.load()
 
 
 class ExclusionHelper(Force):

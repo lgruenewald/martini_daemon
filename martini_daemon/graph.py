@@ -171,6 +171,7 @@ class ParticleCache():
         Helper class that groups S* information and provides helper query
         functions to it.
     """
+
     def __init__(self, sysstar: SysStar, interactions: list[list[Interaction]]):
         self.sysstar = sysstar
         self.interactions = interactions

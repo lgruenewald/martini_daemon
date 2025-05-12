@@ -19,7 +19,7 @@ class VariablesReporter(Reporter):
                        "Temperature (Kelvin),"
                        "Box X (nm),Box Y (nm),Box Z (nm),Volume (nm^3)\n")
 
-    def on_xtc_frame(self, pos, box, xtc_name: str) -> None:
+    def on_xtc_frame(self, i, pos, box, xtc_name: str) -> None:
         filename = xtc_name + ".ener"
         sysstar: SysStar = self._sysstar
         n = sysstar.len_particles()

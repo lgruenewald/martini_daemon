@@ -13,7 +13,8 @@ cdef bint detection_one(
     reactants: list[Fragment],
     rx,
     double[:, :] pos,
-    double[:] box
+    double[:] box,
+    double absolute_rate
 ):
     """Returns True if frag1 and frag2 fulfill constraints specified in rx
 
@@ -35,12 +36,6 @@ cdef bint detection_one(
             if p in pset:
                 return False
             pset.add(p)
-
-    # limiter checks, first for performance
-    if rx.global_limit is not None and rx.global_counter >= rx.global_limit:
-        return False
-    if random.random() > rx.probability:
-        return False
 
     # all the variables we actually want typed
     cdef double dist
@@ -107,7 +102,22 @@ cdef bint detection_one(
         if theta >= min and theta <= max:
             return False
 
-    rx.global_counter += 1
+    # increment this first, we are counting the reactions that pass by geometry
+    rx.reaction_counter += 1
+
+    # rate limiting, must be AFTER reaction counter
+    if absolute_rate == -1.:
+        # special value stands for uninitialized
+        # TODO better warmup
+        return True
+    cdef double prob = absolute_rate / (rx.observed_rate[0] + rx.observed_rate[1])
+    assert prob >= 0., "internal error, probability below 0"
+    assert prob <= 1., "internal error, probability above 1"
+    if prob < random.random():
+        # prob=0.0 - always false
+        # prob=1.0 - always true
+        return False
+    
     return True
 
 
@@ -145,6 +155,7 @@ double[:, :] pos,
 
     reactions = []
     skip: set[i64] = set()
+    cdef double absolute_rate = top.absolute_rate
 
     for i, frag_i in top.frag_list.items():
         if i in skip:
@@ -152,7 +163,7 @@ double[:, :] pos,
         uni_rx = top.reactions.get((frag_i.name, None, None, None))
         if uni_rx is not None and len(uni_rx) > 0:
             for rx in uni_rx:
-                if detection_one([frag_i], rx, pos, box):
+                if detection_one([frag_i], rx, pos, box, absolute_rate):
                     skip.add(i)
                     reactions.append(([frag_i], rx))
                     break
@@ -182,7 +193,7 @@ double[:, :] pos,
             bi_rx = top.reactions.get((frag_i.name, frag_j.name, None, None))
             if bi_rx is not None and len(bi_rx) > 0:
                 for rx in bi_rx:
-                    if detection_one([frag_i, frag_j], rx, pos, box):
+                    if detection_one([frag_i, frag_j], rx, pos, box, absolute_rate):
                         skip.add(i)
                         skip.add(j)
                         reactions.append(([frag_i, frag_j], rx))
@@ -203,7 +214,7 @@ double[:, :] pos,
                 tri_rx = top.reactions.get((frag_i.name, frag_j.name, frag_k.name, None))
                 if tri_rx is not None and len(tri_rx) > 0:
                     for rx in tri_rx:
-                        if detection_one([frag_i, frag_j, frag_k], rx, pos, box):
+                        if detection_one([frag_i, frag_j, frag_k], rx, pos, box, absolute_rate):
                             skip.add(i)
                             skip.add(j)
                             skip.add(k)
@@ -227,7 +238,7 @@ double[:, :] pos,
                     tetra_rx = top.reactions.get((frag_i.name, frag_j.name, frag_k.name, frag_l.name))
                     if tetra_rx is not None and len(tetra_rx) > 0:
                         for rx in tetra_rx:
-                            if detection_one([frag_i, frag_j, frag_k, frag_l], rx, pos, box):
+                            if detection_one([frag_i, frag_j, frag_k, frag_l], rx, pos, box, absolute_rate):
                                 skip.add(i)
                                 skip.add(j)
                                 skip.add(k)

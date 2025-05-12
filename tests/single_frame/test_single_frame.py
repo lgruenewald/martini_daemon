@@ -9,6 +9,7 @@ import math
 import pytest
 
 from martini_daemon.top_parser import DaemonTopFile
+from martini_daemon.gro_file import read_gro
 
 # == CONFIG ==
 e_tol = 1e-5  # energy relative tolerance
@@ -22,7 +23,6 @@ def rootdir(request):
 
 
 tests = [
-    "proper_dihedral",
     # biomolecule tests
     "trypsin",
     # polymer tests
@@ -32,7 +32,7 @@ tests = [
     "waterbox", "DPPC_DIPC_in_W", "CAFF", "BDT", "BZTF_CLPR", "benzbox",
     # specific interaction tests
     "vsite1", "pairs", "pairs_VW", "pairs_VWQ", "pairs_type",
-    "morse", "vsite4fdn", "quartic_angle",
+    "morse", "vsite4fdn", "quartic_angle", "proper_dihedral",
     "cross_bond_bond", "vsiten2", "urey_bradley", "fourier_dihedral",
     "linear_angle", "fene", "cubic", "distance_restraint",
     "connection", "rbtorsion", "vsiten3", "vsite2fd",
@@ -48,15 +48,15 @@ class TestSingleFrame():
         # applies constraints and vsites and checks for position change
         platform = mm.Platform.getPlatformByName("Reference")
         system, top = DaemonTopFile(self.top)
-        gro = mmapp.GromacsGroFile(self.gro)
-        oldpos = gro.getPositions(True)
+        box, pos, vel = read_gro(self.gro)
         system.build_context(mm.VerletIntegrator(20 * femtosecond),
-                             gro.getPeriodicBoxVectors(),
+                             box,
                              platform=platform)
-        system.set_positions(gro.getPositions(True))
+        system.set_positions(pos)
         system.apply_constraints()
-        newpos = system.get_state().getPositions(asNumpy=True)
-        r_diff = np.linalg.norm(newpos - oldpos, axis=1)
+        newpos = system.get_state().getPositions(asNumpy=True)\
+            .value_in_unit(mm.unit.nanometer)
+        r_diff = np.linalg.norm(newpos - pos, axis=1)
         largest_index = np.argmax(r_diff)
         nm = r_diff[largest_index]
         assert not np.any(r_diff > r_tol), (
@@ -67,11 +67,11 @@ class TestSingleFrame():
     def compare_daemon_gmx(self):
         platform = mm.Platform.getPlatformByName("Reference")
         system, top = DaemonTopFile(self.top)
-        gro = mmapp.GromacsGroFile(self.gro)
+        box, pos, vel = read_gro(self.gro)
         system.build_context(mm.VerletIntegrator(20 * femtosecond),
-                             gro.getPeriodicBoxVectors(),
+                             box,
                              platform=platform)
-        system.set_positions(gro.getPositions(True))
+        system.set_positions(pos)
         state = system.get_state()
         energy = state.getPotentialEnergy().value_in_unit(kilojoule_per_mole)
         forces = state.getForces(asNumpy=True).\

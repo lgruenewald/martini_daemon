@@ -21,7 +21,10 @@ def sigma_epsilon_to_c6_c12(sigma, epsilon):
 
 def DaemonTopFile(file, include_dir=None, defines={},
                   epsilon_r=15.0, nonbonded_cutoff=1.1*nanometer,
-                  nlist_cutoff=1.5,
+                  nlist_cutoff=1.1,
+                  max_absolute_rate: float | None = None,
+                  rate_smoothing: tuple[float, float] = (0.01, 0.02),
+                  rate_highest_probability: float = 1.0,
                   logger=None) -> tuple[SysStar, TopStar]:
     """Parses a Martini Top file for Gromacs and generates T*, sys and top
     from it. Also parses .frag and .rx files included in the .top file.
@@ -32,7 +35,10 @@ def DaemonTopFile(file, include_dir=None, defines={},
         logger = logging.getLogger(__name__)
     # field init
     system = SysStar(logger, epsilon_r, nonbonded_cutoff)
-    topology = TopStar(system, logger, nlist_cutoff)
+    topology = TopStar(
+        system, logger, nlist_cutoff,
+        max_absolute_rate, rate_smoothing, rate_highest_probability
+    )
 
     # so .top files stay backwards compatible
     defines["DAEMON"] = "1.0"
@@ -111,10 +117,10 @@ def DaemonTopFile(file, include_dir=None, defines={},
         if last_molecule().index_type != "index":
             raise ValueError("[atoms] only valid in [moleculetype]")
         id = unwrap(tokens, 0, "index")
-        type = unwrap(tokens, 1, "pattern")
+        type = unwrap(tokens, 1, "word")
         resnum = unwrap(tokens, 2, "int")
         resname = unwrap(tokens, 3, "word")
-        atomname = unwrap(tokens, 4, "pattern")
+        atomname = unwrap(tokens, 4, "word")
         charge_group_num = unwrap(tokens, 5, "int")
         charge = unwrap(tokens, 6, "float") if len(tokens) > 6 else None
         mass = unwrap(tokens, 7, "float") if len(tokens) > 7 else None
@@ -643,7 +649,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
         require_complete_reaction()
         name = unwrap(tokens, 0, "word")
         last_reaction = ReactionTemplate(name)
-        _last_molecule = last_reaction.product
+        _last_molecule = topology.new_mol_fragment(name)
+        _last_molecule.index_type = "pair"
 
     p.add_level("reaction", process_reaction)
     p.add_level("rx", process_reaction)
@@ -670,12 +677,12 @@ def DaemonTopFile(file, include_dir=None, defines={},
             case "r_max":
                 idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
                 idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
-                cutoff = unwrap(tokens, 3, "float")                
+                cutoff = unwrap(tokens, 3, "positive")                
                 last_reaction.distance_max.append((idi, atomi, idj, atomj, cutoff))
             case "r_min":
                 idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
                 idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
-                cutoff = unwrap(tokens, 3, "float")
+                cutoff = unwrap(tokens, 3, "positive")
                 last_reaction.distance_min.append((idi, atomi, idj, atomj, cutoff))
             case "angle_not":
                 idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
@@ -754,12 +761,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
                     last_reaction.dihedral_limits.append(
                         (idi, atomi, idj, atomj, idk, atomk, idl, atoml, theta_min, math.tau + 1.)
                     )
-            case "p":
-                probability = unwrap(tokens, 1, "float")
-                last_reaction.probability = probability
-            case "limit":
-                limit = unwrap(tokens, 1, "int")
-                last_reaction.global_limit = limit
+            case "rate":
+                last_reaction.relative_rate = unwrap(tokens, 1, "positive")
             case _:
                 raise ValueError(f"Unknown key {key} in [rx_conditions]")
 

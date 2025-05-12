@@ -1,7 +1,8 @@
-import openmm as mm  # type: ignore[import-untyped]
-import openmm.app as mmapp  # type: ignore[import-untyped]
-from openmm.unit import nanometer, picosecond, md_unit_system  # type: ignore[import-untyped]
+import openmm as mm
+from openmm.app import XTCFile, Topology
+from openmm.unit import nanometer, picosecond, md_unit_system
 from .utils import backup_try
+from .gro_file import write_gro
 from collections import OrderedDict
 import numpy as np
 
@@ -55,12 +56,6 @@ class SysStar():
     # name, resid, resname, type, charge, mass
     _part_list: list[tuple[str, int, str, str, float, float]]
 
-    """All the constraints in the system
-    indices are called constraint_id
-    values are (i: part_id, j: part_id, length: float)
-    """
-    _constraint_list: list[tuple[int, int, float]]
-
     """Atom types to look up default charges and default masses
     values are atom_type: string, (mass: float, charge: float)
     """
@@ -76,7 +71,6 @@ class SysStar():
         self.epsilon_r = epsilon_r
         self.nonbonded_cutoff = nonbonded_cutoff
         self._part_list = []
-        self._constraint_list = []
         self._atom_types = OrderedDict()
         self.context_initialized = False
         self._reinitialize = True
@@ -139,6 +133,53 @@ class SysStar():
 
         self.last_resid = 0
         self.logger = logger
+
+    def save(self, f, box):
+        """
+            Serializes S* into bytes.
+
+            Data saved:
+            - _atom_types (default mass, charge and similar)
+            - _part_list (particle information)
+            - modular forces and all their data (all interactions, we 
+                recursively call save on them)
+            - openmm Context (containing positions, velocities, ...)
+        """
+        if not self.context_initialized:
+            raise ValueError("Can only save after context was initialized")
+        f.dump(box)
+        f.dump(self._atom_types)
+        f.dump(self._part_list)
+        for force in self.modular_forces:
+            force.save(f)
+        chk = self._context.createCheckpoint()
+        f.dump(chk)
+
+    def load(self, f):
+        """
+            Deserializes bytes (read from f) into S* (self). See Sysstar.save.
+            Must be called on a "fresh" (just created) Sysstar.
+
+            must call load_finish later with the integrator and platform
+        """
+        if self.context_initialized:
+            raise ValueError("Can't load after context was already initialized")
+        self.partial_box = f.load()
+        self._atom_types = f.load()
+        self._part_list = f.load()
+        for force in self.modular_forces:
+            force.load(f)
+        self.partial_chk = f.load()
+
+    def load_finish(self, integrator, platform):
+        """
+            Finishes self.load()
+
+            Must be called after the other forces were added, hence the
+            split up into two functions.
+        """
+        self.build_context(integrator, self.partial_box, platform)
+        self._context.loadCheckpoint(self.partial_chk)
 
     def get_defaults(self, part_type, charge, mass):
         defaults = self._atom_types.get(part_type)
@@ -218,7 +259,7 @@ class SysStar():
             raise ValueError("Cannot do this after context is initialized")
         self.nonbonded_force._nb_types[(type1, type2)] = (V, W)
 
-    def build_context(self, integrator, periodicBoxVectors, platform=None):
+    def build_context(self, integrator, box, platform=None):
         """context_initialized flips the state of S* in a way
         the parsing of a topology and the addition of all particles, bonds, ...
         should happen before calling build_context
@@ -235,13 +276,18 @@ class SysStar():
             modular_force.build()
         self._reinitialize = False
         # Build context
-        self._periodic_box = periodicBoxVectors
-        self._system.setDefaultPeriodicBoxVectors(*periodicBoxVectors)
+        pbv = [
+            mm.Vec3(box[0], 0., 0.),
+            mm.Vec3(0., box[1], 0.),
+            mm.Vec3(0., 0., box[2])
+        ]
+        self._periodic_box = pbv
+        self._system.setDefaultPeriodicBoxVectors(*pbv)
         if platform is None:
             self._context = mm.Context(self._system, integrator)
         else:
             self._context = mm.Context(self._system, integrator, platform)
-        self._context.setPeriodicBoxVectors(*periodicBoxVectors)
+        self._context.setPeriodicBoxVectors(*pbv)
 
     def reinitialize(self, force=False):
         if not self.context_initialized:
@@ -262,6 +308,13 @@ class SysStar():
                 "Please check your .gro file."
             )
         self._context.setPositions(positions)
+
+    def set_velocities(self, velocities):
+        if not self.context_initialized:
+            raise Exception("Initialize the context first")
+        if len(velocities) != len(self._part_list):
+            raise Exception("Wrong number of velocities supplied")
+        self._context.setVelocities(velocities)
 
     def generate_velocities(self, temp):
         if not self.context_initialized:
@@ -291,17 +344,28 @@ class SysStar():
     def add_reporter(self, reporter):
         self.reporters.append(reporter)
 
-    def write_xtc_frame(self, interval):
+    def write_xtc_frame(self, i, interval):
         pos, box = self.get_positions()
         self._xtc.interval = interval
         self._xtc.writeModel(pos)
         for reporter in self.reporters:
-            reporter.on_xtc_frame(pos, box, self._xtc_name)
+            reporter.on_xtc_frame(i, pos, box, self._xtc_name)
 
     def do_steps(self, steps):
         if not self.context_initialized:
             raise Exception("Initialize the context first")
         self._integrator.step(steps)
+
+    def get_box(self, state):
+        # only works for 90 degree pbc
+        box = state.getPeriodicBoxVectors()
+        x = box[0].x
+        y = box[1].y
+        z = box[2].z
+        assert box[1].x == 0.
+        assert box[2].x == 0.
+        assert box[2].y == 0.
+        return (x, y, z)
 
     def get_positions(self):
         if not self.context_initialized:
@@ -310,14 +374,7 @@ class SysStar():
         # since enforcePeriodicBox really doesn't like bonds formed across
         # boundaries
         state = self._context.getState(positions=True)
-        box = state.getPeriodicBoxVectors()
-        box_x = box[0].x
-        box_y = box[1].y
-        box_z = box[2].z
-        # only works for 90 degree pbc
-        assert box[1].x == 0.
-        assert box[2].x == 0.
-        assert box[2].y == 0.
+        box_x, box_y, box_z = self.get_box(state)
         pos = state.getPositions(asNumpy=True).value_in_unit(nanometer)
         if np.any(np.abs(pos) > 2147483.0):
             # would be too large to store without remaindering, so likely
@@ -344,7 +401,7 @@ class SysStar():
             raise Exception("Initialize the context first")
         self._context.applyConstraints(tol=1e-10)
 
-    _xtc: mmapp.XTCFile = None
+    _xtc: XTCFile = None
 
     def set_xtc_path(self, path):
         if not self.context_initialized:
@@ -354,11 +411,11 @@ class SysStar():
         backup_try(path)
         for reporter in self.reporters:
             reporter.on_set_xtc_path(path[:-4])
-        mmtopol = mmapp.Topology()
+        mmtopol = Topology()
         mmtopol._numAtoms = self.len_particles()
         mmtopol._periodicBoxVectors = self._periodic_box
         timestep = self._integrator.getStepSize()
-        self._xtc = mmapp.XTCFile(path, mmtopol, timestep)
+        self._xtc = XTCFile(path, mmtopol, timestep)
         self._xtc_name = path[:-4]
 
     def write_gro(self, path):
@@ -366,30 +423,14 @@ class SysStar():
             raise Exception("Initialize the context first")
         if len(path) < 5 or path[-4:] != ".gro":
             raise Exception("Gro path must end with .gro")
-        backup_try(path)
         state = self._context.getState(positions=True, velocities=True)
         pos, box = self.get_positions()
         vel = state.getVelocities(asNumpy=True).\
             value_in_unit_system(md_unit_system)
-        natoms = len(pos)
         time = state.getTime()
-        with open(path, "w") as file:
-            file.write(f"t={time.value_in_unit(picosecond):.1f} ps\n")
-            file.write(f"{natoms}\n")
-            for i in range(natoms):
-                cpos = pos[i]
-                cvel = vel[i]
-                atom_name, resid, resname, *_ = self._part_list[i]
-                atom_index = i + 1
-                file.write(f"{resid:5}{resname:5}{atom_name:>5}"
-                           f"{atom_index:5}{cpos[0]:8.3f}{cpos[1]:8.3f}"
-                           f"{cpos[2]:8.3f}{cvel[0]:8.4f}{cvel[1]:8.4f}"
-                           f"{cvel[2]:8.4f}\n")
-            v1, v2, v3 = (v.value_in_unit(nanometer)
-                          for v in state.getPeriodicBoxVectors())
-            file.write(
-                f"{v1[0]:.4f} {v2[1]:.4f} {v3[2]:.4f} {v1[1]:.4f} {v1[2]:.4f} "
-                f"{v2[0]:.4f} {v2[2]:.4f} {v3[0]:.4f} {v3[1]:.4f}\n"
-            )
+        write_gro(
+            path, f"t={time.value_in_unit(picosecond):.1f} ps\n",
+            self._part_list, box, pos, vel
+        )
         for reporter in self.reporters:
             reporter.on_write_gro(pos, box, path[:-4])

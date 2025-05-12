@@ -1,6 +1,6 @@
 cpdef double pdist(double[:] v1, double[:] v2, double[:] size)
-cpdef double pcos_angle(p1, p2, p3, box)
-cpdef pdihedral(p4, p3, p2, p1, box)
-cpdef bint cross_box(v1: double[:], v2: double[:], size: double[:])
+cpdef double pcos_angle(double[:] p1, double[:] p2, double[:] p3, double[:] box)
+cpdef pdihedral(double[:] p4, double[:] p3, double[:] p2, double[:] p1, double[:] box)
+cpdef bint cross_box(double[:] v1, double[:] v2, double[:] size)
 
 ctypedef long long i64

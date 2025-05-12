@@ -45,7 +45,7 @@ cpdef double pdist(double[:] v1, double[:] v2, double[:] size):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef double pcos_angle(p1, p2, p3, box):
+cpdef double pcos_angle(double[:] p1, double[:] p2, double[:] p3, double[:] box):
     cdef double[:] v1 = psub(p2, p1, box)
     cdef double[:] v2 = psub(p2, p3, box)
     cdef double v1_dot_v2 = 0.0
@@ -70,7 +70,7 @@ cdef cnp.ndarray[cnp.float64_t] cross_product(u: double[:], v: double[:]):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef pdihedral(p4, p3, p2, p1, box):
+cpdef pdihedral(double[:] p4, double[:] p3, double[:] p2, double[:] p1, double[:] box):
     # difference vectors
     cdef double[:] u1 = psub(p2, p1, box)
     cdef double[:] u2 = psub(p3, p2, box)
@@ -94,8 +94,22 @@ cpdef pdihedral(p4, p3, p2, p1, box):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef bint cross_box(v1: double[:], v2: double[:], size: double[:]):
+cpdef bint cross_box(double[:] v1, double[:] v2, double[:] size):
     for i in range(3):
         if fabs((v1[i] - v2[i]) / size[i]) > 0.5:
             return True
     return False
+
+cpdef tuple smooth(double x_t, tuple prev, tuple params):
+    """
+        double exponential smoothing
+
+        x_t: x(t) value
+        prev: previous smoothed value and "slope"
+        params: constants for smoothing
+
+        returns:  (smoothed value, smoothed "slope")
+    """
+    cdef double x = params[0] * x_t + (1 - params[0]) * (prev[0] + prev[1])
+    cdef double y = params[1] * (x - prev[0]) + (1 - params[1]) * prev[1]
+    return x, y

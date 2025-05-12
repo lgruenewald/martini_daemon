@@ -7,13 +7,17 @@ from .fragment import Fragment
 from .reaction_template import ReactionTemplate
 from .mol_fragment import MolFragment
 from .detection import detection_all
+from .utils import smooth
 
+# TODO rename MolFragment to MoleculeType
+# TODO rename GraphFragment to Graph
 random.seed()
 
 class TopStar():
     # ======= (1/3) Building things =======
     # T* fragment and defrag list
     frag_list: dict[int, Fragment]
+    frag_counts: dict[str, int]
     next_frag_id: int
     # for every part_id have a list of fragments it is in
     # and a list of interactions it is in
@@ -24,11 +28,10 @@ class TopStar():
     # type name -> list of subfrag names
     subfrag_map: dict[str, list[str]]
 
-    graph_fragment_list: list[GraphFragment]
     graph_fragment_map: dict[str, GraphFragment]
 
     # type name -> type, used for instantiation
-    # TODO only use it for MolFragment
+    # doubles as a MolFragment list
     type_lookup: dict[str, MolFragment]
 
     # reactant type -> reactions map
@@ -38,31 +41,37 @@ class TopStar():
     # reactant type -> neighbor list atom index map
     neighbor_atom_map: dict[str, int]
 
+    # a relative rate of 1.0, as a smoothed moving average, using utils.smooth
+    absolute_rate: float = -1. # special value when unitialized
+    max_absolute_rate: float
+    smoothing_constant: tuple[float, float]
+    highest_probability: float
+
     system: SysStar
 
     reporters: list[Reporter]
+    out_name: str  # passed to reporters so they generate the correct filenames
 
-    def __init__(self, system, logger, nlist_cutoff):
-        # TODO better suite the bookkeeping to the algorithm used and remove
-        # the other ones
+    def __init__(self, system, logger, nlist_cutoff, max_absolute_rate,
+                 smoothing_constant, highest_probability):
         self.frag_list = {}
         self.next_frag_id = 0
         self.defrag_list = []
         self.interaction_list = []
-        self.frag_fragments = []
-        self.mol_fragments = []
         self.reactions: dict[tuple[str, str, str, str], list[ReactionTemplate]] = {}
-        self.reaction_list: list[ReactionTemplate] = []
         self.r_continue = {}
         self.neighbor_atom_map = {}
         self.type_lookup = {}
         self.subfrag_map = {}
         self.reporters = []
-        self.graph_fragment_list = []
         self.graph_fragment_map = {}
         self.system = system
         self.logger = logger
         self.nlist_cutoff = nlist_cutoff
+        self.absolute_rate = -1.
+        self.max_absolute_rate = max_absolute_rate
+        self.smoothing_constant = smoothing_constant
+        self.highest_probability = highest_probability
 
     def add_reporter(self, reporter) -> None:
         self.reporters.append(reporter)
@@ -75,8 +84,6 @@ class TopStar():
         return mol_fragment
 
     def new_graph_fragment(self, frag: GraphFragment) -> None:
-        # TODO unify
-        self.graph_fragment_list.append(frag)
         self.graph_fragment_map[frag.name] = frag
 
     def new_reaction(self, reaction: ReactionTemplate) -> MolFragment:
@@ -153,14 +160,7 @@ class TopStar():
         if self.reactions.get(key) is None:
             self.reactions[key] = []
         self.reactions[key].append(reaction)
-        self.reaction_list.append(reaction)
-        # reaction product buildup
-        if self.type_lookup.get(reaction.name):
-            raise ValueError(
-                f"Second definition of molfragment type {reaction.name}"
-            )
-        self.type_lookup[reaction.name] = reaction.product
-        return reaction.product
+        return self.type_lookup[reaction.name]
 
     # Graph helpers
 
@@ -184,7 +184,7 @@ class TopStar():
         """
 
         matches: list[GraphMatch] = []
-        for graph in self.graph_fragment_list:
+        for graph in self.graph_fragment_map.values():
             # for each possible graph to match
             # don't match if it's only the specific molecule
             if len(graph.molecules) > 0:
@@ -279,18 +279,145 @@ class TopStar():
             for member in member_parts:
                 self.interaction_list[member].append(f)
 
+    # Save/load helpers
+    def save(self, f):
+        """
+            Serializes T* into bytes, writes it to f
+
+            Data saved:
+            - frag_list
+            - graph_fragment_map (graph fragment list)
+            - type_lookup (molecule definition list)
+            - reactions (reaction template list)
+        """
+        # relies on pickling to handle references to other classes right
+        f.dump(random.getstate())
+
+        f.dump(self.frag_list)
+        f.dump(self.graph_fragment_map)
+        f.dump(self.reactions)
+        f.dump(self.next_frag_id)
+        f.dump(self.defrag_list)
+        f.dump(self.r_continue)
+        f.dump(self.neighbor_atom_map)
+        f.dump(self.subfrag_map)
+        f.dump(self.absolute_rate)
+
+        # unpicklable because they reference force
+        f.dump(len(self.type_lookup))
+        for k, v in self.type_lookup.items():
+            f.dump(k)
+            assert k == v.molecule_name
+            v.save(f)
+
+    def load(self, f):
+        """
+            Deserializes bytes (read from f) into T* (self)
+
+            Should be called after S* is deserialized and set, because
+            of the interaction list.
+        """
+        random.setstate(f.load())
+
+        self.frag_list = f.load()
+        self.graph_fragment_map = f.load()
+        self.reactions = f.load()
+        self.next_frag_id = f.load()
+        self.defrag_list = f.load()
+        self.r_continue = f.load()
+        self.neighbor_atom_map = f.load()
+        self.subfrag_map = f.load()
+        self.absolute_rate = f.load()
+
+        for i in range(f.load()):
+            k = f.load()
+            v = MolFragment(k)
+            v.load(f, self.system)
+            self.type_lookup[k] = v
+
+        # interaction list gets loaded different because we can't pickle
+        # openmm things -> can't pickle Force objects
+        #
+        # but we can assume that everything added to any Force would have
+        # resulted in an interaction, except non bonded
+        #
+        # though this is still fragile code and should be improved later
+
+        self.interaction_list = [[] for _ in range(self.system.len_particles())]
+        for force in self.system.modular_forces:
+            if force == self.system.nonbonded_force:
+                continue
+            for i in range(len(force)):
+                inter = Interaction(force, i)
+                members = inter.get_members()
+                for member in members:
+                    self.interaction_list[member].append(inter)
+
+    def update_frag_counts(self):
+        self.frag_counts = {}
+        for v in self.frag_list.values():
+            k = v.name
+            if self.frag_counts.get(k) is None:
+                self.frag_counts[k] = 1
+            else:
+                self.frag_counts[k] += 1
+
     # ======= (2/3) Detection things =======
     # see detection.pyx
-    def pre_detection(self, step: int) -> None:
-        for _, rxs in self.reactions.items():
-            for rx in rxs:
-                rx.global_counter = 0
+    def init_dm(self, name) -> None:
+        # called exactly once after parsing or loading from file is finished
+        self.update_frag_counts()
+        self.out_name = name
         for reporter in self.reporters:
-            reporter.pre_detection(step)
-    
+            reporter.init_dm(name)
+
+    def pre_detection(self, step: int) -> None:
+        for reporter in self.reporters:
+            reporter.pre_detection(step, self.out_name)
+
+    def update_observed_rate(self, rx: ReactionTemplate):
+        # update_observed_rate only called if it is defined => not none
+        # relative_rate is parsed as "positive" => non zero, safe to divide
+        rate = rx.reaction_counter / rx.relative_rate
+        for reactant in rx.reactants:
+            if self.frag_counts[reactant] == 0:
+                # no reactant, no reaction
+                # keeps old observed_rate and avoids divisions by 0 by returning
+                return
+            rate /= self.frag_counts[reactant]
+
+        # if it's not initialized yet make an initial value
+        if rx.observed_rate is None:
+            rx.observed_rate = (rate, 0.)
+            return
+
+        # otherwise smooth it
+        rx.observed_rate = smooth(rate, rx.observed_rate,
+                                  self.smoothing_constant)
+
+        predicted = rx.observed_rate[0] + rx.observed_rate[1] * self.max_absolute_rate
+
+        # if the prediction value goes below 0, 0 it and issue a warning
+        if predicted < 0.:
+            self.logger.warn(f"The smoothed rate for reaction {rx.name} went below 0.")
+            rx.observed_rate = (0., 0.)
+            predicted = 0.
+
+        # set the relative rate = 1 value to the slowest reaction
+        if predicted < self.absolute_rate:
+            self.absolute_rate = predicted
+
     def detection(self, step: int, box, pos) -> list[tuple[list[Fragment], ReactionTemplate]]:
         self.pre_detection(step)
-        return detection_all(self, box, pos)
+        reactions = detection_all(self, box, pos)
+        # preparations for the next step
+        self.absolute_rate = self.max_absolute_rate or -1.
+        for _, rxs in self.reactions.items():
+            for rx in rxs:
+                if rx.relative_rate is not None:
+                    self.update_observed_rate(rx)
+                rx.reaction_counter = 0
+        return reactions
 
     # ======= (3/3) Modification things =======
     def clean_defrag(self, frag: Fragment, part: int) -> None:
@@ -423,7 +550,7 @@ class TopStar():
         # hook that gets called after detection, before modification
         # only called if there is any modification going on
         for reporter in self.reporters:
-            reporter.pre_modification(rx_list, i)
+            reporter.pre_modification(i, rx_list, self.out_name)
 
     def modification(
         self, 
@@ -455,15 +582,15 @@ class TopStar():
             self.remove_overlapping_graphs(graph_recalc)
 
             self.template_update_atoms(frags, rx)
-            self.instantiate_over_existing(rx.product, frags)
+            self.instantiate_over_existing(self.type_lookup[rx.name], frags)
 
             self.try_match_graphs(graph_recalc)
 
-            
-        self.post_modification(i)
+        self.update_frag_counts()
 
+        self.post_modification(i)
 
     def post_modification(self, i: int) -> None:
         # hook that only gets called after modification
         for reporter in self.reporters:
-            reporter.post_modification(i)
+            reporter.post_modification(i, self.out_name)

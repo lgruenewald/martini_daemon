@@ -15,7 +15,7 @@ class TypeReporter(Reporter):
         bonds_name = xtc_name + "_types.npy"
         backup_try(bonds_name)
 
-    def on_xtc_frame(self, pos, box, xtc_name):
+    def on_xtc_frame(self, i, pos, box, xtc_name):
         bonds_name = xtc_name + "_types.npy"
         n = self._sysstar.len_particles()
 

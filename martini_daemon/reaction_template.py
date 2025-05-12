@@ -1,6 +1,3 @@
-from .mol_fragment import MolFragment
-
-
 class ReactionTemplate:
     name: str
     reactants: list[str]
@@ -8,12 +5,11 @@ class ReactionTemplate:
     distance_min: list[tuple[int, int, int, int, float]]
     angle_limits: list[tuple[int, int, int, int, int, int, float, float]]
     dihedral_limits: list[tuple[int, int, int, int, int, int, int, int, float, float]]
-    probability: float
-    global_counter: int
-    global_limit: int
+    relative_rate: float
+    reaction_counter: int
+    observed_rate: tuple[float, float] | None
     break_groups: list[list[tuple[int, int]]]
     update_groups: list[list[tuple[int, int]]]
-    product: MolFragment
     renames: list[tuple[int, int, str]]
     retypes: list[tuple[int, int, str]]
     recharges: list[tuple[int, int, float]]
@@ -26,13 +22,11 @@ class ReactionTemplate:
         self.distance_min = []
         self.angle_limits = []
         self.dihedral_limits = []
-        self.probability = 1.0
-        self.global_counter = 0
-        self.global_limit = None
+        self.reaction_counter = 0
+        self.observed_rate = None
+        self.relative_rate = None
         self.break_groups = []
         self.update_groups = []
-        self.product = MolFragment(name)
-        self.product.index_type = "pair"
         self.renames = []
         self.retypes = []
         self.recharges = []

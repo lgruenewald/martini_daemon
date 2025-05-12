@@ -38,3 +38,27 @@ class VirtualSite():
             for vid, members, params in self._list:
                 self._make_vsite(vid, members, params)
 
+    def get_index(self) -> int | None:
+        for i, f in enumerate(self._sysstar.modular_forces):
+            if f == self:
+                return i
+        return None
+
+    def get_class_name(self) -> str:
+        return type(self).__name__
+
+    def save(self, f) -> None:
+        f.dump(self.get_class_name())
+        f.dump(self.get_index())
+        f.dump(self._list)
+
+    def load(self, f) -> None:
+        if self._built:
+            raise ValueError("Can only load before _built")
+        assert f.load() == self.get_class_name(), "Attempt to load a checkpoint from a different version of daemon."
+        assert f.load() == self.get_index(), "Attempt to load a checkpoint from a different version of daemon."
+        self._list = f.load()
+
+    def __len__(self) -> int:
+        return len(self._list)
+

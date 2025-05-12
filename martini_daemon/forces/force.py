@@ -26,6 +26,12 @@ class Force():
     def is_instance(self, filter: str) -> bool:
         raise NotImplementedError
 
+    def _additional_save(self, f) -> None:
+        pass
+
+    def _additional_load(self, f) -> None:
+        pass
+
     _members: int
 
     def add(self, members: list[int] | tuple[int], params: list[float] | tuple[float]) -> Interaction:
@@ -66,6 +72,31 @@ class Force():
                 self._sysstar._reinitialize = True
                 return True
         return False
+
+    def get_index(self) -> int | None:
+        for i, f in enumerate(self._sysstar.modular_forces):
+            if f == self:
+                return i
+        return None
+
+    def get_class_name(self) -> str:
+        return type(self).__name__
+
+    def save(self, f) -> None:
+        f.dump(self.get_class_name())
+        f.dump(self.get_index())
+        f.dump(self._list)
+        self._additional_save(f)
+
+    def load(self, f) -> None:
+        assert f.load() == self.get_class_name(), "Attempt to load a checkpoint from a different version of daemon."
+        assert f.load() == self.get_index(), "Attempt to load a checkpoint from a different version of daemon."
+        self._list = f.load()
+        self._rebuild = True
+        self._additional_load(f)
+
+    def __len__(self) -> int:
+        return len(self._list)
 
 
 @dataclass

@@ -17,7 +17,7 @@ class AllBondReporter(Reporter):
         self.comp_obj = zlib.compressobj(6)
         self.handle = open(self.bonds_name, "wb")
 
-    def on_xtc_frame(self, pos, box, xtc_name):
+    def on_xtc_frame(self, i, pos, box, xtc_name):
         n = self._sysstar.len_particles()
 
         bonds = np.zeros((n, 12), dtype=np.int32) - 1

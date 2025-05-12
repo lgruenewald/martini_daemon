@@ -42,3 +42,9 @@ class Pairs(Force):
 
     def is_instance(self, filter):
         return filter == "pair"
+
+    def _additional_save(self, f):
+        f.dump(self.types)
+
+    def _additional_load(self, f):
+        self.types = f.load()

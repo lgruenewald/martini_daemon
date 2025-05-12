@@ -22,7 +22,7 @@ class VMDBondReporter(Reporter):
         self.comp_obj = zlib.compressobj(6)
         self.handle = open(self.bonds_name, "wb")
 
-    def on_xtc_frame(self, pos, box, _):
+    def on_xtc_frame(self, i, pos, box, _):
         bonds = "{" + "} {".join(
             map(
                 lambda part:  # part[0] - i, part[1] - list of interactions
