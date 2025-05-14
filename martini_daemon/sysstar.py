@@ -202,7 +202,9 @@ class SysStar():
         return len(self._part_list) - 1
 
     def rename(self, part_id, new_name):
-        self._part_list[part_id][0] = new_name
+        elems = list(self._part_list[part_id])
+        elems[0] = new_name
+        self._part_list[part_id] = tuple(elems)
 
     def retype(self, part_id, new_type):
         a, b, c, old_type, charge, d = self._part_list[part_id]

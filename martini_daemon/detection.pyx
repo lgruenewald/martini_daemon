@@ -43,6 +43,7 @@ cdef bint detection_one(
     cdef double max
     cdef double theta
     cdef double cos_theta
+    cdef double prob
     cdef i64 p1
     cdef i64 p2
     cdef i64 p3
@@ -102,21 +103,22 @@ cdef bint detection_one(
         if theta >= min and theta <= max:
             return False
 
-    # increment this first, we are counting the reactions that pass by geometry
-    rx.reaction_counter += 1
-
-    # rate limiting, must be AFTER reaction counter
-    if absolute_rate == -1.:
-        # special value stands for uninitialized
-        # TODO better warmup
-        return True
-    cdef double prob = absolute_rate / (rx.observed_rate[0] + rx.observed_rate[1])
-    assert prob >= 0., "internal error, probability below 0"
-    assert prob <= 1., "internal error, probability above 1"
-    if prob < random.random():
-        # prob=0.0 - always false
-        # prob=1.0 - always true
-        return False
+    # rate limiting, as a last condition
+    if rx.relative_rate is not None:
+        rx.reaction_counter += 1
+        if absolute_rate <= 0.:
+            # negative stands for uninitialized / warmup phase globally
+            return False
+        if rx.observed_rate is None:
+            # warmup phase for this reaction
+            return False
+        prob = absolute_rate / (rx.observed_rate[0] + rx.observed_rate[1])
+        assert prob >= 0., "internal error, probability below 0"
+        assert prob <= 1., "internal error, probability above 1"
+        if prob < random.random():
+            # prob=0.0 - always false
+            # prob=1.0 - always true
+            return False
     
     return True
 
@@ -155,7 +157,7 @@ double[:, :] pos,
 
     reactions = []
     skip: set[i64] = set()
-    cdef double absolute_rate = top.absolute_rate
+    cdef double absolute_rate = top.absolute_rate or -1.
 
     for i, frag_i in top.frag_list.items():
         if i in skip:

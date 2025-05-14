@@ -42,7 +42,7 @@ class TopStar():
     neighbor_atom_map: dict[str, int]
 
     # a relative rate of 1.0, as a smoothed moving average, using utils.smooth
-    absolute_rate: float = -1. # special value when unitialized
+    absolute_rate: float = -1. # special value when unitialized / warmup
     max_absolute_rate: float
     smoothing_constant: tuple[float, float]
     highest_probability: float
@@ -68,7 +68,7 @@ class TopStar():
         self.system = system
         self.logger = logger
         self.nlist_cutoff = nlist_cutoff
-        self.absolute_rate = -1.
+        self.absolute_rate = -1. # uninitialized / warmup phase
         self.max_absolute_rate = max_absolute_rate
         self.smoothing_constant = smoothing_constant
         self.highest_probability = highest_probability
@@ -380,22 +380,25 @@ class TopStar():
         # relative_rate is parsed as "positive" => non zero, safe to divide
         rate = rx.reaction_counter / rx.relative_rate
         for reactant in rx.reactants:
-            if self.frag_counts[reactant] == 0:
+            if self.frag_counts.get(reactant) in {0, None}:
                 # no reactant, no reaction
                 # keeps old observed_rate and avoids divisions by 0 by returning
                 return
             rate /= self.frag_counts[reactant]
+        print(f"reaction {rx.name} rate {rate}")
 
         # if it's not initialized yet make an initial value
         if rx.observed_rate is None:
             rx.observed_rate = (rate, 0.)
-            return
+            print(f"observed rate set to {rate}")
+        else:
+            # otherwise smooth it
+            rx.observed_rate = smooth(
+                rate, rx.observed_rate,
+                self.smoothing_constant
+            )
 
-        # otherwise smooth it
-        rx.observed_rate = smooth(rate, rx.observed_rate,
-                                  self.smoothing_constant)
-
-        predicted = rx.observed_rate[0] + rx.observed_rate[1] * self.max_absolute_rate
+        predicted = (rx.observed_rate[0] + rx.observed_rate[1]) * self.highest_probability
 
         # if the prediction value goes below 0, 0 it and issue a warning
         if predicted < 0.:
@@ -403,20 +406,29 @@ class TopStar():
             rx.observed_rate = (0., 0.)
             predicted = 0.
 
+        print(f"PREDICTED {predicted}")
+
         # set the relative rate = 1 value to the slowest reaction
-        if predicted < self.absolute_rate:
+        if self.absolute_rate is None or predicted < self.absolute_rate:
+            print(f"ABS RATE UPDATED")
             self.absolute_rate = predicted
 
     def detection(self, step: int, box, pos) -> list[tuple[list[Fragment], ReactionTemplate]]:
+        print(f"STEP: {step}")
         self.pre_detection(step)
         reactions = detection_all(self, box, pos)
+        print(f"REACTIONS: {len(reactions)}")
         # preparations for the next step
-        self.absolute_rate = self.max_absolute_rate or -1.
+        self.absolute_rate = self.max_absolute_rate
+        print(f"ABS_RATE IS NOW {self.absolute_rate}")
         for _, rxs in self.reactions.items():
             for rx in rxs:
                 if rx.relative_rate is not None:
+                    print(f"REL RATE SET FOR REACTION {rx.name}")
                     self.update_observed_rate(rx)
                 rx.reaction_counter = 0
+        if self.absolute_rate is None:
+            self.absolute_rate = -1.
         return reactions
 
     # ======= (3/3) Modification things =======
