@@ -385,12 +385,10 @@ class TopStar():
                 # keeps old observed_rate and avoids divisions by 0 by returning
                 return
             rate /= self.frag_counts[reactant]
-        print(f"reaction {rx.name} rate {rate}")
 
         # if it's not initialized yet make an initial value
         if rx.observed_rate is None:
             rx.observed_rate = (rate, 0.)
-            print(f"observed rate set to {rate}")
         else:
             # otherwise smooth it
             rx.observed_rate = smooth(
@@ -406,25 +404,19 @@ class TopStar():
             rx.observed_rate = (0., 0.)
             predicted = 0.
 
-        print(f"PREDICTED {predicted}")
 
         # set the relative rate = 1 value to the slowest reaction
         if self.absolute_rate is None or predicted < self.absolute_rate:
-            print(f"ABS RATE UPDATED")
             self.absolute_rate = predicted
 
     def detection(self, step: int, box, pos) -> list[tuple[list[Fragment], ReactionTemplate]]:
-        print(f"STEP: {step}")
         self.pre_detection(step)
         reactions = detection_all(self, box, pos)
-        print(f"REACTIONS: {len(reactions)}")
         # preparations for the next step
         self.absolute_rate = self.max_absolute_rate
-        print(f"ABS_RATE IS NOW {self.absolute_rate}")
         for _, rxs in self.reactions.items():
             for rx in rxs:
                 if rx.relative_rate is not None:
-                    print(f"REL RATE SET FOR REACTION {rx.name}")
                     self.update_observed_rate(rx)
                 rx.reaction_counter = 0
         if self.absolute_rate is None:
