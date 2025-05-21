@@ -53,7 +53,7 @@ class TopStar():
     out_name: str  # passed to reporters so they generate the correct filenames
 
     def __init__(self, system, logger, nlist_cutoff, max_absolute_rate,
-                 smoothing_constant, highest_probability):
+                 smoothing_constant, highest_probability, respos):
         self.frag_list = {}
         self.next_frag_id = 0
         self.defrag_list = []
@@ -72,6 +72,7 @@ class TopStar():
         self.max_absolute_rate = max_absolute_rate
         self.smoothing_constant = smoothing_constant
         self.highest_probability = highest_probability
+        self.respos = respos
 
     def add_reporter(self, reporter) -> None:
         self.reporters.append(reporter)
@@ -262,6 +263,13 @@ class TopStar():
                 e = self.system.exclusions.add(pi, pj)
                 self.interaction_list[pi].append(e)
                 self.interaction_list[pj].append(e)
+        # posres
+        for (i, kx, ky, kz) in molfrag.posres:
+            if self.respos is None:
+                raise ValueError("respos is None but there are position restraints.")
+            pi = index_pair(frags, i)
+            x0, y0, z0 = self.respos[pi]
+            self.system.posres.add((pi), (kx, ky, kz, x0, y0, z0))
         # generic interactions
         for (force, members, params) in molfrag.interactions:
             member_parts = []

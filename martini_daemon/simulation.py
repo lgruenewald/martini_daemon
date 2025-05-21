@@ -40,7 +40,7 @@ class DaemonSimulation():
     dt_ns: float
     force_reinitialize: bool
     reporters: list[Reporter]
-    smooth_params = (0.002, 0.01)
+    smooth_params = (0.002, 0.0)
 
     @alias({
         "xtc_frequency": "traj_frequency",
@@ -70,7 +70,9 @@ class DaemonSimulation():
                  force_reinitialize: bool = False,
                  max_absolute_rate: float | None = None,
                  rate_smoothing: tuple[float, float] = (0.01, 0.02),
-                 rate_highest_probability: float = 1.0
+                 rate_highest_probability: float = 1.0,
+                 nonbonded_type="default",
+                 restraint_coord_path=None
                  ):
         """
         Input topology and geometry can be either:
@@ -122,6 +124,11 @@ class DaemonSimulation():
         highest_probability -> 0 to 1., for every rate controlled reaction,
             the probability of being accepted can be scaled by a value
             affects the general speed of reactions in most cases
+        nonbonded_type -> type of force to use for nonbonded interactions
+            "default": for martini_openmm default - potential shift verlet, \
+                       reaction field coulomb
+            "mie-n-m": for Mie potentials with order n repulsive and order m
+                       attractive interactions, reaction field coulomb
         """
 
         # Self initialization
@@ -134,6 +141,8 @@ class DaemonSimulation():
             raise ValueError(
                 "Please specify: geom_path and top_path only OR chk_path only."
             )
+        if restraint_coord_path is None:
+            restraint_coord_path = geom_path
         self.i: int = 0
         self.md_steps: int = md_steps
         self.traj_path: str = sim_name + ".xtc"
@@ -192,6 +201,7 @@ class DaemonSimulation():
         self.logger.info("Parsing start")
         # Parsing - No checkpoint
         if not use_checkpoint:
+            _, respos, _ = read_gro(restraint_coord_path)
             self.system, self.top = DaemonTopFile(
                 top_path,
                 include_dir=include_dir, defines=defines,
@@ -200,7 +210,9 @@ class DaemonSimulation():
                 max_absolute_rate=max_absolute_rate,
                 rate_smoothing=rate_smoothing,
                 rate_highest_probability=rate_highest_probability,
-                logger=self.logger
+                nonbonded_type=nonbonded_type,
+                logger=self.logger,
+                respos=respos
             )
             # benefits of function based scope
             box, pos, vel = read_gro(geom_path)

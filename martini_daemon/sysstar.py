@@ -40,6 +40,7 @@ from .vsites.three_out import VSite3out
 from .vsites.four_fdn import VSite4fdn
 from .vsites.weighed_average import VSiteWeighedAverage
 from .vsites.center_of_mass import VSiteCenterOfMass
+from .forces.position_restraint import PositionRestraint
 from .reporters.reporter import Reporter
 
 
@@ -67,7 +68,7 @@ class SysStar():
     """
     reporters: list[Reporter]
 
-    def __init__(self, logger, epsilon_r, nonbonded_cutoff):
+    def __init__(self, logger, epsilon_r, nonbonded_cutoff, nonbonded_type):
         self.epsilon_r = epsilon_r
         self.nonbonded_cutoff = nonbonded_cutoff
         self._part_list = []
@@ -97,6 +98,7 @@ class SysStar():
         self.quartic_angle = QuarticAngle(self)
         self.linear_angle = LinearAngle(self)
         self.pairs = Pairs(self)
+        self.posres = PositionRestraint(self)
         self.vsite1 = VSiteOne(self)
         self.vsite2 = VSiteTwo(self)
         self.vsite_2fd = VSite2fd(self)
@@ -107,7 +109,7 @@ class SysStar():
         self.vsite_4fdn = VSite4fdn(self)
         self.vsite_avg = VSiteWeighedAverage(self)
         self.vsite_com = VSiteCenterOfMass(self)
-        self.nonbonded_force = NonBonded(self)
+        self.nonbonded_force = NonBonded(self, nonbonded_type)
         self.exclusions = self.nonbonded_force.get_exclusion_helper()
 
         self.modular_forces = [
@@ -121,6 +123,7 @@ class SysStar():
             self.urey_bradley, self.restricted_dihedral,
             self.cross_bond_bond, self.cross_bond_angle,
             self.quartic_angle, self.linear_angle,
+            self.posres,
             self.vsite1, self.vsite2, self.vsite3,
             self.vsite_2fd, self.vsite_3fd, self.vsite_4fdn,
             self.vsite_avg, self.vsite_3fad, self.vsite_3out, self.vsite_com,

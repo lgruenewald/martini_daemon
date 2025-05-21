@@ -24,7 +24,7 @@ def rootdir(request):
 
 tests = [
     # biomolecule tests
-    "trypsin",
+    "trypsin", "posres",
     # polymer tests
     "polyurethane",
     # small molecule tests
@@ -47,7 +47,8 @@ class TestSingleFrame():
     def apply_constraints(self):
         # applies constraints and vsites and checks for position change
         platform = mm.Platform.getPlatformByName("Reference")
-        system, top = DaemonTopFile(self.top)
+        _, respos, _ = read_gro(self.respos)
+        system, top = DaemonTopFile(self.top, respos=respos)
         box, pos, vel = read_gro(self.gro)
         system.build_context(mm.VerletIntegrator(20 * femtosecond),
                              box,
@@ -66,7 +67,8 @@ class TestSingleFrame():
 
     def compare_daemon_gmx(self):
         platform = mm.Platform.getPlatformByName("Reference")
-        system, top = DaemonTopFile(self.top)
+        _, respos, _ = read_gro(self.respos)
+        system, top = DaemonTopFile(self.top, respos=respos)
         box, pos, vel = read_gro(self.gro)
         system.build_context(mm.VerletIntegrator(20 * femtosecond),
                              box,
@@ -126,6 +128,10 @@ class TestSingleFrame():
             self.gmx_forces = np.array([float(x) for x in gmx_force_line][1:])
         self.top = "system.top"
         self.gro = "system.gro"
+        if os.path.isfile("respos.gro"):
+            self.respos = "respos.gro"
+        else:
+            self.respos = "system.gro"
         self.apply_constraints()
         self.compare_daemon_gmx()
         os.remove("energy.xvg")

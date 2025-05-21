@@ -6,6 +6,7 @@ class MolFragment:
     atoms: list[tuple[str, int, str, str, int, float, float]]
     # exclusions
     exclusions: set[tuple[int | tuple[int, int], int | tuple[int, int]]]
+    posres: list[tuple[int, float, float, float]]
     # interactions: generic members and params
     interactions: list[tuple[Force, list[int | tuple[int, int]], list[float]]]
     index_type = "index"
@@ -14,6 +15,7 @@ class MolFragment:
         self.molecule_name = name
         self.atoms = []
         self.exclusions = set()
+        self.posres = []
         self.interactions = []
         self.renames = []
         self.retypes = []

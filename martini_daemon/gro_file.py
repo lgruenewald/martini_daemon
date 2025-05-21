@@ -58,6 +58,8 @@ def write_gro(path, title, parts, box, pos, vel=None):
         containing name, resid, resname in this order, everything else
         in the tuple is discarded), box, pos and vel.
     """
+    title = title.strip()
+    assert "\n" not in title, "Title must not contain newlines"
     backup_try(path)
     n_atoms = len(parts)
     assert len(parts) == len(pos)

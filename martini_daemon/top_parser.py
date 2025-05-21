@@ -25,7 +25,9 @@ def DaemonTopFile(file, include_dir=None, defines={},
                   max_absolute_rate: float | None = None,
                   rate_smoothing: tuple[float, float] = (0.01, 0.02),
                   rate_highest_probability: float = 1.0,
-                  logger=None) -> tuple[SysStar, TopStar]:
+                  nonbonded_type="default",
+                  logger=None,
+                  respos=None) -> tuple[SysStar, TopStar]:
     """Parses a Martini Top file for Gromacs and generates T*, sys and top
     from it. Also parses .frag and .rx files included in the .top file.
     """
@@ -34,10 +36,11 @@ def DaemonTopFile(file, include_dir=None, defines={},
         logging.basicConfig(filename="out.log", level=logging.INFO)
         logger = logging.getLogger(__name__)
     # field init
-    system = SysStar(logger, epsilon_r, nonbonded_cutoff)
+    system = SysStar(logger, epsilon_r, nonbonded_cutoff, nonbonded_type)
     topology = TopStar(
         system, logger, nlist_cutoff,
-        max_absolute_rate, rate_smoothing, rate_highest_probability
+        max_absolute_rate, rate_smoothing, rate_highest_probability,
+        respos
     )
 
     # so .top files stay backwards compatible
@@ -412,16 +415,36 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     p.add_level("atomtypes", process_atomtypes)
 
+    def process_position_restraints(tokens):
+        if len(tokens) != 5:
+            raise ValueError("Only position_restraint lines formatted as <index> <type> <kx> <ky> <kz> are supported.")
+        type = unwrap(tokens, 1, "int")
+        assert type == 1, "Only type 1 position restraint is supported."
+        id = unwrap(tokens, 0, "index")
+        kx = unwrap(tokens, 2, "float")
+        ky = unwrap(tokens, 3, "float")
+        kz = unwrap(tokens, 4, "float")
+        # x0, y0, z0 can only be set during instantiation - it is part of T*
+        last_molecule().posres.append((id, kx, ky, kz))
+
+    p.add_level("position_restraints", process_position_restraints)
+
+
     def process_nonbond_params(tokens):
         type1 = unwrap(tokens, 0, "word")
         type2 = unwrap(tokens, 1, "word")
         funct = unwrap(tokens, 2, "int")
         if funct != 1:
-            raise ValueError("Only LJ (sigma/epsilon) non bond params accepted")
+            raise ValueError("Only sigma/epsilon non bond params accepted")
         sigma = unwrap(tokens, 3, "float")
         epsilon = unwrap(tokens, 4, "float")
-        c6, c12 = sigma_epsilon_to_c6_c12(sigma, epsilon)
-        system.add_nb_type(type1, type2, c6, c12)
+        if nonbonded_type == "default":
+            c6, c12 = sigma_epsilon_to_c6_c12(sigma, epsilon)
+            system.add_nb_type(type1, type2, c6, c12)
+        elif nonbonded_type[:3] == "mie":
+            system.add_nb_type(type1, type2, sigma, epsilon)
+        else:
+            raise ValueError(f"Unknown nonbonded_type {nonbonded_type}")
 
     p.add_level("nonbond_params", process_nonbond_params)
 
