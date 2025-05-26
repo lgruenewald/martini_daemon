@@ -232,7 +232,7 @@ class DaemonSimulation():
         if p is not None:
             self.system.add_force(mm.MonteCarloBarostat(p, T))
         if remove_com_motion:
-            self.system.add_force(mm.CMMotionRemover())
+            self.system.remove_com_motion()
 
         integrator: mm.Integrator
         if t_type == "langevin":

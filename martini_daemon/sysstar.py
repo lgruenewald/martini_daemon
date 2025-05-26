@@ -137,6 +137,8 @@ class SysStar():
         self.last_resid = 0
         self.logger = logger
 
+        self.remove_com = False
+
     def save(self, f, box):
         """
             Serializes S* into bytes.
@@ -242,6 +244,7 @@ class SysStar():
         for (_, _, _, _, _, mass) in filter(None, self._part_list):
             self._system.addParticle(mass)
 
+    # TODO join all these into 1
     def get_particle_name_type(self, i):
         name, _, _, type, _, _ = self._part_list[i]
         return name, type
@@ -250,6 +253,10 @@ class SysStar():
         """Returns the particle's type, charge, mass"""
         _, _, _, type, charge, mass = self._part_list[i]
         return (type, charge, mass)
+
+    def get_particle_name(self, i):
+        name, _, _, _, _, _ = self._part_list[i]
+        return name
 
     def len_particles(self):
         return len(self._part_list)
@@ -345,6 +352,10 @@ class SysStar():
             # during self.build_context()
             self._forces_list.append(force)
             return False
+
+    def remove_com_motion(self):
+        self.add_force(mm.CMMotionRemover())
+        self.remove_com = True
 
     def add_reporter(self, reporter):
         self.reporters.append(reporter)

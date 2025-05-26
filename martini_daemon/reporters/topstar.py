@@ -1,30 +1,4 @@
 from .reporter import Reporter
-from ..utils import backup_try
-import sys
-from ..topstar import TopStar
-
-
-def dump_topstar(topstar: TopStar, file=sys.stdout) -> None:
-    print("==== TopStar / Fragment Types ====", file=file)
-    for k, molfrag in topstar.type_lookup.items():
-        file.write(f"{k} ")
-    file.write("\n")
-    print("==== TopStar / GraphFragments ====", file=file)
-    for g in topstar.graph_fragment_map.values():
-        file.write(f"{g.name}: ({[name for (name, _, _, _) in g.atoms]}) ")
-    file.write("\n")
-    print("==== TopStar / ReactionTemplates ====", file=file)
-    for _, rl in topstar.reactions.items():
-        for rx in rl:
-            print(f"rx {rx.name} reactants {rx.reactants}", file=file)
-    print("==== TopStar / Fragments ====", file=file)
-    for id, frag in topstar.frag_list.items():
-        print(f"{id}: <frag {frag.name} ps {frag.atoms}>", file=file)
-    print("==== TopStar / defrag list ====", file=file)
-    for id, defrag in enumerate(topstar.defrag_list):
-        print(f"particle {id} is in fragments {defrag}", file=file)
-        if id > 100:
-            break
 
 
 class TopStarLogger(Reporter):
@@ -33,33 +7,51 @@ class TopStarLogger(Reporter):
     """
 
     def init_dm(self, name):
-        backup_try(f"{name}.toplog")
+        self._open(name + ".toplog")
 
     def pre_detection(self, i, name) -> None:
+        # first ever frame
         if i == 0:
             self.post_modification(i, name)
 
     def post_modification(self, i, name) -> None:
-        with open(f"{name}.toplog", "a") as file:
-            print(f"===== Frame {i} =====", file=file)
-            dump_topstar(self._topstar, file)
+        topstar = self._topstar
+        self._print(f"===== Frame {i} =====")
+        self._print("==== TopStar / Fragment Types ====")
+        for k, molfrag in topstar.type_lookup.items():
+            self._write(f"{k} ")
+        self._write("\n")
+        self._print("==== TopStar / GraphFragments ====")
+        for g in topstar.graph_fragment_map.values():
+            self._write(f"{g.name}: ({[name for (name, _, _, _) in g.atoms]}) ")
+        self._write("\n")
+        self._print("==== TopStar / ReactionTemplates ====")
+        for _, rl in topstar.reactions.items():
+            for rx in rl:
+                self._print(f"rx {rx.name} reactants {rx.reactants}")
+        self._print("==== TopStar / Fragments ====")
+        for id, frag in topstar.frag_list.items():
+            self._print(f"{id}: <frag {frag.name} ps {frag.atoms}>")
+        self._print("==== TopStar / defrag list ====")
+        for id, defrag in enumerate(topstar.defrag_list):
+            self._print(f"particle {id} is in fragments {defrag}")
+            if id > 100:
+                break
 
 
 class ReactionReporter(Reporter):
     """A reporter that reports all reactions to <name>.reactions"""
 
     def init_dm(self, name):
-        backup_try(f"{name}.reactions")
+        self._open(name + ".reactions")
 
     def pre_modification(self, i, reactions, name) -> None:
-        with open(f"{name}.reactions", "a") as file:
-            print(f"Frame {i}", file=file)
-            for (frags, rx) in reactions:
-                frags = [(frag.name, frag.frag_id, frag.atoms) for frag in frags]
-                print(
-                    f"Reaction {rx.name} reactants {frags}",
-                    file=file
-                )
+        print(f"Frame {i}", file=self._handle)
+        for (frags, rx) in reactions:
+            frags = [(frag.name, frag.frag_id, frag.atoms) for frag in frags]
+            self._print(
+                f"Reaction {rx.name} reactants {frags}"
+            )
 
     def interactive_line(self) -> str:
         return f"reactions: {self._simulation.reactions}"
@@ -70,14 +62,13 @@ class FragCountReporter(Reporter):
     to <name>.frags"""
 
     def init_dm(self, name):
-        backup_try(f"{name}.frags")
+        self._open(name + ".frags")
 
     def pre_detection(self, i, name) -> None:
         data = ",".join(
             [f"{k}:{v}" for k, v in self._topstar.frag_counts.items()]
         )
-        with open(f"{name}.frags", "a") as file:
-            print(f"Frame:{i},{data}", file=file)
+        self._print(f"Frame:{i},{data}")
 
     def interactive_line(self) -> str:
         return f"fragments: {len(self._topstar.frag_list)}"

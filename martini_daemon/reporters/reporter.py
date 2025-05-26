@@ -1,8 +1,61 @@
-class Reporter():
-    """Placeholder / base class for reporters. _sysstar and _topstar are
-    added as fields when a reporter is added to a DaemonSimulation."""
+from ..utils import backup_try
+import zlib
 
-    # ====== S* reporting ======
+
+class Reporter():
+    """
+    Placeholder / base class for DaemonSimulation reporters.
+    """
+
+    # filled out by DaemonSimulation
+    _topstar = None
+    _sysstar = None
+
+    # ====== (Optional) Helpers ======
+    _handle = None
+    _comp = None
+    _mode = None
+
+    def _open(self, path):
+        """
+        Set self._handle for an uncompressed text format.
+        """
+        assert self._handle is None and self._comp is None, "_open must only be called once."
+        backup_try(path)
+        self._handle = open(path, "w")
+        self._mode = "w"
+        self._comp = None
+
+    def _open_compressed(self, path):
+        """
+        Set self._handle for a compressed binary format
+        (with self._comp for compression).
+        """
+        assert self._handle is None and self._comp is None, "_open must only be called once."
+        backup_try(path)
+        self._handle = open(path, "wb")
+        self._mode = "wb"
+        self._comp = zlib.compressobj(6)
+
+    def _write(self, a):
+        if self._comp is not None:
+            self._handle.write(self._comp.compress(a))
+        else:
+            self._handle.write(a)
+
+    def _print(self, a):
+        assert self._comp is None and self._mode == "w", "only use _print with uncompressed text modes"
+        self._handle.write(a + "\n")
+
+    def __del__(self):
+        if self._handle is not None:
+            if self._comp is not None:
+                self._handle.write(self._comp.flush())
+                self._comp = None
+            self._handle.close()
+            self._handle = None
+
+    # ====== S* reporting overloadable ======
     # on_set_xtc_path, on_xtc_frame, on_write_gro -> should be used to reporters that try to mirror trajectories
     def on_set_xtc_path(self, xtc_name):
         """
@@ -32,7 +85,7 @@ class Reporter():
         # of the gro file without the .gro extension
         pass
 
-    # ====== T* reporting ======
+    # ====== T* reporting overloadable ======
     # init_dm, pre_detection, pre_modification, post_modification -> should be used for reporters that want to report on T* and D/M
     def init_dm(self, name):
         pass
@@ -52,7 +105,12 @@ class Reporter():
         # reinitialized. Only runs if there were reactions.
         pass
 
-    # ====== Misc ======
+    # ====== Misc overloadable ======
     # adds something to the line shown interactively to the user
     def interactive_line(self) -> str:
         pass
+
+
+def read_compressed(path):
+    with open(path, "rb") as f:
+        return zlib.decompress(f.read())
