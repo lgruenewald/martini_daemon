@@ -300,6 +300,8 @@ class DaemonSimulation():
             )
         print()
         self.system.write_gro(self.out_path)
+        for reporter in self.reporters:
+            reporter.finish()
 
     def step(self, steps=1, xtc=True, dm=True, neighbor=True):
         """

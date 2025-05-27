@@ -48,6 +48,9 @@ class Reporter():
         self._handle.write(a + "\n")
 
     def __del__(self):
+        self.finish()
+
+    def finish(self):
         if self._handle is not None:
             if self._comp is not None:
                 self._handle.write(self._comp.flush())

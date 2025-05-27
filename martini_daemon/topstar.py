@@ -241,7 +241,7 @@ class TopStar():
         # add graphs to system
         self.try_match_graphs(set(parts), frag_name)
         # do initial molecules info, used e.g. in helpers/monomer
-        if self.initial_molecules[-1][0] == frag_name:
+        if len(self.initial_molecules) > 0 and self.initial_molecules[-1][0] == frag_name:
             _, n, n_atoms = self.initial_molecules[-1]
             assert len(parts) == n_atoms
             self.initial_molecules[-1] = (frag_name, n+1, n_atoms)
