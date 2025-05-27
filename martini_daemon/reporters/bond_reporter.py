@@ -5,6 +5,7 @@ import struct
 import zlib
 from ..utils import backup_try, cross_box
 
+
 def _append(arr, index, val, max, empty_val):
     """
         helper for simulated variable length numpy arrays
@@ -14,6 +15,18 @@ def _append(arr, index, val, max, empty_val):
             arr[index][i] = val
             return
     assert False, f"More than {max} bonds for atom {index+1}."
+
+
+def _has(arr, index, val, max, empty_val):
+    """
+        helper for simulated variable length numpy arrays
+    """
+    for i in range(max):
+        if arr[index][i] == val:
+            return True
+        elif arr[index][i] == empty_val:
+            return False
+    return False
 
 
 class BondReporter(Reporter):
@@ -71,6 +84,9 @@ class BondReporter(Reporter):
                     i, j = force.get_members(id)
                     if i == j or i >= self.n or j >= self.n:
                         continue
+                    if _has(bonds, i, j, self.max_bonds_per_atom, empty_val):
+                        # multiple bonds between i and j? only add once
+                        continue
                     _append(bonds, i, j, self.max_bonds_per_atom, empty_val)
                     _append(bonds, j, i, self.max_bonds_per_atom, empty_val)
             elif force.is_instance("vsite"):
@@ -79,6 +95,9 @@ class BondReporter(Reporter):
                     for other in others:
                         if vid == other or vid >= self.n or other >= self.n:
                             continue
+                        if _has(bonds, vid, other, self.max_bonds_per_atom, empty_val):
+                            continue
+                        # multiple bonds between i and j? skip
                         _append(
                             bonds, vid, other, self.max_bonds_per_atom, empty_val
                         )
@@ -89,7 +108,7 @@ class BondReporter(Reporter):
         self._write(bonds.tobytes())
 
 
-def read_bonds(path):
+def read_bonds(path: str) -> tuple[int, int, int, int, np.array]:
     """
         Reads a file written by BondReporter.
         Returns:

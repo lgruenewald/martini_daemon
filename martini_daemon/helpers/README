@@ -1,0 +1,5 @@
+# Helpers
+
+Optional components for working with files produced by martini daemon,
+or with martini daemon classes to accomplish common processing and analysis
+tasks.

@@ -52,6 +52,8 @@ class TopStar():
     reporters: list[Reporter]
     out_name: str  # passed to reporters so they generate the correct filenames
 
+    initial_molecules: list[tuple[str, int, int]]
+
     def __init__(self, system, logger, nlist_cutoff, max_absolute_rate,
                  smoothing_constant, highest_probability, respos):
         self.frag_list = {}
@@ -73,6 +75,7 @@ class TopStar():
         self.smoothing_constant = smoothing_constant
         self.highest_probability = highest_probability
         self.respos = respos
+        self.initial_molecules = []
 
     def add_reporter(self, reporter) -> None:
         self.reporters.append(reporter)
@@ -237,6 +240,13 @@ class TopStar():
         res = self.instantiate_over_existing(frag, parts)
         # add graphs to system
         self.try_match_graphs(set(parts), frag_name)
+        # do initial molecules info, used e.g. in helpers/monomer
+        if self.initial_molecules[-1][0] == frag_name:
+            _, n, n_atoms = self.initial_molecules[-1]
+            assert len(parts) == n_atoms
+            self.initial_molecules[-1] = (frag_name, n+1, n_atoms)
+        else:
+            self.initial_molecules.append((frag_name, 1, len(parts)))
         return res
 
     def instantiate_over_existing(self, molfrag: MolFragment,
@@ -287,7 +297,7 @@ class TopStar():
             for member in member_parts:
                 self.interaction_list[member].append(f)
 
-    # Save/load helpers
+    # Save/load helpers - TODO make it a second constructor
     def save(self, f):
         """
             Serializes T* into bytes, writes it to f
@@ -310,6 +320,7 @@ class TopStar():
         f.dump(self.neighbor_atom_map)
         f.dump(self.subfrag_map)
         f.dump(self.absolute_rate)
+        f.dump(self.initial_molecules)
 
         # unpicklable because they reference force
         f.dump(len(self.type_lookup))
@@ -336,6 +347,7 @@ class TopStar():
         self.neighbor_atom_map = f.load()
         self.subfrag_map = f.load()
         self.absolute_rate = f.load()
+        self.initial_molecules = f.load()
 
         for i in range(f.load()):
             k = f.load()
