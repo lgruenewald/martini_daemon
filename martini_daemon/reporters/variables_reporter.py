@@ -19,7 +19,7 @@ class VariablesReporter(Reporter):
 
     def on_xtc_frame(self, i, pos, box, xtc_name: str) -> None:
         sysstar: SysStar = self._sysstar
-        n = sysstar.len_particles()
+        n = sysstar.len_atoms()
         state: mm.State = sysstar.get_state()
         ke = state.getKineticEnergy().value_in_unit(mm.unit.kilojoule_per_mole)
         pe = state.getPotentialEnergy().value_in_unit(mm.unit.kilojoule_per_mole)

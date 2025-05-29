@@ -1,6 +1,13 @@
 from .forces.force import Force
 
-class MolFragment:
+
+class Molecule():
+    """
+        Represents a [moleculetype] or reaction product.
+
+        index_type "index" -> integer indices (moleculetype)
+        index_type "pair" -> string:integer indices (reaction product)
+    """
     molecule_name: str
     # atoms: type, resnum, resname, atomname, chargegr, charge, mass
     atoms: list[tuple[str, int, str, str, int, float, float]]
@@ -27,6 +34,8 @@ class MolFragment:
         self.exclusions.add((i, j))
         self.exclusions.add((j, i))
 
+    # custom save/load necessary, because forces contain
+    # references to unpickled Force instances
     def save(self, f) -> None:
         f.dump(self.molecule_name)
         f.dump(self.atoms)

@@ -7,7 +7,7 @@ class VSite3fd(VirtualSite):
         i, j, k = members
         a, d = params
         vsite = mm.LocalCoordinatesSite(
-            [i, j, k],  # particles
+            [i, j, k],  # atoms
             [1.0, 0.0, 0.0],  # origin weights
             [-1.0, 1.0 - a, a],  # x direction weight
             [0.0, 0.0, 0.0],  # y direction weight

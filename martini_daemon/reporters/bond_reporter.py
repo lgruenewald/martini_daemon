@@ -34,7 +34,7 @@ class BondReporter(Reporter):
 
     def on_set_xtc_path(self, xtc_name):
         self._open_compressed(xtc_name + ".bonds")
-        n = self._sysstar.len_particles()
+        n = self._sysstar.len_atoms()
         assert n > 0
         assert self.max_atoms < n, f"max_atoms ({self.max_atoms}) is larger than the total number of atoms ({n})."
         if self.max_atoms > 0:

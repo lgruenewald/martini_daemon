@@ -70,7 +70,42 @@ def read_monomer_graph(bond_frames: list[np.array], mapping: np.array):
     return monomer_frames
 
 
-def unroll(max: int, edge_array: np.array):
+# calculate degree of conversion
+def conversion(
+    monomer_frames: list[np.array], start: int, end: int,
+    bonds_per_monomer: int
+):
+    """
+        Calculate the degree of conversion in a polymerization reaction.
+        - monomer_frames is given by read_monomer_graph
+        - Should be calculated for a specific monomer. Its index in the monomer
+        list should be between start and end (start inclusive, end not).
+        - 100% conversion is reached when all monomers between start and end
+        have bonds_per_monomer bonds to other monomers (the other monomers
+        can be, but don't have to be between start and end)
+    """
+
+    count = end - start
+    max_bonds = bonds_per_monomer * count
+    conversions = np.empty(len(monomer_frames), np.float32)
+    for i, frame in enumerate(monomer_frames):
+        conversions[i] = sum(
+            map(
+                lambda bond:
+                    (1 if bond[0] >= start and bond[0] < end else 0) +
+                    (1 if bond[1] >= start and bond[0] < end else 0),
+                frame
+            )
+        ) / max_bonds
+    return conversions
+
+
+# calculate give #s for different bond orders
+
+
+# loop analysis - find different types of loops
+
+def _unroll(max: int, edge_array: np.array):
     """
         Converts a condensed (np.array of dimension (n_edges, 2)) list of
         edges representation of a graph of 0:max numbers as nodes to a python
@@ -83,11 +118,6 @@ def unroll(max: int, edge_array: np.array):
         graph[edge[1]].add(edge[0])
     return graph
 
-# calculate degree of conversion
-# calculate give #s for different bond orders
-
-
-# loop analysis - find different types of loops
 
 def _find_cycles(graph, max_loop, path):
     """
@@ -133,7 +163,7 @@ def loop_analysis(n_monomers, monomer_frames, max_loop=10, progress=False):
         if progress and frame_index % 16 == 0:
             sys.stdout.write(f"\033[2K\rfinding loops frame {frame_index} of {len(monomer_frames)}")
         loop_set: set[frozenset[int]] = loops[frame_index]
-        graph = unroll(n_monomers, frame)
+        graph = _unroll(n_monomers, frame)
         for i in range(n_monomers):
             loop_set |= _find_cycles(graph, max_loop, [i])
 

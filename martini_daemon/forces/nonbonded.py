@@ -61,7 +61,7 @@ class NonBonded(Force):
         self.nonbonded_type = nonbonded_type
 
     def add(self, members, params):
-        """Particle types are listed in S*, not here"""
+        """Atom types are listed in S*, not here"""
         raise NotImplementedError
 
     def get_members(self, i):
@@ -72,9 +72,9 @@ class NonBonded(Force):
         """Non bonded force, so invalid"""
         raise NotImplementedError
 
-    def update_params(self, i, part_type, charge, charge_changed):
-        part_type_id = self.use_atom_type(part_type)
-        self._force_obj.setParticleParameters(i, [part_type_id, charge])
+    def update_params(self, i, atom_type, charge, charge_changed):
+        atom_type_id = self.use_atom_type(atom_type)
+        self._force_obj.setParticleParameters(i, [atom_type_id, charge])
         self._sysstar.pairs._rebuild = True
         if charge_changed:
             self._es_force._rebuild = True
@@ -123,10 +123,10 @@ class NonBonded(Force):
             self._sysstar.nonbonded_cutoff.value_in_unit(nanometer)
         )
 
-        for i in range(self._sysstar.len_particles()):
-            type, charge, _ = self._sysstar.get_particle_details(i)
-            part_type_id = self.use_atom_type(type)
-            self._force_obj.addParticle([part_type_id, charge])
+        for i in range(self._sysstar.len_atoms()):
+            type, charge, _ = self._sysstar.get_atom_details(i)
+            atom_type_id = self.use_atom_type(type)
+            self._force_obj.addParticle([atom_type_id, charge])
 
         for (i, j) in filter(None, self._exclusions._list):
             self._force_obj.addExclusion(i, j)
@@ -233,17 +233,17 @@ class NonBonded(Force):
     def get_exclusion_helper(self):
         return self._exclusions
 
-    def use_atom_type(self, part_type):
+    def use_atom_type(self, atom_type):
         """Add new atom types for LJ.
 
         It is not a problem to call this with atom types already present.
 
         Returns the atom type index
         """
-        id = self._used_atom_types.get(part_type)
+        id = self._used_atom_types.get(atom_type)
         if id is None:
             id = len(self._used_atom_types)
-            self._used_atom_types[part_type] = id
+            self._used_atom_types[atom_type] = id
             self._rebuild = True
         return id
 
@@ -288,8 +288,8 @@ class ExclusionHelper(Force):
         self._force_obj = None
 
     def es_self_correction_add(self, i, j):
-        _, q1, _ = self._sysstar.get_particle_details(i)
-        _, q2, _ = self._sysstar.get_particle_details(j)
+        _, q1, _ = self._sysstar.get_atom_details(i)
+        _, q2, _ = self._sysstar.get_atom_details(j)
         qprod = q1 * q2
         if i == j:
             qprod *= 0.5
@@ -310,8 +310,8 @@ class ExclusionHelper(Force):
         )
         self._force_obj.addPerBondParameter("q_product")
         self._force_obj.setUsesPeriodicBoundaryConditions(True)
-        for i in range(self._sysstar.len_particles()):
-            _, charge, _ = self._sysstar.get_particle_details(i)
+        for i in range(self._sysstar.len_atoms()):
+            _, charge, _ = self._sysstar.get_atom_details(i)
             if charge != 0:
                 # self term in reaction field correction
                 self.es_self_correction_add(i, i)

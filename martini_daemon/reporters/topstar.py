@@ -17,12 +17,12 @@ class TopStarLogger(Reporter):
     def post_modification(self, i, name) -> None:
         topstar = self._topstar
         self._print(f"===== Frame {i} =====")
-        self._print("==== TopStar / Fragment Types ====")
-        for k, molfrag in topstar.type_lookup.items():
+        self._print("==== TopStar / Molecules ====")
+        for k, molfrag in topstar.molecules.items():
             self._write(f"{k} ")
         self._write("\n")
-        self._print("==== TopStar / GraphFragments ====")
-        for g in topstar.graph_fragment_map.values():
+        self._print("==== TopStar / Graphs ====")
+        for g in topstar.graphs.values():
             self._write(f"{g.name}: ({[name for (name, _, _, _) in g.atoms]}) ")
         self._write("\n")
         self._print("==== TopStar / ReactionTemplates ====")
@@ -34,7 +34,7 @@ class TopStarLogger(Reporter):
             self._print(f"{id}: <frag {frag.name} ps {frag.atoms}>")
         self._print("==== TopStar / defrag list ====")
         for id, defrag in enumerate(topstar.defrag_list):
-            self._print(f"particle {id} is in fragments {defrag}")
+            self._print(f"atom {id} is in fragments {defrag}")
             if id > 100:
                 break
 

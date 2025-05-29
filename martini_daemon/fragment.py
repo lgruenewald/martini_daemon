@@ -1,10 +1,11 @@
-from .graph import GraphFragment
+from .graph import Graph
+
 
 class Fragment():
     name: str
     atoms: list[int]
     frag_id: int
-    graph: GraphFragment
+    graph: Graph
 
     def __init__(self, graph, id: int):
         self.name = graph.name

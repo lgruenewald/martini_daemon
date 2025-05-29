@@ -3,13 +3,14 @@ A more modular
 parser that constructs S* and T* rather than openmm's internal objects
 """
 
-from .parser import TopParser, unwrap
-from .topstar import TopStar, MolFragment
+from .parser import Parser, unwrap
+from .topstar import TopStar
+from .molecule import Molecule
 from .reaction_template import ReactionTemplate
 from .sysstar import SysStar
-from .graph import GraphFragment, GraphAtomType
+from .graph import Graph, GraphAtomType
 import math
-from openmm.unit import nanometer  # type: ignore[import-untyped]
+from openmm.unit import nanometer
 import logging
 
 
@@ -19,16 +20,18 @@ def sigma_epsilon_to_c6_c12(sigma, epsilon):
     return c6, c12
 
 
-def DaemonTopFile(file, include_dir=None, defines={},
-                  epsilon_r=15.0, nonbonded_cutoff=1.1*nanometer,
-                  nlist_cutoff=1.1,
-                  max_absolute_rate: float | None = None,
-                  rate_smoothing: tuple[float, float] = (0.01, 0.02),
-                  rate_highest_probability: float = 1.0,
-                  nonbonded_type="default",
-                  logger=None,
-                  respos=None) -> tuple[SysStar, TopStar]:
-    """Parses a Martini Top file for Gromacs and generates T*, sys and top
+def DaemonTopFile(
+    file, include_dir=None, defines: dict[str, str] = {},
+    epsilon_r=15.0,
+    nonbonded_cutoff=1.1*nanometer,
+    nlist_cutoff: float = 1.1,
+    max_absolute_rate: float | None = None,
+    rate_smoothing: tuple[float, float] = (0.01, 0.02),
+    rate_highest_probability: float = 1.0,
+    nonbonded_type="default", logger=None, respos=None
+) -> tuple[SysStar, TopStar]:
+    """
+    Parses a Martini Top file for Gromacs and generates T*, sys and top
     from it. Also parses .frag and .rx files included in the .top file.
     """
 
@@ -43,22 +46,24 @@ def DaemonTopFile(file, include_dir=None, defines={},
         respos
     )
 
-    # so .top files stay backwards compatible
-    defines["DAEMON"] = "1.0"
+    # so .top files can be compatible with gromacs
+    defines["DAEMON"] = "1"
 
     # make parser
-    p = TopParser()
+    p = Parser()
 
     # state of the parser
     system_defined = False  # whether the [system] happened yet
-    _last_molecule = None
-    last_graph: GraphFragment = None
-    last_reaction: ReactionTemplate = None
+    _last_molecule: Molecule | None = None
+    last_graph: Graph | None = None
+    last_reaction: ReactionTemplate | None = None
 
-    # parsers
+    # a list of parsers for each directive
     def parse_pair(pair: int | tuple[int, str]) -> int | tuple[int, int]:
         nonlocal last_reaction
-        if type(pair) is int:  # for scenarios when pair or int can come, int shouldn't be processed
+        if type(pair) is int:
+            # for scenarios when both pair or int valid,
+            # int shouldn't be processed
             return pair
         if last_reaction is None:
             raise ValueError("Attempt to pair-index before a [reaction] was defined")
@@ -66,7 +71,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
         idi, namei = pair
         if idi < 0 or idi >= n_reac:
             raise ValueError(f"Pair {idi}:{namei} index {idi} out of range: 1 to {n_reac}.")
-        graph = topology.graph_fragment_map.get(last_reaction.reactants[idi])
+        graph = topology.graphs.get(last_reaction.reactants[idi])
         if graph is None:
             raise ValueError(f"Pair {idi}:{namei} graph {last_reaction.reactants[idi]} not found.")
         atomi = graph.atom_name_to_index.get(namei)
@@ -75,7 +80,6 @@ def DaemonTopFile(file, include_dir=None, defines={},
         if graph.atoms[atomi][3] not in {GraphAtomType.NORMAL, GraphAtomType.OPT}:
             raise ValueError(f"Pair {idi}:{namei} references an atom!, which is not valid.")
         return idi, atomi
-
 
     def process_defaults(tokens):
         nb_type = unwrap(tokens, 0, "int")
@@ -86,7 +90,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
             raise ValueError("Unsupported combination rule: "
                              f"{combination_rule}")
         if len(tokens) > 2:
-            raise ValueError("Too many fields in [ defaults ] directive")
+            raise ValueError("Too many fields in [defaults] directive")
 
     p.add_level("defaults", process_defaults)
 
@@ -96,7 +100,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
         nrexcl = unwrap(tokens, 1, "int")
         if nrexcl != 1:
             raise ValueError("nrexcl is not 1, only nrexcl=1 is implemented")
-        _last_molecule = topology.new_mol_fragment(name)
+        _last_molecule = topology.new_molecule(name)
 
     p.add_level("moleculetype", process_moltype)
 
@@ -111,9 +115,9 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     p.add_level("molecules", process_molecule)
 
-    def last_molecule() -> MolFragment:
+    def last_molecule() -> Molecule:
         if last_molecule is None:
-            raise ValueError("No [ moleculetype ] given")
+            raise ValueError("No [moleculetype] given")
         return _last_molecule
 
     def process_atoms(tokens):
@@ -129,11 +133,13 @@ def DaemonTopFile(file, include_dir=None, defines={},
         mass = unwrap(tokens, 7, "float") if len(tokens) > 7 else None
         atom_index = len(last_molecule().atoms)
         if id != atom_index:
-            raise ValueError("Bad atom ID, are they out of order?"
-                             f" got id {id} but expected {atom_index}")
-        last_molecule().atoms.append((type, resnum, resname,
-                                      atomname, charge_group_num,
-                                      charge, mass))
+            raise ValueError(
+                "Bad atom ID, are they out of order?"
+                f" got id {id} but expected {atom_index}"
+            )
+        last_molecule().atoms.append(
+            (type, resnum, resname, atomname, charge_group_num, charge, mass)
+        )
 
     p.add_level("atoms", process_atoms)
 
@@ -149,42 +155,49 @@ def DaemonTopFile(file, include_dir=None, defines={},
         if type == 1 or type == 6:
             # harmonic bond / harmonic potential
             force = unwrap(tokens, 4, "float")
-            last_molecule().interactions.append((system.harmonic_bond, [i, j],
-                                                 [length, force]))
+            last_molecule().interactions.append(
+                (system.harmonic_bond, [i, j], [length, force])
+            )
         elif type == 2:
             # G96 bond
             force = unwrap(tokens, 4, "float")
-            last_molecule().interactions.append((system.g96_bond, [i, j],
-                                                [length, force]))
+            last_molecule().interactions.append(
+                (system.g96_bond, [i, j], [length, force])
+            )
         elif type == 3:
             # morse
             D = unwrap(tokens, 4, "float")
             beta = unwrap(tokens, 5, "float")
-            last_molecule().interactions.append((system.morse_bond, [i, j],
-                                                 [length, D, beta]))
+            last_molecule().interactions.append(
+                (system.morse_bond, [i, j], [length, D, beta])
+            )
         elif type == 4:
             # cubic bond
             kb = unwrap(tokens, 4, "float")
             kcub = unwrap(tokens, 5, "float")
-            last_molecule().interactions.append((system.cubic_bond, [i, j],
-                                                 [length, kb, kcub]))
+            last_molecule().interactions.append(
+                (system.cubic_bond, [i, j], [length, kb, kcub])
+            )
         elif type == 5:
             # connection - only generate exclusions and add a dummy interaction
-            last_molecule().interactions.append((system.connection, [i, j],
-                                                 []))
+            last_molecule().interactions.append(
+                (system.connection, [i, j], [])
+            )
         elif type == 7:
             # FENE (finitely extensible nonlinear elastic) bond
             force = unwrap(tokens, 4, "float")
-            last_molecule().interactions.append((system.fene_bond, [i, j],
-                                                 [length, force]))
+            last_molecule().interactions.append(
+                (system.fene_bond, [i, j], [length, force])
+            )
         elif type == 10:
             # restraint potential
             low = length
             up1 = unwrap(tokens, 4, "float")
             up2 = unwrap(tokens, 5, "float")
             k = unwrap(tokens, 6, "float")
-            last_molecule().interactions.append((system.distance_restraint,
-                                                [i, j], [low, up1, up2, k]))
+            last_molecule().interactions.append(
+                (system.distance_restraint, [i, j], [low, up1, up2, k])
+            )
         else:
             raise ValueError("Unsupported  bond function type")
         if type != 6:
@@ -204,39 +217,42 @@ def DaemonTopFile(file, include_dir=None, defines={},
             # Harmonic angle
             theta = unwrap(tokens, 4, "degree")
             force = unwrap(tokens, 5, "float")
-            last_molecule().interactions.append((system.harmonic_angle,
-                                                [i, j, k], [theta, force]))
+            last_molecule().interactions.append(
+                (system.harmonic_angle, [i, j, k], [theta, force])
+            )
         elif type == 2:
             # G96 angle
             theta = unwrap(tokens, 4, "degree")
             force = unwrap(tokens, 5, "float")
-            last_molecule().interactions.append((system.g96_angle, [i, j, k],
-                                                [theta, force]))
+            last_molecule().interactions.append(
+                (system.g96_angle, [i, j, k], [theta, force])
+            )
         elif type == 3:
             # cross bond bond
             r1 = unwrap(tokens, 4, "float")
             r2 = unwrap(tokens, 5, "float")
             force = unwrap(tokens, 6, "float")
-            last_molecule().interactions.append((system.cross_bond_bond,
-                                                [i, j, k], [r1, r2, force]))
+            last_molecule().interactions.append(
+                (system.cross_bond_bond, [i, j, k], [r1, r2, force])
+            )
         elif type == 4:
             # cross bond angle
             r1 = unwrap(tokens, 4, "float")
             r2 = unwrap(tokens, 5, "float")
             r3 = unwrap(tokens, 6, "float")
             force = unwrap(tokens, 7, "float")
-            last_molecule().interactions.append((system.cross_bond_angle,
-                                                [i, j, k],
-                                                [r1, r2, r3, force]))
+            last_molecule().interactions.append(
+                (system.cross_bond_angle, [i, j, k], [r1, r2, r3, force])
+            )
         elif type == 5:
             # Urey-Bradley
             theta = unwrap(tokens, 4, "degree")
             force = unwrap(tokens, 5, "float")
             r13 = unwrap(tokens, 6, "float")
             k_UB = unwrap(tokens, 7, "float")
-            last_molecule().interactions.append((system.urey_bradley,
-                                                [i, j, k],
-                                                [theta, force, r13, k_UB]))
+            last_molecule().interactions.append(
+                (system.urey_bradley, [i, j, k], [theta, force, r13, k_UB])
+            )
         elif type == 6:
             # Quartic angle
             # theta
@@ -244,19 +260,23 @@ def DaemonTopFile(file, include_dir=None, defines={},
             # C0 to C4
             for x in range(5):
                 params.append(unwrap(tokens, 5+x, "float"))
-            last_molecule().interactions.append((system.quartic_angle, 
-                                                [i, j, k], params))
+            last_molecule().interactions.append(
+                (system.quartic_angle, [i, j, k], params)
+            )
         elif type == 9:
             # Linear angle
             a = unwrap(tokens, 4, "float")
             force = unwrap(tokens, 5, "float")
-            last_molecule().interactions.append((system.linear_angle,
-                                                [i, j, k], [a, force]))
+            last_molecule().interactions.append(
+                (system.linear_angle, [i, j, k], [a, force])
+            )
         elif type == 10:
+            # Restricted angle
             theta = unwrap(tokens, 4, "degree")
             force = unwrap(tokens, 5, "float")
-            last_molecule().interactions.append((system.restricted_angle,
-                                                [i, j, k], [theta, force]))
+            last_molecule().interactions.append(
+                (system.restricted_angle, [i, j, k], [theta, force])
+            )
         else:
             raise ValueError(f"Unsupported angle type {type}.")
 
@@ -267,7 +287,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
         i = parse_pair(unwrap(tokens, 0, index_type))
         j = parse_pair(unwrap(tokens, 1, index_type))
         k = parse_pair(unwrap(tokens, 2, index_type))
-        l = parse_pair(unwrap(tokens, 3, index_type))
+        L = parse_pair(unwrap(tokens, 3, index_type))
         type = unwrap(tokens, 4, "int")
         match type:
             case 1 | 9:
@@ -276,7 +296,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 force = unwrap(tokens, 6, "float")
                 multiplicity = unwrap(tokens, 7, "int", 1)
                 last_molecule().interactions.append(
-                    (system.proper_dihedral, [i, j, k, l],
+                    (system.proper_dihedral, [i, j, k, L],
                      [theta, force, multiplicity])
                 )
             case 2:
@@ -285,7 +305,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 force = unwrap(tokens, 6, "float")
                 theta = theta - math.tau if theta > math.pi else theta
                 last_molecule().interactions.append(
-                    (system.improper_dihedral, [i, j, k, l],
+                    (system.improper_dihedral, [i, j, k, L],
                      [theta, force])
                 )
             case 3:
@@ -295,7 +315,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
                     # C0 to C5
                     params.append(unwrap(tokens, 5+c, "float"))
                 last_molecule().interactions.append(
-                    (system.rb_torsion, [i, j, k, l], params)
+                    (system.rb_torsion, [i, j, k, L], params)
                 )
             case 5:
                 # Fourier dihedral
@@ -312,14 +332,14 @@ def DaemonTopFile(file, include_dir=None, defines={},
                     0,
                 ]
                 last_molecule().interactions.append(
-                    (system.rb_torsion, [i, j, k, l], rb_params)
+                    (system.rb_torsion, [i, j, k, L], rb_params)
                 )
             case 10:
                 # restricted dihedral
                 theta = unwrap(tokens, 5, "degree")
                 force = unwrap(tokens, 6, "float")
                 last_molecule().interactions.append(
-                    (system.restricted_dihedral, [i, j, k, l], [theta, force])
+                    (system.restricted_dihedral, [i, j, k, L], [theta, force])
                 )
             case 11:
                 # combined bending-torsion potential
@@ -329,7 +349,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
                     # a0 to a4
                     params.append(unwrap(tokens, 6+c, "float"))
                 last_molecule().interactions.append(
-                    (system.combined_bending_torsion, [i, j, k, l], params)
+                    (system.combined_bending_torsion, [i, j, k, L], params)
                 )
             case _:
                 raise ValueError("Unsupported dihedral function type {type}.")
@@ -393,31 +413,38 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 (system.pairs, [i, j], [c6, c12])
             )
         else:
-            last_molecule().interactions.append((system.pairs, [i, j], []))
+            last_molecule().interactions.append(
+                (system.pairs, [i, j], [])
+            )
 
     p.add_level("pairs", process_pairs)
 
     def process_atomtypes(tokens):
         if len(tokens) != 6:
             raise ValueError("Only atomtypes lines formatted as type, m, q,"
-                             "particle_type, sigma, epsilon are supported.")
+                             "atom_type, sigma, epsilon are supported.")
         type = unwrap(tokens, 0, "word")
         mass = unwrap(tokens, 1, "float")
         charge = unwrap(tokens, 2, "float")
-        particle_type = unwrap(tokens, 3, "word")
-        if particle_type != "A":
-            raise ValueError("Only A particle type expected in [atomtypes]")
+        atom_type = unwrap(tokens, 3, "word")
+        if atom_type != "A":
+            raise ValueError("Only A atom type expected in [atomtypes]")
         sigma = unwrap(tokens, 4, "float")
         epsilon = unwrap(tokens, 5, "float")
         if sigma != 0.0 or epsilon != 0.0:
-            raise ValueError("Only zero sigma and epsilon are expected in [atomtypes]")
+            raise ValueError(
+                "Only zero sigma and epsilon are expected in [atomtypes]"
+            )
         system.add_atom_type(type, charge, mass)
 
     p.add_level("atomtypes", process_atomtypes)
 
     def process_position_restraints(tokens):
         if len(tokens) != 5:
-            raise ValueError("Only position_restraint lines formatted as <index> <type> <kx> <ky> <kz> are supported.")
+            raise ValueError(
+                "Only position_restraint lines formatted as "
+                "<index> <type> <kx> <ky> <kz> are supported."
+            )
         type = unwrap(tokens, 1, "int")
         assert type == 1, "Only type 1 position restraint is supported."
         id = unwrap(tokens, 0, "index")
@@ -428,7 +455,6 @@ def DaemonTopFile(file, include_dir=None, defines={},
         last_molecule().posres.append((id, kx, ky, kz))
 
     p.add_level("position_restraints", process_position_restraints)
-
 
     def process_nonbond_params(tokens):
         type1 = unwrap(tokens, 0, "word")
@@ -457,7 +483,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
         last_molecule().interactions.append(
             (system.vsite1, [vid, member], [])
         )
-        # OpenMM does not like overlapping particles otherwise
+        # OpenMM does not like overlapping atoms otherwise
         last_molecule().add_exclusion(vid, member)
 
     p.add_level("virtual_sites1", process_virtual_sites1)
@@ -540,8 +566,8 @@ def DaemonTopFile(file, include_dir=None, defines={},
         i = parse_pair(unwrap(tokens, 1, index_type))
         j = parse_pair(unwrap(tokens, 2, index_type))
         k = parse_pair(unwrap(tokens, 3, index_type))
-        l = parse_pair(unwrap(tokens, 4, index_type))
-        members = [vid, i, j, k, l]
+        L = parse_pair(unwrap(tokens, 4, index_type))
+        members = [vid, i, j, k, L]
         type = unwrap(tokens, 5, "int")
         match type:
             case 2:
@@ -596,8 +622,9 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 )
             case _:
                 raise ValueError(
-                    f"Virtua site n type {type} not implemented."
+                    f"Virtual site n type {type} not implemented."
                 )
+        # OpenMM does not like overlapping particles without exclusions
         if len(members) == 2:
             last_molecule().add_exclusion(members[0], members[1])
 
@@ -605,7 +632,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
 
     def graph_start():
         nonlocal last_graph
-        last_graph = GraphFragment(None)
+        last_graph = Graph(None)
 
     def process_graph(tokens):
         nonlocal last_graph
@@ -636,9 +663,10 @@ def DaemonTopFile(file, include_dir=None, defines={},
             mols = [unwrap(tokens, n, "word") for n in range(1, len(tokens))]
             last_graph.molecules += mols
         elif keyword == "equivalent":
-            parts = set(unwrap(tokens, n, "word") for n in range(1, len(tokens)))
+            parts = set(
+                unwrap(tokens, n, "word") for n in range(1, len(tokens))
+            )
             last_graph.equivalents.append(parts)
-        # TODO construct a list of filters and validate against typos
         else:
             parts = [unwrap(tokens, i, "word") for i in range(1, len(tokens))]
             last_graph.interactions.append((keyword, parts))
@@ -648,11 +676,12 @@ def DaemonTopFile(file, include_dir=None, defines={},
         if last_graph.name is None:
             raise ValueError("name is mandatory")
         last_graph.finish_init()
-        topology.new_graph_fragment(last_graph)
+        topology.new_graph(last_graph)
         last_graph = None
 
-    p.add_level("frag", process_graph, start=graph_start, end=graph_end)
     p.add_level("graph", process_graph, start=graph_start, end=graph_end)
+    # alias:
+    p.add_level("frag", process_graph, start=graph_start, end=graph_end)
 
     def require_complete_reaction():
         nonlocal last_reaction
@@ -668,14 +697,15 @@ def DaemonTopFile(file, include_dir=None, defines={},
     def process_reaction(tokens):
         nonlocal last_reaction, _last_molecule
         if system_defined:
-            raise ValueError("[ rx ] must be before [ system ]")
+            raise ValueError("[ reaction ] must be before [ system ]")
         require_complete_reaction()
         name = unwrap(tokens, 0, "word")
         last_reaction = ReactionTemplate(name)
-        _last_molecule = topology.new_mol_fragment(name)
+        _last_molecule = topology.new_molecule(name)
         _last_molecule.index_type = "pair"
 
     p.add_level("reaction", process_reaction)
+    # alias:
     p.add_level("rx", process_reaction)
 
     def process_reactants(tokens):
@@ -688,6 +718,7 @@ def DaemonTopFile(file, include_dir=None, defines={},
         last_reaction.reactants = rxs
 
     p.add_level("reactants", process_reactants)
+    # alias:
     p.add_level("reactant", process_reactants)
 
     def process_conditions(tokens):
@@ -700,50 +731,59 @@ def DaemonTopFile(file, include_dir=None, defines={},
             case "r_max":
                 idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
                 idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
-                cutoff = unwrap(tokens, 3, "positive")                
-                last_reaction.distance_max.append((idi, atomi, idj, atomj, cutoff))
+                cutoff = unwrap(tokens, 3, "positive")
+                last_reaction.distance_max.append(
+                    (idi, atomi, idj, atomj, cutoff)
+                )
             case "r_min":
                 idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
                 idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
                 cutoff = unwrap(tokens, 3, "positive")
-                last_reaction.distance_min.append((idi, atomi, idj, atomj, cutoff))
+                last_reaction.distance_min.append(
+                    (idi, atomi, idj, atomj, cutoff)
+                )
             case "angle_not":
                 idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
                 idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
                 idk, atomk = parse_pair(unwrap(tokens, 3, "pair"))
                 theta_min = unwrap(tokens, 4, "degree")
                 theta_max = unwrap(tokens, 5, "degree")
-                last_reaction.angle_limits.append(
-                    (idi, atomi, idj, atomj, idk, atomk, math.cos(theta_min), math.cos(theta_max))
-                )
+                last_reaction.angle_limits.append((
+                    idi, atomi, idj, atomj, idk, atomk,
+                    math.cos(theta_min), math.cos(theta_max)
+                ))
             case "angle_min":
                 idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
                 idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
                 idk, atomk = parse_pair(unwrap(tokens, 3, "pair"))
                 theta_min = unwrap(tokens, 4, "degree")
-                last_reaction.angle_limits.append(
-                    (idi, atomi, idj, atomj, idk, atomk, math.cos(theta_min), math.cos(math.pi))
-                )
+                last_reaction.angle_limits.append((
+                    idi, atomi, idj, atomj, idk, atomk,
+                    math.cos(theta_min), math.cos(math.pi)
+                ))
             case "angle_max":
                 idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
                 idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
                 idk, atomk = parse_pair(unwrap(tokens, 3, "pair"))
                 theta_max = unwrap(tokens, 4, "degree")
-                last_reaction.angle_limits.append(
-                    (idi, atomi, idj, atomj, idk, atomk, math.cos(0.), math.cos(theta_max))
-                )
+                last_reaction.angle_limits.append((
+                    idi, atomi, idj, atomj, idk, atomk,
+                    math.cos(0.), math.cos(theta_max)
+                ))
             case "angle_between":
                 idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
                 idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
                 idk, atomk = parse_pair(unwrap(tokens, 3, "pair"))
                 theta_min = unwrap(tokens, 4, "degree")
                 theta_max = unwrap(tokens, 5, "degree")
-                last_reaction.angle_limits.append(
-                    (idi, atomi, idj, atomj, idk, atomk, math.cos(0.), math.cos(theta_min))
-                )
-                last_reaction.angle_limits.append(
-                    (idi, atomi, idj, atomj, idk, atomk, math.cos(theta_max), math.cos(math.pi))
-                )
+                last_reaction.angle_limits.append((
+                    idi, atomi, idj, atomj, idk, atomk,
+                    math.cos(0.), math.cos(theta_min)
+                ))
+                last_reaction.angle_limits.append((
+                    idi, atomi, idj, atomj, idk, atomk,
+                    math.cos(theta_max), math.cos(math.pi)
+                ))
             case "dihedral_not":
                 idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
                 idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
@@ -753,17 +793,20 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 theta_max = unwrap(tokens, 6, "degree")
                 # periodicity consideration
                 if theta_max > theta_min:
-                    last_reaction.dihedral_limits.append(
-                        (idi, atomi, idj, atomj, idk, atomk, idl, atoml, theta_min, theta_max)
-                    )
+                    last_reaction.dihedral_limits.append((
+                        idi, atomi, idj, atomj, idk, atomk, idl, atoml,
+                        theta_min, theta_max
+                    ))
                 else:
                     # minus one / add one for inclusive ranges
-                    last_reaction.dihedral_limits.append(
-                        (idi, atomi, idj, atomj, idk, atomk, idl, atoml, -1., theta_max)
-                    )
-                    last_reaction.dihedral_limits.append(
-                        (idi, atomi, idj, atomj, idk, atomk, idl, atoml, theta_min, math.tau + 1.)
-                    )
+                    last_reaction.dihedral_limits.append((
+                        idi, atomi, idj, atomj, idk, atomk, idl, atoml,
+                        0., theta_max
+                    ))
+                    last_reaction.dihedral_limits.append((
+                        idi, atomi, idj, atomj, idk, atomk, idl, atoml,
+                        theta_min, math.tau
+                    ))
             case "dihedral_between":
                 idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
                 idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
@@ -773,23 +816,27 @@ def DaemonTopFile(file, include_dir=None, defines={},
                 theta_min = unwrap(tokens, 6, "degree")
                 # periodicity consideration
                 if theta_max > theta_min:
-                    last_reaction.dihedral_limits.append(
-                        (idi, atomi, idj, atomj, idk, atomk, idl, atoml, theta_min, theta_max)
-                    )
+                    last_reaction.dihedral_limits.append((
+                        idi, atomi, idj, atomj, idk, atomk, idl, atoml,
+                        theta_min, theta_max
+                    ))
                 else:
                     # minus one / add one for inclusive ranges
-                    last_reaction.dihedral_limits.append(
-                        (idi, atomi, idj, atomj, idk, atomk, idl, atoml, -1., theta_max)
-                    )
-                    last_reaction.dihedral_limits.append(
-                        (idi, atomi, idj, atomj, idk, atomk, idl, atoml, theta_min, math.tau + 1.)
-                    )
+                    last_reaction.dihedral_limits.append((
+                        idi, atomi, idj, atomj, idk, atomk, idl, atoml,
+                        0., theta_max
+                    ))
+                    last_reaction.dihedral_limits.append((
+                        idi, atomi, idj, atomj, idk, atomk, idl, atoml,
+                        theta_min, math.tau
+                    ))
             case "rate":
                 last_reaction.relative_rate = unwrap(tokens, 1, "positive")
             case _:
-                raise ValueError(f"Unknown key {key} in [rx_conditions]")
+                raise ValueError(f"Unknown key {key} in [conditions]")
 
     p.add_level("conditions", process_conditions)
+    # alias:
     p.add_level("condition", process_conditions)
 
     def process_break(tokens):

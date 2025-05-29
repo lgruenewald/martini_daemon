@@ -33,8 +33,8 @@ class Pairs(Force):
             params = (*params, None, None)
 
         i, j, p1, p2 = params
-        t1, q1, _ = self._sysstar.get_particle_details(i)
-        t2, q2, _ = self._sysstar.get_particle_details(j)
+        t1, q1, _ = self._sysstar.get_atom_details(i)
+        t2, q2, _ = self._sysstar.get_atom_details(j)
         qprod = q1 * q2
         if p1 is None or p2 is None:
             p1, p2 = self.types[(t1, t2)]

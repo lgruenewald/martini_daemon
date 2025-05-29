@@ -52,25 +52,25 @@ def read_gro(path):
         return tuple(box[0:3]), pos, vel
 
 
-def write_gro(path, title, parts, box, pos, vel=None):
+def write_gro(path, title, atoms, box, pos, vel=None):
     """
-        Write .gro file at path, with title, parts (list of tuples
+        Write .gro file at path, with title, atoms (list of tuples
         containing name, resid, resname in this order, everything else
         in the tuple is discarded), box, pos and vel.
     """
     title = title.strip()
     assert "\n" not in title, "Title must not contain newlines"
     backup_try(path)
-    n_atoms = len(parts)
-    assert len(parts) == len(pos)
+    n_atoms = len(atoms)
+    assert len(atoms) == len(pos)
     if vel is not None:
         assert len(pos) == len(vel)
     with open(path, "w") as file:
         file.write(f"{title}\n")
-        file.write(f"{len(parts)}\n")
+        file.write(f"{len(atoms)}\n")
         for i in range(n_atoms):
             cpos = pos[i]
-            name, resid, resname, *_ = parts[i]
+            name, resid, resname, *_ = atoms[i]
             index = i + 1
             file.write(f"{resid:5}{resname:5}{name:>5}")
             file.write(f"{index:5}{cpos[0]:8.3f}{cpos[1]:8.3f}{cpos[2]:8.3f}")

@@ -21,7 +21,7 @@ class VSiteWeighedAverage(VirtualSite):
             )
         else:
             vsite = mm.LocalCoordinatesSite(
-                members,  # particles
+                members,  # atoms
                 weights,  # origin weights
                 [0.0] * n,  # x direction weight
                 [0.0] * n,  # y direction weight

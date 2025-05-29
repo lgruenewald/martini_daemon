@@ -2,95 +2,158 @@ import random
 from .sysstar import SysStar
 from .forces.force import Interaction
 from .reporters.reporter import Reporter
-from .graph import GraphFragment, GraphMatch, GraphAtomType, match_particles
+from .graph import Graph, GraphMatch, GraphAtomType, match_atoms
 from .fragment import Fragment
 from .reaction_template import ReactionTemplate
-from .mol_fragment import MolFragment
+from .molecule import Molecule
 from .detection import detection_all
 from .utils import smooth
 
-# TODO rename MolFragment to MoleculeType
-# TODO rename GraphFragment to Graph
-random.seed()
 
 class TopStar():
     # ======= (1/3) Building things =======
-    # T* fragment and defrag list
-    frag_list: dict[int, Fragment]
-    frag_counts: dict[str, int]
-    next_frag_id: int
-    # for every part_id have a list of fragments it is in
-    # and a list of interactions it is in
-    # type is  list[list[frag_id]]
-    defrag_list: list[list[int]]
-    interaction_list: list[list[Interaction]]
-
-    # type name -> list of subfrag names
-    subfrag_map: dict[str, list[str]]
-
-    graph_fragment_map: dict[str, GraphFragment]
-
-    # type name -> type, used for instantiation
-    # doubles as a MolFragment list
-    type_lookup: dict[str, MolFragment]
-
-    # reactant type -> reactions map
-    reactions: dict[tuple[str, str, str, str], list[ReactionTemplate]]
-    # reactant type -> are there any higher order reactions with this combo map
-    r_continue: dict[tuple[str, str, str], bool]
-    # reactant type -> neighbor list atom index map
-    neighbor_atom_map: dict[str, int]
-
-    # a relative rate of 1.0, as a smoothed moving average, using utils.smooth
-    absolute_rate: float = -1. # special value when unitialized / warmup
-    max_absolute_rate: float
-    smoothing_constant: tuple[float, float]
-    highest_probability: float
-
-    system: SysStar
-
-    reporters: list[Reporter]
-    out_name: str  # passed to reporters so they generate the correct filenames
-
-    initial_molecules: list[tuple[str, int, int]]
-
     def __init__(self, system, logger, nlist_cutoff, max_absolute_rate,
                  smoothing_constant, highest_probability, respos):
-        self.frag_list = {}
-        self.next_frag_id = 0
-        self.defrag_list = []
-        self.interaction_list = []
-        self.reactions: dict[tuple[str, str, str, str], list[ReactionTemplate]] = {}
-        self.r_continue = {}
-        self.neighbor_atom_map = {}
-        self.type_lookup = {}
-        self.subfrag_map = {}
-        self.reporters = []
-        self.graph_fragment_map = {}
-        self.system = system
+        # == 1. Fragments ==
+        # TODO rework this into a dense structure
+        # fragment by unique id
+        self.frag_list: dict[int, Fragment] = {}
+        # next unique id
+        self.next_frag_id: int = 0
+        # TODO rework this into a dense structure
+        # for every atom_id have a list of fragments it is in
+        # and a list of interactions it is in
+        self.defrag_list: list[list[int]] = []
+        # TODOish dense structure?
+        self.interaction_list: list[list[Interaction]] = []
+        # set by self.update_frag_counts()
+        # TODO too much state synchronization...
+        self.frag_counts: dict[str, int] = {}
+
+        # == 2. Graphs ==
+        self.graphs: dict[str, Graph] = {}
+
+        # == 3. Molecules ==
+        self.molecules: dict[str, Molecule] = {}
+
+        # == 4. Reactions ==
+        # (rx1, rx2, rx3, rx4) -> templates for this reactant combo
+        self.reactions: dict[
+            tuple[str, str | None, str | None, str | None],
+            list[ReactionTemplate]
+        ] = {}
+        # are there any reactions that continue a certain combo of reactants
+        self.r_continue: dict[tuple[str, str | None, str | None], bool] = {}
+        # which atom to use within a fragment type for the neighbor listt
+        self.neighbor_atom_map: dict[str, int] = {}
+
+        # == 5. Misc ==
+        self.reporters: list[Reporter] = []
+        self.system: SysStar = system
         self.logger = logger
-        self.nlist_cutoff = nlist_cutoff
-        self.absolute_rate = -1. # uninitialized / warmup phase
-        self.max_absolute_rate = max_absolute_rate
-        self.smoothing_constant = smoothing_constant
-        self.highest_probability = highest_probability
+        self.nlist_cutoff: float = nlist_cutoff
+        # warmup phase for rate control
+        self.absolute_rate: float = -1.
+        self.max_absolute_rate: float = max_absolute_rate
+        self.smoothing_constant: tuple[float, float] = smoothing_constant
+        self.highest_probability: float = highest_probability
         self.respos = respos
-        self.initial_molecules = []
+        # a list of what was in [molecules] in the .top,
+        # used for analysis only at the moment
+        self.initial_molecules: list[tuple[str, int, int]] = []
+        # set in self.init_dm
+        self.out_name = None
+        random.seed()
+
+    # Save/load helpers - TODO make load an option in the constructor
+    def save(self, f):
+        """
+            Serializes T* into bytes, writes it to f
+
+            Data saved:
+            - frag_list
+            - graphs (graph fragment list)
+            - molecules (molecule definition list)
+            - reactions (reaction template list)
+        """
+        # relies on pickling to handle references to other classes right
+        f.dump(random.getstate())
+
+        f.dump(self.frag_list)
+        f.dump(self.graphs)
+        f.dump(self.reactions)
+        f.dump(self.next_frag_id)
+        f.dump(self.defrag_list)
+        f.dump(self.r_continue)
+        f.dump(self.neighbor_atom_map)
+        f.dump(self.absolute_rate)
+        f.dump(self.initial_molecules)
+
+        # unpicklable because they reference force
+        f.dump(len(self.molecules))
+        for k, v in self.molecules.items():
+            f.dump(k)
+            assert k == v.molecule_name
+            v.save(f)
+
+    def load(self, f):
+        """
+            Deserializes bytes (read from f) into T* (self)
+
+            Should be called after S* is deserialized and set, because
+            of the interaction list.
+        """
+        random.setstate(f.load())
+
+        self.frag_list = f.load()
+        self.graphs = f.load()
+        self.reactions = f.load()
+        self.next_frag_id = f.load()
+        self.defrag_list = f.load()
+        self.r_continue = f.load()
+        self.neighbor_atom_map = f.load()
+        self.absolute_rate = f.load()
+        self.initial_molecules = f.load()
+
+        for i in range(f.load()):
+            k = f.load()
+            v = Molecule(k)
+            v.load(f, self.system)
+            self.molecules[k] = v
+
+        # interaction list gets loaded different because we can't pickle
+        # openmm things -> can't pickle Force objects
+        #
+        # but we can assume that everything added to any Force would have
+        # resulted in an interaction, except non bonded
+        #
+        # though this is still fragile code and should be improved later
+
+        self.interaction_list = [[] for _ in range(self.system.len_atoms())]
+        for force in self.system.modular_forces:
+            if force == self.system.nonbonded_force:
+                continue
+            for i in range(len(force)):
+                inter = Interaction(force, i)
+                members = inter.get_members()
+                for member in members:
+                    self.interaction_list[member].append(inter)
 
     def add_reporter(self, reporter) -> None:
         self.reporters.append(reporter)
 
-    def new_mol_fragment(self, name: str) -> MolFragment:
-        if self.type_lookup.get(name):
-            raise ValueError(f"Second definition of fragment type {name}")
-        mol_fragment = MolFragment(name)
-        self.type_lookup[name] = mol_fragment
-        return mol_fragment
+    def new_molecule(self, name: str) -> Molecule:
+        if self.molecules.get(name):
+            raise ValueError(f"Second definition of molecule type {name}")
+        molecule = Molecule(name)
+        self.molecules[name] = molecule
+        return molecule
 
-    def new_graph_fragment(self, frag: GraphFragment) -> None:
-        self.graph_fragment_map[frag.name] = frag
+    def new_graph(self, graph: Graph) -> None:
+        self.graphs[graph.name] = graph
 
-    def new_reaction(self, reaction: ReactionTemplate) -> MolFragment:
+    # TODO fix this monster
+    def new_reaction(self, reaction: ReactionTemplate) -> Molecule:
         # reactant names
         r1 = reaction.reactants[0]
         r2 = reaction.reactants[1] if len(reaction.reactants) >= 2 else None
@@ -104,7 +167,9 @@ class TopStar():
                 r_max_connected.append({i})
             for i1, aindex1, i2, aindex2, dist in reaction.distance_max:
                 if i1 > len(reaction.reactants) or i2 > len(reaction.reactants):
-                    raise ValueError("r_max with index higher than the number of reactants")
+                    raise ValueError(
+                        "r_max with index higher than the number of reactants"
+                    )
                 name1 = key[i1]
                 name2 = key[i2]
                 if i1 == i2:
@@ -119,8 +184,8 @@ class TopStar():
                         f" neighborlist cutoff of {self.nlist_cutoff}."
                     )
                 # graph 1 and 2
-                graph1 = self.graph_fragment_map[name1]
-                graph2 = self.graph_fragment_map[name2]
+                graph1 = self.graphs[name1]
+                graph2 = self.graphs[name2]
                 # index to type
                 _, _, _, type1 = graph1.atoms[aindex1]
                 _, _, _, type2 = graph2.atoms[aindex2]
@@ -164,38 +229,40 @@ class TopStar():
         if self.reactions.get(key) is None:
             self.reactions[key] = []
         self.reactions[key].append(reaction)
-        return self.type_lookup[reaction.name]
+        return self.molecules[reaction.name]
 
     # Graph helpers
 
-    def try_match_graphs(self, particles: set[int], molname=None) -> None:
+    def try_match_graphs(self, atoms: set[int], molname=None) -> None:
         """
-            Graph version of instantiate subfrag.
+        Given a set of atoms, find all graph matches of all known
+        graphs and add them to the fragment list.
 
-            Tries to match all known graphs at all particles in a list.
-            Should be called after interactions (self.interaction_list) have
-            been updated. Particles should be all affected particles, and
-            all their neighbors (during reactions) or all particles
-            (at the start).
+        Should be called after interactions (self.interaction_list) have
+        been updated.
 
-            Will add graphs to self.frag_list, if the same match/graph doesn't
-            already exist.
+        Initial system construction: call this for every molecule, specify
+        molname.
 
-            If molname is specified, it means that we can be assured that
-            the same matches are going to happen when we call it with the
-            same molname again, so we can cache the results and speed up
-            this function call later.
+        Reaction: Atoms should be all affected atoms in a reaction,
+        and all their neighbors. Remove all fragments that contain atoms
+        on which try_match_graphs is called first.
+
+        If molname is specified, it means that we can be assured that
+        the same matches are going to happen when we call it with the
+        same molname again, so we can cache the results and speed up
+        this function call later.
         """
 
         matches: list[GraphMatch] = []
-        for graph in self.graph_fragment_map.values():
+        for graph in self.graphs.values():
             # for each possible graph to match
             # don't match if it's only the specific molecule
             if len(graph.molecules) > 0:
                 if molname not in graph.molecules:
                     continue
-            matches += match_particles(
-                graph, particles, self.system,
+            matches += match_atoms(
+                graph, atoms, self.system,
                 self.interaction_list
             )
 
@@ -207,65 +274,72 @@ class TopStar():
             for key, _, _, type in m.graph.atoms:
                 val = m.atoms.get(key)
                 # key - name in the graph
-                # val - particle id
+                # val - atom id
                 if val is None:
                     inst.atoms.append(-1)
                 else:
                     inst.atoms.append(val)
                     self.defrag_list[val].append(inst.frag_id)
 
-    def instantiate(self, frag_name: str) -> Fragment:
-        # frag_name must refer to a MolFragment type
-        frag = self.type_lookup.get(frag_name)
-        if frag is None:
-            raise ValueError(f"Can't find mol {frag_name}")
-        elif not isinstance(frag, MolFragment):
-            raise ValueError(f"Attempt to instantiate {frag_name}, but it's"
-                             " not a mol fragment type."
-                             f" It is: {frag}")
-        # add particles to S*
-        parts = []
+    def instantiate(self, molname: str) -> None:
+        """
+        Adds a fresh new copy of moleculetype molname to the system.
+        R
+        """
+        # molname must refer to a Molecule type
+        mol = self.molecules.get(molname)
+        if mol is None:
+            raise ValueError(f"Can't find mol {molname}")
+
+        # add atoms to S* and other bookkeeping
+        atoms = []
         prev_resnum = 0
-        for in_frag_id, atom in enumerate(frag.atoms):
+        for atom in mol.atoms:
             type, resnum, resname, atomname, chargegr, charge, mass = atom
             if resnum != prev_resnum:
                 self.system.new_residue()
                 prev_resnum = resnum
-            p = self.system.add_particle(atomname, resname, type, charge, mass)
-            parts.append(p)
+            p = self.system.add_atom(atomname, resname, type, charge, mass)
+            atoms.append(p)
             self.defrag_list.append([])
             self.interaction_list.append([])
 
         # instantiate interactions
-        res = self.instantiate_over_existing(frag, parts)
-        # add graphs to system
-        self.try_match_graphs(set(parts), frag_name)
-        # do initial molecules info, used e.g. in helpers/monomer
-        if len(self.initial_molecules) > 0 and self.initial_molecules[-1][0] == frag_name:
-            _, n, n_atoms = self.initial_molecules[-1]
-            assert len(parts) == n_atoms
-            self.initial_molecules[-1] = (frag_name, n+1, n_atoms)
-        else:
-            self.initial_molecules.append((frag_name, 1, len(parts)))
-        return res
+        self.instantiate_over_existing(mol, atoms)
 
-    def instantiate_over_existing(self, molfrag: MolFragment,
-                                  frags: list[Fragment] | list[int],
-                                  ):
-        """Takes a name of a mol fragment, adds interactions to those particles
-        according to the mol fragment, or optionally a reaction template.
+        # add graphs to system
+        self.try_match_graphs(set(atoms), molname)
+
+        # do initial molecules info, used e.g. in helpers/monomer
+        if (
+            len(self.initial_molecules) > 0 
+            and self.initial_molecules[-1][0] == molname
+        ):
+            _, n, n_atoms = self.initial_molecules[-1]
+            assert len(atoms) == n_atoms
+            self.initial_molecules[-1] = (molname, n+1, n_atoms)
+        else:
+            self.initial_molecules.append((molname, 1, len(atoms)))
+
+    def instantiate_over_existing(
+        self, mol: Molecule, atoms: list[Fragment] | list[int],
+    ) -> None:
         """
-        def index_pair(frags: list[int] | list[Fragment], index: int | tuple[int, int]) -> int:
+        Takes a name of a molecule, adds interactions to those atoms
+        according to the molecule.
+        """
+        def index_pair(index: int | tuple[int, int]) -> int:
+            # abstraction, because of the duality of Molecule
             if type(index) is int:
-                return frags[index]
+                return atoms[index]
             else:
                 idi, atomi = index
-                return frags[idi].atoms[atomi]
-        # TODO good index_pair solution for this one
+                return atoms[idi].atoms[atomi]
+
         # exclusions
-        for (i, j) in molfrag.exclusions:
-            pi = index_pair(frags, i)
-            pj = index_pair(frags, j)
+        for (i, j) in mol.exclusions:
+            pi = index_pair(i)
+            pj = index_pair(j)
             if pi == -1 or pj == -1:
                 # optional atom missing
                 continue
@@ -274,106 +348,38 @@ class TopStar():
                 self.interaction_list[pi].append(e)
                 self.interaction_list[pj].append(e)
         # posres
-        for (i, kx, ky, kz) in molfrag.posres:
+        for (i, kx, ky, kz) in mol.posres:
             if self.respos is None:
-                raise ValueError("respos is None but there are position restraints.")
-            pi = index_pair(frags, i)
+                raise ValueError(
+                    "respos is None but there are position restraints."
+                )
+            pi = index_pair(i)
             x0, y0, z0 = self.respos[pi]
             self.system.posres.add((pi), (kx, ky, kz, x0, y0, z0))
         # generic interactions
-        for (force, members, params) in molfrag.interactions:
-            member_parts = []
+        for (force, members, params) in mol.interactions:
+            member_atoms = []
             missing_opt = False
             for x in members:
-                part = index_pair(frags, x)
-                if part == -1:
+                atom = index_pair(x)
+                if atom == -1:
                     missing_opt = True
                     break
-                member_parts.append(part)
+                member_atoms.append(atom)
             if missing_opt:
                 # optional missing => skip
                 continue
-            f = force.add(member_parts, params)
-            for member in member_parts:
+            f = force.add(member_atoms, params)
+            for member in member_atoms:
                 self.interaction_list[member].append(f)
 
-    # Save/load helpers - TODO make it a second constructor
-    def save(self, f):
-        """
-            Serializes T* into bytes, writes it to f
-
-            Data saved:
-            - frag_list
-            - graph_fragment_map (graph fragment list)
-            - type_lookup (molecule definition list)
-            - reactions (reaction template list)
-        """
-        # relies on pickling to handle references to other classes right
-        f.dump(random.getstate())
-
-        f.dump(self.frag_list)
-        f.dump(self.graph_fragment_map)
-        f.dump(self.reactions)
-        f.dump(self.next_frag_id)
-        f.dump(self.defrag_list)
-        f.dump(self.r_continue)
-        f.dump(self.neighbor_atom_map)
-        f.dump(self.subfrag_map)
-        f.dump(self.absolute_rate)
-        f.dump(self.initial_molecules)
-
-        # unpicklable because they reference force
-        f.dump(len(self.type_lookup))
-        for k, v in self.type_lookup.items():
-            f.dump(k)
-            assert k == v.molecule_name
-            v.save(f)
-
-    def load(self, f):
-        """
-            Deserializes bytes (read from f) into T* (self)
-
-            Should be called after S* is deserialized and set, because
-            of the interaction list.
-        """
-        random.setstate(f.load())
-
-        self.frag_list = f.load()
-        self.graph_fragment_map = f.load()
-        self.reactions = f.load()
-        self.next_frag_id = f.load()
-        self.defrag_list = f.load()
-        self.r_continue = f.load()
-        self.neighbor_atom_map = f.load()
-        self.subfrag_map = f.load()
-        self.absolute_rate = f.load()
-        self.initial_molecules = f.load()
-
-        for i in range(f.load()):
-            k = f.load()
-            v = MolFragment(k)
-            v.load(f, self.system)
-            self.type_lookup[k] = v
-
-        # interaction list gets loaded different because we can't pickle
-        # openmm things -> can't pickle Force objects
-        #
-        # but we can assume that everything added to any Force would have
-        # resulted in an interaction, except non bonded
-        #
-        # though this is still fragile code and should be improved later
-
-        self.interaction_list = [[] for _ in range(self.system.len_particles())]
-        for force in self.system.modular_forces:
-            if force == self.system.nonbonded_force:
-                continue
-            for i in range(len(force)):
-                inter = Interaction(force, i)
-                members = inter.get_members()
-                for member in members:
-                    self.interaction_list[member].append(inter)
-
     def update_frag_counts(self):
+        """
+        Sets self.frag_counts. Call after every modification.
+
+        self.frag_counts is used notably for rate calculation.
+        """
+        # TODO too much state sync..
         self.frag_counts = {}
         for v in self.frag_list.values():
             k = v.name
@@ -382,18 +388,14 @@ class TopStar():
             else:
                 self.frag_counts[k] += 1
 
-    # ======= (2/3) Detection things =======
-    # see detection.pyx
+    # ======= (2/3) Detection things - see detection.pyx =======
     def init_dm(self, name) -> None:
+        # TODO remove this function, reduce fragility that way
         # called exactly once after parsing or loading from file is finished
         self.update_frag_counts()
         self.out_name = name
         for reporter in self.reporters:
             reporter.init_dm(name)
-
-    def pre_detection(self, step: int) -> None:
-        for reporter in self.reporters:
-            reporter.pre_detection(step, self.out_name)
 
     def update_observed_rate(self, rx: ReactionTemplate):
         # update_observed_rate only called if it is defined => not none
@@ -401,8 +403,8 @@ class TopStar():
         rate = rx.reaction_counter / rx.relative_rate
         for reactant in rx.reactants:
             if self.frag_counts.get(reactant) in {0, None}:
-                # no reactant, no reaction
-                # keeps old observed_rate and avoids divisions by 0 by returning
+                # no reactant => no reaction
+                # keeps old observed_rate and we avoid divisions by 0
                 return
             rate /= self.frag_counts[reactant]
 
@@ -416,21 +418,28 @@ class TopStar():
                 self.smoothing_constant
             )
 
-        predicted = (rx.observed_rate[0] + rx.observed_rate[1]) * self.highest_probability
+        predicted = (
+            (rx.observed_rate[0] + rx.observed_rate[1])
+            * self.highest_probability
+        )
 
         # if the prediction value goes below 0, 0 it and issue a warning
         if predicted < 0.:
-            self.logger.warn(f"The smoothed rate for reaction {rx.name} went below 0.")
+            self.logger.warn(
+                f"The smoothed rate for reaction {rx.name} went below 0."
+            )
             rx.observed_rate = (0., 0.)
             predicted = 0.
-
 
         # set the relative rate = 1 value to the slowest reaction
         if self.absolute_rate is None or predicted < self.absolute_rate:
             self.absolute_rate = predicted
 
-    def detection(self, step: int, box, pos) -> list[tuple[list[Fragment], ReactionTemplate]]:
-        self.pre_detection(step)
+    def detection(
+        self, step: int, box, pos
+    ) -> list[tuple[list[Fragment], ReactionTemplate]]:
+        for reporter in self.reporters:
+            reporter.pre_detection(step, self.out_name)
         reactions = detection_all(self, box, pos)
         # preparations for the next step
         self.absolute_rate = self.max_absolute_rate
@@ -444,47 +453,44 @@ class TopStar():
         return reactions
 
     # ======= (3/3) Modification things =======
-    def clean_defrag(self, frag: Fragment, part: int) -> None:
-        self.defrag_list[part] = list(filter(
+    def clean_defrag(self, frag: Fragment, atom: int) -> None:
+        """Removes references to frag in the defrag_list for atom_id atom."""
+        self.defrag_list[atom] = list(filter(
             lambda x: x != frag.frag_id,
-            self.defrag_list[part]
+            self.defrag_list[atom]
         ))
 
     def remove_fragment(self, frag: Fragment) -> None:
-        """Removes a fragment from frag_list and defrag_list
-        """
+        """Removes a fragment from frag_list and defrag_list"""
 
-        for part in frag.atoms:
-            if part != -1:
-                self.clean_defrag(frag, part)
+        for atom in frag.atoms:
+            if atom != -1:
+                self.clean_defrag(frag, atom)
 
         del self.frag_list[frag.frag_id]
 
     def remove_interaction(self, interaction: Interaction) -> None:
-        """Removes an interaction from interaction_list and S*
-        """
-        for part in interaction.get_members():
-            self.interaction_list[part] = list(filter(
+        """Removes an interaction from interaction_list and S*"""
+        for atom in interaction.get_members():
+            self.interaction_list[atom] = list(filter(
                 lambda x: x != interaction,
-                self.interaction_list[part]
+                self.interaction_list[atom]
             ))
         interaction.remove()
 
     def process_break(self, frags: list[Fragment], rx: ReactionTemplate,
                       ) -> None:
-        """
-            Process [rx_break] in rx over frags.
-        """
+        """Process [break] in rx over frags."""
 
         for group in rx.break_groups:
             group_atoms = []
             all_found = True
             for id, atom in group:
-                part = frags[id].atoms[atom]
-                if part == -1:
+                atom = frags[id].atoms[atom]
+                if atom == -1:
                     all_found = False
                     break
-                group_atoms.append(part)
+                group_atoms.append(atom)
             if not all_found:
                 # missing optional
                 continue
@@ -501,21 +507,17 @@ class TopStar():
 
     def process_update(self, frags: list[Fragment], rx: ReactionTemplate,
                        ) -> None:
-        """
-            Process [rx_update] in rx over frags.
-        """
-        # TODO: consider if we really need this or if there are better ways
-        # to remove interactions
+        """Process [rx_update] in rx over frags."""
 
         for group in rx.update_groups:
             group_atoms = []
             all_found = True
             for id, atom in group:
-                part = frags[id].atoms[atom]
-                if part == -1:
+                atom = frags[id].atoms[atom]
+                if atom == -1:
                     all_found = False
                     break
-                group_atoms.append(part)
+                group_atoms.append(atom)
             if not all_found:
                 # missing optional
                 continue
@@ -528,53 +530,53 @@ class TopStar():
                        )):
                     self.remove_interaction(inter)
 
-    def populate_neighbors(self, particles: set[int]) -> set[int]:
+    def populate_neighbors(self, atoms: set[int]) -> set[int]:
+        """
+        For a set of atoms, return a set that also contains their neighbors.
+
+        Neighbor = shared interaction (e.g. bond, angle, exclusion...)
+        """
         res = set()
-        for part in particles:
-            res.add(part)
-            for inter in self.interaction_list[part]:
+        for atom in atoms:
+            res.add(atom)
+            for inter in self.interaction_list[atom]:
                 for member in inter.get_members():
                     res.add(member)
         return res
 
-    def remove_overlapping_graphs(self, particles: set[int]) -> None:
-        for part in particles:
-            for frag_id in self.defrag_list[part][:]:
+    def remove_overlapping_graphs(self, atoms: set[int]) -> None:
+        """Remove all fragments in T* that contain any of the given atoms."""
+        for atom in atoms:
+            for frag_id in self.defrag_list[atom][:]:
                 frag = self.frag_list.get(frag_id)
                 if frag is not None and frag.graph is not None:
                     self.remove_fragment(frag)
 
     def template_update_atoms(
-                              self, frags: list[Fragment], rx: ReactionTemplate
-                             ) -> None:
+        self, frags: list[Fragment], rx: ReactionTemplate
+    ) -> None:
+        """Process [rename], [retype], [recharge], [remass]."""
         # re* overrides everything
         for (id, atom, new_name) in rx.renames:
-            part_id = frags[id].atoms[atom]
-            if part_id == -1:
+            atom_id = frags[id].atoms[atom]
+            if atom_id == -1:
                 continue
-            self.system.rename(part_id, new_name)
+            self.system.rename(atom_id, new_name)
         for (id, atom, new_type) in rx.retypes:
-            part_id = frags[id].atoms[atom]
-            if part_id == -1:
+            atom_id = frags[id].atoms[atom]
+            if atom_id == -1:
                 continue
-            self.system.retype(part_id, new_type)
+            self.system.retype(atom_id, new_type)
         for (id, atom, new_charge) in rx.recharges:
-            part_id = frags[id].atoms[atom]
-            if part_id == -1:
+            atom_id = frags[id].atoms[atom]
+            if atom_id == -1:
                 continue
-            self.system.recharge(part_id, new_charge)
+            self.system.recharge(atom_id, new_charge)
         for (id, atom, new_mass) in rx.remasses:
-            part_id = frags[id].atoms[atom]
-            if part_id == -1:
+            atom_id = frags[id].atoms[atom]
+            if atom_id == -1:
                 continue
-            self.system.remass(part_id, new_mass)
-
-    def pre_modification(self, rx_list: list[(list, ReactionTemplate)], i
-                         ) -> None:
-        # hook that gets called after detection, before modification
-        # only called if there is any modification going on
-        for reporter in self.reporters:
-            reporter.pre_modification(i, rx_list, self.out_name)
+            self.system.remass(atom_id, new_mass)
 
     def modification(
         self, 
@@ -584,37 +586,34 @@ class TopStar():
         """Modification helper for the D/M algorithm
         """
 
-        self.pre_modification(reactions, i)
+        for reporter in self.reporters:
+            reporter.pre_modification(i, reactions, self.out_name)
 
         for (frags, rx) in reactions:
-            # just normal particles to instantiate products over
-            product_particles = []
-            # which particles to recalculate graphs over
+            # just normal atoms to instantiate products over
+            product_atoms = []
+            # which atoms to recalculate graphs over
             graph_recalc = set()
             for f in frags:
-                product_particles += list(filter(lambda x: x != -1, f.atoms))
+                product_atoms += list(filter(lambda x: x != -1, f.atoms))
                 graph_recalc |= set(filter(lambda x: x != -1, f.atoms))
             # add neighbors since those can be changed too (opt/not atoms)
-            graph_recalc = self.populate_neighbors(set(product_particles))
+            graph_recalc = self.populate_neighbors(set(product_atoms))
 
             # [rx_break]
             self.process_break(frags, rx)
             # [rx_update]
             self.process_update(frags, rx)
 
-            # graphs get recalculated later over the same particles
+            # graphs get recalculated later over the same atoms
             self.remove_overlapping_graphs(graph_recalc)
 
             self.template_update_atoms(frags, rx)
-            self.instantiate_over_existing(self.type_lookup[rx.name], frags)
+            self.instantiate_over_existing(self.molecules[rx.name], frags)
 
             self.try_match_graphs(graph_recalc)
 
         self.update_frag_counts()
 
-        self.post_modification(i)
-
-    def post_modification(self, i: int) -> None:
-        # hook that only gets called after modification
         for reporter in self.reporters:
             reporter.post_modification(i, self.out_name)

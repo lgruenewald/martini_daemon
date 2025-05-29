@@ -8,12 +8,12 @@ class VSiteCenterOfMass(VirtualSite):
         masses = []
         sum = 0.
         for i in members:
-            _, _, m = self._sysstar.get_particle_details(i)
+            _, _, m = self._sysstar.get_atom_details(i)
             masses.append(m)
             sum += m
         weights = [m/sum for m in masses]
         vsite = mm.LocalCoordinatesSite(
-            members,  # particles
+            members,  # atoms
             weights,  # origin weights
             [0.0] * n,  # x direction weight
             [0.0] * n,  # y direction weight

@@ -26,18 +26,18 @@ class AtomReporter(Reporter):
 
     def on_set_xtc_path(self, xtc_name):
         self._open_compressed(xtc_name + ".atoms")
-        n = self._sysstar.len_particles()
+        n = self._sysstar.len_atoms()
         self._write(struct.pack("=Q", n))
 
     def on_xtc_frame(self, i, pos, box, xtc_name):
-        n = self._sysstar.len_particles()
+        n = self._sysstar.len_atoms()
         names = np.empty(n, dtype="a8")
         types = np.empty(n, dtype="a8")
         charges = np.empty(n, dtype=np.float32)
         masses = np.empty(n, dtype=np.float32)
         for i in range(n):
-            name = self._sysstar.get_particle_name(i)
-            type, charge, mass = self._sysstar.get_particle_details(i)
+            name = self._sysstar.get_atom_name(i)
+            type, charge, mass = self._sysstar.get_atom_details(i)
             # this will silently cut off everything after 8 bytes
             names[i] = name.encode("utf-8")
             types[i] = type.encode("utf-8")

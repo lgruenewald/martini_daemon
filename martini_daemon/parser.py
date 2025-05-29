@@ -1,12 +1,12 @@
-# Martini Topology + fragments and reaction templates parser
+# gromacs-style .ini format parser (used for .top/.itp files)
 
 import re
-import sys
 from dataclasses import dataclass
 from enum import Enum
-from collections import OrderedDict
 import os
 import math
+from typing import Callable
+import traceback
 
 
 @dataclass
@@ -24,6 +24,21 @@ pair_pat = re.compile(r"[0-9]+:[a-zA-Z0-9_.]+")
 
 
 def unwrap(tokens, index, type_filter, default="default placeholder"):
+    """
+    Given a list of tokens, try to index it and convert to a useable value
+    based on type_filter. If the index would be out of range, a default
+    value can be specified in place.
+
+    Possible filters:
+    int - returns int type, no processing
+    float - returns float type, no processing
+    positive - float, but raises an exception if 0 or smaller
+    index - int, but subtracts 1, exception if 0 or smaller
+    degree - degree to radian and makes sure it's in the range 0 to 2pi
+    word - a string with only alphanumerics and no whitespace in it
+    pattern - fnmatch pattern, converts {} to [] so {} can be used for sets
+    pair - a tuple of an index (which reactant) and a word (which graph atom)
+    """
     if len(tokens) <= index:
         if default == "default placeholder":
             # hack so "None" can also be used as a default value
@@ -42,12 +57,17 @@ def unwrap(tokens, index, type_filter, default="default placeholder"):
         case "positive":
             if float_pat.match(tok):
                 if float(tok) <= 0.:
-                    raise ValueError("Expected a positive non-zero real number.")
+                    raise ValueError(
+                        "Expected a positive non-zero real number."
+                    )
                 return float(tok)
         case "index":
             if int_pat.match(tok):
                 if int(tok) <= 0:
-                    raise ValueError("Expected index, got an integer 0 or smaller. Note: indexing in .itp/.top files is usually 1 based.")
+                    raise ValueError(
+                        "Expected index, got an integer 0 or smaller."
+                        "Note: indexing in .itp/.top files is usually 1 based."
+                    )
                 return int(tok) - 1
         case "degree":
             if float_pat.match(tok):
@@ -73,64 +93,54 @@ def unwrap(tokens, index, type_filter, default="default placeholder"):
                      f"expected {type_filter}.")
 
 
-class TopParser:
-    """A parser for gromacs topology file-like config files
+class Parser():
+    """
+    A parser for gromacs topology file-like config files with limited C
+    style preprocessing, that should be sufficient for most input files.
+    You can add your own levels (directives) as callbacks and this class will
+    give you processed tokens for every line.
+
+    You can parse the tokens using unwrap() from this module.
+
+    All exceptions inside callbacks and otherwise will be caught and re-raised,
+    so that the specific line and file they occured on can be printed to
+    stdout, and the traceback surpressed to reduce clutter.
 
     Usage:
-    p = TopParser()
+    p = Parser()
     p.add_level(name, handler)
-    ok, dirs = p.parse(path_to_top, defines={})
-    if ok:
-        # do stuff with dirs
+    ok = p.parse(path_to_top, defines={})
+    if not ok:
+        # there was an error
     """
-
-    # line number for reporting errors
-    _linenum: int
-    # current file being parsed
-    _path: str
-    # was there an error at any point?
-    _haderror: bool
-    # which files were #included
-    _included: dict[str, bool]
-    # which DEFINES were defined
-    _defines: dict
-    # current level similar to how openmm parses top files
-    _current_level = None
-    # TODO potential improvement: validate the nesting of levels to see if the
-    # structure makes sense. It wouldn't change behavior on correct top files
-    # but would enhance error messages on incorrect top files
-    _include_dir: str
-
-    # list of functions to call with data lines in each level
-    _levels: dict
-    _start: dict
-    _end: dict
-    # list of directives we already complained about
-    _complained_directives: dict
 
     def __init__(self):
         self._complained_directives = {}
-        self._levels = {}
-        self._start = {}
-        self._end = {}
+        self._levels: dict[str, Callable] = {}
+        self._start: dict[str, Callable] = {}
+        self._end: dict[str, Callable] = {}
 
     def parse(self, path, include_dir, defines={}):
         """The main interface for using a TopParser class
         """
-        self._linenum = 0
-        self._path = path
-        self._haderror = False
-        self._defines = defines
-        self._include_dir = include_dir
-        self._complained_directives = {}
-        self._included = {}
+        self._linenum: int = 0
+        self._path: str = path
+        self._haderror: bool = False
+        self._defines: dict[str, str] = defines
+        self._include_dir: str | None = include_dir
+        self._complained_directives: set[str] = set()
+        self._included: set[str] = set()
+        self._current_level = None
         self._parse(path)
         return not self._haderror
 
     def error(self, message):
-        print("\033[1;91mParser error\033[0m")
+        # we have to grab attention more than the stack trace
+        print("============================================================")
+        print("\033[1;91mAn error has occured during parsing\033[0m")
         print(f" {message}")
         print(f" In file {self._path} at line {self._linenum + 1}")
+        print("============================================================")
         self._haderror = True
 
     def _tokenize(self, line):
@@ -155,7 +165,7 @@ class TopParser:
         if path in self._included:
             self.error("Double inclusion of " + path)
             return
-        self._included[path] = True
+        self._included.add(path)
         oldpath = self._path
         self._path = path
         IfstackElem = Enum("IfstackElem", ["DoBranch", "SkipBranch",
@@ -190,7 +200,10 @@ class TopParser:
                                 continue
                             if ifstack_top in {IfstackElem.DoBranch,
                                                IfstackElem.Root}:
-                                if float_pat.match(tokens[1].content) and float(tokens[1].content) != 0.0:
+                                if (
+                                    float_pat.match(tokens[1].content)
+                                    and float(tokens[1].content) != 0.0
+                                ):
                                     ifstack.append(IfstackElem.DoBranch)
                                 else:
                                     ifstack.append(IfstackElem.SkipBranch)
@@ -204,7 +217,10 @@ class TopParser:
                                 continue
                             if ifstack_top in {IfstackElem.DoBranch,
                                                IfstackElem.Root}:
-                                if float_pat.match(tokens[1].content) and float(tokens[1].content) != 0.0:
+                                if (
+                                    float_pat.match(tokens[1].content)
+                                    and float(tokens[1].content) != 0.0
+                                ):
                                     ifstack.append(IfstackElem.SkipBranch)
                                 else:
                                     ifstack.append(IfstackElem.DoBranch)
@@ -264,11 +280,15 @@ class TopParser:
                     start_hook = self._start.get(self._current_level)
                     start_hook and start_hook()
                     if self._levels.get(self._current_level) is None:
-                        if self._complained_directives.get(self._current_level):
+                        if self._current_level in self._complained_directives:
                             self._haderror = True
                         else:
-                            self.error(f"Unknown directive: {self._current_level}")
-                            self._complained_directives[self._current_level] = True
+                            self.error(
+                                f"Unknown directive: {self._current_level}"
+                            )
+                            self._complained_directives.add(
+                                self._current_level
+                            )
                 elif tokens[0].content[0] == "#":
                     match tokens[0].content:
                         case "#include":
@@ -293,7 +313,9 @@ class TopParser:
                                 self.error(f"File not found: '{name}'")
                         case "#define":
                             if len(tokens) not in {2, 3}:
-                                self.error("#define takes one or two arguments")
+                                self.error(
+                                    "#define takes one or two arguments"
+                                )
                                 continue
                             key = tokens[1].content
                             val = "1.0"
@@ -318,25 +340,39 @@ class TopParser:
                         continue
                     handler = self._levels.get(self._current_level)
                     if handler is None:
-                        if self._complained_directives.get(self._current_level):
+                        if self._current_level in self._complained_directives:
                             self._haderror = True
                         else:
                             self.error(f"Data line in unknown directive "
                                        f"{self._current_level}")
-                            self._complained_directives[self._current_level] = True
+                            self._complained_directives.add(
+                                self._current_level
+                            )
                         continue
                     try:
                         handler(tokens)
-                    except Exception as e:
-                        print("\033[1;91mCallback error\033[0m")
-                        print(f"In file {path} at line {self._linenum}")
-                        raise e
+                    except Exception:
+                        self.error("Callback error (see below)")
+                        traceback.print_exc(limit=1)
         if len(ifstack) > 1:
             self.error("Unmatched #ifdef or #ifndef")
         self._path = oldpath
 
     def add_level(self, name, handler, start=None, end=None):
-        """Add a new level to this TopParser
+        """
+        Add a new level to this Parser.
+
+        name is the string contained within brackets / directive name.
+
+        handler will be called on every line (with tokens, a dataclass
+        containing the string content, file path and line number).
+        In principle, the tokens are whitespace separated strings of a single
+        line, but this handles backslash escaping of newlines and simple
+        #defines (no preprocessor macros, only "variables", which can be
+        recursive).
+
+        start is a callback called every time at the start of a directive,
+        end is a callback called every time at the end of a directive.
         """
         self._levels[name] = handler
         if start is not None:

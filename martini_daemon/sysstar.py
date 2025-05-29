@@ -46,36 +46,19 @@ from .reporters.reporter import Reporter
 
 class SysStar():
 
-    _system: mm.System
-    _context: mm.Context
-    _reinitialize: bool
-    _integrator: mm.Integrator
-    nonbonded_force: NonBonded
-    exclusions: ExclusionHelper
-    _forces_list: list[mm.Force]  # to keep track of indices
-    context_initialized: bool
-    # name, resid, resname, type, charge, mass
-    _part_list: list[tuple[str, int, str, str, float, float]]
-
-    """Atom types to look up default charges and default masses
-    values are atom_type: string, (mass: float, charge: float)
-    """
-    _atom_types: dict[str, tuple[float, float]]
-
-    modular_forces: list[Force]
-
-    """Extra reporters that can write stuff to files every step / at the end
-    """
-    reporters: list[Reporter]
-
     def __init__(self, logger, epsilon_r, nonbonded_cutoff, nonbonded_type):
         self.epsilon_r = epsilon_r
         self.nonbonded_cutoff = nonbonded_cutoff
-        self._part_list = []
-        self._atom_types = OrderedDict()
-        self.context_initialized = False
-        self._reinitialize = True
-        self._forces_list = []
+        # name, resid, resname, type, charge, mass
+        self._atom_list: list[tuple[str, int, str, str, float, float]] = []
+        # default charge and mass
+        self._atom_types: OrderedDict[str, tuple[float, float]] = OrderedDict()
+        self.context_initialized: bool = False
+        self._reinitialize: bool = True
+        # for keeping track of indices, used for removing forces
+        self._forces_list: list[mm.Force] = []
+
+        # modular forces
         self.constraint = Constraint(self)
         self.harmonic_bond = HarmonicBond(self)
         self.morse_bond = MorseBond(self)
@@ -110,9 +93,11 @@ class SysStar():
         self.vsite_avg = VSiteWeighedAverage(self)
         self.vsite_com = VSiteCenterOfMass(self)
         self.nonbonded_force = NonBonded(self, nonbonded_type)
-        self.exclusions = self.nonbonded_force.get_exclusion_helper()
+        self.exclusions: ExclusionHelper = (
+            self.nonbonded_force.get_exclusion_helper()
+        )
 
-        self.modular_forces = [
+        self.modular_forces: list[Force] = [
             self.constraint,
             self.harmonic_bond, self.harmonic_angle,
             self.proper_dihedral, self.improper_dihedral,
@@ -130,14 +115,22 @@ class SysStar():
             self.nonbonded_force, self.exclusions, self.pairs,
         ]
 
-        self.vsites = []
+        # every vsite atom_id should be put here, this is useful for analysis
+        self.vsites: list[int] = []
 
-        self.reporters = []
+        self.reporters: list[Reporter] = []
 
-        self.last_resid = 0
+        self.last_resid: int = 0
+
         self.logger = logger
 
+        # read by variables reporter to know if to remove 3 additional degrees
+        # of freedom
         self.remove_com = False
+
+        self._system: None | mm.System = None
+        self._context: None | mm.Context = None
+        self._integrator: None | mm.Integrator = None
 
     def save(self, f, box):
         """
@@ -145,7 +138,7 @@ class SysStar():
 
             Data saved:
             - _atom_types (default mass, charge and similar)
-            - _part_list (particle information)
+            - _atom_list (atom information)
             - modular forces and all their data (all interactions, we 
                 recursively call save on them)
             - openmm Context (containing positions, velocities, ...)
@@ -154,12 +147,13 @@ class SysStar():
             raise ValueError("Can only save after context was initialized")
         f.dump(box)
         f.dump(self._atom_types)
-        f.dump(self._part_list)
+        f.dump(self._atom_list)
         for force in self.modular_forces:
             force.save(f)
         chk = self._context.createCheckpoint()
         f.dump(chk)
 
+    # TODO put this in constructor
     def load(self, f):
         """
             Deserializes bytes (read from f) into S* (self). See Sysstar.save.
@@ -171,7 +165,7 @@ class SysStar():
             raise ValueError("Can't load after context was already initialized")
         self.partial_box = f.load()
         self._atom_types = f.load()
-        self._part_list = f.load()
+        self._atom_list = f.load()
         for force in self.modular_forces:
             force.load(f)
         self.partial_chk = f.load()
@@ -186,11 +180,11 @@ class SysStar():
         self.build_context(integrator, self.partial_box, platform)
         self._context.loadCheckpoint(self.partial_chk)
 
-    def get_defaults(self, part_type, charge, mass):
-        defaults = self._atom_types.get(part_type)
+    def get_defaults(self, atom_type, charge, mass):
+        defaults = self._atom_types.get(atom_type)
         if defaults is None:
-            raise ValueError("Attempt to add particle with unknown atom type"
-                             f"Particle type: {part_type}.")
+            raise ValueError("Attempt to add atom with unknown atom type"
+                             f"Atom type: {atom_type}.")
         dcharge, dmass = defaults
         return (charge if charge is not None else dcharge,
                 mass if mass is not None else dmass)
@@ -198,68 +192,63 @@ class SysStar():
     def new_residue(self):
         self.last_resid += 1
 
-    def add_particle(self, part_name, resname, part_type, charge, mass):
-        """Adds a particle to the list, and returns its part_id"""
+    def add_atom(self, atom_name, resname, atom_type, charge, mass):
+        """Adds a atom to the list, and returns its atom_id"""
         if self.context_initialized:
             raise ValueError("Do this operation before context is initialized")
-        charge, mass = self.get_defaults(part_type, charge, mass)
-        self._part_list.append((part_name, self.last_resid, resname, part_type, charge, mass))
-        return len(self._part_list) - 1
+        charge, mass = self.get_defaults(atom_type, charge, mass)
+        self._atom_list.append((atom_name, self.last_resid, resname, atom_type, charge, mass))
+        return len(self._atom_list) - 1
 
-    def rename(self, part_id, new_name):
-        elems = list(self._part_list[part_id])
+    def rename(self, atom_id, new_name):
+        elems = list(self._atom_list[atom_id])
         elems[0] = new_name
-        self._part_list[part_id] = tuple(elems)
+        self._atom_list[atom_id] = tuple(elems)
 
-    def retype(self, part_id, new_type):
-        a, b, c, old_type, charge, d = self._part_list[part_id]
-        self._part_list[part_id] = (a, b, c, new_type, charge, d)
+    def retype(self, atom_id, new_type):
+        a, b, c, old_type, charge, d = self._atom_list[atom_id]
+        self._atom_list[atom_id] = (a, b, c, new_type, charge, d)
         if self.context_initialized and old_type != new_type:
             self.nonbonded_force.update_params(
-                part_id, new_type, charge, False
+                atom_id, new_type, charge, False
             )
 
-    def recharge(self, part_id, new_charge):
-        _, _, _, type, old_charge, _ = self._part_list[part_id]
-        self._part_list[part_id][4] = new_charge
+    def recharge(self, atom_id, new_charge):
+        _, _, _, type, old_charge, _ = self._atom_list[atom_id]
+        self._atom_list[atom_id][4] = new_charge
         if self.context_initialized and old_charge != new_charge:
             self.nonbonded_force.update_params(
-                part_id, type, new_charge, True
+                atom_id, type, new_charge, True
             )
 
-    def remass(self, part_id, new_mass):
-        old_mass = self._part_list[part_id][5]
-        self._part_list[part_id][5] = new_mass
+    def remass(self, atom_id, new_mass):
+        old_mass = self._atom_list[atom_id][5]
+        self._atom_list[atom_id][5] = new_mass
         if self.context_initialized and new_mass != old_mass:
-            self._system.setParticleMass(part_id, new_mass)
+            self._system.setParticleMass(atom_id, new_mass)
             self._reinitialize = True
 
-    def update_particle(self, part_id, part_type, charge, mass):
-        self.retype(part_id, part_type)
-        self.recharge(part_id, charge)
-        self.remass(part_id, mass)
+    def update_atom(self, atom_id, atom_type, charge, mass):
+        self.retype(atom_id, atom_type)
+        self.recharge(atom_id, charge)
+        self.remass(atom_id, mass)
 
     def build_system(self):
         self._system = mm.System()
-        for (_, _, _, _, _, mass) in filter(None, self._part_list):
+        for (_, _, _, _, _, mass) in filter(None, self._atom_list):
             self._system.addParticle(mass)
 
-    # TODO join all these into 1
-    def get_particle_name_type(self, i):
-        name, _, _, type, _, _ = self._part_list[i]
-        return name, type
-
-    def get_particle_details(self, i):
-        """Returns the particle's type, charge, mass"""
-        _, _, _, type, charge, mass = self._part_list[i]
-        return (type, charge, mass)
-
-    def get_particle_name(self, i):
-        name, _, _, _, _, _ = self._part_list[i]
+    def get_atom_name(self, i):
+        name, _, _, _, _, _ = self._atom_list[i]
         return name
 
-    def len_particles(self):
-        return len(self._part_list)
+    def get_atom_details(self, i):
+        """Returns the atom's type, charge, mass"""
+        _, _, _, type, charge, mass = self._atom_list[i]
+        return (type, charge, mass)
+
+    def len_atoms(self):
+        return len(self._atom_list)
 
     def add_atom_type(self, type, charge, mass):
         if self.context_initialized:
@@ -273,7 +262,7 @@ class SysStar():
 
     def build_context(self, integrator, box, platform=None):
         """context_initialized flips the state of S* in a way
-        the parsing of a topology and the addition of all particles, bonds, ...
+        the parsing of a topology and the addition of all atom, bonds, ...
         should happen before calling build_context
         """
         if self.context_initialized:
@@ -312,11 +301,11 @@ class SysStar():
     def set_positions(self, positions):
         if not self.context_initialized:
             raise Exception("Initialize the context first")
-        if len(positions) != len(self._part_list):
+        if len(positions) != len(self._atom_list):
             raise ValueError(
                 "Wrong length of coordinate file."
                 f"Supplied {len(positions)} coordinates."
-                f"Particle list contains {len(self._part_list)} particles."
+                f"Atom list contains {len(self._atom_list)} atoms."
                 "Please check your .gro file."
             )
         self._context.setPositions(positions)
@@ -324,7 +313,7 @@ class SysStar():
     def set_velocities(self, velocities):
         if not self.context_initialized:
             raise Exception("Initialize the context first")
-        if len(velocities) != len(self._part_list):
+        if len(velocities) != len(self._atom_list):
             raise Exception("Wrong number of velocities supplied")
         self._context.setVelocities(velocities)
 
@@ -396,7 +385,7 @@ class SysStar():
             # would be too large to store without remaindering, so likely
             # the system blew up
             self.logger.error(
-                "Particle coordinates too large, your system likely blew up. "
+                "Atom coordinates too large, your system likely blew up. "
                 f"Largest coordinate (abs value) is {np.max(np.abs(pos))}."
             )
         pos[:, 0] = np.remainder(pos[:, 0], box_x)
@@ -428,7 +417,7 @@ class SysStar():
         for reporter in self.reporters:
             reporter.on_set_xtc_path(path[:-4])
         mmtopol = Topology()
-        mmtopol._numAtoms = self.len_particles()
+        mmtopol._numAtoms = self.len_atoms()
         mmtopol._periodicBoxVectors = self._periodic_box
         timestep = self._integrator.getStepSize()
         self._xtc = XTCFile(path, mmtopol, timestep)
@@ -446,7 +435,7 @@ class SysStar():
         time = state.getTime()
         write_gro(
             path, f"t={time.value_in_unit(picosecond):.1f} ps\n",
-            self._part_list, box, pos, vel
+            self._atom_list, box, pos, vel
         )
         for reporter in self.reporters:
             reporter.on_write_gro(pos, box, path[:-4])

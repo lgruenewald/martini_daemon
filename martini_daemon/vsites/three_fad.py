@@ -9,7 +9,7 @@ class VSite3fad(VirtualSite):
         i, j, k = members
         theta, d = params
         vsite = mm.LocalCoordinatesSite(
-            [i, j, k],  # particles
+            [i, j, k],  # atoms
             [1.0, 0.0, 0.0],  # origin weights
             [-0.5, 0.5, 0.0],  # x direction weight
             [0.0, -0.5, 0.5],  # y direction weight
