@@ -1,7 +1,7 @@
 load ../../tcl/libdaemon.so
 source ../../tcl/daemon.tcl
 daemon_open out.gro out.xtc
-daemon_bonds out.bonds
+daemon_bonds out.z
 
 color Display Background white
 mol modstyle 0 0 CPK 1.5 1.3 12.0 12.0

@@ -36,33 +36,39 @@ class BondReporter(Reporter):
         self._open_compressed(xtc_name + ".bonds")
         n = self._sysstar.len_atoms()
         assert n > 0
-        assert self.max_atoms < n, f"max_atoms ({self.max_atoms}) is larger than the total number of atoms ({n})."
+        assert self.max_atoms < n, (
+            f"max_atoms ({self.max_atoms}) is larger "
+            f"than the total number of atoms ({n})."
+        )
         if self.max_atoms > 0:
             n = self.max_atoms
         self.n = n
 
     def on_xtc_frame(self, frame_index, pos, box, xtc_name):
-        bonds_len = sum(
-            map(
-                lambda force: len(force),
-                filter(
-                    lambda force: force.is_instance("bond"),
-                    self._sysstar.modular_forces
-                )
-            )
-        )
+        # count first
+        bonds_len = 0
         vsite_len = 0
-        for vsite in filter(lambda force: force.is_instance("vsite"), self._sysstar.modular_forces):
-            for i in range(len(vsite)):
-                # one vsite for every vid - constructing particle
-                vsite_len += len(vsite.get_members(i)) - 1
+        for force in self._sysstar.modular_forces:
+            if force.is_instance("bond"):
+                for id in range(len(force)):
+                    if force.get_members(id) is not None:
+                        bonds_len += 1
+            elif force.is_instance("vsite"):
+                for id in range(len(force)):
+                    if force.get_members(id) is not None:
+                        vsite_len += len(force.get_members(id) - 1)
+        # allocate
         self._write(struct.pack("=Q", bonds_len + vsite_len))
         bonds = np.empty((bonds_len + vsite_len, 2), dtype=np.uint32)
+        # write
         bond_index = 0
         for force in self._sysstar.modular_forces:
             if force.is_instance("bond"):
                 for id in range(len(force)):
-                    i, j = force.get_members(id)
+                    members = force.get_members(id)
+                    if members is None:
+                        continue
+                    i, j = members
                     if i == j or i >= self.n or j >= self.n:
                         continue
                     bonds[bond_index][0] = i
@@ -70,7 +76,10 @@ class BondReporter(Reporter):
                     bond_index += 1
             elif force.is_instance("vsite"):
                 for id in range(len(force)):
-                    vid, *others = force.get_members(id)
+                    members = force.get_members(id)
+                    if members is None:
+                        continue
+                    vid, *others = members
                     for other in others:
                         if vid == other or vid >= self.n or other >= self.n:
                             continue
@@ -82,7 +91,7 @@ class BondReporter(Reporter):
         self._write(bonds.tobytes())
 
 
-def read_bonds(path: str) -> tuple[int, int, int, int, np.array]:
+def read_bonds(path: str) -> list[np.ndarray]:
     """
         Reads a file written by BondReporter.
         Returns: frames - a list of frames, each frame containing a numpy

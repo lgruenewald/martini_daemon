@@ -43,8 +43,10 @@ class Force():
             self._sysstar._reinitialize = True
         return Interaction(self, len(self._list) - 1)
 
-    def get_members(self, i: int) -> list[int]:
+    def get_members(self, i: int) -> None | list[int]:
         params = self._list[i]
+        if params is None:
+            return None
         return params[:self._members]
 
     def remove(self, i: int) -> None:

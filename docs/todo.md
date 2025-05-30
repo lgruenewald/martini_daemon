@@ -2,11 +2,6 @@
 	- hyperbranched (with rates) - kinetic analysis
 	- polyurethane + loop analysis + kinetic analysis
 	- step polymerization - polystyrene?
-- benchmark reaction rate vs D/M frequency
-
-- rate systems:
-	- decay
-	- acid/base
 
 - silicate systems:
 	- silica with chains

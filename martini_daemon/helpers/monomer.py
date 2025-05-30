@@ -1,10 +1,8 @@
 # analysis helper for problems where a group of atoms can be permanently mapped
 # into a "monomer" unit, and a graph of monomers
 
-from ..reporters.bond_reporter import read_bonds
 import sys
 import numpy as np
-from collections import OrderedDict
 
 
 # convert a .bonds trajectory into a monomer graph based one

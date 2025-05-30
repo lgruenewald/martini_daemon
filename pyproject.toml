@@ -12,3 +12,6 @@ keywords = []
 classifiers = []
 dependencies = ["numpy", "openmm", "freud-analysis"]
 dynamic = ["version"]
+
+[project.optional-dependencies]
+all = ["molly"]
