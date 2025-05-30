@@ -77,7 +77,7 @@ class NonBonded(Force):
         self._force_obj.setParticleParameters(i, [atom_type_id, charge])
         self._sysstar.pairs._rebuild = True
         if charge_changed:
-            self._es_force._rebuild = True
+            self._exclusions._rebuild = True
 
     def _build(self):
         cutoff = self._sysstar.nonbonded_cutoff.value_in_unit(nanometer)
@@ -207,7 +207,6 @@ class NonBonded(Force):
                 "switch", mm.Discrete2DFunction(n, n, switch)
             )
 
-
     def build(self):
         if self._rebuild:
             self.destroy()
@@ -271,10 +270,6 @@ class ExclusionHelper(Force):
     See:
     https://manual.gromacs.org/documentation/current/reference-manual/functions/nonbonded-interactions.html
     """
-    # TODO is a dict based approach better, then duplicate additions of
-    # exclusions could return the same one
-    # does returning an existing exclusion create any problems? what if that
-    # exclusion gets removed in a reaction?
     _list: list[tuple[int, int]]
     _nb: NonBonded
     _rebuild: bool

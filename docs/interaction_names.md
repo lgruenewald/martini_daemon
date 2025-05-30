@@ -25,7 +25,6 @@ Also doubles as a list of interactions implemented in martini_daemon.
 - `linear_angle` - angle type 9
 - `restricted_angle` - angle type 10
 
-
 ## Dihedrals
 
 - `dihedral` - any dihedral listed here
@@ -34,7 +33,6 @@ Also doubles as a list of interactions implemented in martini_daemon.
 - `rb_torsion` - dihedral type 3 and 5
 - `restricted_dihedral` - dihedral type 10
 - `combined_bending_torsion` - dihedral type 11
-
 
 ## Virtual sites
 

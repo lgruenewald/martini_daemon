@@ -1,36 +1,25 @@
+- poly systems
+	- hyperbranched (with rates) - kinetic analysis
+	- polyurethane + loop analysis + kinetic analysis
+	- step polymerization - polystyrene?
+- benchmark reaction rate vs D/M frequency
+
+- rate systems:
+	- decay
+	- acid/base
+
+- silicate systems:
+	- silica with chains
+	- tetrahedral silica - larger system, run longer, some extra analysis?
+
+- bonus system:
+	- mietini
+
 DOCS:
-- new user's guide - basic concept explanation, simple example
-- how-to-guide
-	- more advanced polymerization
-	- more advanced silica based guide
-	- with analysis!
+- new user's guide - basic concept explanation + init+propagation+termination poly system
+- how-to-guide - focus on analysis! - polyurethane + loop analysis + kinetic analysis
+- how-to-guide - focus on graph! - tetrahedral network
 - reference - explanation, architecture, public API reference
-
-- warn user if no fragments
-- bug - what if the same interaction gets matched multiple times in the graph
-- alternative friendlier dihedral/angle syntax ?
-
-- benchmark reaction rate vs D/M frequency, make sure it's constant with default settings
-
-- graph bug - trying to match the same interaction multiple times
-
-- T* reporters auto generate graphs that are interesting
-
-mol_fragment -> molecule
-graph_fragment -> graph
-particles -> atoms
-
-helper folder:
-working with top trajectories
-all bond -> vmd bond
-pbc whole
-finalize itp
-
-- optimization: the same graphs per molecule type when doing it at the start
-	- cache results for this and reuse
-
-- S* should try to update forces instead of remove/adding when possible
-  - allow this for vsites, constraints
 
 - D/M unit testing
 	- detection testing - single run of D algo
@@ -38,7 +27,30 @@ finalize itp
 	- modification testing - single run of D/M algo
 		- fragment list similar to how graphs do it
 
-What would we need to get support for all .top files? Most to least important.
+- rates testing
+
+- sim stability benchmark
+
+- reactions vs dm freq
+
+- api change - less work, more exposed / transparency, split up constructor
+	- pick n threads, gpu
+
+- load() -> optional constructor argument
+
+- move stuff to core and clean up the package API
+
+- bug - what if the same interaction gets matched multiple times in the graph
+- alternative friendlier dihedral/angle syntax ?
+
+- optimization: the same graphs per molecule type when doing it at the start
+	- cache results for this and reuse
+
+- detection2?
+
+- don't reinitialize if only LJ type and/or charge change (unpaired, unexcluded)
+
 - fix pairs
-- position restraints
 - dihedral type 4
+- modularize nonbonded
+- finish other helpers

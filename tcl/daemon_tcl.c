@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-ssize_t load_file(const char *path, char **out) {
+static ssize_t load_file(const char *path, char **out) {
   // Loads a file at path, returns its length and sets the (char *) buffer out
   // to point to the contents. If there is an error, it returns -1 and the out
   // parameter will point to the error message (in static memory)
@@ -50,7 +50,7 @@ ssize_t load_file(const char *path, char **out) {
   #undef ERROR
 }
 
-ssize_t decompress(ssize_t file_len, Bytef *compressed, char **out) {
+static ssize_t decompress(ssize_t file_len, Bytef *compressed, char **out) {
   // Returns the number of bytes decompressed, and sets out to point to the
   // output buffer. In should be cleaned up by caller.
   // If there is an error, returns -1 and sets out to point to the error
@@ -138,7 +138,7 @@ typedef struct bonds_info {
   char *body;
 } BondsInfo;
 
-BondsInfo parse(ssize_t n_atoms, ssize_t n_frames, char *source) {
+static BondsInfo parse(ssize_t n_atoms, ssize_t n_frames, char *source) {
   BondsInfo res;
   res.success = true;
   res.msg = NULL;
@@ -194,9 +194,9 @@ BondsInfo parse(ssize_t n_atoms, ssize_t n_frames, char *source) {
   #undef ERROR
 }
 
-BondsInfo global_bonds;
+static BondsInfo global_bonds;
 
-void free_buf(char *buf) {
+static void free_buf(char *buf) {
   free(buf);
 }
 
@@ -225,7 +225,7 @@ static int Bonds_Frame_Cmd(ClientData cdata, Tcl_Interp *interp, int argc, char 
 }
 
 
-void free_globals() {
+static void free_globals() {
   if (global_bonds.body != NULL) {
     free(global_bonds.body);
     global_bonds.body = NULL;

@@ -214,16 +214,16 @@ class SysStar():
             )
 
     def recharge(self, atom_id, new_charge):
-        _, _, _, type, old_charge, _ = self._atom_list[atom_id]
-        self._atom_list[atom_id][4] = new_charge
+        a, b, c, type, old_charge, d = self._atom_list[atom_id]
+        self._atom_list[atom_id] = (a, b, c, type, new_charge, d)
         if self.context_initialized and old_charge != new_charge:
             self.nonbonded_force.update_params(
                 atom_id, type, new_charge, True
             )
 
     def remass(self, atom_id, new_mass):
-        old_mass = self._atom_list[atom_id][5]
-        self._atom_list[atom_id][5] = new_mass
+        a, b, c, d, e, old_mass = self._atom_list[atom_id]
+        self._atom_list[atom_id] = (a, b, c, d, e, new_mass)
         if self.context_initialized and new_mass != old_mass:
             self._system.setParticleMass(atom_id, new_mass)
             self._reinitialize = True

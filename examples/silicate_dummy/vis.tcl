@@ -1,6 +1,7 @@
-source ../../daemon.tcl
+load ../../tcl/libdaemon.so
+source ../../tcl/daemon.tcl
 daemon_open out.gro out.xtc
-daemon_bonds out_bonds.npy
+daemon_bonds out.bonds
 
 mol modstyle 0 0 VDW 0.8 12.0
 mol modselect 0 0 name SI1

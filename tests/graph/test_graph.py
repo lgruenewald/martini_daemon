@@ -4,7 +4,6 @@ import json
 from martini_daemon.topstar import TopStar
 from martini_daemon.top_parser import DaemonTopFile
 from martini_daemon.fragment import Fragment
-from martini_daemon.reporters.topstar import dump_topstar
 
 
 # == CONFIG ==
@@ -73,7 +72,9 @@ class TestGraph():
                     matched_frags.add(frag)
                     break
             if not matched:
-                dump_topstar(topstar)
+                for frag in frags:
+                    print("found frags:")
+                    print(f"frag {frag.name} {frag.atoms}")
                 assert False
         assert len(expected) == len(topstar.frag_list)
 
