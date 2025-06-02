@@ -18,10 +18,6 @@ except ImportError:
     )
 
 
-def _cross_box(v1, v2, box):
-    return np.any(np.abs(v1 - v2) / box > 0.5)
-
-
 def generate_vmd_readable_bonds(
     frames: list[np.array], xtc_path: str, out_path: str
 ) -> None:
@@ -47,7 +43,8 @@ def generate_vmd_readable_bonds(
     comp_obj = zlib.compressobj(6)
     with open(out_path, "wb") as handle:
         for i, frame in enumerate(frames):
-            print(f"Processing frame {i} of {len(frames)}")
+            if i % 8 == 0:
+                print(f"Processing frame {i} of {len(frames)}")
             if xtc_reader == "molly":
                 xtc_frame = xtc.pop_frame()
                 pos = xtc_frame.positions
@@ -61,9 +58,14 @@ def generate_vmd_readable_bonds(
                 )
             n_atoms = len(pos)
             bonds = [[] for _ in range(n_atoms)]
-            for pair in frame:
-                i, j = pair[0], pair[1]
-                if _cross_box(pos[i], pos[j], box):
+            crosses = np.any(
+                np.abs(
+                    pos[frame[:, 0]] - pos[frame[:, 1]]
+                ) / box > 0.5,
+                axis=-1
+            )
+            for [i, j], cross in zip(frame, crosses):
+                if cross:
                     continue
                 bonds[i].append(j)
                 bonds[j].append(i)
