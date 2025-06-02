@@ -1,4 +1,4 @@
-load ../../tcl/libdaemon.so
+load ../../tcl/bond_loader.so
 source ../../tcl/daemon.tcl
 daemon_open out.gro out.xtc
 daemon_bonds out.z

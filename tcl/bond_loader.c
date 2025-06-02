@@ -1,11 +1,8 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <tcl/tcl.h>
-// switch which lines are commented on e.g. fedora
-//#include <tcl.h>
-#include <tcl/tclDecls.h>
-//#include <tclDecls.h>
+#include <tcl.h>
+#include <tclDecls.h>
 #include <zconf.h>
 #include <zlib.h>
 #include <string.h>
@@ -296,7 +293,7 @@ static int Load_Bonds_Cmd(ClientData cdata, Tcl_Interp *interp, int argc, char c
   #undef ERROR
 }
 
-int DLLEXPORT Daemon_Init(Tcl_Interp *interp) {
+int DLLEXPORT Bond_loader_Init(Tcl_Interp *interp) {
   if (Tcl_InitStubs(interp, TCL_VERSION, 0) == NULL) {
     return TCL_ERROR;
   }

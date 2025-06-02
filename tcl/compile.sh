@@ -1,3 +1,3 @@
 #!/bin/sh
 
-gcc -shared -o libdaemon.so daemon_tcl.c -ltcl8.6 -fPIC -g
+gcc -shared $(pkg-config --cflags tcl) -o bond_loader.so bond_loader.c $(pkg-config --libs tcl) -fPIC -g
