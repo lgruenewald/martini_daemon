@@ -112,7 +112,7 @@ cdef bint detection_one(
         if rx.observed_rate is None:
             # warmup phase for this reaction
             return False
-        prob = absolute_rate / (rx.observed_rate[0] + rx.observed_rate[1])
+        prob = absolute_rate / rx.observed_rate
         assert prob >= 0., "internal error, probability below 0"
         assert prob <= 1., "internal error, probability above 1"
         if prob < random.random():

@@ -1,15 +1,3 @@
-- poly systems
-	- hyperbranched (with rates) - kinetic analysis
-	- polyurethane + loop analysis + kinetic analysis
-	- step polymerization - polystyrene?
-
-- silicate systems:
-	- silica with chains
-	- tetrahedral silica - larger system, run longer, some extra analysis?
-
-- bonus system:
-	- mietini
-
 DOCS:
 - new user's guide - basic concept explanation + init+propagation+termination poly system
 - how-to-guide - focus on analysis! - polyurethane + loop analysis + kinetic analysis
@@ -21,8 +9,6 @@ DOCS:
 		- json recipe for list of reactions and list of atoms involved
 	- modification testing - single run of D/M algo
 		- fragment list similar to how graphs do it
-
-- rates testing
 
 - sim stability benchmark
 
@@ -47,5 +33,6 @@ DOCS:
 
 - fix pairs
 - dihedral type 4
+- cmap
 - modularize nonbonded
 - finish other helpers

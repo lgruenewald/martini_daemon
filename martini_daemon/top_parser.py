@@ -26,7 +26,6 @@ def DaemonTopFile(
     nonbonded_cutoff=1.1*nanometer,
     nlist_cutoff: float = 1.1,
     max_absolute_rate: float | None = None,
-    rate_smoothing: tuple[float, float] = (0.01, 0.02),
     rate_highest_probability: float = 1.0,
     nonbonded_type="default", logger=None, respos=None
 ) -> tuple[SysStar, TopStar]:
@@ -42,7 +41,7 @@ def DaemonTopFile(
     system = SysStar(logger, epsilon_r, nonbonded_cutoff, nonbonded_type)
     topology = TopStar(
         system, logger, nlist_cutoff,
-        max_absolute_rate, rate_smoothing, rate_highest_probability,
+        max_absolute_rate, rate_highest_probability,
         respos
     )
 

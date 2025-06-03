@@ -7,7 +7,7 @@ from .sysstar import SysStar
 from .topstar import TopStar
 from .meta import alias
 from .gro_file import read_gro
-from .utils import backup_try, smooth
+from .utils import backup_try
 from .reporters.checkpoint_reporter import load_checkpoint
 from .reporters.reporter import Reporter
 import sys
@@ -29,7 +29,7 @@ class DaemonSimulation():
     logger: logging.Logger
     logger_id = 0
     reactions: int
-    last_step_time: tuple[float, float]
+    last_step_time: float
     md_steps: int
     dm_freq: int
     xtc_freq: int
@@ -40,7 +40,6 @@ class DaemonSimulation():
     dt_ns: float
     force_reinitialize: bool
     reporters: list[Reporter]
-    smooth_params = (0.002, 0.0)
 
     @alias({
         "xtc_frequency": "traj_frequency",
@@ -69,7 +68,6 @@ class DaemonSimulation():
                  neighbor_cutoff: float = 1.1,
                  force_reinitialize: bool = False,
                  max_absolute_rate: float | None = None,
-                 rate_smoothing: tuple[float, float] = (0.01, 0.02),
                  rate_highest_probability: float = 1.0,
                  nonbonded_type="default",
                  restraint_coord_path=None
@@ -117,10 +115,6 @@ class DaemonSimulation():
             use case: slowing down reactions only at times where all reactions
             in the system are fast (relative to their concentration),
             without slowing them down in other cases
-        rate_smoothing_constant -> parameters for the smoothing algorithm,
-            the smaller the slower it is to react to rate changes. The first
-            argument is for value smoothing, the second is for slope smoothing
-            (it uses double exponential smoothing)
         highest_probability -> 0 to 1., for every rate controlled reaction,
             the probability of being accepted can be scaled by a value
             affects the general speed of reactions in most cases
@@ -149,7 +143,7 @@ class DaemonSimulation():
         self.out_path: str = sim_name + ".gro"
         self.log_path: str = sim_name + ".log"
         self.reactions: int = 0
-        self.last_step_time: tuple[float, float] = (0., 0.)
+        self.last_step_time: float = 0.
         self.first_step_time: float = 0.
         self.xtc_freq: int = traj_frequency
         self.dm_freq: int = dm_frequency
@@ -208,7 +202,6 @@ class DaemonSimulation():
                 epsilon_r=epsilon_r, nonbonded_cutoff=nonbonded_cutoff,
                 nlist_cutoff=neighbor_cutoff,
                 max_absolute_rate=max_absolute_rate,
-                rate_smoothing=rate_smoothing,
                 rate_highest_probability=rate_highest_probability,
                 nonbonded_type=nonbonded_type,
                 logger=self.logger,
@@ -323,7 +316,7 @@ class DaemonSimulation():
         self.logger.info("MD finished")
         if self.md_steps > 0:
             ns_so_far = self.dt_ns * self.i
-            time_left = self.last_step_time[0] * (self.md_steps - self.i)
+            time_left = self.last_step_time * (self.md_steps - self.i)
             time_fmt: str
             if time_left < 3600:
                 time_fmt = time.strftime("%M:%S", time.gmtime(time_left))
@@ -360,8 +353,8 @@ class DaemonSimulation():
             self.logger.info("XTC write finished")
         end_time = time.time()
         step_time = (end_time - start_time) / steps
-        if self.last_step_time[0] > 0.:
-            self.last_step_time = smooth(step_time, self.last_step_time, self.smooth_params)
+        if self.last_step_time > 0.:
+            self.last_step_time = step_time * 0.01 + self.last_step_time * 0.99
         elif not xtc or not dm:
             # step 0 tends to have both xtc and dm as True, and is
             # usually unrepresentatively slow
@@ -371,7 +364,7 @@ class DaemonSimulation():
             if self.first_step_time == 0.:
                 # continuations might not start with an expensive step
                 scale = 0.
-            self.last_step_time = (step_time * (1 - scale) + scale * self.first_step_time, 0.)
+            self.last_step_time = step_time * (1 - scale) + scale * self.first_step_time
         else:
             # step 0 probably
             self.first_step_time = step_time

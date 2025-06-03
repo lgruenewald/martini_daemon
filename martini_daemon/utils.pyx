@@ -99,17 +99,3 @@ cpdef bint cross_box(double[:] v1, double[:] v2, double[:] size):
         if fabs((v1[i] - v2[i]) / size[i]) > 0.5:
             return True
     return False
-
-cpdef tuple smooth(double x_t, tuple prev, tuple params):
-    """
-        double exponential smoothing
-
-        x_t: x(t) value
-        prev: previous smoothed value and "slope"
-        params: constants for smoothing
-
-        returns:  (smoothed value, smoothed "slope")
-    """
-    cdef double x = params[0] * x_t + (1 - params[0]) * (prev[0] + prev[1])
-    cdef double y = params[1] * (x - prev[0]) + (1 - params[1]) * prev[1]
-    return x, y

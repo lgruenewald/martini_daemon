@@ -13,9 +13,9 @@ sim = simulation.DaemonSimulation(
         VariablesReporter(),
         ReactionReporter(),
         FragCountReporter(),
-        CheckpointReporter()
+        CheckpointReporter(100000)
     ],
-    md_steps=100000000, dm_frequency=100,
+    md_steps=100000000, dm_frequency=250,
     xtc_frequency=5000,
     platform="CUDA"
 )

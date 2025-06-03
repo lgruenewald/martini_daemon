@@ -7,7 +7,7 @@ class ReactionTemplate:
     dihedral_limits: list[tuple[int, int, int, int, int, int, int, int, float, float]]
     relative_rate: float
     reaction_counter: int
-    observed_rate: tuple[float, float] | None
+    observed_rate: float | None
     break_groups: list[list[tuple[int, int]]]
     update_groups: list[list[tuple[int, int]]]
     renames: list[tuple[int, int, str]]

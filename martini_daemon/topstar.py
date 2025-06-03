@@ -7,13 +7,12 @@ from .fragment import Fragment
 from .reaction_template import ReactionTemplate
 from .molecule import Molecule
 from .detection import detection_all
-from .utils import smooth
 
 
 class TopStar():
     # ======= (1/3) Building things =======
     def __init__(self, system, logger, nlist_cutoff, max_absolute_rate,
-                 smoothing_constant, highest_probability, respos):
+                 highest_probability, respos):
         # == 1. Fragments ==
         # TODO rework this into a dense structure
         # fragment by unique id
@@ -55,7 +54,6 @@ class TopStar():
         # warmup phase for rate control
         self.absolute_rate: float = -1.
         self.max_absolute_rate: float = max_absolute_rate
-        self.smoothing_constant: tuple[float, float] = smoothing_constant
         self.highest_probability: float = highest_probability
         self.respos = respos
         # a list of what was in [molecules] in the .top,
@@ -312,7 +310,7 @@ class TopStar():
 
         # do initial molecules info, used e.g. in helpers/monomer
         if (
-            len(self.initial_molecules) > 0 
+            len(self.initial_molecules) > 0
             and self.initial_molecules[-1][0] == molname
         ):
             _, n, n_atoms = self.initial_molecules[-1]
@@ -410,25 +408,19 @@ class TopStar():
 
         # if it's not initialized yet make an initial value
         if rx.observed_rate is None:
-            rx.observed_rate = (rate, 0.)
+            rx.observed_rate = rate
         else:
             # otherwise smooth it
-            rx.observed_rate = smooth(
-                rate, rx.observed_rate,
-                self.smoothing_constant
-            )
+            rx.observed_rate = rate * 0.01 + rx.observed_rate * 0.99
 
-        predicted = (
-            (rx.observed_rate[0] + rx.observed_rate[1])
-            * self.highest_probability
-        )
+        predicted = rx.observed_rate * self.highest_probability
 
         # if the prediction value goes below 0, 0 it and issue a warning
         if predicted < 0.:
             self.logger.warn(
                 f"The smoothed rate for reaction {rx.name} went below 0."
             )
-            rx.observed_rate = (0., 0.)
+            rx.observed_rate = 0.
             predicted = 0.
 
         # set the relative rate = 1 value to the slowest reaction
