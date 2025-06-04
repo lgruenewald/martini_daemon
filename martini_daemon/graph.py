@@ -18,47 +18,47 @@ class Graph():
         The class constructed from [graph]/[frag] directives that contains all
         the information the user provided about a graph.
     """
-    name: str
-    # only summon this graph on atoms of this molecule during its instantion
-    # and only during the start of the simulation (TODO make this more flexible)
-    # if empty, all molecules and during reactions too
-    molecules: list[str]
-    # list[(atom_id, name_pat, type_pat, type)]
-    atoms: list[tuple[str, str, str, GraphAtomType]]
-    # list[(interaction_type, list[atom_id])]
-    interactions: list[tuple[str, list[str]]]
-    equivalents: list[set[str]]
-
-    atom_name_to_index: dict[str, int]
 
     def __init__(self, name):
-        self.name = name
-        self.molecules = []
-        self.atoms = []
-        self.interactions = []
-        self.equivalents = []
-        self.atom_name_to_index = {}
+        self.name: str = name
+        # if set, only add this graph at the start and for these mol names
+        self.molecules: list[str] = []
+        # list[(graph_atom_name, name_pat, type_pat, type)]
+        self.atoms: list[tuple[str, str, str, GraphAtomType]] = []
+        # list[(interaction_type, list[atom_id])]
+        self.interactions: list[tuple[str, list[str]]] = []
+        self.equivalents: list[set[str]] = []
+        # dict[graph_atom_name, graph_atom_index]
+        self.atom_name_to_index: dict[str, int] = {}
 
-    def finish_init(self):
+    def finish_init(self) -> None:
         """
             Must be called after parsing the graph and before it's used.
 
             Validates graphs and errors on malformed graphs.
         """
         nodes: dict[str, set[str]] = {}
-        if len(list(filter(lambda x: x[3] == GraphAtomType.NORMAL, self.atoms))) == 0:
+        if len([x for x in self.atoms if x[3] == GraphAtomType.NORMAL]) == 0:
             raise ValueError("Graph must contain at least one normal atom")
         for i, (name, _, _, _) in enumerate(self.atoms):
             if nodes.get(name) is not None:
-                raise ValueError(f"Same graph has multiple atoms of the same name: {name}.")
+                raise ValueError(
+                    f"Same graph has multiple atoms of the same name: {name}."
+                )
             nodes[name] = set()
             self.atom_name_to_index[name] = i
         for filter_str, atoms in self.interactions:
             if len(atoms) < 2:
-                raise ValueError(f"Interaction {filter_str} must have at least two atom members. Only found {atoms}.")
+                raise ValueError(
+                    f"Interaction {filter_str} must have at least "
+                    f"two atom members. Only found {atoms}."
+                )
             for atom in atoms:
                 if nodes.get(atom) is None:
-                    raise ValueError(f"Interaction {filter_str} for atoms {atoms} references undefined atom name {atom}.")
+                    raise ValueError(
+                        f"Interaction {filter_str} for atoms {atoms} "
+                        "references undefined atom name {atom}."
+                    )
                 for other_atom in atoms:
                     if atom != other_atom:
                         nodes[atom].add(other_atom)
@@ -78,7 +78,10 @@ class Graph():
         if len(marked) != len(self.atoms):
             assert len(self.atoms) == len(nodes.keys())
             missing = set(nodes.keys()) - marked
-            raise ValueError(f"Invalid graph. The graph is not all connected to itself. Add interactions to connect it. Disconnected atom: {missing}.")
+            raise ValueError(
+                f"Invalid graph. The graph is not all connected to itself. Add"
+                f" interactions to connect it. Disconnected atom: {missing}."
+            )
 
 
 # === MATCH HELPERS ===
@@ -113,29 +116,32 @@ class GraphMatch():
         # next_inter intentionally not copied
         return res
 
-    def add_atom(self, name: str, atom_num: int):
+    def add_atom(self, name: str, atom_num: int) -> None:
         assert self.atoms.get(name) is None and atom_num not in self.rev_atoms
         self.atoms[name] = atom_num
         self.rev_atoms[atom_num] = name
 
-    def add_inter(self, id: int, inter: Interaction):
-        assert self.interactions[id] is None and inter not in self.matched_inter
+    def add_inter(self, id: int, inter: Interaction) -> None:
+        assert (
+            self.interactions[id] is None and inter not in self.matched_inter
+        )
         self.interactions[id] = inter
         self.matched_inter.add(inter)
 
-    def is_complete(self):
+    def is_complete(self) -> bool:
         # interactions are checked during construction
         # only partials that this should be called on are ones where
         # every time a new atom is added, all interactions are enforced
-        # that can be enforced when adding that atom // TLDR only checks atoms
+        # that can be enforced when adding that atom
+        # TLDR only checks atoms, not interactions
         for (name, _, _, atom_type) in self.graph.atoms:
             found = self.atoms.get(name) is not None
             if atom_type == GraphAtomType.NORMAL and not found:
                 return False
         return True
 
-    def is_acceptable(self):
-        # is complete + not type checking
+    def is_acceptable(self) -> bool:
+        # is_complete + NOT type checking
         for (name, _, _, atom_type) in self.graph.atoms:
             found = self.atoms.get(name) is not None
             if atom_type == GraphAtomType.NORMAL and not found:
@@ -145,8 +151,9 @@ class GraphMatch():
         return True
 
     def is_equal(self, other: GraphMatch) -> bool:
+        # note1:
         # also see note for is_complete / is_acceptable -> only checks atoms
-        # equivalent atoms in graph are exchangeable
+        # note2: equivalent atoms in graph are exchangeable
         if self.graph != other.graph:
             return False
         if len(self.atoms) != len(other.atoms):
@@ -172,7 +179,9 @@ class AtomCache():
         functions to it.
     """
 
-    def __init__(self, sysstar: SysStar, interactions: list[list[Interaction]]):
+    def __init__(
+            self, sysstar: SysStar, interactions: list[list[Interaction]]
+    ):
         self.sysstar = sysstar
         self.interactions = interactions
 
@@ -186,59 +195,88 @@ class AtomCache():
         res.remove(atom)
         return res
 
-    def check_atom_interactions(self, atom: str, atom_id: int, partial: GraphMatch) -> bool:
+    def check_atom_interactions(
+        self, g_atom: str, atom_id: int, partial: GraphMatch
+    ) -> bool:
         """
-            When adding a new atom, check all interactions that this new atom
-            has are complete or still possible.
+            Returns True if adding g_atom=atom_id to the graph match is
+            possible (all interaction requirements fulfilled).
+            Returns False if there is an interaction requirement violated
+            (missing interaction that should be there).
 
-            Note: partial must not have the atom to be added in it
-            yet. atom is the name of the would be added atom, atom_id is the
-            index in S*
-
-            Does not mutate partial.
+            Args:
+            g_atom -> graph atom name
+            atom_id -> S* atom ID candidate for g_name
+            partial -> partial graph match that g_atom=atom_id is considered
+            for. Note: assumes g_atom=atom_id is not a part of partial yet.
+            Note2: this function does not mutate partial.
         """
-        inters = self.interactions[atom_id]
-        skip: set[Interaction] = set()  # interactions already considered
-        matches: list[tuple[int, Interaction]] = []
-        for i, (inter_type, inter_atoms) in enumerate(partial.graph.interactions):
-            # already mapped out, so already full
+        # g_ prefix -> graph things
+        # s_ prefix -> S* things
+        s_inters = self.interactions[atom_id]  # interactions for atom_id in S*
+        # interactions already considered
+        skip: set[Interaction] = set(
+            i for i in partial.interactions if i is not None
+        )
+        matches: list[tuple[int, Interaction]] = []  # new matches
+        # iterate over all iteraction requirements in graph
+        for i, (g_type, g_atoms) in enumerate(partial.graph.interactions):
+            # g_type -> the filter text of this interaction (e.g. "connection")
+            # g_atoms -> list of graph atom names in the interaction
+
+            # already has an interaction for this one, skip
             if partial.interactions[i] is not None:
                 continue
             # atom name not in this interaction, skip
-            if atom not in inter_atoms:
+            if g_atom not in g_atoms:
                 continue
-            # members already there in the partial graph match
-            inter_g_members = {
-                partial.atoms.get(name) if name != atom else atom_id
-                for name in inter_atoms
+            # members already there in the partial graph match for this graph
+            # inter
+            g_members = {
+                # g_atom: atom_id, otherwise query partial
+                partial.atoms.get(name) if name != g_atom else atom_id
+                for name in g_atoms
             }
-            # missing atom? we don't say anything yet
-            if None in inter_g_members:
+            # missing atom for this interaction? for now ignore, will be
+            # matched once it gets filled
+            if None in g_members:
                 continue
+
+            # find which interaction in S* corresponds to this to-be-filled
+            # by now interaction in the graph
+            # note: unsound code below
+            # we eagerly take the first interaction that matches, this might
+            # not be what we want (e.g. vsite 1 2 3 and vsite 1 2, we might
+            # accept vsite 1 2 3 for a constraint vsite 1 2)
+            #
+            # but this is rarely a problem and would add a lot of complexity
+            # for this edge case
             found = False
-            for inter in inters:
-                # wrong type
-                if not inter.is_instance(inter_type):
+            for s_inter in s_inters:
+                # S* interaction does not fulfill graph type filter
+                if not s_inter.is_instance(g_type):
                     continue
-                # already used up
-                if inter in skip:
+                # s_inter already used
+                if s_inter in skip:
                     continue
                 # S* Interaction members
-                inter_s_members = set(inter.get_members())
-                if len(inter_g_members - inter_s_members) > 0:
-                    # S* can contain extra members, but all in graph
-                    # should be ones in the graph
+                s_members = set(s_inter.get_members())
+                if len(g_members - s_members) > 0:
+                    # S* can contain extra members, but all Graph ones
+                    # should be fulfilled
                     continue
-                # got here? match
+                # got here? matching S* inter = Graph inter
                 found = True
-                matches.append((i, inter))
-                skip.add(inter)
+                matches.append((i, s_inter))
+                skip.add(s_inter)
                 break
             if not found:
                 return False, []
         return True, matches
 
-    def is_name_type(self, name_filter: str, type_filter: str, atom_id: int) -> bool:
+    def is_name_type(
+        self, name_filter: str, type_filter: str, atom_id: int
+    ) -> bool:
         name = self.sysstar.get_atom_name(atom_id)
         type, _, _ = self.sysstar.get_atom_details(atom_id)
         return fnmatch(name, name_filter) and fnmatch(type, type_filter)
@@ -248,19 +286,16 @@ class AtomCache():
 def match_atoms(
     graph: Graph, atoms: set[int],
     sysstar: SysStar, interactions: list[list[Interaction]]
-):
+) -> list[GraphMatch]:
     """
     Return all unique graph matches for graph against a given set of atoms.
     """
     # 1. build a atom cache
     cache = AtomCache(sysstar, interactions)
-    queue: list[GraphMatch] = []
-    results: list[GraphMatch] = []
+    queue: list[GraphMatch] = []  # partial matches
+    results: list[GraphMatch] = []  # complete matches
     # 2. find starting matches of a single atom
-    # any of atoms can be a normal atom obviously
-    # optionals included, because it's possible only an optional of the graph
-    # is/was in the set of atoms
-    # put all of these in a queue
+    # find all normal/optional single atom matches and add them to the queue
     for atom in atoms:
         for name, name_filter, type_filter, graph_type in graph.atoms:
             if graph_type is GraphAtomType.NOT:
@@ -275,17 +310,24 @@ def match_atoms(
         cmatch = queue.pop(0)
         # 1. find one interaction that is missing but already has at least one
         # atom
-        any_found = False
         assert len(cmatch.interactions) == len(graph.interactions)
-        for inter_id in range(cmatch.next_inter, len(cmatch.interactions)):
-            cmatch.next_inter = inter_id + 1
+        any_found = False
+
+        # go through the remaining missing interactions in this graph match
+        # the first suitable is picked, and all atom candidates for it
+        # get added to the queue with next_inter reset.
+        while cmatch.next_inter < len(cmatch.interactions):
+            inter_id = cmatch.next_inter
+            cmatch.next_inter += 1
             inter = cmatch.interactions[inter_id]
             if inter is not None:
+                # already filled, skip
                 continue
+            # corresponds to a inter in the graph (e.g. connection cc1 cc2)
             inter_filter, inter_atoms = graph.interactions[inter_id]
             # find one of the atoms in the interaction
             missing: list[str] = []  # <- holes in the graph (graph atom names)
-            len_filled = 0
+            len_filled = 0  # <- # of filled atoms
             last_filled: int  # <- one of the atoms already in the inter
             for atom in inter_atoms:
                 atom_id = cmatch.atoms.get(atom)
@@ -294,11 +336,10 @@ def match_atoms(
                 else:
                     len_filled += 1
                     last_filled = atom_id
+            # no atom yet, so we can't begin to fill it, skip for now
             if len_filled == 0:
                 continue
-            # by reaching this point we commit to this interaction in this
-            # queue iter, increase next_inter
-            # 2. query all possible new matches in the interaction and put
+            # 2. query ALL possible new matches in the interaction and put
             # them in the queue
             # new matches have to:
             # a) match name/type
@@ -308,13 +349,18 @@ def match_atoms(
                 # only look for new atoms
                 if cmatch.rev_atoms.get(new_atom) is not None:
                     continue
-                # exhaustively treat all matches here: all holes with all neighbors
+                # exhaustively treat all matches here: all holes with all
+                # neighbors
                 for cmissing in missing:
                     cmissing_id = graph.atom_name_to_index[cmissing]
                     _, name_filter, type_filter, _ = graph.atoms[cmissing_id]
-                    if not cache.is_name_type(name_filter, type_filter, new_atom):
+                    if not cache.is_name_type(
+                        name_filter, type_filter, new_atom
+                    ):
                         continue
-                    valid, matches = cache.check_atom_interactions(cmissing, new_atom, cmatch)
+                    valid, matches = cache.check_atom_interactions(
+                        cmissing, new_atom, cmatch
+                    )
                     if not valid:
                         continue
                     new_cmatch = cmatch.copy()
@@ -322,14 +368,11 @@ def match_atoms(
                     for i, inter in matches:
                         new_cmatch.add_inter(i, inter)
                     queue.append(new_cmatch)
-                    # we are exhaustive with filling just this one gap in the graph
-                    # so we can commit to the set of things in the queue added here,
-                    # and we no longer need cmatch after this inner loop
+                    # we are exhaustive with filling just this one gap in the
+                    # graph so we can commit to the set of things in the queue
+                    # added here, and we no longer need cmatch after this
+                    # inner loop
                     any_found = True
-
-            # note: if any_found is False here, it means there is a hole
-            # in the graph that we now know cannot be filled starting at
-            # the previous value of cmatch.next_inter
 
             # 3. break because we only try to progress on one
             # interaction per queue loop
@@ -339,18 +382,22 @@ def match_atoms(
         # if any_found is False, readd to the queue (next_inter has been incr)
         # this is how we query all interactions one by one, even if we can't
         # fill it all immediately
-        if not any_found and cmatch.next_inter < len(cmatch.interactions):
-            queue.append(cmatch)
-        elif not any_found:
-            # if next_inter is already the last one, check if it is complete,
-            # acceptable and non duplicate. If all three add to result list
-            if cmatch.is_complete() and cmatch.is_acceptable():
-                duplicate = False
-                for res in results:
-                    if cmatch.is_equal(res):
-                        duplicate = True
-                        break
-                if not duplicate:
-                    results.append(cmatch)
+        if not any_found:
+            # cmatch was not consumed
+            if cmatch.next_inter < len(cmatch.interactions):
+                # there is more to check
+                queue.append(cmatch)
+            else:
+                # if next_inter is already the last one, check if it is
+                # complete, acceptable and non duplicate.
+                # If all three add to result list.
+                if cmatch.is_complete() and cmatch.is_acceptable():
+                    duplicate = False
+                    for res in results:
+                        if cmatch.is_equal(res):
+                            duplicate = True
+                            break
+                    if not duplicate:
+                        results.append(cmatch)
 
     return results

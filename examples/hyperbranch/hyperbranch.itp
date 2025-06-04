@@ -53,7 +53,7 @@ DHBA 1
 6 TN6  1 DHBA COH2 6 0.0 0.0
 
 [ bonds ]
-2 4 5
+2 5 5
 3 6 5
 
 [ constraints ]

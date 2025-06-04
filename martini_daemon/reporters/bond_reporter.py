@@ -56,7 +56,7 @@ class BondReporter(Reporter):
             elif force.is_instance("vsite"):
                 for id in range(len(force)):
                     if force.get_members(id) is not None:
-                        vsite_len += len(force.get_members(id) - 1)
+                        vsite_len += len(force.get_members(id)) - 1
         # allocate
         self._write(struct.pack("=Q", bonds_len + vsite_len))
         bonds = np.empty((bonds_len + vsite_len, 2), dtype=np.uint32)

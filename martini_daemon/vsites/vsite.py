@@ -19,7 +19,9 @@ class VirtualSite():
 
     def add(self, members, params) -> Interaction:
         if self._built:
-            raise ValueError("Virtual sites cannot be added during the simulation.")
+            raise ValueError(
+                "Virtual sites cannot be added during the simulation."
+            )
         vid, *other = members
         self._list.append((vid, other, params))
         self._sysstar.vsites.append(vid)
@@ -30,7 +32,9 @@ class VirtualSite():
         return [vid, *members]
 
     def remove(self, i):
-        raise ValueError("Virtual sites cannot be removed during the simulation.")
+        raise ValueError(
+            "Virtual sites cannot be removed during the simulation."
+        )
 
     def build(self) -> None:
         if not self._built:
@@ -55,8 +59,12 @@ class VirtualSite():
     def load(self, f) -> None:
         if self._built:
             raise ValueError("Can only load before _built")
-        assert f.load() == self.get_class_name(), "Attempt to load a checkpoint from a different version of daemon."
-        assert f.load() == self.get_index(), "Attempt to load a checkpoint from a different version of daemon."
+        assert f.load() == self.get_class_name(), (
+            "Attempt to load a checkpoint from a different version of daemon."
+        )
+        assert f.load() == self.get_index(), (
+            "Attempt to load a checkpoint from a different version of daemon."
+        )
         self._list = f.load()
 
     def __len__(self) -> int:

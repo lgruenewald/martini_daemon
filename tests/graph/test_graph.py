@@ -13,7 +13,8 @@ def rootdir(request):
 
 
 tests = [
-    "single", "square", "star", "BDT", "opt", "equiv", "v_shape", "bicycle"
+    "single", "square", "star", "BDT", "opt", "equiv", "v_shape", "bicycle",
+    "spiked_triangle"
 ]
 
 
@@ -74,7 +75,11 @@ class TestGraph():
             if not matched:
                 for frag in frags:
                     print("found frags:")
-                    print(f"frag {frag.name} {frag.atoms}")
+                    # convert to 1 based indexing
+                    atoms = [
+                        atom+1 if atom >= 0 else atom for atom in frag.atoms
+                    ]
+                    print(f"frag {frag.name} {atoms}")
                 assert False
         assert len(expected) == len(topstar.frag_list)
 
