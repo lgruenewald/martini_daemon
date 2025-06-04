@@ -2,7 +2,6 @@
 
 import os
 import openmm as mm
-import openmm.app as mmapp
 from openmm.unit import femtosecond, kilojoule_per_mole, kilojoule, mole, nanometer
 import numpy as np
 import math
@@ -10,6 +9,7 @@ import pytest
 
 from martini_daemon.top_parser import DaemonTopFile
 from martini_daemon.gro_file import read_gro
+from martini_daemon.forces.nonbonded import NonBonded
 
 # == CONFIG ==
 e_tol = 1e-5  # energy relative tolerance
@@ -48,7 +48,7 @@ class TestSingleFrame():
         # applies constraints and vsites and checks for position change
         platform = mm.Platform.getPlatformByName("Reference")
         _, respos, _ = read_gro(self.respos)
-        system, top = DaemonTopFile(self.top, respos=respos)
+        system, top = DaemonTopFile(self.top, NonBonded(), respos=respos)
         box, pos, vel = read_gro(self.gro)
         system.build_context(mm.VerletIntegrator(20 * femtosecond),
                              box,
@@ -68,7 +68,7 @@ class TestSingleFrame():
     def compare_daemon_gmx(self):
         platform = mm.Platform.getPlatformByName("Reference")
         _, respos, _ = read_gro(self.respos)
-        system, top = DaemonTopFile(self.top, respos=respos)
+        system, top = DaemonTopFile(self.top, NonBonded(), respos=respos)
         box, pos, vel = read_gro(self.gro)
         system.build_context(mm.VerletIntegrator(20 * femtosecond),
                              box,

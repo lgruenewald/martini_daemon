@@ -3,6 +3,7 @@ import pytest
 import json
 from martini_daemon.topstar import TopStar
 from martini_daemon.top_parser import DaemonTopFile
+from martini_daemon.forces.nonbonded import NonBonded
 from martini_daemon.fragment import Fragment
 
 
@@ -22,7 +23,7 @@ tests = [
 class TestGraph():
     def get_topology(self, path: str) -> TopStar:
         assert os.path.isfile(path)
-        _, top = DaemonTopFile(path)
+        _, top = DaemonTopFile(path, NonBonded())
         return top
 
     def parse_expected(self, path) -> list[(str, list[int])]:

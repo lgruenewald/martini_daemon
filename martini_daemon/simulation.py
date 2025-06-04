@@ -2,6 +2,7 @@
 the D/M algorithm + wrappers
 """
 
+from .forces.nonbonded import NonBonded
 from .top_parser import DaemonTopFile
 from .sysstar import SysStar
 from .topstar import TopStar
@@ -22,24 +23,7 @@ import os
 
 class DaemonSimulation():
 
-    system: SysStar
-    top: TopStar
-
-    i: int
-    logger: logging.Logger
     logger_id = 0
-    reactions: int
-    last_step_time: float
-    md_steps: int
-    dm_freq: int
-    xtc_freq: int
-    traj_path: str
-    out_path: str
-    log_path: str
-    neighbor_cutoff: float
-    dt_ns: float
-    force_reinitialize: bool
-    reporters: list[Reporter]
 
     @alias({
         "xtc_frequency": "traj_frequency",
@@ -59,8 +43,7 @@ class DaemonSimulation():
                  minimize_energy: bool = True,
                  generate_velocities: bool = True,
                  remove_com_motion: bool = True,
-                 epsilon_r: float = 15.0,
-                 nonbonded_cutoff_nm: float = 1.1,
+                 nonbonded_force=None,
                  include_dir: str | None = None,
                  defines: dict[str, str] = {},
                  reporters: list[Any] = [],
@@ -69,7 +52,6 @@ class DaemonSimulation():
                  force_reinitialize: bool = False,
                  max_absolute_rate: float | None = None,
                  rate_highest_probability: float = 1.0,
-                 nonbonded_type="default",
                  restraint_coord_path=None
                  ):
         """
@@ -99,8 +81,6 @@ class DaemonSimulation():
         minimize_energy -> should we minimize energy?
         generate_velocities -> should we generate velocities?
         remove_com_motion -> should we remove center of mass motion?
-        epsilon_r
-        nonbonded_cutoff_nm -> LJ / ES neighbor list cutoff
         include_dir -> search for .itp files here too
         defines -> #defines for .itp
         reporters -> list of Reporters
@@ -118,11 +98,6 @@ class DaemonSimulation():
         highest_probability -> 0 to 1., for every rate controlled reaction,
             the probability of being accepted can be scaled by a value
             affects the general speed of reactions in most cases
-        nonbonded_type -> type of force to use for nonbonded interactions
-            "default": for martini_openmm default - potential shift verlet, \
-                       reaction field coulomb
-            "mie-n-m": for Mie potentials with order n repulsive and order m
-                       attractive interactions, reaction field coulomb
         """
 
         # Self initialization
@@ -158,7 +133,6 @@ class DaemonSimulation():
             raise ValueError("Must couple T for p coupling")
         dt = dt_ps * mm.unit.picosecond
         self.dt_ns: float = dt.value_in_unit(mm.unit.nanosecond)
-        nonbonded_cutoff = nonbonded_cutoff_nm * mm.unit.nanometer
         friction = friction_ps_1 / mm.unit.picosecond
         if type(platform) is str:
             platform = mm.Platform.getPlatformByName(platform)
@@ -170,6 +144,8 @@ class DaemonSimulation():
             os.path.join(os.environ["GMXBIN"], "..", "share", "gromacs", "top")
         ) or "/usr/local/gromacs/share/gromacs/top"
         self.force_reinitialize = force_reinitialize
+        if nonbonded_force is None:
+            nonbonded_force = NonBonded(epsilon_r=15.0, cutoff_nm=1.1)
 
         # Logging setup
         backup_try(self.log_path)
@@ -197,13 +173,11 @@ class DaemonSimulation():
         if not use_checkpoint:
             _, respos, _ = read_gro(restraint_coord_path)
             self.system, self.top = DaemonTopFile(
-                top_path,
+                top_path, nonbonded_force,
                 include_dir=include_dir, defines=defines,
-                epsilon_r=epsilon_r, nonbonded_cutoff=nonbonded_cutoff,
                 nlist_cutoff=neighbor_cutoff,
                 max_absolute_rate=max_absolute_rate,
                 rate_highest_probability=rate_highest_probability,
-                nonbonded_type=nonbonded_type,
                 logger=self.logger,
                 respos=respos
             )
@@ -212,7 +186,7 @@ class DaemonSimulation():
         # Parsing - Checkpoint
         else:
             self.i, self.system, self.top = load_checkpoint(
-                chk_path, self.logger, epsilon_r, nonbonded_cutoff,
+                chk_path, self.logger, nonbonded_force,
                 neighbor_cutoff
             )
         self.logger.info("Parsing finished")

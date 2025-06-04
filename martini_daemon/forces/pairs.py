@@ -11,12 +11,12 @@ class Pairs(Force):
         super().__init__(sysstar)
         self.types = {}
 
-    def add_type(self, type1, type2, c6, c12):
-        self.types[(type1, type2)] = (c6, c12)
-        self.types[(type2, type1)] = (c6, c12)
+    def add_type(self, type1, type2, sigma, epsilon):
+        self.types[(type1, type2)] = (sigma, epsilon)
+        self.types[(type2, type1)] = (sigma, epsilon)
 
     def _set_force_obj(self):
-        epsilon_r = self._sysstar.epsilon_r
+        epsilon_r = self._sysstar.nonbonded_force.epsilon_r
         self._force_obj = mm.CustomBondForce(
             "LJ + ES;"
             "LJ = (C12 / r^12 - C6 / r^6);"
@@ -32,13 +32,15 @@ class Pairs(Force):
         if len(params) == 2:
             params = (*params, None, None)
 
-        i, j, p1, p2 = params
+        i, j, sigma, epsilon = params
         t1, q1, _ = self._sysstar.get_atom_details(i)
         t2, q2, _ = self._sysstar.get_atom_details(j)
         qprod = q1 * q2
-        if p1 is None or p2 is None:
-            p1, p2 = self.types[(t1, t2)]
-        self._force_obj.addBond(i, j, [qprod, p1, p2])
+        if sigma is None or epsilon is None:
+            sigma, epsilon = self.types[(t1, t2)]
+        c6 = 4 * epsilon * (sigma ** 6)
+        c12 = 4 * epsilon * (sigma ** 12)
+        self._force_obj.addBond(i, j, [qprod, c6, c12])
 
     def is_instance(self, filter):
         return filter == "pair"

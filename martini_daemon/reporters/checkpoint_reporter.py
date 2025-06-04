@@ -41,7 +41,7 @@ class CheckpointReporter(Reporter):
         self.since_checkpoint = 0
 
 
-def load_checkpoint(path, logger, epsilon_r, nonbonded_cutoff, nlist_cutoff):
+def load_checkpoint(path, logger, nonbonded_force, nlist_cutoff):
     """
         Loads checkpoint file at <path>.
 
@@ -57,7 +57,7 @@ def load_checkpoint(path, logger, epsilon_r, nonbonded_cutoff, nlist_cutoff):
     with open(path, "rb") as file:
         f = pickle.Unpickler(file)
         i = f.load()
-        sys = SysStar(logger, epsilon_r, nonbonded_cutoff)
+        sys = SysStar(logger, nonbonded_force)
         top = TopStar(sys, logger, nlist_cutoff)
         sys.load(f)
         top.load(f)

@@ -46,9 +46,7 @@ from .reporters.reporter import Reporter
 
 class SysStar():
 
-    def __init__(self, logger, epsilon_r, nonbonded_cutoff, nonbonded_type):
-        self.epsilon_r = epsilon_r
-        self.nonbonded_cutoff = nonbonded_cutoff
+    def __init__(self, logger, nonbonded):
         # name, resid, resname, type, charge, mass
         self._atom_list: list[tuple[str, int, str, str, float, float]] = []
         # default charge and mass
@@ -92,7 +90,8 @@ class SysStar():
         self.vsite_4fdn = VSite4fdn(self)
         self.vsite_avg = VSiteWeighedAverage(self)
         self.vsite_com = VSiteCenterOfMass(self)
-        self.nonbonded_force = NonBonded(self, nonbonded_type)
+        nonbonded._sysstar = self
+        self.nonbonded_force = nonbonded
         self.exclusions: ExclusionHelper = (
             self.nonbonded_force.get_exclusion_helper()
         )

@@ -10,24 +10,15 @@ from .reaction_template import ReactionTemplate
 from .sysstar import SysStar
 from .graph import Graph, GraphAtomType
 import math
-from openmm.unit import nanometer
 import logging
 
 
-def sigma_epsilon_to_c6_c12(sigma, epsilon):
-    c6 = 4 * epsilon * (sigma ** 6)
-    c12 = 4 * epsilon * (sigma ** 12)
-    return c6, c12
-
-
 def DaemonTopFile(
-    file, include_dir=None, defines: dict[str, str] = {},
-    epsilon_r=15.0,
-    nonbonded_cutoff=1.1*nanometer,
+    file, nonbonded, include_dir=None, defines: dict[str, str] = {},
     nlist_cutoff: float = 1.1,
     max_absolute_rate: float | None = None,
     rate_highest_probability: float = 1.0,
-    nonbonded_type="default", logger=None, respos=None
+    logger=None, respos=None
 ) -> tuple[SysStar, TopStar]:
     """
     Parses a Martini Top file for Gromacs and generates T*, sys and top
@@ -38,7 +29,7 @@ def DaemonTopFile(
         logging.basicConfig(filename="out.log", level=logging.INFO)
         logger = logging.getLogger(__name__)
     # field init
-    system = SysStar(logger, epsilon_r, nonbonded_cutoff, nonbonded_type)
+    system = SysStar(logger, nonbonded)
     topology = TopStar(
         system, logger, nlist_cutoff,
         max_absolute_rate, rate_highest_probability,
@@ -392,8 +383,7 @@ def DaemonTopFile(
             raise ValueError("Unsupported pairs type")
         sigma = unwrap(tokens, 3, "float")
         epsilon = unwrap(tokens, 4, "float")
-        c6, c12 = sigma_epsilon_to_c6_c12(sigma, epsilon)
-        system.pairs.add_type(t1, t2, c6, c12)
+        system.pairs.add_type(t1, t2, sigma, epsilon)
 
     p.add_level("pairtypes", process_pairtypes)
 
@@ -407,9 +397,8 @@ def DaemonTopFile(
         if len(tokens) >= 5:
             sigma = unwrap(tokens, 3, "float")
             epsilon = unwrap(tokens, 4, "float")
-            c6, c12 = sigma_epsilon_to_c6_c12(sigma, epsilon)
             last_molecule().interactions.append(
-                (system.pairs, [i, j], [c6, c12])
+                (system.pairs, [i, j], [sigma, epsilon])
             )
         else:
             last_molecule().interactions.append(
@@ -463,13 +452,7 @@ def DaemonTopFile(
             raise ValueError("Only sigma/epsilon non bond params accepted")
         sigma = unwrap(tokens, 3, "float")
         epsilon = unwrap(tokens, 4, "float")
-        if nonbonded_type == "default":
-            c6, c12 = sigma_epsilon_to_c6_c12(sigma, epsilon)
-            system.add_nb_type(type1, type2, c6, c12)
-        elif nonbonded_type[:3] == "mie":
-            system.add_nb_type(type1, type2, sigma, epsilon)
-        else:
-            raise ValueError(f"Unknown nonbonded_type {nonbonded_type}")
+        system.add_nb_type(type1, type2, sigma, epsilon)
 
     p.add_level("nonbond_params", process_nonbond_params)
 

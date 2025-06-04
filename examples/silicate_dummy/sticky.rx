@@ -66,10 +66,6 @@ r_max 1:1 2:1 0.25
 1:2 1:1 2:1 1 180.0 200.0
 1:1 2:1 2:2 1 180.0 200.0
 
-[dihedrals]
-; improper dihedral for linearity
-;1:2 1:1 2:1 2:2 2 180.0 200.0
-
 [reaction]
 bond_break
 [reactants]

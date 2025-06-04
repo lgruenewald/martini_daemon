@@ -9,19 +9,22 @@ DOCS:
 		- json recipe for list of reactions and list of atoms involved
 	- modification testing - single run of D/M algo
 		- fragment list similar to how graphs do it
-
-- sim stability benchmark
-
-- reactions vs dm freq
+- checkpoint load testing
+- reporter testing
+- helper testing
 
 - api change - less work, more exposed / transparency, split up constructor
-	- pick n threads, gpu
+- pick n threads, gpu
+- make everything use DaemonSimulation as API, rename DaemonSimulation to Daemon
+- make TopParser internal
+- make forces even more modular / non inheritance
 
-- load() -> optional constructor argument
+- don't reinitialize if only LJ type and/or charge change (unpaired, unexcluded)
+
+- checkpoints: load() -> optional constructor argument
 
 - move stuff to core and clean up the package API
 
-- bug - what if the same interaction gets matched multiple times in the graph
 - alternative friendlier dihedral/angle syntax ?
 
 - optimization: the same graphs per molecule type when doing it at the start
@@ -29,10 +32,7 @@ DOCS:
 
 - detection2?
 
-- don't reinitialize if only LJ type and/or charge change (unpaired, unexcluded)
-
 - fix pairs
 - dihedral type 4
 - cmap
-- modularize nonbonded
 - finish other helpers
