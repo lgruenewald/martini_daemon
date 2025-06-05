@@ -13,7 +13,7 @@ import logging
 import shutil
 from datetime import datetime
 
-from martini_daemon.simulation import DaemonSimulation
+from martini_daemon.simulation import Simulation
 from martini_daemon.utils import backup_try
 
 # setup logging
@@ -37,6 +37,8 @@ logger.addHandler(sh)
 
 # gromacs helper
 cached = {}
+
+
 def bench_gromacs(top, gro, steps):
     """
     In a temporary folder that it creates and cleans up after,
@@ -74,6 +76,7 @@ def bench_gromacs(top, gro, steps):
     shutil.rmtree(tmpdir)
     return grompp, mdrun
 
+
 # daemon n repetition setup
 def setup_daemon():
     """
@@ -84,6 +87,7 @@ def setup_daemon():
     """
     os.mkdir(tmpdir)
     os.chdir(tmpdir)
+
 
 # daemon run
 def bench_daemon(top, gro, steps, freq, reactive, force_reinit):
@@ -97,14 +101,20 @@ def bench_daemon(top, gro, steps, freq, reactive, force_reinit):
         defines["REACT"] = "1.0"
 
     sim_name = f"out_{datetime.now()}"
-    logger.info(f"Running daemon with {top} {gro} for {steps} steps {freq} freq {reactive} reactive force_reinit {force_reinit}.")
+    logger.info(
+        f"Running daemon with {top} {gro} for {steps} steps {freq} "
+        f"freq {reactive} reactive force_reinit {force_reinit}."
+    )
     start_grompp = time.time()
-    sim = DaemonSimulation(top_path=top, gro_path=gro, md_steps=steps,
-                        dm_frequency=freq, xtc_frequency=5000,
-                        sim_name=sim_name,
-                        T_kelvin=300., p_bar=1.0,
-                        platform=mm_platform, defines=defines,
-                        force_reinitialize=force_reinit)
+    sim = Simulation(
+        top_path=top, gro_path=gro, md_steps=steps,
+        dm_frequency=freq, xtc_frequency=5000,
+        sim_name=sim_name,
+        platform=mm_platform, defines=defines,
+        force_reinitialize=force_reinit
+    )
+    sim.minimize_energy()
+    sim.generate_velocities(300)
     end_grompp = time.time()
     grompp = end_grompp - start_grompp
 
@@ -116,7 +126,7 @@ def bench_daemon(top, gro, steps, freq, reactive, force_reinit):
     logger.info(f"Simulation done in {mdrun:.1f} s.")
 
     probe_start = time.time()
-    sim.step(100000, xtc=True, dm=False, neighbor=False, i=0, max_steps=0)
+    sim.step(100000, xtc=True, dm=False, neighbor=False)
     probe_end = time.time()
     probe = probe_end - probe_start
     logger.info(f"Probe 100k steps took {probe:.2f} s.")
@@ -124,14 +134,19 @@ def bench_daemon(top, gro, steps, freq, reactive, force_reinit):
     for h in sim.logger.handlers:
         h.flush()
         h.close()
-    
+
     return (sim_name + ".log", grompp, mdrun, probe)
+
 
 # log extractor, dat writer
 # date format for parsing .log files
 date_format = "%Y-%m-%d %H:%M:%S,%f"
 # hardcoded categories we care about
-categories = ["Parsing", "MD", "Detection", "Modification", "Reinitialize", "XTC write"]
+categories = [
+    "Parsing", "MD", "Detection", "Modification", "Reinitialize", "XTC write"
+]
+
+
 def extract(log_path, result_prefix, result_hist_prefix):
     """
     Takes daemon .log file at log_path, returns data about how much time
@@ -145,7 +160,10 @@ def extract(log_path, result_prefix, result_hist_prefix):
 
     Returns the information required for the summary
     """
-    logger.info(f"Extracting log info from {log_path} to {result_prefix}* and {result_hist_prefix}*.")
+    logger.info(
+        f"Extracting log info from {log_path} to "
+        f"{result_prefix}* and {result_hist_prefix}*."
+    )
     categories_starts = {}
     categories_values = {}
     reactions = []
@@ -224,10 +242,12 @@ def extract(log_path, result_prefix, result_hist_prefix):
         sums[cat] = np.sum(arr)
     return sums
 
+
 # n repetition collector
 def finish_daemon(result_dir, name, reactive_runs, non_reactive_runs):
     """
-    called after n repetitions, with the result of every run of bench_daemon as a list
+    called after n repetitions, with the result of every run of bench_daemon
+    as a list
 
     args: 
     name - name of the run, used to generate the result .dat path
@@ -236,11 +256,13 @@ def finish_daemon(result_dir, name, reactive_runs, non_reactive_runs):
     side effects:
     generates the .dat files in results/
     <sim name>_n_*.dat and <sim name>_n_hist_*.dat:
-    - The first gives the time * (md, detection, ...) took, n represents which repetition it is
+    - The first gives the time * (md, detection, ...) took, n represents which
+        repetition it is
     - The second gives the histogram for the first piece of data
 
     <sim name>_reactions_n.dat and <sim name>_reactions_n_hist.dat file:
-    Similar to previous, but it counts the reactions, rather than telling the time for each component
+    Similar to previous, but it counts the reactions, rather than telling the
+    time for each component
 
     exits and cleans up the temporary folder, deleting the logs, xtc, ...
 
@@ -266,12 +288,18 @@ def finish_daemon(result_dir, name, reactive_runs, non_reactive_runs):
         dat_path = os.path.join(result_dir, dat_name)
         hist_name = f"{name}_{i}_hist_"
         hist_path = os.path.join(result_dir, hist_name)
-        
+
         reactive_data.append(extract(log_path, dat_path, hist_path))
         # averages over n
-        reactive_parsetime = parsetime if i == 0 else (reactive_parsetime * (i-1) + parsetime) / i
-        reactive_runtime = runtime if i == 0 else (reactive_runtime * (i-1) + runtime) / i
-        reactive_probe = probe if i == 0 else (reactive_probe * (i-1) + probe) / i
+        reactive_parsetime = parsetime if i == 0 else (
+            reactive_parsetime * (i-1) + parsetime
+        ) / i
+        reactive_runtime = runtime if i == 0 else (
+            reactive_runtime * (i-1) + runtime
+        ) / i
+        reactive_probe = probe if i == 0 else (
+            reactive_probe * (i-1) + probe
+        ) / i
 
     for i, (run, parsetime, runtime, probe) in enumerate(non_reactive_runs):
         log_path = os.path.join(tmpdir, run)
@@ -279,23 +307,51 @@ def finish_daemon(result_dir, name, reactive_runs, non_reactive_runs):
         dat_path = os.path.join(result_dir, dat_name)
         hist_name = f"{name}_NO_REACTION_{i}_hist_"
         hist_path = os.path.join(result_dir, hist_name)
-        
+
         non_reactive_data.append(extract(log_path, dat_path, hist_path))
         # averages over n
-        non_reactive_parsetime = parsetime if i == 0 else (non_reactive_parsetime * (i-1) + parsetime) / i
-        non_reactive_runtime = runtime if i == 0 else (non_reactive_runtime * (i-1) + runtime) / i 
-        non_reactive_probe = probe if i == 0 else (non_reactive_probe * (i-1) + probe) / i
-    
-    parse_slowdown = (reactive_parsetime - non_reactive_parsetime) / non_reactive_parsetime * 100.
-    run_slowdown = (reactive_runtime - non_reactive_runtime) / non_reactive_runtime * 100.
-    logger.info(f"Reactive systems for {name} took on average {reactive_parsetime:.1f} s to parse {reactive_runtime:.1f} to run.")
-    logger.info(f"Not reactive systems for {name} took on average {non_reactive_parsetime:.1f} s to parse {non_reactive_runtime:.1f} to run.")
-    logger.info(f"Parse slowdown of {parse_slowdown:.1f}%. Run slowdown of {run_slowdown:.1f}%.")
-    logger.info(f"Reactive probe {reactive_probe:.2f}. Non reactive probe {non_reactive_probe:.2f}.")
+        non_reactive_parsetime = parsetime if i == 0 else (
+            non_reactive_parsetime * (i-1) + parsetime
+        ) / i
+        non_reactive_runtime = runtime if i == 0 else (
+            non_reactive_runtime * (i-1) + runtime
+        ) / i 
+        non_reactive_probe = probe if i == 0 else (
+            non_reactive_probe * (i-1) + probe
+        ) / i
+
+    parse_slowdown = (
+        (reactive_parsetime - non_reactive_parsetime)
+        / non_reactive_parsetime * 100.
+    )
+    run_slowdown = (
+        (reactive_runtime - non_reactive_runtime) / non_reactive_runtime * 100.
+    )
+    logger.info(
+        f"Reactive systems for {name} took on average "
+        f"{reactive_parsetime:.1f} s to parse {reactive_runtime:.1f} to run."
+    )
+    logger.info(
+        f"Not reactive systems for {name} took on average "
+        f"{non_reactive_parsetime:.1f} s to parse "
+        f"{non_reactive_runtime:.1f} to run."
+    )
+    logger.info(
+        f"Parse slowdown of {parse_slowdown:.1f}%. "
+        f"Run slowdown of {run_slowdown:.1f}%."
+    )
+    logger.info(
+        f"Reactive probe {reactive_probe:.2f}. "
+        f"Non reactive probe {non_reactive_probe:.2f}."
+    )
 
     # TODO also copy over the energy data (T, box size, etc.)
     shutil.rmtree(tmpdir)
-    return reactive_data, non_reactive_data, parse_slowdown, run_slowdown, reactive_probe, non_reactive_probe
+    return (
+        reactive_data, non_reactive_data, parse_slowdown,
+        run_slowdown, reactive_probe, non_reactive_probe
+    )
+
 
 # main helper
 def run_recipe(recipe_name, data):
@@ -305,7 +361,7 @@ def run_recipe(recipe_name, data):
     A recipe is a list of reactive MD simulation parameters.
 
     To run the recipe, every simulation in the list
-    is ran in gromacs (without reactions), 
+    is ran in gromacs (without reactions),
     daemon (without reactions) and daemon (with reactions).
 
     Afterwards, performance data is extracted to results/recipe_name.
@@ -313,7 +369,7 @@ def run_recipe(recipe_name, data):
 
     Additionally, generates the following summary .dat file
     in results containing the main information we care about.
-    
+
     Folder structure:
     results/<recipe name>/*.dat
 
@@ -348,10 +404,22 @@ def run_recipe(recipe_name, data):
         non_reactive_runs = []
         setup_daemon()  # enters tmp dir
         for i in range(n):
-            reactive_runs.append(bench_daemon(top, gro, steps, freq, True, force_reinit))
-            non_reactive_runs.append(bench_daemon(top, gro, steps, freq, False, force_reinit))
-        reac_data, non_reac_data, parse_slowdown, run_slowdown, rprobe, nprobe = finish_daemon(result_dir, name, reactive_runs, non_reactive_runs)  # exits tmp dir
-        entries.append((entry, reac_data, non_reac_data, grompp, mdrun, parse_slowdown, run_slowdown, rprobe, nprobe))
+            reactive_runs.append(
+                bench_daemon(top, gro, steps, freq, True, force_reinit)
+            )
+            non_reactive_runs.append(
+                bench_daemon(top, gro, steps, freq, False, force_reinit)
+            )
+
+        # this exits the tmpdir
+        (
+            reac_data, non_reac_data, parse_slowdown, run_slowdown,
+            rprobe, nprobe
+        ) = finish_daemon(result_dir, name, reactive_runs, non_reactive_runs)
+        entries.append((
+            entry, reac_data, non_reac_data, grompp, mdrun, parse_slowdown,
+            run_slowdown, rprobe, nprobe
+        ))
 
     # generate summary
     summary = os.path.join(result_dir, "summary.dat")
@@ -363,8 +431,11 @@ def run_recipe(recipe_name, data):
             f"# Associated benchmark log: {result_path}\n"
             f"@ {cats}\n"
         )
-        
-        for entry, reac_data, non_reac_data, grompp, mdrun, parse_slowdown, run_slowdown, rprobe, nprobe in entries:
+
+        for (
+            entry, reac_data, non_reac_data, grompp, mdrun, parse_slowdown,
+            run_slowdown, rprobe, nprobe
+        ) in entries:
             top = entry["top"]
             gro = entry["gro"]
             steps = entry["md_steps"]
@@ -399,14 +470,17 @@ def run_recipe(recipe_name, data):
             no_reac_str = ",".join(no_reac_values)
             gromacs_str = ",".join(gromacs_values)
             f.write(
-                f"# name: {name} top: {top} gro: {gro} steps: {steps} freq: {freq} n: {n}\n"
-                f"# parse slowdown: {parse_slowdown:.1f}% run slowdown: {run_slowdown:.1f}%\n"
-                f"# reactive probe {rprobe:.2f} s; non reactive probe {nprobe:.2f} s.\n"
+                f"# name: {name} top: {top} gro: {gro} steps: {steps} "
+                f"freq: {freq} n: {n}\n"
+                f"# parse slowdown: {parse_slowdown:.1f}% "
+                f"run slowdown: {run_slowdown:.1f}%\n"
+                f"# reactive probe {rprobe:.2f} s; "
+                f"non reactive probe {nprobe:.2f} s.\n"
                 f"{name},{values_str}\n"
                 f"{no_reac_name},{no_reac_str}\n"
                 f"{gro_name},{gromacs_str}\n"
             )
-    
+
 
 # print data about hardware and current utilization of resources
 def get_cpu_model():
@@ -418,12 +492,19 @@ def get_cpu_model():
 
 
 def get_gpu_stats():
-    command = "nvidia-smi --query-gpu=utilization.gpu,memory.total,memory.used,temperature.gpu,gpu_name --format=csv"
+    command = (
+        "nvidia-smi --query-gpu=utilization.gpu,memory.total,"
+        "memory.used,temperature.gpu,gpu_name --format=csv"
+    )
     info = subprocess.check_output(command, shell=True).decode().strip()
     res = ""
     for line in info.split("\n")[1:]:
         data = line.split(",")
-        res += f"GPU {data[4]}: GPU utilization {data[0]}, Total mem {data[1]}, Used mem {data[2]}, Temperature {data[3]}C\n"
+        res += (
+            f"GPU {data[4]}: GPU utilization {data[0]}, "
+            f"Total mem {data[1]}, Used mem {data[2]}, "
+            f"Temperature {data[3]}C\n"
+        )
     res.strip()
     return res
 
@@ -431,7 +512,9 @@ def get_gpu_stats():
 logger.debug(f"Log file: {result_path}")
 logger.debug(f"Hostname: {platform.node()}")
 logger.debug(f"Platform: {platform.platform()}")
-logger.debug(f"CPU model: {get_cpu_model()} utilization {psutil.cpu_percent()}%")
+logger.debug(
+    f"CPU model: {get_cpu_model()} utilization {psutil.cpu_percent()}%"
+)
 logger.debug(f"{get_gpu_stats()}")
 logger.debug(f"OpenMM version: {openmm.version.version}")
 logger.debug(f"OpenMM platform being used: {mm_platform}")
@@ -445,9 +528,13 @@ if not os.path.exists(os.path.join(os.curdir, "benchmark.py")):
 results_path = os.path.join(os.curdir, "results")
 if not os.path.exists(results_path):
     os.mkdir(results_path)
-    
+
 for x in os.listdir(results_path):
-    print("Results folder (./result) is not empty. Please back up previous benchmark results, delete existing results folder? (y/N)")
+    print(
+        "Results folder (./result) is not empty. "
+        "Please back up previous benchmark results, "
+        "delete existing results folder? (y/N)"
+    )
     answer = input()
     if answer in {"y", "Y"}:
         shutil.rmtree(results_path)

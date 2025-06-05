@@ -13,10 +13,7 @@ DOCS:
 - reporter testing
 - helper testing
 
-- api change - less work, more exposed / transparency, split up constructor
 - pick n threads, gpu
-- make everything use DaemonSimulation as API, rename DaemonSimulation to Daemon
-- make TopParser internal
 - make forces even more modular / non inheritance
 
 - don't reinitialize if only LJ type and/or charge change (unpaired, unexcluded)

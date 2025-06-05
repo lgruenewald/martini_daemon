@@ -4,13 +4,10 @@ the D/M algorithm + wrappers
 
 from .forces.nonbonded import NonBonded
 from .top_parser import DaemonTopFile
-from .sysstar import SysStar
-from .topstar import TopStar
 from .meta import alias
 from .gro_file import read_gro
 from .utils import backup_try
 from .reporters.checkpoint_reporter import load_checkpoint
-from .reporters.reporter import Reporter
 import sys
 import openmm as mm
 import logging
@@ -21,7 +18,7 @@ import math
 import os
 
 
-class DaemonSimulation():
+class Simulation():
 
     logger_id = 0
 
@@ -31,29 +28,42 @@ class DaemonSimulation():
         "T_kelvin": "t_kelvin",
         "T_type": "t_type"
     })
-    def __init__(self, top_path: str = "", geom_path: str = "",
-                 md_steps: int = 0, dm_frequency: int = 0,
-                 chk_path: str = "",
-                 traj_frequency: int = 5000,
-                 sim_name: str = "out",
-                 t_kelvin: float | None = 300., t_type: str = "langevin",
-                 p_bar: float = 1.,
-                 dt_ps: float = 0.02,
-                 platform: str | None | mm.Platform = None,
-                 minimize_energy: bool = True,
-                 generate_velocities: bool = True,
-                 remove_com_motion: bool = True,
-                 nonbonded_force=None,
-                 include_dir: str | None = None,
-                 defines: dict[str, str] = {},
-                 reporters: list[Any] = [],
-                 friction_ps_1: float = 2.0,
-                 neighbor_cutoff: float = 1.1,
-                 force_reinitialize: bool = False,
-                 max_absolute_rate: float | None = None,
-                 rate_highest_probability: float = 1.0,
-                 restraint_coord_path=None
-                 ):
+    def __init__(
+        # main input files
+        self, top_path: str = "", geom_path: str = "",
+        # simulation length / frequencies
+        md_steps: int = 0, dm_frequency: int = 0,
+        traj_frequency: int = 5000,
+        # other input / output files
+        sim_name: str = "out",
+        chk_path: str = "",
+        restraint_coord_path=None,
+        # integrator, context params, coupling
+        integrator: mm.Integrator = mm.LangevinMiddleIntegrator(
+            300 * mm.unit.kelvin,
+            1.0 / mm.unit.picosecond,
+            0.02 * mm.unit.picosecond
+        ),
+        coupling: list[mm.Force] = [
+            mm.MonteCarloBarostat(
+                1.0 * mm.unit.bar,
+                300 * mm.unit.kelvin
+            )
+        ],
+        remove_com_motion: bool = True,
+        platform: str | None | mm.Platform = None,
+        context_parameters: None | dict[str, str] = None,
+        nonbonded_force: NonBonded = NonBonded(epsilon_r=15.0, cutoff_nm=1.1),
+        # parsing things
+        include_dir: str | None = None,
+        defines: dict[str, str] = {},
+        reporters: list[Any] = [],
+        # T* additional params
+        neighbor_cutoff: float = 1.1,
+        force_reinitialize: bool = False,
+        max_absolute_rate: float | None = None,
+        rate_highest_probability: float = 1.0,
+    ):
         """
         Input topology and geometry can be either:
             top_path -> .top file
@@ -71,20 +81,18 @@ class DaemonSimulation():
             (and associated reporters)
         xtc_frequency -> alias for traj_frequency
         sim_name -> prefix for simulation output files
-        t_kelvin -> reference temperature
-        T_kelvin -> alias for t_kelvin
-        t_type -> "langevin" or "andersen"
-        T_type -> alias for t_type
-        p_bar -> reference pressure in bars
-        dt_ps -> single MD timestep in ps
-        platform -> openmm platform
+        integrator -> integrator to use, by default LangevinMiddleIntegrator,
+            0.02 ps timestep, 1 ps^-1 friction, 300K temp
+        coupling -> additional openmm forces to add to the system.
+        Useful for T/p coupling. By default contains a monte carlo barostat
+        set to 300K temp and 1 bar.
+        remove_com_motion -> should we remove center of mass motion?
+        platform -> openmm platform, can be a string or obj
         minimize_energy -> should we minimize energy?
         generate_velocities -> should we generate velocities?
-        remove_com_motion -> should we remove center of mass motion?
         include_dir -> search for .itp files here too
         defines -> #defines for .itp
         reporters -> list of Reporters
-        friction_ps_1 -> friction value for temperature coupling
         neighbor_cutoff -> neighbor cutoff for the detection algorithm
         force_reinitialize -> only used to benchmark the impact of
             reinitialize, keep it False
@@ -123,17 +131,9 @@ class DaemonSimulation():
         self.xtc_freq: int = traj_frequency
         self.dm_freq: int = dm_frequency
         self.neighbor_cutoff = neighbor_cutoff
-        if t_kelvin is None and t_type != "none":
-            raise ValueError("No valid T temperature given")
-        if t_type not in {"andersen", "langevin", "none"}:
-            raise ValueError("Unknown t_type")
-        T = t_kelvin * mm.unit.kelvin if t_type != "none" else None
-        p = p_bar * mm.unit.bar if p_bar is not None else None
-        if p is None and t_type == "none":
-            raise ValueError("Must couple T for p coupling")
-        dt = dt_ps * mm.unit.picosecond
-        self.dt_ns: float = dt.value_in_unit(mm.unit.nanosecond)
-        friction = friction_ps_1 / mm.unit.picosecond
+        self.dt_ns: float = (
+            integrator.getStepSize().value_in_unit(mm.unit.nanosecond)
+        )
         if type(platform) is str:
             platform = mm.Platform.getPlatformByName(platform)
         include_dir = include_dir or (
@@ -144,8 +144,6 @@ class DaemonSimulation():
             os.path.join(os.environ["GMXBIN"], "..", "share", "gromacs", "top")
         ) or "/usr/local/gromacs/share/gromacs/top"
         self.force_reinitialize = force_reinitialize
-        if nonbonded_force is None:
-            nonbonded_force = NonBonded(epsilon_r=15.0, cutoff_nm=1.1)
 
         # Logging setup
         backup_try(self.log_path)
@@ -163,7 +161,7 @@ class DaemonSimulation():
         self.logger.addHandler(sh)
         self.logger.info("DaemonSimulation __init__ called")
         self.logger.info(f"Parameters: {top_path} {geom_path} "
-                         f"T: {T} p: {p} dt: {dt} "
+                         f"dt (ns): {self.dt_ns} "
                          f"steps: {md_steps} dm_freq: {dm_frequency} "
                          f"traj_freq: {traj_frequency} "
                          f"sim_name: {sim_name} platform: {platform}")
@@ -193,34 +191,23 @@ class DaemonSimulation():
 
         # Coupling and integrators
         self.logger.info("Setup integrator and coupling start")
-        if t_type == "andersen":
-            self.system.add_force(mm.AndersenThermostat(T, friction))
-
-        if p is not None:
-            self.system.add_force(mm.MonteCarloBarostat(p, T))
+        for f in coupling:
+            self.system.add_force(f)
         if remove_com_motion:
             self.system.remove_com_motion()
-
-        integrator: mm.Integrator
-        if t_type == "langevin":
-            integrator = mm.LangevinIntegrator(T, friction, dt)
-        else:
-            integrator = mm.VerletIntegrator(dt)
-        self.logger.info("Setup integrator and coupling finished")
 
         # Context build and reporter initialization
         self.logger.info("Context build start")
         if use_checkpoint:
-            self.system.load_finish(integrator, platform)
+            self.system.load_finish(
+                integrator, platform, context_parameters
+            )
         else:
-            self.system.build_context(integrator, box, platform)
+            self.system.build_context(
+                integrator, box, platform, context_parameters
+            )
             self.system.set_positions(pos)
-
-            if not generate_velocities:
-                if vel is None:
-                    raise ValueError("Generate velocities is false, but there are no velocities in the .gro file.")
-                if minimize_energy:
-                    raise ValueError("Attempt to minimize energy and then read velocities from a file, which is likely wrong.")
+            if vel is not None:
                 self.system.set_velocities(vel)
 
         for rep in reporters:
@@ -237,22 +224,30 @@ class DaemonSimulation():
             self.system.write_xtc_frame(0, 0)
             self.logger.info("Initial geometry XTC frame written")
         self.logger.info("Context build finished")
+        self.logger.info("__init__ end")
 
-        # Genvel, energy min
-        if use_checkpoint and (generate_velocities or minimize_energy):
-            raise ValueError("Cannot load .chk and generate velocities or minimize energies.")
-        if generate_velocities:
-            self.logger.info("genvel start")
-            self.system.generate_velocities(T)
-            self.logger.info("genvel finished")
-        if minimize_energy:
-            self.logger.info("Energy min start")
-            self.system.minimize_energy()
+    def generate_velocities(self, T=300):
+        """Generate velocities at temp T (in kelvin)."""
+        self.logger.info("genvel start")
+        self.system.generate_velocities(T)
+        self.logger.info("genvel finished")
+
+    def minimize_energy(
+        self, tolerance=10, max_steps=0, write_xtc=False, out=None
+    ):
+        """
+        Minimizes energy of the system. If write_xtc is True, an xtc frame
+        will be written. If out is set to a string value, a .gro file of
+        the minimized coordinates will be written there.
+        """
+        self.logger.info("Energy min start")
+        self.system.minimize_energy(tolerance, max_steps)
+        if write_xtc:
             self.system.write_xtc_frame(0, 0)
             self.logger.info("Energy minimized XTC frame written")
-            self.logger.info("Energy min finished")
-
-        self.logger.info("__init__ end")
+        if out is not None:
+            self.system.write_gro(out)
+        self.logger.info("Energy min finished")
 
     def simulate(self):
         remaining = self.md_steps - self.i

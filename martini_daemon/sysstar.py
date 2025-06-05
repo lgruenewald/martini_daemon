@@ -91,7 +91,7 @@ class SysStar():
         self.vsite_avg = VSiteWeighedAverage(self)
         self.vsite_com = VSiteCenterOfMass(self)
         nonbonded._sysstar = self
-        self.nonbonded_force = nonbonded
+        self.nonbonded_force: NonBonded = nonbonded
         self.exclusions: ExclusionHelper = (
             self.nonbonded_force.get_exclusion_helper()
         )
@@ -169,14 +169,14 @@ class SysStar():
             force.load(f)
         self.partial_chk = f.load()
 
-    def load_finish(self, integrator, platform):
+    def load_finish(self, integrator, platform, params):
         """
             Finishes self.load()
 
             Must be called after the other forces were added, hence the
             split up into two functions.
         """
-        self.build_context(integrator, self.partial_box, platform)
+        self.build_context(integrator, self.partial_box, platform, params)
         self._context.loadCheckpoint(self.partial_chk)
 
     def get_defaults(self, atom_type, charge, mass):
@@ -259,7 +259,7 @@ class SysStar():
             raise ValueError("Cannot do this after context is initialized")
         self.nonbonded_force._nb_types[(type1, type2)] = (V, W)
 
-    def build_context(self, integrator, box, platform=None):
+    def build_context(self, integrator, box, platform=None, params={}):
         """context_initialized flips the state of S* in a way
         the parsing of a topology and the addition of all atom, bonds, ...
         should happen before calling build_context
@@ -283,10 +283,16 @@ class SysStar():
         ]
         self._periodic_box = pbv
         self._system.setDefaultPeriodicBoxVectors(*pbv)
-        if platform is None:
+        if platform is None and len(params) == 0:
             self._context = mm.Context(self._system, integrator)
+        elif platform is None and len(params) > 0:
+            raise ValueError(
+                "Please specify a platform, if specifying context params."
+            )
         else:
-            self._context = mm.Context(self._system, integrator, platform)
+            self._context = mm.Context(
+                self._system, integrator, platform, params
+            )
         self._context.setPeriodicBoxVectors(*pbv)
 
     def reinitialize(self, force=False):
