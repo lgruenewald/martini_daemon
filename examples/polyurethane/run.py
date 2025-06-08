@@ -27,4 +27,6 @@ sim = simulation.Simulation(
     platform="CUDA",
     context_parameters={"DeviceIndex": f"{gpu}"}
 )
+sim.minimize_energy()
+sim.generate_velocities(300)
 sim.simulate()

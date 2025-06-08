@@ -7,7 +7,7 @@ from martini_daemon.reporters.variables_reporter import VariablesReporter
 from martini_daemon.reporters.topstar import FragCountReporter, ReactionReporter
 from martini_daemon.reporters.checkpoint_reporter import CheckpointReporter
 
-sim = simulation.DaemonSimulation(
+sim = simulation.Simulation(
     "system.top", "system.gro",
     reporters=[
         BondReporter(),
@@ -22,4 +22,6 @@ sim = simulation.DaemonSimulation(
     platform="CUDA",
     dt_ps=0.01
 )
+sim.minimize_energy()
+sim.generate_velocities(300)
 sim.simulate()

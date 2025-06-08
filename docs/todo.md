@@ -13,23 +13,6 @@ DOCS:
 - reporter testing
 - helper testing
 
-- pick n threads, gpu
-- make forces even more modular / non inheritance
-
-- don't reinitialize if only LJ type and/or charge change (unpaired, unexcluded)
-
-- checkpoints: load() -> optional constructor argument
-
-- move stuff to core and clean up the package API
-
-- alternative friendlier dihedral/angle syntax ?
-
-- optimization: the same graphs per molecule type when doing it at the start
-	- cache results for this and reuse
-
 - detection2?
 
-- fix pairs
-- dihedral type 4
-- cmap
 - finish other helpers

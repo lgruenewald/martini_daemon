@@ -39,21 +39,12 @@ class Simulation():
         chk_path: str = "",
         restraint_coord_path=None,
         # integrator, context params, coupling
-        integrator: mm.Integrator = mm.LangevinMiddleIntegrator(
-            300 * mm.unit.kelvin,
-            1.0 / mm.unit.picosecond,
-            0.02 * mm.unit.picosecond
-        ),
-        coupling: list[mm.Force] = [
-            mm.MonteCarloBarostat(
-                1.0 * mm.unit.bar,
-                300 * mm.unit.kelvin
-            )
-        ],
+        integrator: mm.Integrator = None,
+        coupling: list[mm.Force] = None,
         remove_com_motion: bool = True,
         platform: str | None | mm.Platform = None,
         context_parameters: None | dict[str, str] = None,
-        nonbonded_force: NonBonded = NonBonded(epsilon_r=15.0, cutoff_nm=1.1),
+        nonbonded_force: NonBonded = None,
         # parsing things
         include_dir: str | None = None,
         defines: dict[str, str] = {},
@@ -131,9 +122,6 @@ class Simulation():
         self.xtc_freq: int = traj_frequency
         self.dm_freq: int = dm_frequency
         self.neighbor_cutoff = neighbor_cutoff
-        self.dt_ns: float = (
-            integrator.getStepSize().value_in_unit(mm.unit.nanosecond)
-        )
         if type(platform) is str:
             platform = mm.Platform.getPlatformByName(platform)
         include_dir = include_dir or (
@@ -144,6 +132,24 @@ class Simulation():
             os.path.join(os.environ["GMXBIN"], "..", "share", "gromacs", "top")
         ) or "/usr/local/gromacs/share/gromacs/top"
         self.force_reinitialize = force_reinitialize
+        if integrator is None:
+            integrator = mm.LangevinMiddleIntegrator(
+                300 * mm.unit.kelvin,
+                1.0 / mm.unit.picosecond,
+                0.02 * mm.unit.picosecond
+            )
+        if coupling is None:
+            coupling = [
+                mm.MonteCarloBarostat(
+                    1.0 * mm.unit.bar,
+                    300 * mm.unit.kelvin
+                )
+            ]
+        if nonbonded_force is None:
+            nonbonded_force = NonBonded(epsilon_r=15.0, cutoff_nm=1.1)
+        self.dt_ns: float = (
+            integrator.getStepSize().value_in_unit(mm.unit.nanosecond)
+        )
 
         # Logging setup
         backup_try(self.log_path)

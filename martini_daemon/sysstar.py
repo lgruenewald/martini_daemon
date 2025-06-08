@@ -259,7 +259,7 @@ class SysStar():
             raise ValueError("Cannot do this after context is initialized")
         self.nonbonded_force._nb_types[(type1, type2)] = (V, W)
 
-    def build_context(self, integrator, box, platform=None, params={}):
+    def build_context(self, integrator, box, platform=None, params=None):
         """context_initialized flips the state of S* in a way
         the parsing of a topology and the addition of all atom, bonds, ...
         should happen before calling build_context
@@ -283,7 +283,7 @@ class SysStar():
         ]
         self._periodic_box = pbv
         self._system.setDefaultPeriodicBoxVectors(*pbv)
-        if platform is None and len(params) == 0:
+        if platform is None and params is None:
             self._context = mm.Context(self._system, integrator)
         elif platform is None and len(params) > 0:
             raise ValueError(

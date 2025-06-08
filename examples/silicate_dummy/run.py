@@ -1,21 +1,17 @@
 #!/usr/bin/env python3
 
 from martini_daemon import simulation
-from martini_daemon.reporters.bond_reporter import VMDBondReporter
-from martini_daemon.reporters.topstar import TopStarLogger, ReactionReporter, FragCountReporter
 from martini_daemon.reporters.variables_reporter import VariablesReporter
+from martini_daemon.reporters.bond_reporter import BondReporter
 
-sim = simulation.DaemonSimulation(top_path="system.top", gro_path="system.gro",
-                                  sim_name="out",
-                                  p_bar=1.0, friction_ps_1=2.0,
-                                  reporters=[
-                                      VMDBondReporter(),
-#                                      TopStarLogger(),
-#                                      ReactionReporter(),
-#                                      FragCountReporter(),
-                                      VariablesReporter()
-                                  ],
-                                  md_steps=1000000, dm_frequency=100,
-                                  xtc_frequency=1000,
-                                  minimize_energy=False)
+sim = simulation.Simulation(
+    top_path="system.top", gro_path="system.gro",
+    sim_name="out",
+    reporters=[
+        VariablesReporter()
+    ],
+    md_steps=1000000, dm_frequency=100,
+    xtc_frequency=1000,
+)
+sim.generate_velocities(300)
 sim.simulate()
