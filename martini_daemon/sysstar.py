@@ -283,16 +283,23 @@ class SysStar():
         ]
         self._periodic_box = pbv
         self._system.setDefaultPeriodicBoxVectors(*pbv)
-        if platform is None and params is None:
-            self._context = mm.Context(self._system, integrator)
-        elif platform is None and len(params) > 0:
-            raise ValueError(
-                "Please specify a platform, if specifying context params."
-            )
-        else:
-            self._context = mm.Context(
-                self._system, integrator, platform, params
-            )
+        match platform, params:
+            case None, None:
+                self._context = mm.Context(
+                    self._system, integrator
+                )
+            case None, params:
+                raise ValueError(
+                    "Please specify a platform, if specifying context params."
+                )
+            case platform, None:
+                self._context = mm.Context(
+                    self._system, integrator, platform
+                )
+            case platform, params:
+                self._context = mm.Context(
+                    self._system, integrator, platform, params
+                )
         self._context.setPeriodicBoxVectors(*pbv)
 
     def reinitialize(self, force=False):
