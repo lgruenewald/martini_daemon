@@ -40,6 +40,10 @@ class Graph():
         nodes: dict[str, set[str]] = {}
         if len([x for x in self.atoms if x[3] == GraphAtomType.NORMAL]) == 0:
             raise ValueError("Graph must contain at least one normal atom")
+        if self.atoms[0][3] != GraphAtomType.NORMAL:
+            raise ValueError(
+                "First atom in graph must be a normal atom (not opt or not)."
+            )
         for i, (name, _, _, _) in enumerate(self.atoms):
             if nodes.get(name) is not None:
                 raise ValueError(

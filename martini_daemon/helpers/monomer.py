@@ -5,8 +5,6 @@ import sys
 import numpy as np
 
 
-# convert a .bonds trajectory into a monomer graph based one
-
 def generate_mapping(initial_molecules: list[tuple[str, int, int]]):
     """
         From a list of each type of monomer and their number and number of
@@ -68,7 +66,6 @@ def read_monomer_graph(bond_frames: list[np.array], mapping: np.array):
     return monomer_frames
 
 
-# calculate degree of conversion
 def conversion(
     monomer_frames: list[np.array], start: int, end: int,
     bonds_per_monomer: int
@@ -97,11 +94,6 @@ def conversion(
         ) / max_bonds
     return conversions
 
-
-# calculate give #s for different bond orders
-
-
-# loop analysis - find different types of loops
 
 def _unroll(max: int, edge_array: np.array):
     """
@@ -179,4 +171,6 @@ def find_double_bonds(n_monomers, monomer_frames):
         different ends.
     """
 
-# chain analysis - find different types of linear chains
+# TODO chain analysis - find different types of linear chains
+# TODO find n_mers
+# TODO find how many bonds per monomer, distribution

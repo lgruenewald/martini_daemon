@@ -271,7 +271,7 @@ class Simulation():
         for reporter in self.reporters:
             reporter.finish()
 
-    def step(self, steps=1, xtc=True, dm=True, neighbor=True):
+    def step(self, steps=1, xtc=True, dm=True):
         """
             Do a step of the following:
             - steps MD steps
@@ -285,11 +285,12 @@ class Simulation():
         self.i += steps
         percent = self.i/self.md_steps*100 if self.md_steps > 0 else 100
         self.logger.info(f"step {self.i}")
-        self.logger.info(f"md_steps {steps}")
-        self.logger.info("MD start")
-        self.system.do_steps(steps)
-        self.logger.info("MD finished")
-        if self.md_steps > 0:
+        if steps > 0:
+            self.logger.info(f"md_steps {steps}")
+            self.logger.info("MD start")
+            self.system.do_steps(steps)
+            self.logger.info("MD finished")
+        if self.md_steps > 0 and steps > 0:
             ns_so_far = self.dt_ns * self.i
             time_left = self.last_step_time * (self.md_steps - self.i)
             time_fmt: str
@@ -327,19 +328,21 @@ class Simulation():
             self.system.write_xtc_frame(self.i, self.xtc_freq)
             self.logger.info("XTC write finished")
         end_time = time.time()
-        step_time = (end_time - start_time) / steps
-        if self.last_step_time > 0.:
-            self.last_step_time = step_time * 0.01 + self.last_step_time * 0.99
-        elif not xtc or not dm:
-            # step 0 tends to have both xtc and dm as True, and is
-            # usually unrepresentatively slow
-            scale = self.dm_freq / self.xtc_freq
-            if scale > 1.:
-                scale = 1. / scale
-            if self.first_step_time == 0.:
-                # continuations might not start with an expensive step
-                scale = 0.
-            self.last_step_time = step_time * (1 - scale) + scale * self.first_step_time
-        else:
-            # step 0 probably
-            self.first_step_time = step_time
+        # timing info update
+        if steps > 0:
+            step_time = (end_time - start_time) / steps
+            if self.last_step_time > 0.:
+                self.last_step_time = step_time * 0.01 + self.last_step_time * 0.99
+            elif not xtc or not dm:
+                # step 0 tends to have both xtc and dm as True, and is
+                # usually unrepresentatively slow
+                scale = self.dm_freq / self.xtc_freq
+                if scale > 1.:
+                    scale = 1. / scale
+                if self.first_step_time == 0.:
+                    # continuations might not start with an expensive step
+                    scale = 0.
+                self.last_step_time = step_time * (1 - scale) + scale * self.first_step_time
+            else:
+                # step 0 probably
+                self.first_step_time = step_time

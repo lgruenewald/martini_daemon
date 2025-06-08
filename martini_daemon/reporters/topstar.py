@@ -44,13 +44,24 @@ class ReactionReporter(Reporter):
 
     def init_dm(self, name):
         self._open(name + ".reactions")
+        self._print(
+            "# frame,reaction_name;"
+            "reactant1_name,reactant1_id,atoms...;"
+            "reactantn_id,reactantn_id,atoms..."
+        )
 
     def pre_modification(self, i, reactions, name) -> None:
-        print(f"Frame {i}", file=self._handle)
         for (frags, rx) in reactions:
-            frags = [(frag.name, frag.frag_id, frag.atoms) for frag in frags]
             self._print(
-                f"Reaction {rx.name} reactants {frags}"
+                f"{i},{rx.name};"
+                + ";".join([
+                    f"{frag.name},{frag.frag_id},"
+                    + ",".join([
+                        f"{atom}"
+                        for atom in frag.atoms
+                    ])
+                    for frag in frags
+                ])
             )
 
     def interactive_line(self) -> str:

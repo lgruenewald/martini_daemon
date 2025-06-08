@@ -1,0 +1,52 @@
+#include "../../../itp/martini_v3.0.0.itp"
+
+[moleculetype]
+X 1
+[atoms]
+1 W 1 X X 1
+
+[moleculetype]
+Y 1
+[atoms]
+1 W 1 Y Y 1
+2 W 1 Y Z 2
+[bonds]
+1 2 5
+
+[graph]
+name x
+atom x X W
+
+[graph]
+name y
+atom y Y W
+atom z Z W
+connection y z
+
+[reaction]
+xy
+[reactants]
+x y
+[conditions]
+r_max 1:x 2:y 0.5
+angle_between 1:x 2:y 2:z 80 100
+
+[reaction]
+xy2
+[reactants]
+y x
+[conditions]
+r_max 1:y 2:x 0.5
+; it's exactly 115
+angle_between 1:z 1:y 2:x 114 116
+
+[system]
+detection test
+
+[molecules]
+X 1
+Y 1
+X 1
+Y 1
+X 1
+Y 1

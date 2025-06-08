@@ -2,6 +2,8 @@ from .graph import Graph
 
 
 class Fragment():
+    # TODO if detection2.py works out, change this to already
+    # be a condensed version to reduce data massaging in D/M
     name: str
     atoms: list[int]
     frag_id: int

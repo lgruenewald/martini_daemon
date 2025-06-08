@@ -7,6 +7,8 @@ from .fragment import Fragment
 from .reaction_template import ReactionTemplate
 from .molecule import Molecule
 from .detection import detection_all
+#from .detection2 import detection_all
+import numpy as np
 
 
 class TopStar():
@@ -432,7 +434,23 @@ class TopStar():
     ) -> list[tuple[list[Fragment], ReactionTemplate]]:
         for reporter in self.reporters:
             reporter.pre_detection(step, self.out_name)
-        reactions = detection_all(self, box, pos)
+        rxs = []
+        for more_rxs in self.reactions.values():
+            for rx in more_rxs:
+                rxs.append(rx)
+        reactions = detection_all(
+            self, box, pos
+        )
+        """
+        reactions = detection_all(
+            self.frag_list, rxs,
+            box, pos,
+            self.nlist_cutoff,
+            self.absolute_rate,
+            # TODO save state (not sure there is much point)
+            np.random.default_rng()
+        )
+        """
         # preparations for the next step
         self.absolute_rate = self.max_absolute_rate
         for _, rxs in self.reactions.items():

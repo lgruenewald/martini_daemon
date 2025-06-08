@@ -1,0 +1,13 @@
+# frame,reaction_name;reactant1_name,reactant1_id,atoms...;reactantn_id,reactantn_id,atoms...
+0,dimer_form;monomer,65,163,161,162,-1;monomer,766,1919,1915,1917,-1
+0,dimer_form;monomer,75,188,186,187,-1;monomer,743,1859,1855,1857,-1
+0,dimer_form;monomer,181,453,451,452,-1;monomer,984,2464,2460,2462,-1
+0,dimer_form;monomer,269,674,670,672,-1;monomer,465,1163,1161,1162,-1
+0,dimer_form;monomer,297,743,741,742,-1;monomer,598,1499,1495,1497,-1
+0,dimer_form;monomer,322,809,805,807,-1;monomer,908,2273,2271,2272,-1
+0,dimer_form;monomer,398,999,995,997,-1;monomer,731,1828,1826,1827,-1
+0,dimer_form;monomer,427,1068,1066,1067,-1;monomer,595,1488,1486,1487,-1
+0,dimer_form;monomer,490,1229,1225,1227,-1;monomer,890,2229,2225,2227,-1
+0,dimer_form;monomer,523,1308,1306,1307,-1;monomer,897,2243,2241,2242,-1
+0,dimer_form;monomer,574,1439,1435,1437,-1;monomer,938,2349,2345,2347,-1
+0,dimer_form;monomer,905,2263,2261,2262,-1;monomer,978,2449,2445,2447,-1

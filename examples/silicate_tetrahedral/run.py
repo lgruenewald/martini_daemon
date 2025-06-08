@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from martini_daemon import simulation
-from martini_daemon.reporters.bond_reporter import BondReporter
+from martini_daemon.reporters.bond_reporter2 import BondReporter
 from martini_daemon.reporters.topstar import ReactionReporter, FragCountReporter
 from martini_daemon.reporters.checkpoint_reporter import CheckpointReporter
 from martini_daemon.reporters.variables_reporter import VariablesReporter
