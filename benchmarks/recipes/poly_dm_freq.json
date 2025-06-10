@@ -16,6 +16,14 @@
         "n": 1
     },
     {
+        "name": "dm_every_250",
+        "top": "polyurethane_200.top",
+        "gro": "polyurethane_200.gro",
+        "md_steps": 500000,
+        "freq": 250,
+        "n": 1
+    },
+    {
         "name": "dm_every_300",
         "top": "polyurethane_200.top",
         "gro": "polyurethane_200.gro",
