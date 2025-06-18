@@ -16,7 +16,7 @@ sim = simulation.Simulation(
         VariablesReporter(),
         CheckpointReporter(100000)
     ],
-    md_steps=1000000, dm_frequency=250,
+    md_steps=10000000, dm_frequency=250,
     xtc_frequency=5000
 )
 sim.generate_velocities(300)

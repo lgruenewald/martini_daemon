@@ -1,7 +1,7 @@
-load ../../tcl/libdaemon.so
+load ../../tcl/bond_loader.so
 source ../../tcl/daemon.tcl
-daemon_open out.gro out.xtc
-daemon_bonds out.bonds
+daemon_open out.gro whole.xtc
+daemon_bonds whole.z
 
 mol modstyle 0 0 VDW 0.8 12.0
 mol modselect 0 0 name SI1

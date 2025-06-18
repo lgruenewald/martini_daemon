@@ -9,6 +9,8 @@
 *.xtc
 # exclude out files
 out*
+whole*
+!whole.py
 # exclude xvg from tests directory (energy.xvg, forces.xvg usually)
 tests/**/*.xvg
 # exclude logs
