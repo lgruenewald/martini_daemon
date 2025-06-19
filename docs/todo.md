@@ -1,3 +1,4 @@
+- adjust reaction rate counting to filter out when overlapping fragments react independently (currently rejected by the modification algorithm, right?)
 - more Detection testing
 - Modification testing
 - checkpoint testing
@@ -12,7 +13,7 @@
 - cleaner should-we-reinit logic
 - checkpoint reporter load() should become part of the initializer
 - friendlier angle/dihedral syntax
-- replace optional atoms with a half reaction system
+- remove optional atoms if possible
 - fix failing pairs test
 - dihedral type 4
 - cmap
@@ -22,4 +23,7 @@
 - consistent style guide (especially regarding type hints)
 - linting
 - docstring everything
+
+new features?
+- half reaction system
 - multi reactant reactions using neighbor list union

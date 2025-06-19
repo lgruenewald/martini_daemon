@@ -84,14 +84,20 @@ def conversion(
     max_bonds = bonds_per_monomer * count
     conversions = np.empty(len(monomer_frames), np.float32)
     for i, frame in enumerate(monomer_frames):
-        conversions[i] = sum(
+        conversion = sum(
             map(
                 lambda bond:
                     (1 if bond[0] >= start and bond[0] < end else 0) +
-                    (1 if bond[1] >= start and bond[0] < end else 0),
+                    (1 if bond[1] >= start and bond[1] < end else 0),
                 frame
             )
         ) / max_bonds
+        if i % 8 == 0:
+            print(
+                f"Calculating conversion for frame {i}. "
+                f"Current conversion {conversion}"
+            )
+        conversions[i] = conversion
     return conversions
 
 
