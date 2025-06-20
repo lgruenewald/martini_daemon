@@ -8,8 +8,16 @@ command `load`.
 
 For usage, see /examples/*/vis.tcl in the repository.
 
-Compiling the shared library
------------------------------
+Dependencies (ubuntu package names):
+- pkg-config
+- gcc
+- tcl8.6-dev
+- zlib1g-dev
 
-1. Build dependencies: pkg-config, gcc, tcl 8.6 headers, zlib headers
+Usage
+-----
+
+1. Install build dependencies
 2. Run ./compile.sh
+3. Load bond_loader.so with the `load` command in Tcl
+4. Source daemon.tcl with the `source` command in Tcl
