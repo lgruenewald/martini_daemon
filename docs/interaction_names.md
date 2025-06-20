@@ -28,7 +28,7 @@ Also doubles as a list of interactions implemented in martini_daemon.
 ## Dihedrals
 
 - `dihedral` - any dihedral listed here
-- `proper_dihedral` - dihedral type 1 and 9
+- `proper_dihedral` - dihedral type 1, 4 and 9
 - `improper_dihedral` - dihedral type 2
 - `rb_torsion` - dihedral type 3 and 5
 - `restricted_dihedral` - dihedral type 10

@@ -15,7 +15,6 @@
 - friendlier angle/dihedral syntax
 - remove optional atoms if possible
 - fix failing pairs test
-- dihedral type 4
 - cmap
 - tabulated bonds
 - break up T*, improve the QoL when using daemon only as a martini impl

@@ -280,7 +280,7 @@ def DaemonTopFile(
         L = parse_pair(unwrap(tokens, 3, index_type))
         type = unwrap(tokens, 4, "int")
         match type:
-            case 1 | 9:
+            case 1 | 4 | 9:
                 # proper dihedral | proper dihedral (multiple)
                 theta = unwrap(tokens, 5, "degree")
                 force = unwrap(tokens, 6, "float")
