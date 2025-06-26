@@ -189,9 +189,17 @@ class Simulation():
             box, pos, vel = read_gro(geom_path)
         # Parsing - Checkpoint
         else:
+            if (
+                restraint_coord_path is not None and \
+                len(restraint_coord_path) > 0
+            ):
+                raise ValueError(
+                    "Currently position restraints don't work from checkpoints"
+                )
             self.i, self.system, self.top = load_checkpoint(
                 chk_path, self.logger, nonbonded_force,
-                neighbor_cutoff
+                neighbor_cutoff,
+                max_absolute_rate, rate_highest_probability
             )
         self.logger.info("Parsing finished")
 

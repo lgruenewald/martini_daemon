@@ -101,6 +101,10 @@ def conversion(
     return conversions
 
 
+def bond_orders(
+    
+)
+
 def _unroll(max: int, edge_array: np.array):
     """
         Converts a condensed (np.array of dimension (n_edges, 2)) list of
@@ -176,7 +180,29 @@ def find_double_bonds(n_monomers, monomer_frames):
         multifunctional monomers can be bonded to eachother twice at
         different ends.
     """
+    doubles = [set() for _ in monomer_frames]
+
+    for frame_index, frame in enumerate(monomer_frames):
+        graph = [{} for _ in range(n_monomers)]
+        for edge in frame:
+            l = graph[edge[0]]
+            r = graph[edge[1]]
+
+            if l.get(edge[1]) is None:
+                l[edge[1]] = 1
+            else:
+                l[edge[1]] += 1
+
+            if r.get(edge[0]) is None:
+                r[edge[0]] = 1
+            else:
+                r[edge[0]] += 1
+
+        for li, l in enumerate(graph):
+            for ri, order in l.items():
+                if order == 2:
+                    doubles[frame_index].add((li, ri) if li > ri else (ri, li))
+    return doubles
 
 # TODO chain analysis - find different types of linear chains
 # TODO find n_mers
-# TODO find how many bonds per monomer, distribution

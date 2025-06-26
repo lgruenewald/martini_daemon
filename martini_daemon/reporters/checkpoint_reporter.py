@@ -41,7 +41,9 @@ class CheckpointReporter(Reporter):
         self.since_checkpoint = 0
 
 
-def load_checkpoint(path, logger, nonbonded_force, nlist_cutoff):
+def load_checkpoint(
+    path, logger, nonbonded_force, nlist_cutoff, max_abs_rate, highest_prob
+):
     """
         Loads checkpoint file at <path>.
 
@@ -58,7 +60,9 @@ def load_checkpoint(path, logger, nonbonded_force, nlist_cutoff):
         f = pickle.Unpickler(file)
         i = f.load()
         sys = SysStar(logger, nonbonded_force)
-        top = TopStar(sys, logger, nlist_cutoff)
+        top = TopStar(
+            sys, logger, nlist_cutoff, max_abs_rate, highest_prob, None
+        )
         sys.load(f)
         top.load(f)
         assert f.load() == "magic"

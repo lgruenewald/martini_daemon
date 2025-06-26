@@ -135,6 +135,9 @@ class TopStar():
                 continue
             for i in range(len(force)):
                 inter = Interaction(force, i)
+                # TODO make this better
+                if force._list[i] is None:
+                    continue
                 members = inter.get_members()
                 for member in members:
                     self.interaction_list[member].append(inter)

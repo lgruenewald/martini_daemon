@@ -56,6 +56,7 @@ class BondReporter(Reporter):
                     if force.get_members(id) is not None:
                         max_len += len(force.get_members(id) - 1)
         # allocate
+        # don't write max_len here TODO, this is a bug
         self._write(struct.pack("=Q", max_len))
         bonds = np.empty((max_len, 2), dtype=np.uint32)
         # write
