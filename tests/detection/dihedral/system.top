@@ -1,0 +1,53 @@
+#include "../../../itp/martini_v3.0.0.itp"
+
+[moleculetype]
+Y 1
+[atoms]
+1 W 1 Y Y 1
+2 W 1 Y Z 2
+[bonds]
+1 2 5
+
+[graph]
+name y
+atom y Y W
+atom z Z W
+connection y z
+
+[reaction]
+zero
+[reactants]
+y y
+[conditions]
+r_max 1:z 2:y 0.5
+dihedral_between 1:y 1:z 2:y 2:z -10 10
+
+[reaction]
+ninety
+[reactants]
+y y
+[conditions]
+r_max 1:z 2:y 0.5
+dihedral_between 1:y 1:z 2:y 2:z 80 110
+
+[reaction]
+minus_ninety
+[reactants]
+y y
+[conditions]
+r_max 1:z 2:y 0.5
+dihedral_between 1:y 1:z 2:y 2:z -110 -80
+
+[reaction]
+hundredeighty
+[reactants]
+y y
+[conditions]
+r_max 1:z 2:y 0.5
+dihedral_between 1:y 1:z 2:y 2:z 170 190
+
+[system]
+detection test
+
+[molecules]
+Y 8

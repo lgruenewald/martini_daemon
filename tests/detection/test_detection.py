@@ -19,6 +19,7 @@ tests = [
     # dummy systems
     "distance",
     "angle",
+    "dihedral"
 # TODO
 #    "dihedral",
 #    "mono_distance",
