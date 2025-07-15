@@ -18,6 +18,7 @@ from .forces.fene_bond import FENEBond
 from .forces.improper_dihedral import ImproperDihedral
 from .forces.nonbonded import NonBonded, ExclusionHelper
 from .forces.pairs import Pairs
+from .forces.cmap import Cmap
 from .forces.proper_dihedral import ProperDihedral
 from .forces.rbtorsion import RBTorsion
 from .forces.restricted_angle import RestrictedAngle
@@ -42,6 +43,9 @@ from .vsites.weighed_average import VSiteWeighedAverage
 from .vsites.center_of_mass import VSiteCenterOfMass
 from .forces.position_restraint import PositionRestraint
 from .reporters.reporter import Reporter
+# custom forces not in Gromacs
+from .forces.custom_donor_acceptor import CustomDonorAcceptor
+from .forces.periodic_gaussian import PeriodicGaussian
 
 
 class SysStar():
@@ -79,6 +83,7 @@ class SysStar():
         self.quartic_angle = QuarticAngle(self)
         self.linear_angle = LinearAngle(self)
         self.pairs = Pairs(self)
+        self.cmap = Cmap(self)
         self.posres = PositionRestraint(self)
         self.vsite1 = VSiteOne(self)
         self.vsite2 = VSiteTwo(self)
@@ -90,6 +95,10 @@ class SysStar():
         self.vsite_4fdn = VSite4fdn(self)
         self.vsite_avg = VSiteWeighedAverage(self)
         self.vsite_com = VSiteCenterOfMass(self)
+        # custom forces not in Gromacs
+        self.custom_donor_acceptor = CustomDonorAcceptor(self)
+        self.periodic_gaussian = PeriodicGaussian(self)
+
         nonbonded._sysstar = self
         self.nonbonded_force: NonBonded = nonbonded
         self.exclusions: ExclusionHelper = (
@@ -111,7 +120,9 @@ class SysStar():
             self.vsite1, self.vsite2, self.vsite3,
             self.vsite_2fd, self.vsite_3fd, self.vsite_4fdn,
             self.vsite_avg, self.vsite_3fad, self.vsite_3out, self.vsite_com,
-            self.nonbonded_force, self.exclusions, self.pairs,
+            self.nonbonded_force, self.exclusions, self.pairs, self.cmap,
+            # custom forces not in Gromacs
+            self.custom_donor_acceptor, self.periodic_gaussian
         ]
 
         # every vsite atom_id should be put here, this is useful for analysis

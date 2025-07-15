@@ -41,7 +41,9 @@ class NonBonded(Force):
     def update_params(self, i, atom_type, charge, charge_changed):
         atom_type_id = self.use_atom_type(atom_type)
         self._force_obj.setParticleParameters(i, [atom_type_id, charge])
+        # TODO LJ type change event?
         self._sysstar.pairs._rebuild = True
+        self._sysstar.cmap._rebuild = True
         if charge_changed:
             self._exclusions._rebuild = True
 

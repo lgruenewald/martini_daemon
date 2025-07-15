@@ -23,6 +23,8 @@ def rootdir(request):
 
 
 tests = [
+    # usual suspects
+    "cmap", "pairs", "pairs_VW", "pairs_VWQ", "pairs_type",
     # biomolecule tests
     "trypsin", "posres",
     # polymer tests
@@ -31,7 +33,7 @@ tests = [
     "NMC", "CHOL_in_W", "AEA", "NAPH", "nacl+waterbox", "solvent_mixture",
     "waterbox", "DPPC_DIPC_in_W", "CAFF", "BDT", "BZTF_CLPR", "benzbox",
     # specific interaction tests
-    "vsite1", "pairs", "pairs_VW", "pairs_VWQ", "pairs_type",
+    "vsite1",
     "morse", "vsite4fdn", "quartic_angle", "proper_dihedral",
     "cross_bond_bond", "vsiten2", "urey_bradley", "fourier_dihedral",
     "linear_angle", "fene", "cubic", "distance_restraint",

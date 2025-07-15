@@ -1,6 +1,5 @@
 #!/usr/bin/bash
 
-source /usr/local/gromacs-2024.1-double/bin/GMXRC
 if [ -e respos.gro ]; then
   gmx_d grompp -f ../md.mdp -c system.gro -p system.top -o run.tpr -r respos.gro >>log.txt &>> log.txt
 else

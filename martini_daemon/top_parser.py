@@ -341,6 +341,15 @@ def DaemonTopFile(
                 last_molecule().interactions.append(
                     (system.combined_bending_torsion, [i, j, k, L], params)
                 )
+            case 101:
+                # custom type - periodic gaussian
+                theta = unwrap(tokens, 5, "degree")
+                depth = unwrap(tokens, 6, "float")
+                force = unwrap(tokens, 7, "float")
+                last_molecule().interactions.append((
+                    system.periodic_gaussian, [i, j, k, L],
+                    [theta, depth, force]
+                ))
             case _:
                 raise ValueError("Unsupported dihedral function type {type}.")
 
@@ -406,6 +415,73 @@ def DaemonTopFile(
             )
 
     p.add_level("pairs", process_pairs)
+
+    def process_cmaptypes(tokens):
+        parts = [
+            unwrap(tokens, i, "word") for i in range(5)
+        ]
+        type = unwrap(tokens, 5, "int")
+        if type != 1:
+            raise ValueError("Unsupported cmap type")
+        size = [
+            unwrap(tokens, 6, "int"),
+            unwrap(tokens, 7, "int")
+        ]
+        if size[0] != size[1]:
+            raise ValueError("Non-square CMAPs are not supported")
+        params = [
+            unwrap(tokens, 8+i, "float")
+            for i in range(size[0] * size[1])
+        ]
+        system.cmap.add_type(parts, [*size, *params])
+
+    p.add_level("cmaptypes", process_cmaptypes)
+
+    def process_cmap(tokens):
+        index_type = last_molecule().index_type
+        members = [
+            parse_pair(unwrap(tokens, i, index_type))
+            for i in range(5)
+        ]
+        # GromacsTopFile in openmm does support cmap types
+        # here, but GROMACS seems to require [cmaptypes]
+        # so we only support [cmaptypes]
+        last_molecule().interactions.append((
+            system.cmap, members, []
+        ))
+
+    p.add_level("cmap", process_cmap)
+
+    def process_custom_donor_acceptor(tokens):
+        index_type = last_molecule().index_type
+        i = parse_pair(unwrap(tokens, 0, index_type))
+        j = parse_pair(unwrap(tokens, 1, index_type))
+        k = parse_pair(unwrap(tokens, 2, index_type))
+        type = unwrap(tokens, 3, "word")
+        if type not in {"donor", "acceptor"}:
+            raise ValueError("Type must be 'donor' or 'acceptor'")
+        dist = unwrap(tokens, 4, "float")
+        force = unwrap(tokens, 5, "float")
+        angle1 = unwrap(tokens, 6, "float", 0)
+        angle1_force = unwrap(tokens, 7, "float", 0)
+        angle2 = unwrap(tokens, 8, "float", 0)
+        angle2_force = unwrap(tokens, 9, "float", 0)
+        dihedral1 = unwrap(tokens, 10, "float", 0)
+        dihedral1_force = unwrap(tokens, 11, "float", 0)
+        dihedral2 = unwrap(tokens, 12, "float", 0)
+        dihedral2_force = unwrap(tokens, 13, "force", 0)
+        last_molecule().interactions.append((
+            system.custom_donor_acceptor, [i, j, k],
+            [
+                type, dist, force,
+                angle1, angle1_force,
+                angle2, angle2_force,
+                dihedral1, dihedral1_force,
+                dihedral2, dihedral2_force
+            ]
+        ))
+
+    p.add_level("donor_acceptor", process_custom_donor_acceptor)
 
     def process_atomtypes(tokens):
         if len(tokens) != 6:
