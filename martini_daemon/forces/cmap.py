@@ -7,7 +7,7 @@ class Cmap(Force):
 
     def __init__(self, sysstar):
         super().__init__(sysstar)
-        self.types: dict[tuple[str, str, str, str, str], tuple[int, int, list[float]]] = {}
+        self.types = {}
 
     def add_type(self, members, params):
         self.types[tuple(members)] = tuple(params)

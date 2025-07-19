@@ -24,9 +24,7 @@ class Simulation():
 
     @alias({
         "xtc_frequency": "traj_frequency",
-        "gro_path": "geom_path",
-        "T_kelvin": "t_kelvin",
-        "T_type": "t_type"
+        "gro_path": "geom_path"
     })
     def __init__(
         # main input files
