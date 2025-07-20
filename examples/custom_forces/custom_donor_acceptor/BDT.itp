@@ -1,0 +1,22 @@
+[ moleculetype ]
+BDT 1
+
+[ atoms ]
+1 SC6 1 BDT BS1  1 0.0 54.0
+2 SC6 1 BDT BS2  2 0.0 54.0
+3 TC5 1 BDT BNZ1 3 0.0 36.0
+4 U   1 BDT COG  4 0.0  0.0
+
+[ constraints ]
+1 2 1 0.395 ; BS1_BS2
+2 3 1 0.314 ; BS2_BNZ1
+3 1 1 0.313 ; BNZ1_BS1
+
+[ virtual_sitesn ]
+4 1 1 2 3
+
+#ifdef REACT
+[ custom_donor_acceptor ]
+1 4 3
+2 4 3
+#endif

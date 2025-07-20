@@ -453,35 +453,16 @@ def DaemonTopFile(
     p.add_level("cmap", process_cmap)
 
     def process_custom_donor_acceptor(tokens):
+        # just a test for now, hardcoded constants
         index_type = last_molecule().index_type
         i = parse_pair(unwrap(tokens, 0, index_type))
         j = parse_pair(unwrap(tokens, 1, index_type))
         k = parse_pair(unwrap(tokens, 2, index_type))
-        type = unwrap(tokens, 3, "word")
-        if type not in {"donor", "acceptor"}:
-            raise ValueError("Type must be 'donor' or 'acceptor'")
-        dist = unwrap(tokens, 4, "float")
-        force = unwrap(tokens, 5, "float")
-        angle1 = unwrap(tokens, 6, "float", 0)
-        angle1_force = unwrap(tokens, 7, "float", 0)
-        angle2 = unwrap(tokens, 8, "float", 0)
-        angle2_force = unwrap(tokens, 9, "float", 0)
-        dihedral1 = unwrap(tokens, 10, "float", 0)
-        dihedral1_force = unwrap(tokens, 11, "float", 0)
-        dihedral2 = unwrap(tokens, 12, "float", 0)
-        dihedral2_force = unwrap(tokens, 13, "force", 0)
         last_molecule().interactions.append((
-            system.custom_donor_acceptor, [i, j, k],
-            [
-                type, dist, force,
-                angle1, angle1_force,
-                angle2, angle2_force,
-                dihedral1, dihedral1_force,
-                dihedral2, dihedral2_force
-            ]
+            system.custom_donor_acceptor, [i, j, k], []
         ))
 
-    p.add_level("donor_acceptor", process_custom_donor_acceptor)
+    p.add_level("custom_donor_acceptor", process_custom_donor_acceptor)
 
     def process_atomtypes(tokens):
         if len(tokens) != 6:

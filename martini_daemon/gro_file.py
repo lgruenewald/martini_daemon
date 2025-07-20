@@ -72,8 +72,8 @@ def write_gro(path, title, atoms, box, pos, vel=None):
             cpos = pos[i]
             name, resid, resname, *_ = atoms[i]
             index = i + 1
-            file.write(f"{resid:5}{resname:5}{name:>5}")
-            file.write(f"{index:5}{cpos[0]:8.3f}{cpos[1]:8.3f}{cpos[2]:8.3f}")
+            file.write(f"{resid % 100000:5}{resname:5}{name:>5}")
+            file.write(f"{index % 100000:5}{cpos[0]:8.3f}{cpos[1]:8.3f}{cpos[2]:8.3f}")
             if vel is not None:
                 cvel = vel[i]
                 file.write(f"{cvel[0]:8.4f}{cvel[1]:8.4f}{cvel[2]:8.4f}")
