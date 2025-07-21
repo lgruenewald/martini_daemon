@@ -24,7 +24,7 @@ class Force():
         raise NotImplementedError
 
     def is_instance(self, filter: str) -> bool:
-        raise NotImplementedError
+        return filter in self._filters
 
     def _additional_save(self, f) -> None:
         pass
@@ -34,6 +34,7 @@ class Force():
 
     _members: int
     _pbc: bool = True
+    _filters: set[string] = set()
 
     def add(self, members: list[int] | tuple[int], params: list[float] | tuple[float]) -> Interaction:
         params = tuple(members) + tuple(params)

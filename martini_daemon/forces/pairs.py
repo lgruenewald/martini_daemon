@@ -42,8 +42,7 @@ class Pairs(Force):
         c12 = 4 * epsilon * (sigma ** 12)
         self._force_obj.addBond(i, j, [qprod, c6, c12])
 
-    def is_instance(self, filter):
-        return filter == "pair"
+    _filters = {"pair"}
 
     def _additional_save(self, f):
         f.dump(self.types)

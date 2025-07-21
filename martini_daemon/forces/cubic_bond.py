@@ -17,5 +17,4 @@ class CubicBond(Force):
         i, j, length, kb, kcub = params
         self._force_obj.addBond(i, j, [length, kb, kcub])
 
-    def is_instance(self, filter):
-        return filter in {"bond", "cubic_bond"}
+    _filters = {"bond", "cubic_bond"}

@@ -21,5 +21,4 @@ class VSiteCenterOfMass(VirtualSite):
         )
         self._sysstar._system.setVirtualSite(vid, vsite)
 
-    def is_instance(self, filter):
-        return filter in {"virtual_site", "vsite", "com"}
+    _filters = {"virtual_site", "vsite", "com"}

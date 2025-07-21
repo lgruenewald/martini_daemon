@@ -11,5 +11,4 @@ class VSite3out(VirtualSite):
         )
         self._sysstar._system.setVirtualSite(vid, vsite)
 
-    def is_instance(self, filter):
-        return filter in {"virtual_site", "vsite", "3out"}
+    _filters = {"virtual_site", "vsite", "3out"}

@@ -17,5 +17,4 @@ class VSite3fad(VirtualSite):
         )
         self._sysstar._system.setVirtualSite(vid, vsite)
 
-    def is_instance(self, filter):
-        return filter in {"virtual_site", "vsite", "3fad"}
+    _filters = {"virtual_site", "vsite", "3fad"}

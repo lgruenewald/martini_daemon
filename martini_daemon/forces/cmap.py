@@ -44,8 +44,7 @@ class Cmap(Force):
             j, k, L, m
         )
 
-    def is_instance(self, filter):
-        return filter == "cmap"
+    _filters = {"cmap"}
 
     def _additional_save(self, f):
         f.dump(self.types)

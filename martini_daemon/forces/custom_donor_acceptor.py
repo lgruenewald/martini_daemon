@@ -137,5 +137,4 @@ class CustomDonorAcceptor(Force):
                         d, self.acceptor_map[pi]
                     )
 
-    def is_instance(self, filter):
-        return filter == "custom_donor_acceptor"
+    _filters = {"custom_donor_acceptor"}

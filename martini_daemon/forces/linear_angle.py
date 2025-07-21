@@ -21,5 +21,4 @@ class LinearAngle(Force):
         i, j, k, a, force = params
         self._force_obj.addBond((i, j, k), (a, force))
 
-    def is_instance(self, filter):
-        return filter in {"angle", "linear_angle"}
+    _filters = {"angle", "linear_angle"}

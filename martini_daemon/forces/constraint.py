@@ -20,5 +20,4 @@ class Constraint(Force):
     def destroy(self):
         raise Exception("Can't destroy constraints.")
 
-    def is_instance(self, filter):
-        return filter in {"bond", "constraint"}
+    _filters = {"bond", "constraint"}

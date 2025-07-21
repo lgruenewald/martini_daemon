@@ -28,6 +28,3 @@ class PositionRestraint(Force):
     def _add_to_force_obj(self, params) -> None:
         i, kx, ky, kz, x0, y0, z0 = params
         self._force_obj.addParticle(i, (kx, ky, kz, x0, y0, z0))
-
-    def is_instance(self, filter: str) -> bool:
-        return False

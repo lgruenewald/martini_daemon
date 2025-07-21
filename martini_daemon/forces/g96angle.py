@@ -16,5 +16,4 @@ class G96Angle(Force):
         i, j, k, theta, force = params
         self._force_obj.addAngle(i, j, k, (theta, force))
 
-    def is_instance(self, filter):
-        return filter in {"angle", "g96_angle"}
+    _filters = {"angle", "g96_angle"}

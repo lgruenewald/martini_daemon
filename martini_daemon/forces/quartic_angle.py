@@ -24,5 +24,4 @@ class QuarticAngle(Force):
         i, j, k, angle, c0, c1, c2, c3, c4 = params
         self._force_obj.addAngle(i, j, k, (angle, c0, c1, c2, c3, c4))
 
-    def is_instance(self, filter):
-        return filter in {"angle", "quartic_angle"}
+    _filters = {"angle", "quartic_angle"}

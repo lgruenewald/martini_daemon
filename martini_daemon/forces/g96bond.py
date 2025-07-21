@@ -17,5 +17,4 @@ class G96Bond(Force):
         i, j, length, force = params
         self._force_obj.addBond(i, j, [length, force])
 
-    def is_instance(self, filter):
-        return filter in {"bond", "g96_bond"}
+    _filters = {"bond", "g96_bond"}

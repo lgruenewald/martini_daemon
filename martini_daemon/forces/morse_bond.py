@@ -17,5 +17,4 @@ class MorseBond(Force):
         i, j, length, D, beta = params
         self._force_obj.addBond(i, j, [length, D, beta])
 
-    def is_instance(self, filter):
-        return filter in {"bond", "morse_bond"}
+    _filters = {"bond", "morse_bond"}

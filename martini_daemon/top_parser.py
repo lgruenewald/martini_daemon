@@ -11,6 +11,7 @@ from .sysstar import SysStar
 from .graph import Graph, GraphAtomType
 import math
 import logging
+import difflib
 
 
 def DaemonTopFile(
@@ -707,8 +708,23 @@ def DaemonTopFile(
             )
             last_graph.equivalents.append(parts)
         else:
-            parts = [unwrap(tokens, i, "word") for i in range(1, len(tokens))]
-            last_graph.interactions.append((keyword, parts))
+            if keyword in system.filters:
+                parts = [unwrap(tokens, i, "word") for i in range(1, len(tokens))]
+                last_graph.interactions.append((keyword, parts))
+            else:
+                possibilities = system.filters | {
+                    "atom", "atom?", "atom!", "molecule", "name"
+                }
+                close_matches = difflib.get_close_matches(
+                    keyword, possibilities, 1
+                )
+                raise ValueError(
+                    f"Keyword {keyword} in graph unrecognized." +
+                    (
+                        f" Perhaps you meant {close_matches[0]}?"
+                        if len(close_matches) > 0 else ""
+                    )
+                )
 
     def graph_end():
         nonlocal last_graph, topology

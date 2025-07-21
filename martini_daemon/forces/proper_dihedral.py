@@ -12,5 +12,4 @@ class ProperDihedral(Force):
         i, j, k, l, theta, force, mult = params
         self._force_obj.addTorsion(i, j, k, l, mult, theta, force)
 
-    def is_instance(self, filter):
-        return filter in {"dihedral", "proper_dihedral"}
+    _filters = {"dihedral", "proper_dihedral"}

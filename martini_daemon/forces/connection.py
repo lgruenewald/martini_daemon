@@ -16,5 +16,4 @@ class Connection(Force):
     def destroy(self):
         return False
 
-    def is_instance(self, filter):
-        return filter in {"bond", "connection"}
+    _filters = {"bond", "connection"}

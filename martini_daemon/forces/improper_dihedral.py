@@ -21,5 +21,4 @@ class ImproperDihedral(Force):
         i, j, k, l, theta, force = params
         self._force_obj.addTorsion(i, j, k, l, (theta, force))
 
-    def is_instance(self, filter):
-        return filter in {"dihedral", "improper_dihedral"}
+    _filters = {"dihedral", "improper_dihedral"}

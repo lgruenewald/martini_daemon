@@ -20,5 +20,4 @@ class PeriodicGaussian(Force):
         i, j, k, L, theta, depth, force = params
         self._force_obj.addTorsion(i, j, k, L, [theta, depth, force])
 
-    def is_instance(self, filter):
-        return filter in {"dihedral", "periodic_gaussian"}
+    _filters = {"dihedral", "periodic_gaussian"}

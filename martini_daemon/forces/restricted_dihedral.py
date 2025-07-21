@@ -16,5 +16,4 @@ class RestrictedDihedral(Force):
         i, j, k, l, theta, force = params
         self._force_obj.addTorsion(i, j, k, l, [theta, force])
 
-    def is_instance(self, filter):
-        return filter in {"dihedral", "restricted_dihedral"}
+    _filters = {"dihedral", "restricted_dihedral"}

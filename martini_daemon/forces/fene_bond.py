@@ -16,6 +16,5 @@ class FENEBond(Force):
         i, j, length, k = params
         self._force_obj.addBond(i, j, [length, k])
 
-    def is_instance(self, filter):
-        return filter in {"bond", "fene_bond"}
+    _filters = {"bond", "fene_bond"}
 

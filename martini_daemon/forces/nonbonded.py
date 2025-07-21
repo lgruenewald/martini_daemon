@@ -133,9 +133,6 @@ class NonBonded(Force):
             self._rebuild = True
         return id
 
-    def is_instance(self, filter):
-        return False
-
     def _additional_save(self, f):
         f.dump(self.epsilon_r)
         f.dump(self.cutoff_nm)
@@ -245,7 +242,4 @@ class ExclusionHelper(Force):
                 self._sysstar._system.removeForce(i)
                 self._sysstar._reinitialize = True
                 return True
-        return False
-
-    def is_instance(self, filter):
         return False

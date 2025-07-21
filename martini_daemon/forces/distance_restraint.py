@@ -21,5 +21,4 @@ class DistanceRestraint(Force):
         i, j, low, up1, up2, force = params
         self._force_obj.addBond(i, j, [low, up1, up2, force])
 
-    def is_instance(self, filter):
-        return filter in {"bond", "distance_restraint"}
+    _filters = {"bond", "distance_restraint"}

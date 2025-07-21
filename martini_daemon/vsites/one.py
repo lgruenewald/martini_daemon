@@ -10,5 +10,4 @@ class VSiteOne(VirtualSite):
         )
         self._sysstar._system.setVirtualSite(vid, vsite)
 
-    def is_instance(self, filter):
-        return filter in {"virtual_site", "vsite", "vsite1"}
+    _filters = {"virtual_site", "vsite", "vsite1"}

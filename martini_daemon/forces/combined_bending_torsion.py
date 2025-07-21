@@ -25,5 +25,4 @@ class CombinedBendingTorsion(Force):
         params = params[4:]
         self._force_obj.addBond(members, params)
 
-    def is_instance(self, filter):
-        return filter in {"dihedral", "combined_bending_torsion"}
+    _filters = {"dihedral", "combined_bending_torsion"}

@@ -20,5 +20,4 @@ class UreyBradley(Force):
         i, j, k, theta, force, r13, k_UB = params
         self._force_obj.addBond((i, j, k), (theta, force, r13, k_UB))
 
-    def is_instance(self, filter):
-        return filter in {"angle", "urey_bradley"}
+    _filters = {"angle", "urey_bradley"}

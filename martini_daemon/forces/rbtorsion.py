@@ -12,5 +12,4 @@ class RBTorsion(Force):
         i, j, k, l, c0, c1, c2, c3, c4, c5 = params
         self._force_obj.addTorsion(i, j, k, l, c0, c1, c2, c3, c4, c5)
 
-    def is_instance(self, filter):
-        return filter in {"dihedral", "rb_torsion"}
+    _filters = {"dihedral", "rb_torsion"}

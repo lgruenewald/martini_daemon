@@ -11,5 +11,4 @@ class HarmonicBond(Force):
     def _add_to_force_obj(self, params):
         self._force_obj.addBond(*params)
 
-    def is_instance(self, filter):
-        return filter in {"bond", "harmonic_bond"}
+    _filters = {"bond", "harmonic_bond"}

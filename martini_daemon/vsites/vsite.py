@@ -14,8 +14,10 @@ class VirtualSite():
     def _make_vsite(self, vid, members, params):
         raise NotImplementedError
 
+    _filters = set()
+
     def is_instance(self, filter) -> bool:
-        raise NotImplementedError
+        return filter in self._filters
 
     def add(self, members, params) -> Interaction:
         if self._built:

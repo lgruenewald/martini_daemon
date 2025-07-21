@@ -19,5 +19,4 @@ class CrossBondAngle(Force):
         i, j, k, r1, r2, r3, force = params
         self._force_obj.addBond((i, j, k), (r1, r2, r3, force))
 
-    def is_instance(self, filter):
-        return filter in {"angle", "cross_bond_angle"}
+    _filters = {"angle", "cross_bond_angle"}

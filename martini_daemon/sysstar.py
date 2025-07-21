@@ -125,6 +125,11 @@ class SysStar():
             self.custom_donor_acceptor, self.periodic_gaussian
         ]
 
+        # total list of filters
+        self.filters = set()
+        for f in self.modular_forces:
+            self.filters |= f._filters
+
         # every vsite atom_id should be put here, this is useful for analysis
         self.vsites: list[int] = []
 

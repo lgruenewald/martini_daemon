@@ -11,5 +11,4 @@ class HarmonicAngle(Force):
     def _add_to_force_obj(self, params):
         self._force_obj.addAngle(*params)
 
-    def is_instance(self, filter):
-        return filter in {"angle", "harmonic_angle"}
+    _filters = {"angle", "harmonic_angle"}
