@@ -27,9 +27,7 @@ class BondReporter(Reporter):
     Note: assumes at most 2^32 atoms. Endianness used is native.
     """
 
-    def __init__(self, max_bonds_per_atom=12, max_atoms=0):
-        self.max_bonds_per_atom = max_bonds_per_atom
-        assert self.max_bonds_per_atom > 0
+    def __init__(self, max_atoms=0):
         self.max_atoms = max_atoms
 
     def on_set_xtc_path(self, xtc_name):
@@ -43,6 +41,7 @@ class BondReporter(Reporter):
         if self.max_atoms > 0:
             n = self.max_atoms
         self.n = n
+        self._write(struct.pack("=Q", n))
 
     def on_xtc_frame(self, frame_index, pos, box, xtc_name):
         # count first
@@ -98,7 +97,8 @@ def read_bonds(path: str) -> list[np.ndarray]:
         array of (n_bonds, 2) shape, where n_bonds can vary per frame.
     """
     data = read_compressed(path)
-    frame_start = 0
+    n_atoms, = struct.unpack("=Q", data[0:8])
+    frame_start = 8
     frames = []
     while frame_start < len(data):
         n_bonds, = struct.unpack("=Q", data[frame_start:frame_start+8])
@@ -108,4 +108,5 @@ def read_bonds(path: str) -> list[np.ndarray]:
             .reshape((n_bonds, 2))
         )
         frame_start = frame_end
-    return frames
+    n_frames = len(frames)
+    return n_frames, n_atoms, frames

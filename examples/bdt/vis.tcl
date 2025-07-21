@@ -1,6 +1,7 @@
-source ../../daemon.tcl
+load ../../tcl/bond_loader.so
+source ../../tcl/daemon.tcl
 daemon_open out.gro out.xtc
-daemon_bonds out.bonds
+daemon_bonds out.z
 
 mol modstyle 0 0 CPK 1.5 1.2 12.0 12.0
 mol modselect 0 0 resname BDT
