@@ -1,4 +1,5 @@
 from .reporter import Reporter
+from ..helpers.monomer import generate_mapping
 
 
 class TopStarLogger(Reporter):
@@ -42,20 +43,62 @@ class TopStarLogger(Reporter):
 class ReactionReporter(Reporter):
     """A reporter that reports all reactions to <name>.reactions"""
 
+    def __init__(self, molid=False):
+        """
+        A reporter that reports all reactions to <name>.reactions.
+
+        The created file has a text format, where every line is a reaction.
+        First, the frame number and reaction name are separated by a comma,
+        then, each reactant is separated by a semicolon. Each reactant
+        will have its frag name, internal frag id, and atom indices
+        (-1 for missing optional or forbidden atoms) printed.
+
+        Example:
+        frame,reaction_name;reactant1_name,reactant1_id,atoms...;...reactantn_name,reactantn_id,atoms...
+
+        If molid is True, additionally the indices of initial molecules
+        (see helpers/monomer) are printed in parentheses, prefixed with mol:
+        after reactant IDs, before atoms.
+
+        Example:
+        frame,reaction_name;reactant1_name,reactant1_id(mol:molid1,...molidn),atoms...;...reactantn_name,reactantn_id(mol:molid1,...molidn),atoms...
+        """
+        self.molid = molid
+
     def init_dm(self, name):
+        if self.molid:
+            _, _, self.mapping = generate_mapping(self._topstar.initial_molecules)
         self._open(name + ".reactions")
-        self._print(
-            "# frame,reaction_name;"
-            "reactant1_name,reactant1_id,atoms...;"
-            "reactantn_id,reactantn_id,atoms..."
-        )
+        if not self.molid:
+            self._print(
+                "# frame,reaction_name;"
+                "reactant1_name,reactant1_id,atoms...;..."
+                "reactantn_name,reactantn_id,atoms..."
+            )
+        else:
+            self._print(
+
+                "# frame,reaction_name;"
+                "reactant1_name,reactant1_id(mol:molid1,...molidn),atoms...;..."
+                "reactantn_name,reactantn_id(mol:molid1,...molidn),atoms...;"
+            )
+
+    def get_molids(self, atoms):
+        if not self.molid:
+            return ""
+        mols = set()
+        for atom in atoms:
+            if atom != -1:
+                mols.add(f"{self.mapping[atom]}")
+        return "(mol:" + ",".join(mols) + ")"
 
     def pre_modification(self, i, reactions, name) -> None:
         for (frags, rx) in reactions:
             self._print(
                 f"{i},{rx.name};"
                 + ";".join([
-                    f"{frag.name},{frag.frag_id},"
+                    f"{frag.name},{frag.frag_id}"
+                    f"{self.get_molids(frag.atoms)},"
                     + ",".join([
                         f"{atom}"
                         for atom in frag.atoms

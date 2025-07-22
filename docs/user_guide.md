@@ -17,6 +17,8 @@ is provided below, which should be adjustable to meet various
 needs.
 
 ```
+#!/usr/bin/env python3
+
 from martini_daemon.simulation import Simulation
 from martini_daemon.reporters.variables_reporter import VariablesReporter
 import openmm as mm
@@ -67,6 +69,11 @@ eq.generate_velocities(298)
 # run equilibration
 eq.simulate()
 ```
+
+Selecting GPUs for the simulation can be done using context parameters,
+as seen in the example above. Selecting CPU cores for the simulation
+can be done with the `taskset` command. For example,
+`taskset -c 0-31 ./run.py` will limit run.py to cores 0 to 31.
 
 # Including reactions
 

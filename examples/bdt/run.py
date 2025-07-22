@@ -9,7 +9,7 @@ sim = simulation.Simulation(
     sim_name="out",
     reporters=[
         BondReporter(),
-        ReactionReporter(),
+        ReactionReporter(molid=True),
     ],
     md_steps=100000000, dm_frequency=100,
     xtc_frequency=5000,

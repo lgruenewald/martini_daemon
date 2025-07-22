@@ -49,7 +49,7 @@ class CustomDonorAcceptor(Force):
             "V_martini=4*epsilon*((sigma/r)^12-(sigma/r)^6);"
             "V_martini_min=4*epsilon*((sigma/R_min)^12-(sigma/R_min)^6);"
             "R_min=sigma*sqrt(2);"
-            "r=distance(a1, d1);"
+            "r=distance(a1, d1)-0.4;"
         )
         self._force_obj.setNonbondedMethod(
             self._force_obj.CutoffPeriodic

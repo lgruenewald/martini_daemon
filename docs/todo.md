@@ -4,6 +4,7 @@ documentation:
 - Some write up for the examples
 
 testing overhaul:
+- test custom forces
 - verify dihedral detection testing again
 - Modification testing
 - checkpoint testing + integrate save()/load() into constructors
@@ -13,7 +14,6 @@ code quality issues:
 - finish/clean up helpers
 - pbc whole constraints + vsites? when loading .gro files, warn if not possible
 - forces even more modular (return mm.Force, not set self._force_obj)
-- reporter 2 - remove version 2 if not any better
 - adjust reaction rate counting to filter out when overlapping fragments react independently (currently rejected by the modification algorithm, right?)
 - improve the passing around of values, remove all default values
 	except in Simulation
