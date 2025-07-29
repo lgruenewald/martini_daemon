@@ -920,6 +920,49 @@ def DaemonTopFile(
 
     p.add_level("update", process_update)
 
+    def process_redefine(tokens):
+        nonlocal last_reaction
+        n_reac = len(last_reaction.reactants)
+        if n_reac == 0:
+            raise ValueError("[reactants] must come before [redefine]")
+        id, name = parse_pair(unwrap(tokens, 0, "pair"))
+        changes = set()
+        if len(tokens) % 2 != 1:
+            raise ValueError(
+                "[redefine] must contain an atom, and a list of pairs of"
+                " properties and new values. Found an even number of"
+                " tokens, expected an odd number."
+            )
+        for i in range((len(tokens)-1) // 2):
+            word = unwrap(tokens, 1+i*2, "word")
+            if word in changes:
+                raise ValueError(f"Duplicate entry {word}.")
+            changes.add(word)
+            match word:
+                # TODO unify this into a redefine
+                case "name":
+                    last_reaction.renames.append((
+                        id, name, unwrap(tokens, 2+i*2, "word")
+                    ))
+                case "type":
+                    last_reaction.retypes.append((
+                        id, name, unwrap(tokens, 2+i*2, "word")
+                    ))
+                case "charge":
+                    last_reaction.recharges.append((
+                        id, name, unwrap(tokens, 2+i*2, "float")
+                    ))
+                case "mass":
+                    last_reaction.remasses.append((
+                        id, name, unwrap(tokens, 2+i*2, "float")
+                    ))
+                case _:
+                    raise ValueError(
+                        f"Unknown atom property {word}."
+                    )
+
+    p.add_level("redefine", process_redefine)
+
     def process_retype(tokens):
         nonlocal last_reaction
         n_reac = len(last_reaction.reactants)
