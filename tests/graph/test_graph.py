@@ -23,7 +23,9 @@ tests = [
 class TestGraph():
     def get_topology(self, path: str) -> TopStar:
         assert os.path.isfile(path)
-        _, top = DaemonTopFile(path, NonBonded())
+        ok, res = DaemonTopFile(path, NonBonded())
+        assert ok
+        _, top = res
         return top
 
     def parse_expected(self, path) -> list[(str, list[int])]:

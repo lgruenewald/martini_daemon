@@ -174,7 +174,7 @@ class Simulation():
         # Parsing - No checkpoint
         if not use_checkpoint:
             _, respos, _ = read_gro(restraint_coord_path)
-            self.system, self.top = DaemonTopFile(
+            ok, res = DaemonTopFile(
                 top_path, nonbonded_force,
                 include_dir=include_dir, defines=defines,
                 nlist_cutoff=neighbor_cutoff,
@@ -183,6 +183,14 @@ class Simulation():
                 logger=self.logger,
                 respos=respos
             )
+            if not ok:
+                # idk how to return error values from constructors
+                # if parsing fails, there is an error message anyways though
+                #
+                # this works for run.py scripts fine, though sucks as a library
+                # feature in general..
+                raise SystemExit("Terminated due to parsing error.")
+            self.system, self.top = res
             # benefits of function based scope
             box, pos, vel = read_gro(geom_path)
         # Parsing - Checkpoint

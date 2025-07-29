@@ -14,6 +14,8 @@ class Token:
     content: str
     path: str
     line: int
+    start: int
+    end: int
 
 
 int_pat = re.compile("[-+]?[0-9]+")
@@ -21,6 +23,17 @@ float_pat = re.compile("[-+]?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?")
 word_pat = re.compile("[a-zA-Z0-9_.]+")
 pattern_pat = re.compile("[a-zA-Z0-9_?!*{}]+")
 pair_pat = re.compile(r"[0-9]+:[a-zA-Z0-9_.]+")
+
+
+class TokenParseError(Exception):
+    def __init__(self, token: Token, message: str):
+        self.token = token
+        self.message = message
+
+
+class ParseError(Exception):
+    def __init__(self, message: str):
+        self.message = message
 
 
 def unwrap(tokens, index, type_filter, default="default placeholder"):
@@ -42,7 +55,10 @@ def unwrap(tokens, index, type_filter, default="default placeholder"):
     if len(tokens) <= index:
         if default == "default placeholder":
             # hack so "None" can also be used as a default value
-            raise ValueError(f"Not enough tokens, expect token index {index}")
+            raise TokenParseError(
+                tokens[-1],
+                f"Not enough tokens, expected token at index {index}."
+            )
         else:
             return default
 
@@ -57,14 +73,16 @@ def unwrap(tokens, index, type_filter, default="default placeholder"):
         case "positive":
             if float_pat.match(tok):
                 if float(tok) <= 0.:
-                    raise ValueError(
+                    raise TokenParseError(
+                        tokens[index],
                         "Expected a positive non-zero real number."
                     )
                 return float(tok)
         case "index":
             if int_pat.match(tok):
                 if int(tok) <= 0:
-                    raise ValueError(
+                    raise TokenParseError(
+                        tokens[index],
                         "Expected index, got an integer 0 or smaller."
                         "Note: indexing in .itp/.top files is usually 1 based."
                     )
@@ -89,8 +107,10 @@ def unwrap(tokens, index, type_filter, default="default placeholder"):
                 items = tok.split(":")
                 return (int(items[0])-1, items[1])
 
-    raise ValueError(f"Token {tok}: "
-                     f"expected {type_filter}.")
+    raise TokenParseError(
+        tokens[index],
+        f"Expected token of type {type_filter}."
+     )
 
 
 class Parser():
@@ -115,33 +135,65 @@ class Parser():
     """
 
     def __init__(self):
-        self._complained_directives = {}
         self._levels: dict[str, Callable] = {}
         self._start: dict[str, Callable] = {}
         self._end: dict[str, Callable] = {}
+        self._mandatory: set[str] = set()
+        self._unique: set[str] = set()
 
     def parse(self, path, include_dir, defines={}):
         """The main interface for using a TopParser class
         """
         self._linenum: int = 0
         self._path: str = path
-        self._haderror: bool = False
         self._defines: dict[str, str] = defines
         self._include_dir: str | None = include_dir
-        self._complained_directives: set[str] = set()
         self._included: set[str] = set()
+        self._past_directives: set[str] = set()
         self._current_level = None
-        self._parse(path)
-        return not self._haderror
+        try:
+            self._parse(path)
+            for dir in self._mandatory:
+                if dir not in self._past_directives:
+                    raise ParseError(
+                        f"Mandatory directive {dir} not found."
+                    )
+            return True
+        except TokenParseError as pe:
+            print("Parsing error:")
+            print(pe.message)
+            print()
+            self.error_message_location(
+                pe.token.path, pe.token.line,
+                pe.token.start, pe.token.end
+            )
+            print()
+        except ParseError as pe:
+            print("Parsing error:")
+            print(pe.message)
+            print()
+            self.error_message_location(self._path, self._linenum)
+            print()
+        except Exception:
+            traceback.print_exc()
+            print()
+            print("Exception occured while parsing at:")
+            self.error_message_location(self._path, self._linenum)
+        return False
 
-    def error(self, message):
-        # we have to grab attention more than the stack trace
-        print("============================================================")
-        print("\033[1;91mAn error has occured during parsing\033[0m")
-        print(f" {message}")
-        print(f" In file {self._path} at line {self._linenum + 1}")
-        print("============================================================")
-        self._haderror = True
+    def error_message_location(self, path, linenum, start=None, end=None):
+        print(f"In file {path} at line {linenum+1}.")
+        with open(path, "r") as f:
+            line = f.read().split("\n")[linenum]
+        if len(line) > 0:
+            if (start is None or end is None):
+                print(line)
+            else:
+                print(
+                    f"{line[0:start]}"
+                    f"\033[1;33m{line[start:end]}\033[0m"
+                    f"{line[end:]}"
+                )
 
     def _tokenize(self, line):
         """Splits a line up into a list of tokens. Similar to separating by
@@ -150,21 +202,24 @@ class Parser():
         """
 
         line = re.sub(r";.*", "", line).strip()
-        toks = [Token(tok, self._path, self._linenum) for tok in line.split()]
+        toks = [
+            Token(
+                match.group(), self._path, self._linenum,
+                match.start(), match.end()
+            )
+            for match in re.finditer(r"\S+", line)
+        ]
         for i in range(len(toks)):
             while toks[i].content in self._defines:
                 toks[i].content = self._defines[toks[i].content]
         return toks, line
 
     def _parse(self, path):
-        """Parses path, adding new data linespython add lines to stack trace
+        """
+        Parses path, adding new data linespython add lines to stack trace
         or directives to the accumulated list of directives so far.
         """
 
-        # stuff for #includes and the #ifdef stack
-        if path in self._included:
-            self.error("Double inclusion of " + path)
-            return
         self._included.add(path)
         oldpath = self._path
         self._path = path
@@ -196,8 +251,9 @@ class Parser():
                     match tokens[0].content:
                         case "#ifdef":
                             if len(tokens) != 2:
-                                self.error("#ifdef takes one argument")
-                                continue
+                                raise TokenParseError(
+                                    tokens[0], "#ifdef takes one argument."
+                                )
                             if ifstack_top in {IfstackElem.DoBranch,
                                                IfstackElem.Root}:
                                 if (
@@ -213,8 +269,9 @@ class Parser():
 
                         case "#ifndef":
                             if len(tokens) != 2:
-                                self.error("#ifndef takes one argument")
-                                continue
+                                raise TokenParseError(
+                                    tokens[0], "#ifndef takes one argument."
+                                )
                             if ifstack_top in {IfstackElem.DoBranch,
                                                IfstackElem.Root}:
                                 if (
@@ -229,25 +286,33 @@ class Parser():
                             continue
                         case "#else":
                             if len(tokens) != 1:
-                                self.error("#else takes no argument")
+                                raise TokenParseError(
+                                    tokens[0], "#else takes no argument."
+                                )
                             if ifstack_top == IfstackElem.DoBranch:
                                 ifstack[-1] = IfstackElem.SkipBranch
                             elif ifstack_top == IfstackElem.SkipBranch:
                                 ifstack[-1] = IfstackElem.DoBranch
                             elif ifstack_top == IfstackElem.Root:
-                                self.error("#else unmatched")
+                                raise TokenParseError(
+                                    tokens[0], "#else unmatched."
+                                )
                             continue
                         case "#endif":
                             if len(tokens) != 1:
-                                self.error("#endif takes no argument")
+                                raise TokenParseError(
+                                    tokens[0], "#endif takes no argument."
+                                )
                             if ifstack_top == IfstackElem.Root:
-                                self.error("#endif unmatched")
-                                continue
+                                raise TokenParseError(
+                                    tokens[0], "#endif unmatched."
+                                )
                             ifstack.pop()
                             continue
                         case "#end":
-                            self.error("Please use #endif")
-                            continue
+                            raise TokenParseError(
+                                tokens[0], "Please use #endif."
+                            )
                         # must list all other macro words here
                         # so that it doesn't error
 
@@ -261,8 +326,9 @@ class Parser():
                             pass
                         case _:
                             # error at unknown macros
-                            self.error("Unknown preprocessor directive "
-                                       f"{tokens[0].content}")
+                            raise TokenParseError(
+                                tokens[0], "Unknown preprocessor directive."
+                            )
 
                 # everything below this only happens if the #ifdef/#else
                 # says it should happen
@@ -273,22 +339,32 @@ class Parser():
                 if tokens[0].content[0] == "[":
                     # directives
                     if line[-1] != "]":
-                        self.error("Invalid directive: no ]")
+                        raise TokenParseError(
+                            tokens[-1], "Invalid directive, not closed by ']'."
+                        )
+                    if tokens[0].content == "[":
+                        tok_index = 1
+                    else:
+                        tok_index = 0
                     end_hook = self._end.get(self._current_level)
                     end_hook and end_hook()
                     self._current_level = line.strip("[] \t")
+                    if (
+                        self._current_level in self._unique
+                        and self._current_level in self._past_directives
+                    ):
+                        raise ParseError(
+                            tokens[tok_index],
+                            "Unique directive present more than once."
+                        )
+                    self._past_directives.add(self._current_level)
                     start_hook = self._start.get(self._current_level)
                     start_hook and start_hook()
                     if self._levels.get(self._current_level) is None:
-                        if self._current_level in self._complained_directives:
-                            self._haderror = True
-                        else:
-                            self.error(
-                                f"Unknown directive: {self._current_level}"
-                            )
-                            self._complained_directives.add(
-                                self._current_level
-                            )
+                        raise TokenParseError(
+                            tokens[tok_index],
+                            f"Unknown directive {self._current_level}."
+                        )
                 elif tokens[0].content[0] == "#":
                     match tokens[0].content:
                         case "#include":
@@ -298,67 +374,97 @@ class Parser():
                             elif name[0] == "<" and name[-1] == ">":
                                 name = name.strip("<>")
                             else:
-                                self.error("#include argument should be inside"
-                                           "quotations or <>")
+                                raise TokenParseError(
+                                    Token(
+                                        "", self._path, self._linenum,
+                                        len("#include "), len(line)
+                                    ),
+                                    "#include argument should be inside"
+                                    " quotation marks or <>."
+                                )
                             search_dirs = [os.path.dirname(path),
                                            self._include_dir]
                             found = False
                             for dir in search_dirs:
                                 newpath = os.path.join(dir, name)
                                 if os.path.isfile(newpath):
+                                    if newpath in self._included:
+                                        raise TokenParseError(
+                                            Token(
+                                                "", self._path, self._linenum,
+                                                len("#include "), len(line)
+                                            ),
+                                            f"Double inclusion of {newpath}."
+                                        )
                                     self._parse(newpath)
                                     found = True
                                     break
                             if not found:
-                                self.error(f"File not found: '{name}'")
+                                raise TokenParseError(
+                                    Token(
+                                        "", self._path, self._linenum,
+                                        len("#include "), len(line)
+                                    ),
+                                    f"File not found: {name}."
+                                )
                         case "#define":
                             if len(tokens) not in {2, 3}:
-                                self.error(
-                                    "#define takes one or two arguments"
+                                raise TokenParseError(
+                                    tokens[0],
+                                    "#define takes one or two arguments."
+                                    " Preprocessor macros are not supported."
                                 )
-                                continue
                             key = tokens[1].content
-                            val = "1.0"
+                            val = "1"
                             if len(tokens) == 3:
                                 if tokens[2].content[0] in '"<':
-                                    self.error("Cannot #define strings/paths")
+                                    raise TokenParseError(
+                                        tokens[2],
+                                        "#define with strings/paths as tokens"
+                                        " is not supported."
+                                    )
                                 val = tokens[2].content
                             self._defines[key] = val
                         case "#undef":
                             if len(tokens) != 2:
-                                self.error("#undef takes one word argument")
-                                continue
+                                raise TokenParseError(
+                                    tokens[0],
+                                    "#undef takes one argument."
+                                )
                             key = tokens[1].content
                             if self._defines.get(key):
                                 self._defines.pop(key)
                         case _:
-                            self.error("Unknown " + tokens[0].content)
+                            raise TokenParseError(
+                                tokens[0],
+                                f"Unknown preprocessor directive {tokens[0].content}."
+                            )
                 else:
                     # data lines
                     if self._current_level == "":
-                        self.error("Data line outside of directives")
-                        continue
+                        raise TokenParseError(
+                            tokens[0],
+                            "Data line encountered outside of any directive."
+                        )
                     handler = self._levels.get(self._current_level)
                     if handler is None:
-                        if self._current_level in self._complained_directives:
-                            self._haderror = True
-                        else:
-                            self.error(f"Data line in unknown directive "
-                                       f"{self._current_level}")
-                            self._complained_directives.add(
-                                self._current_level
-                            )
-                        continue
-                    try:
-                        handler(tokens)
-                    except Exception:
-                        self.error("Callback error (see below)")
-                        traceback.print_exc(limit=1)
+                        raise TokenParseError(
+                            tokens[0],
+                            "Data line encountered in unknown directive."
+                        )
+                    handler(tokens)
+
         if len(ifstack) > 1:
-            self.error("Unmatched #ifdef or #ifndef")
+            raise ParseError(
+                "Unmatched #ifdef or #ifndef."
+                " #ifdef/#ifndef crossing file boundaries are not supported."
+            )
         self._path = oldpath
 
-    def add_level(self, name, handler, start=None, end=None):
+    def add_level(
+            self, name, handler, start=None, end=None,
+            mandatory=False, unique=False
+        ):
         """
         Add a new level to this Parser.
 
@@ -379,3 +485,7 @@ class Parser():
             self._start[name] = start
         if end is not None:
             self._end[name] = end
+        if mandatory:
+            self._mandatory.add(name)
+        if unique:
+            self._unique.add(name)

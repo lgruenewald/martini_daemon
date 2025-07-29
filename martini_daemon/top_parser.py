@@ -3,7 +3,7 @@ A more modular
 parser that constructs S* and T* rather than openmm's internal objects
 """
 
-from .parser import Parser, unwrap
+from .parser import Parser, unwrap, TokenParseError, ParseError
 from .topstar import TopStar
 from .molecule import Molecule
 from .reaction_template import ReactionTemplate
@@ -45,75 +45,113 @@ def DaemonTopFile(
 
     # state of the parser
     system_defined = False  # whether the [system] happened yet
-    _last_molecule: Molecule | None = None
+    last_molecule: Molecule | None = None
     last_graph: Graph | None = None
     last_reaction: ReactionTemplate | None = None
 
     # a list of parsers for each directive
-    def parse_pair(pair: int | tuple[int, str]) -> int | tuple[int, int]:
+    def parse_pair(tokens, id, filter) -> int | tuple[int, int]:
         nonlocal last_reaction
+        pair = unwrap(tokens, id, filter)
         if type(pair) is int:
-            # for scenarios when both pair or int valid,
-            # int shouldn't be processed
             return pair
         if last_reaction is None:
-            raise ValueError("Attempt to pair-index before a [reaction] was defined")
+            raise TokenParseError(
+                tokens[id],
+                "Attempt to pair-index before a [reaction] was defined"
+            )
         n_reac = len(last_reaction.reactants)
         idi, namei = pair
         if idi < 0 or idi >= n_reac:
-            raise ValueError(f"Pair {idi}:{namei} index {idi} out of range: 1 to {n_reac}.")
-        graph = topology.graphs.get(last_reaction.reactants[idi])
+            raise TokenParseError(
+                tokens[id],
+                f"Reactant index {idi+1} out of range: 1 to {n_reac}."
+            )
+        graph_name = last_reaction.reactants[idi]
+        graph = topology.graphs.get(graph_name)
         if graph is None:
-            raise ValueError(f"Pair {idi}:{namei} graph {last_reaction.reactants[idi]} not found.")
+            raise TokenParseError(
+                tokens[id],
+                f"Reactant graph {graph_name} not found."
+            )
         atomi = graph.atom_name_to_index.get(namei)
         if atomi is None:
-            raise ValueError(f"Pair {idi}:{namei} atom name {namei} not found.")
-        if graph.atoms[atomi][3] not in {GraphAtomType.NORMAL, GraphAtomType.OPT}:
-            raise ValueError(f"Pair {idi}:{namei} references an atom!, which is not valid.")
+            raise TokenParseError(
+                tokens[id],
+                f"Atom {namei} not found in reactant {graph_name}."
+            )
+        if graph.atoms[atomi][3] not in {
+            GraphAtomType.NORMAL, GraphAtomType.OPT
+        }:
+            raise TokenParseError(
+                tokens[id],
+                "Attempt to reference a forbidden atom!"
+            )
         return idi, atomi
 
     def process_defaults(tokens):
         nb_type = unwrap(tokens, 0, "int")
         if nb_type != 1:
-            raise ValueError(f"Unsupported non-bonded type: {nb_type}")
+            raise TokenParseError(
+                tokens[0],
+                f"Unsupported nonbonded type {nb_type}."
+            )
         combination_rule = unwrap(tokens, 1, "int")
         if combination_rule != 2:
-            raise ValueError("Unsupported combination rule: "
-                             f"{combination_rule}")
+            raise TokenParseError(
+                tokens[1],
+                f"Unsupported combination rule {combination_rule}."
+            )
         if len(tokens) > 2:
-            raise ValueError("Too many fields in [defaults] directive")
+            raise TokenParseError(
+                tokens[2],
+                "Too many tokens in [defaults] directive, "
+                f"got {len(tokens)}, expect 2."
+            )
 
     p.add_level("defaults", process_defaults)
 
     def process_moltype(tokens):
-        nonlocal _last_molecule
+        nonlocal last_molecule
         name = unwrap(tokens, 0, "word")
         nrexcl = unwrap(tokens, 1, "int")
         if nrexcl != 1:
-            raise ValueError("nrexcl is not 1, only nrexcl=1 is implemented")
-        _last_molecule = topology.new_molecule(name)
+            raise TokenParseError(
+                tokens[1],
+                f"nrexcl is {nrexcl}, only nrexcl=1 is supported."
+            )
+        last_molecule = topology.new_molecule(name)
 
     p.add_level("moleculetype", process_moltype)
 
-    def process_molecule(tokens):
-        nonlocal system_defined
+    def molecules_start():
         if not system_defined:
-            raise ValueError("[molecules] must come after [system]")
+            raise ParseError(
+                "[molecules] must come after [system]."
+            )
+
+    def process_molecule(tokens):
         name = unwrap(tokens, 0, "word")
+        if topology.molecules.get(name) is None:
+            raise TokenParseError(
+                tokens[0],
+                f"Undefined molecule type {name}."
+            )
         count = unwrap(tokens, 1, "int")
         for i in range(count):
             topology.instantiate(name)
 
-    p.add_level("molecules", process_molecule)
+    p.add_level("molecules", process_molecule, start=molecules_start)
 
-    def last_molecule() -> Molecule:
+    def assert_last_molecule():
+        nonlocal last_molecule
         if last_molecule is None:
-            raise ValueError("No [moleculetype] given")
-        return _last_molecule
+            raise ParseError("No [moleculetype] given.")
 
     def process_atoms(tokens):
-        if last_molecule().index_type != "index":
-            raise ValueError("[atoms] only valid in [moleculetype]")
+        nonlocal last_molecule
+        if last_molecule.index_type != "index":
+            raise ParseError("[atoms] only valid in [moleculetype]")
         id = unwrap(tokens, 0, "index")
         type = unwrap(tokens, 1, "word")
         resnum = unwrap(tokens, 2, "int")
@@ -122,22 +160,24 @@ def DaemonTopFile(
         charge_group_num = unwrap(tokens, 5, "int")
         charge = unwrap(tokens, 6, "float") if len(tokens) > 6 else None
         mass = unwrap(tokens, 7, "float") if len(tokens) > 7 else None
-        atom_index = len(last_molecule().atoms)
+        atom_index = len(last_molecule.atoms)
         if id != atom_index:
-            raise ValueError(
+            raise TokenParseError(
+                tokens[0],
                 "Bad atom ID, are they out of order?"
                 f" got id {id} but expected {atom_index}"
             )
-        last_molecule().atoms.append(
+        last_molecule.atoms.append(
             (type, resnum, resname, atomname, charge_group_num, charge, mass)
         )
 
-    p.add_level("atoms", process_atoms)
+    p.add_level("atoms", process_atoms, start=assert_last_molecule)
 
     def process_bonds(tokens):
-        index_type = last_molecule().index_type
-        i = parse_pair(unwrap(tokens, 0, index_type))
-        j = parse_pair(unwrap(tokens, 1, index_type))
+        nonlocal last_molecule
+        index_type = last_molecule.index_type
+        i = parse_pair(tokens, 0, index_type)
+        j = parse_pair(tokens, 1, index_type)
         type = unwrap(tokens, 2, "int")
         length = None
         if type != 5:
@@ -146,38 +186,38 @@ def DaemonTopFile(
         if type == 1 or type == 6:
             # harmonic bond / harmonic potential
             force = unwrap(tokens, 4, "float")
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.harmonic_bond, [i, j], [length, force])
             )
         elif type == 2:
             # G96 bond
             force = unwrap(tokens, 4, "float")
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.g96_bond, [i, j], [length, force])
             )
         elif type == 3:
             # morse
             D = unwrap(tokens, 4, "float")
             beta = unwrap(tokens, 5, "float")
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.morse_bond, [i, j], [length, D, beta])
             )
         elif type == 4:
             # cubic bond
             kb = unwrap(tokens, 4, "float")
             kcub = unwrap(tokens, 5, "float")
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.cubic_bond, [i, j], [length, kb, kcub])
             )
         elif type == 5:
             # connection - only generate exclusions and add a dummy interaction
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.connection, [i, j], [])
             )
         elif type == 7:
             # FENE (finitely extensible nonlinear elastic) bond
             force = unwrap(tokens, 4, "float")
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.fene_bond, [i, j], [length, force])
             )
         elif type == 10:
@@ -186,36 +226,40 @@ def DaemonTopFile(
             up1 = unwrap(tokens, 4, "float")
             up2 = unwrap(tokens, 5, "float")
             k = unwrap(tokens, 6, "float")
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.distance_restraint, [i, j], [low, up1, up2, k])
             )
         else:
-            raise ValueError("Unsupported  bond function type")
+            raise TokenParseError(
+                tokens[2],
+                f"Unsupported bond function type {type}."
+            )
         if type != 6:
             # type 6 does not generate exclusions
             # nrexcl other than 1 is not supported
-            last_molecule().add_exclusion(i, j)
+            last_molecule.add_exclusion(i, j)
 
-    p.add_level("bonds", process_bonds)
+    p.add_level("bonds", process_bonds, start=assert_last_molecule)
 
     def process_angles(tokens):
-        index_type = last_molecule().index_type
-        i = parse_pair(unwrap(tokens, 0, index_type))
-        j = parse_pair(unwrap(tokens, 1, index_type))
-        k = parse_pair(unwrap(tokens, 2, index_type))
+        nonlocal last_molecule
+        index_type = last_molecule.index_type
+        i = parse_pair(tokens, 0, index_type)
+        j = parse_pair(tokens, 1, index_type)
+        k = parse_pair(tokens, 2, index_type)
         type = unwrap(tokens, 3, "int")
         if type == 1:
             # Harmonic angle
             theta = unwrap(tokens, 4, "degree")
             force = unwrap(tokens, 5, "float")
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.harmonic_angle, [i, j, k], [theta, force])
             )
         elif type == 2:
             # G96 angle
             theta = unwrap(tokens, 4, "degree")
             force = unwrap(tokens, 5, "float")
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.g96_angle, [i, j, k], [theta, force])
             )
         elif type == 3:
@@ -223,7 +267,7 @@ def DaemonTopFile(
             r1 = unwrap(tokens, 4, "float")
             r2 = unwrap(tokens, 5, "float")
             force = unwrap(tokens, 6, "float")
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.cross_bond_bond, [i, j, k], [r1, r2, force])
             )
         elif type == 4:
@@ -232,7 +276,7 @@ def DaemonTopFile(
             r2 = unwrap(tokens, 5, "float")
             r3 = unwrap(tokens, 6, "float")
             force = unwrap(tokens, 7, "float")
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.cross_bond_angle, [i, j, k], [r1, r2, r3, force])
             )
         elif type == 5:
@@ -241,7 +285,7 @@ def DaemonTopFile(
             force = unwrap(tokens, 5, "float")
             r13 = unwrap(tokens, 6, "float")
             k_UB = unwrap(tokens, 7, "float")
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.urey_bradley, [i, j, k], [theta, force, r13, k_UB])
             )
         elif type == 6:
@@ -251,34 +295,38 @@ def DaemonTopFile(
             # C0 to C4
             for x in range(5):
                 params.append(unwrap(tokens, 5+x, "float"))
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.quartic_angle, [i, j, k], params)
             )
         elif type == 9:
             # Linear angle
             a = unwrap(tokens, 4, "float")
             force = unwrap(tokens, 5, "float")
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.linear_angle, [i, j, k], [a, force])
             )
         elif type == 10:
             # Restricted angle
             theta = unwrap(tokens, 4, "degree")
             force = unwrap(tokens, 5, "float")
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.restricted_angle, [i, j, k], [theta, force])
             )
         else:
-            raise ValueError(f"Unsupported angle type {type}.")
+            raise TokenParseError(
+                tokens[3],
+                f"Unsupported angle type {type}."
+            )
 
-    p.add_level("angles", process_angles)
+    p.add_level("angles", process_angles, start=assert_last_molecule)
 
     def process_dihedrals(tokens):
-        index_type = last_molecule().index_type
-        i = parse_pair(unwrap(tokens, 0, index_type))
-        j = parse_pair(unwrap(tokens, 1, index_type))
-        k = parse_pair(unwrap(tokens, 2, index_type))
-        L = parse_pair(unwrap(tokens, 3, index_type))
+        nonlocal last_molecule
+        index_type = last_molecule.index_type
+        i = parse_pair(tokens, 0, index_type)
+        j = parse_pair(tokens, 1, index_type)
+        k = parse_pair(tokens, 2, index_type)
+        L = parse_pair(tokens, 3, index_type)
         type = unwrap(tokens, 4, "int")
         match type:
             case 1 | 4 | 9:
@@ -286,7 +334,7 @@ def DaemonTopFile(
                 theta = unwrap(tokens, 5, "degree")
                 force = unwrap(tokens, 6, "float")
                 multiplicity = unwrap(tokens, 7, "int", 1)
-                last_molecule().interactions.append(
+                last_molecule.interactions.append(
                     (system.proper_dihedral, [i, j, k, L],
                      [theta, force, multiplicity])
                 )
@@ -295,7 +343,7 @@ def DaemonTopFile(
                 theta = unwrap(tokens, 5, "degree")
                 force = unwrap(tokens, 6, "float")
                 theta = theta - math.tau if theta > math.pi else theta
-                last_molecule().interactions.append(
+                last_molecule.interactions.append(
                     (system.improper_dihedral, [i, j, k, L],
                      [theta, force])
                 )
@@ -305,7 +353,7 @@ def DaemonTopFile(
                 for c in range(6):
                     # C0 to C5
                     params.append(unwrap(tokens, 5+c, "float"))
-                last_molecule().interactions.append(
+                last_molecule.interactions.append(
                     (system.rb_torsion, [i, j, k, L], params)
                 )
             case 5:
@@ -322,14 +370,14 @@ def DaemonTopFile(
                     -4 * params[3],
                     0,
                 ]
-                last_molecule().interactions.append(
+                last_molecule.interactions.append(
                     (system.rb_torsion, [i, j, k, L], rb_params)
                 )
             case 10:
                 # restricted dihedral
                 theta = unwrap(tokens, 5, "degree")
                 force = unwrap(tokens, 6, "float")
-                last_molecule().interactions.append(
+                last_molecule.interactions.append(
                     (system.restricted_dihedral, [i, j, k, L], [theta, force])
                 )
             case 11:
@@ -339,7 +387,7 @@ def DaemonTopFile(
                 for c in range(5):
                     # a0 to a4
                     params.append(unwrap(tokens, 6+c, "float"))
-                last_molecule().interactions.append(
+                last_molecule.interactions.append(
                     (system.combined_bending_torsion, [i, j, k, L], params)
                 )
             case 101:
@@ -347,50 +395,69 @@ def DaemonTopFile(
                 theta = unwrap(tokens, 5, "degree")
                 depth = unwrap(tokens, 6, "float")
                 force = unwrap(tokens, 7, "float")
-                last_molecule().interactions.append((
+                last_molecule.interactions.append((
                     system.periodic_gaussian, [i, j, k, L],
                     [theta, depth, force]
                 ))
             case _:
-                raise ValueError("Unsupported dihedral function type {type}.")
+                raise TokenParseError(
+                    tokens[4],
+                    f"Unsupported dihedral function type {type}."
+                )
 
-    p.add_level("dihedrals", process_dihedrals)
+    p.add_level("dihedrals", process_dihedrals, start=assert_last_molecule)
 
     def process_exclusions(tokens):
-        index_type = last_molecule().index_type
-        i = parse_pair(unwrap(tokens, 0, index_type))
-        j = parse_pair(unwrap(tokens, 1, index_type))
-        last_molecule().add_exclusion(i, j)
+        nonlocal last_molecule
+        index_type = last_molecule.index_type
+        i = parse_pair(tokens, 0, index_type)
+        j = parse_pair(tokens, 1, index_type)
+        last_molecule.add_exclusion(i, j)
         for k in range(2, len(tokens)):
             c = unwrap(tokens, k, "index")
-            last_molecule().add_exclusion(i, c)
+            last_molecule.add_exclusion(i, c)
 
-    p.add_level("exclusions", process_exclusions)
+    p.add_level("exclusions", process_exclusions, start=assert_last_molecule)
 
     def process_constraints(tokens):
-        index_type = last_molecule().index_type
-        i = parse_pair(unwrap(tokens, 0, index_type))
-        j = parse_pair(unwrap(tokens, 1, index_type))
+        nonlocal last_molecule
+        index_type = last_molecule.index_type
+        i = parse_pair(tokens, 0, index_type)
+        j = parse_pair(tokens, 1, index_type)
         type = unwrap(tokens, 2, "int")
         length = unwrap(tokens, 3, "float")
         if type == 1 or type == 2:
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.constraint, [i, j], [length])
             )
             if type == 1:
                 # type 2 doesn't generate exclusions
-                last_molecule().add_exclusion(i, j)
+                last_molecule.add_exclusion(i, j)
         else:
-            raise ValueError("Unsupported constraint type")
+            raise TokenParseError(
+                tokens[2],
+                f"Unsupported constraint type {type}."
+            )
 
-    p.add_level("constraints", process_constraints)
+    p.add_level("constraints", process_constraints, start=assert_last_molecule)
+
+    def unwrap_atomtype(tokens, index):
+        type = unwrap(tokens, index, "word")
+        if system._atom_types.get(type) is None:
+            raise TokenParseError(
+                tokens[index],
+                f"Unknown atom type {type}."
+            )
 
     def process_pairtypes(tokens):
-        t1 = unwrap(tokens, 0, "word")
-        t2 = unwrap(tokens, 1, "word")
+        t1 = unwrap_atomtype(tokens, 0)
+        t2 = unwrap_atomtype(tokens, 1)
         type = unwrap(tokens, 2, "int")
         if type != 1:
-            raise ValueError("Unsupported pairs type")
+            raise TokenParseError(
+                tokens[2],
+                f"Unsupported pairs type {type}."
+            )
         sigma = unwrap(tokens, 3, "float")
         epsilon = unwrap(tokens, 4, "float")
         system.pairs.add_type(t1, t2, sigma, epsilon)
@@ -398,38 +465,48 @@ def DaemonTopFile(
     p.add_level("pairtypes", process_pairtypes)
 
     def process_pairs(tokens):
-        index_type = last_molecule().index_type
-        i = parse_pair(unwrap(tokens, 0, index_type))
-        j = parse_pair(unwrap(tokens, 1, index_type))
+        nonlocal last_molecule
+        index_type = last_molecule.index_type
+        i = parse_pair(tokens, 0, index_type)
+        j = parse_pair(tokens, 1, index_type)
         type = unwrap(tokens, 2, "int")
         if type != 1:
-            raise ValueError("Unsupported pairs type")
+            raise TokenParseError(
+                tokens[2],
+                f"Unsupported pairs type {type}."
+            )
         if len(tokens) >= 5:
             sigma = unwrap(tokens, 3, "float")
             epsilon = unwrap(tokens, 4, "float")
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.pairs, [i, j], [sigma, epsilon])
             )
         else:
-            last_molecule().interactions.append(
+            last_molecule.interactions.append(
                 (system.pairs, [i, j], [])
             )
 
-    p.add_level("pairs", process_pairs)
+    p.add_level("pairs", process_pairs, start=assert_last_molecule)
 
     def process_cmaptypes(tokens):
         parts = [
-            unwrap(tokens, i, "word") for i in range(5)
+            unwrap_atomtype(tokens, i) for i in range(5)
         ]
         type = unwrap(tokens, 5, "int")
         if type != 1:
-            raise ValueError("Unsupported cmap type")
+            raise TokenParseError(
+                tokens[5],
+                f"Unsupported cmap type {type}."
+            )
         size = [
             unwrap(tokens, 6, "int"),
             unwrap(tokens, 7, "int")
         ]
         if size[0] != size[1]:
-            raise ValueError("Non-square CMAPs are not supported")
+            raise TokenParseError(
+                tokens[7],
+                "Non-square CMAPs are not supported."
+            )
         params = [
             unwrap(tokens, 8+i, "float")
             for i in range(size[0] * size[1])
@@ -439,75 +516,102 @@ def DaemonTopFile(
     p.add_level("cmaptypes", process_cmaptypes)
 
     def process_cmap(tokens):
-        index_type = last_molecule().index_type
+        nonlocal last_molecule
+        index_type = last_molecule.index_type
         members = [
-            parse_pair(unwrap(tokens, i, index_type))
+            parse_pair(tokens, i, index_type)
             for i in range(5)
         ]
         # GromacsTopFile in openmm does support cmap types
         # here, but GROMACS seems to require [cmaptypes]
         # so we only support [cmaptypes]
-        last_molecule().interactions.append((
+        last_molecule.interactions.append((
             system.cmap, members, []
         ))
 
-    p.add_level("cmap", process_cmap)
+    p.add_level("cmap", process_cmap, start=assert_last_molecule)
 
     def process_custom_donor_acceptor(tokens):
+        nonlocal last_molecule
         # just a test for now, hardcoded constants
-        index_type = last_molecule().index_type
-        i = parse_pair(unwrap(tokens, 0, index_type))
-        j = parse_pair(unwrap(tokens, 1, index_type))
-        k = parse_pair(unwrap(tokens, 2, index_type))
-        last_molecule().interactions.append((
+        index_type = last_molecule.index_type
+        i = parse_pair(tokens, 0, index_type)
+        j = parse_pair(tokens, 1, index_type)
+        k = parse_pair(tokens, 2, index_type)
+        last_molecule.interactions.append((
             system.custom_donor_acceptor, [i, j, k], []
         ))
 
-    p.add_level("custom_donor_acceptor", process_custom_donor_acceptor)
+    p.add_level(
+        "custom_donor_acceptor", process_custom_donor_acceptor,
+        start=assert_last_molecule
+    )
 
     def process_atomtypes(tokens):
         if len(tokens) != 6:
-            raise ValueError("Only atomtypes lines formatted as type, m, q,"
-                             "atom_type, sigma, epsilon are supported.")
+            raise ParseError(
+                "Only atomtypes lines formatted as type, m, q,"
+                "atom_type, sigma, epsilon are supported."
+            )
         type = unwrap(tokens, 0, "word")
         mass = unwrap(tokens, 1, "float")
         charge = unwrap(tokens, 2, "float")
         atom_type = unwrap(tokens, 3, "word")
         if atom_type != "A":
-            raise ValueError("Only A atom type expected in [atomtypes]")
+            raise TokenParseError(
+                tokens[3],
+                "Only 'A' atom type supported."
+            )
         sigma = unwrap(tokens, 4, "float")
         epsilon = unwrap(tokens, 5, "float")
-        if sigma != 0.0 or epsilon != 0.0:
-            raise ValueError(
-                "Only zero sigma and epsilon are expected in [atomtypes]"
+        if sigma != 0.0:
+            raise TokenParseError(
+                tokens[4],
+                "Only sigma=0 is supported in [atomtypes]."
+            )
+        if epsilon != 0.0:
+            raise TokenParseError(
+                tokens[5],
+                "Only epsilon=0 is supported in [atomtypes]."
             )
         system.add_atom_type(type, charge, mass)
 
     p.add_level("atomtypes", process_atomtypes)
 
     def process_position_restraints(tokens):
+        nonlocal last_molecule
         if len(tokens) != 5:
-            raise ValueError(
+            raise ParseError(
                 "Only position_restraint lines formatted as "
                 "<index> <type> <kx> <ky> <kz> are supported."
             )
         type = unwrap(tokens, 1, "int")
-        assert type == 1, "Only type 1 position restraint is supported."
+        if type != 1:
+            raise TokenParseError(
+                tokens[1],
+                f"Unsupported position restraint type {type}."
+            )
         id = unwrap(tokens, 0, "index")
         kx = unwrap(tokens, 2, "float")
         ky = unwrap(tokens, 3, "float")
         kz = unwrap(tokens, 4, "float")
         # x0, y0, z0 can only be set during instantiation - it is part of T*
-        last_molecule().posres.append((id, kx, ky, kz))
+        last_molecule.posres.append((id, kx, ky, kz))
 
-    p.add_level("position_restraints", process_position_restraints)
+    p.add_level(
+        "position_restraints", process_position_restraints,
+        start=assert_last_molecule
+    )
 
     def process_nonbond_params(tokens):
         type1 = unwrap(tokens, 0, "word")
         type2 = unwrap(tokens, 1, "word")
         funct = unwrap(tokens, 2, "int")
         if funct != 1:
-            raise ValueError("Only sigma/epsilon non bond params accepted")
+            raise TokenParseError(
+                tokens[2],
+                f"Unsupported function type {type}."
+            )
         sigma = unwrap(tokens, 3, "float")
         epsilon = unwrap(tokens, 4, "float")
         system.add_nb_type(type1, type2, sigma, epsilon)
@@ -515,51 +619,63 @@ def DaemonTopFile(
     p.add_level("nonbond_params", process_nonbond_params)
 
     def process_virtual_sites1(tokens):
-        vid = parse_pair(unwrap(tokens, 0, last_molecule().index_type))
-        member = parse_pair(unwrap(tokens, 1, last_molecule().index_type))
+        nonlocal last_molecule
+        vid = parse_pair(tokens, 0, last_molecule.index_type)
+        member = parse_pair(tokens, 1, last_molecule.index_type)
         type = unwrap(tokens, 2, "int")
         if type != 1:
-            raise ValueError(f"Virtual site 1 type {type} not implemented.")
-        last_molecule().interactions.append(
+            raise TokenParseError(
+                tokens[2],
+                f"Virtual site 1 type {type} not supported."
+            )
+        last_molecule.interactions.append(
             (system.vsite1, [vid, member], [])
         )
         # OpenMM does not like overlapping atoms otherwise
-        last_molecule().add_exclusion(vid, member)
+        last_molecule.add_exclusion(vid, member)
 
-    p.add_level("virtual_sites1", process_virtual_sites1)
+    p.add_level(
+        "virtual_sites1", process_virtual_sites1, start=assert_last_molecule
+    )
 
     def process_virtual_sites2(tokens):
-        index_type = last_molecule().index_type
-        vid = parse_pair(unwrap(tokens, 0, index_type))
-        i = parse_pair(unwrap(tokens, 1, index_type))
-        j = parse_pair(unwrap(tokens, 2, index_type))
+        nonlocal last_molecule
+        index_type = last_molecule.index_type
+        vid = parse_pair(tokens, 0, index_type)
+        i = parse_pair(tokens, 1, index_type)
+        j = parse_pair(tokens, 2, index_type)
         members = [vid, i, j]
         type = unwrap(tokens, 3, "int")
         match type:
             case 1:
                 a = unwrap(tokens, 4, "float")
                 weights = [1-a, a]
-                last_molecule().interactions.append(
+                last_molecule.interactions.append(
                     (system.vsite2, members, weights)
                 )
             case 2:
                 d = unwrap(tokens, 4, "float")
-                last_molecule().interactions.append(
+                last_molecule.interactions.append(
                     (system.vsite_2fd, members, [d])
                 )
             case _:
-                raise ValueError(
-                    f"Virtual site 2 type {type} not implemented."
+                raise TokenParseError(
+                    tokens[3],
+                    f"Virtual site 2 type {type} unsupported."
                 )
 
-    p.add_level("virtual_sites2", process_virtual_sites2)
+    p.add_level(
+        "virtual_sites2", process_virtual_sites2,
+        start=assert_last_molecule
+    )
 
     def process_virtual_sites3(tokens):
-        index_type = last_molecule().index_type
-        vid = parse_pair(unwrap(tokens, 0, index_type))
-        i = parse_pair(unwrap(tokens, 1, index_type))
-        j = parse_pair(unwrap(tokens, 2, index_type))
-        k = parse_pair(unwrap(tokens, 3, index_type))
+        nonlocal last_molecule
+        index_type = last_molecule.index_type
+        vid = parse_pair(tokens, 0, index_type)
+        i = parse_pair(tokens, 1, index_type)
+        j = parse_pair(tokens, 2, index_type)
+        k = parse_pair(tokens, 3, index_type)
         members = [vid, i, j, k]
         type = unwrap(tokens, 4, "int")
         match type:
@@ -568,21 +684,21 @@ def DaemonTopFile(
                 a = unwrap(tokens, 5, "float")
                 b = unwrap(tokens, 6, "float")
                 weights = [1 - a - b, a, b]
-                last_molecule().interactions.append(
+                last_molecule.interactions.append(
                     (system.vsite3, members, weights)
                 )
             case 2:
                 # 3fd
                 a = unwrap(tokens, 5, "float")
                 d = unwrap(tokens, 6, "float")
-                last_molecule().interactions.append(
+                last_molecule.interactions.append(
                     (system.vsite_3fd, members, [a, d])
                 )
             case 3:
                 # 3fad
                 theta = unwrap(tokens, 5, "degree")
                 d = unwrap(tokens, 6, "float")
-                last_molecule().interactions.append(
+                last_molecule.interactions.append(
                     (system.vsite_3fad, members, [theta, d])
                 )
             case 4:
@@ -590,23 +706,28 @@ def DaemonTopFile(
                 a = unwrap(tokens, 5, "float")
                 b = unwrap(tokens, 6, "float")
                 c = unwrap(tokens, 7, "float")
-                last_molecule().interactions.append(
+                last_molecule.interactions.append(
                     (system.vsite_3out, members, [a, b, c])
                 )
             case _:
-                raise ValueError(
-                    f"Virtual site 3 type {type} not implemented."
+                raise TokenParseError(
+                    tokens[4],
+                    f"Virtual site 3 type {type} unsupported."
                 )
 
-    p.add_level("virtual_sites3", process_virtual_sites3)
+    p.add_level(
+        "virtual_sites3", process_virtual_sites3,
+        start=assert_last_molecule
+    )
 
     def process_virtual_sites4(tokens):
-        index_type = last_molecule().index_type
-        vid = parse_pair(unwrap(tokens, 0, index_type))
-        i = parse_pair(unwrap(tokens, 1, index_type))
-        j = parse_pair(unwrap(tokens, 2, index_type))
-        k = parse_pair(unwrap(tokens, 3, index_type))
-        L = parse_pair(unwrap(tokens, 4, index_type))
+        nonlocal last_molecule
+        index_type = last_molecule.index_type
+        vid = parse_pair(tokens, 0, index_type)
+        i = parse_pair(tokens, 1, index_type)
+        j = parse_pair(tokens, 2, index_type)
+        k = parse_pair(tokens, 3, index_type)
+        L = parse_pair(tokens, 4, index_type)
         members = [vid, i, j, k, L]
         type = unwrap(tokens, 5, "int")
         match type:
@@ -614,61 +735,70 @@ def DaemonTopFile(
                 a = unwrap(tokens, 6, "float")
                 b = unwrap(tokens, 7, "float")
                 c = unwrap(tokens, 8, "float")
-                last_molecule().interactions.append(
+                last_molecule.interactions.append(
                     (system.vsite_4fdn, members, [a, b, c])
                 )
             case _:
-                raise ValueError(
-                    f"Virtual site 4 type {type} not implemented."
+                raise TokenParseError(
+                    tokens[5],
+                    f"Virtual site 4 type {type} unsupported."
                 )
 
-    p.add_level("virtual_sites4", process_virtual_sites4)
+    p.add_level(
+        "virtual_sites4", process_virtual_sites4,
+        start=assert_last_molecule
+    )
 
     def process_virtual_sitesn(tokens):
-        index_type = last_molecule().index_type
-        vid = parse_pair(unwrap(tokens, 0, index_type))
+        nonlocal last_molecule
+        index_type = last_molecule.index_type
+        vid = parse_pair(tokens, 0, index_type)
         members = [vid]
         type = unwrap(tokens, 1, "int")
         match type:
             case 1:
                 for c in range(2, len(tokens)):
-                    members.append(parse_pair(unwrap(tokens, c, index_type)))
+                    members.append(parse_pair(tokens, c, index_type))
                 n = len(members) - 1
                 weights = [1/n] * n
-                last_molecule().interactions.append(
+                last_molecule.interactions.append(
                     (system.vsite_avg, members, weights)
                 )
             case 2:
                 for c in range(2, len(tokens)):
-                    members.append(parse_pair(unwrap(tokens, c, index_type)))
+                    members.append(parse_pair(tokens, c, index_type))
                 n = len(members) - 1
-                last_molecule().interactions.append(
+                last_molecule.interactions.append(
                     (system.vsite_com, members, [])
                 )
             case 3:
                 weights = []
                 wsum = 0.
                 if len(tokens) % 2 != 0:
-                    raise ValueError("Must have an even number of arguments")
+                    raise ParseError("Must have an even number of arguments")
                 for c in range(2, len(tokens), 2):
-                    index = parse_pair(unwrap(tokens, c, index_type))
+                    index = parse_pair(tokens, c, index_type)
                     weight = unwrap(tokens, c+1, "float")
                     members.append(index)
                     weights.append(weight)
                     wsum += weight
                 weights = [w/wsum for w in weights]
-                last_molecule().interactions.append(
+                last_molecule.interactions.append(
                     (system.vsite_avg, members, weights)
                 )
             case _:
-                raise ValueError(
-                    f"Virtual site n type {type} not implemented."
+                raise TokenParseError(
+                    tokens[1],
+                    f"Virtual site n type {type} unsupported."
                 )
         # OpenMM does not like overlapping particles without exclusions
         if len(members) == 2:
-            last_molecule().add_exclusion(members[0], members[1])
+            last_molecule.add_exclusion(members[0], members[1])
 
-    p.add_level("virtual_sitesn", process_virtual_sitesn)
+    p.add_level(
+        "virtual_sitesn", process_virtual_sitesn,
+        start=assert_last_molecule
+    )
 
     def graph_start():
         nonlocal last_graph
@@ -679,7 +809,10 @@ def DaemonTopFile(
         keyword = unwrap(tokens, 0, "word")
         if keyword == "name":
             if last_graph.name is not None:
-                raise ValueError("redefinition of name")
+                raise TokenParseError(
+                    tokens[0],
+                    f"The graph already has a name {last_graph.name}."
+                )
             last_graph.name = unwrap(tokens, 1, "word")
         elif keyword == "atom":
             part_id = unwrap(tokens, 1, "word")
@@ -718,7 +851,8 @@ def DaemonTopFile(
                 close_matches = difflib.get_close_matches(
                     keyword, possibilities, 1
                 )
-                raise ValueError(
+                raise TokenParseError(
+                    tokens[0],
                     f"Keyword {keyword} in graph unrecognized." +
                     (
                         f" Perhaps you meant {close_matches[0]}?"
@@ -729,7 +863,7 @@ def DaemonTopFile(
     def graph_end():
         nonlocal last_graph, topology
         if last_graph.name is None:
-            raise ValueError("name is mandatory")
+            ParseError("Graph name is mandatory, but was not given.")
         last_graph.finish_init()
         topology.new_graph(last_graph)
         last_graph = None
@@ -747,17 +881,17 @@ def DaemonTopFile(
             topology.new_reaction(last_reaction)
             last_reaction = None
         else:
-            raise ValueError(f"unfinished reaction {last_reaction.name}")
+            raise ParseError(f"Unfinished reaction {last_reaction.name}.")
 
     def process_reaction(tokens):
-        nonlocal last_reaction, _last_molecule
+        nonlocal last_reaction, last_molecule
         if system_defined:
-            raise ValueError("[ reaction ] must be before [ system ]")
+            raise ParseError("[ reaction ] must be before [ system ]")
         require_complete_reaction()
         name = unwrap(tokens, 0, "word")
         last_reaction = ReactionTemplate(name)
-        _last_molecule = topology.new_molecule(name)
-        _last_molecule.index_type = "pair"
+        last_molecule = topology.new_molecule(name)
+        last_molecule.index_type = "pair"
 
     p.add_level("reaction", process_reaction)
     # alias:
@@ -766,10 +900,17 @@ def DaemonTopFile(
     def process_reactants(tokens):
         nonlocal last_reaction
         rxs = [unwrap(tokens, i, "word") for i in range(len(tokens))]
+        for i, rx in enumerate(rxs):
+            if topology.graphs.get(rx) is None:
+                raise TokenParseError(
+                    tokens[i],
+                    f"Undefined reactant graph name {rx}."
+                    " Please define the graph first."
+                )
         if len(tokens) > 4:
-            raise ValueError("Only up to 4 reactants are allowed.")
+            raise ParseError("Only up to 4 reactants are allowed.")
         if len(last_reaction.reactants) > 0:
-            raise ValueError("Only one set of reactants per reaction.")
+            raise ParseError("Only one set of reactants per reaction.")
         last_reaction.reactants = rxs
 
     p.add_level("reactants", process_reactants)
@@ -780,27 +921,48 @@ def DaemonTopFile(
         nonlocal last_reaction
         n_reac = len(last_reaction.reactants)
         if n_reac == 0:
-            raise ValueError("[reactants] must come before [conditions]")
+            raise ParseError("[reactants] must come before [conditions]")
         key = unwrap(tokens, 0, "word")
+        angles = {
+            (a, b, c, d, e, f)
+            for a, b, c, d, e, f, _, _ in last_reaction.angle_limits
+        }
+        dihedrals = {
+            (a, b, c, d, e, f, g, h)
+            for a, b, c, d, e, f, g, h, _, _ in last_reaction.dihedral_limits
+        }
         match key:
             case "r_max":
-                idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
-                idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
+                idi, atomi = parse_pair(tokens, 1, "pair")
+                idj, atomj = parse_pair(tokens, 2, "pair")
                 cutoff = unwrap(tokens, 3, "positive")
                 last_reaction.distance_max.append(
                     (idi, atomi, idj, atomj, cutoff)
                 )
             case "r_min":
-                idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
-                idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
+                idi, atomi = parse_pair(tokens, 1, "pair")
+                idj, atomj = parse_pair(tokens, 2, "pair")
                 cutoff = unwrap(tokens, 3, "positive")
                 last_reaction.distance_min.append(
                     (idi, atomi, idj, atomj, cutoff)
                 )
+            case "angle":
+                idi, atomi = parse_pair(tokens, 1, "pair")
+                idj, atomj = parse_pair(tokens, 2, "pair")
+                idk, atomk = parse_pair(tokens, 3, "pair")
+                if (idi, atomi, idj, atomj, idk, atomk) in angles:
+                    raise ParseError(
+                        "There is already angle conditions defined for"
+                        " the atoms:"
+                        f" {unwrap(tokens, 1, 'pair')},"
+                        f" {unwrap(tokens, 2, 'pair')},"
+                        f" {unwrap(tokens, 3, 'pair')}."
+                    )
+                # TODO finish this
             case "angle_not":
-                idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
-                idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
-                idk, atomk = parse_pair(unwrap(tokens, 3, "pair"))
+                idi, atomi = parse_pair(tokens, 1, "pair")
+                idj, atomj = parse_pair(tokens, 2, "pair")
+                idk, atomk = parse_pair(tokens, 3, "pair")
                 theta_min = unwrap(tokens, 4, "degree")
                 theta_max = unwrap(tokens, 5, "degree")
                 last_reaction.angle_limits.append((
@@ -808,27 +970,27 @@ def DaemonTopFile(
                     math.cos(theta_min), math.cos(theta_max)
                 ))
             case "angle_min":
-                idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
-                idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
-                idk, atomk = parse_pair(unwrap(tokens, 3, "pair"))
+                idi, atomi = parse_pair(tokens, 1, "pair")
+                idj, atomj = parse_pair(tokens, 2, "pair")
+                idk, atomk = parse_pair(tokens, 3, "pair")
                 theta_min = unwrap(tokens, 4, "degree")
                 last_reaction.angle_limits.append((
                     idi, atomi, idj, atomj, idk, atomk,
                     math.cos(theta_min), math.cos(math.pi)
                 ))
             case "angle_max":
-                idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
-                idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
-                idk, atomk = parse_pair(unwrap(tokens, 3, "pair"))
+                idi, atomi = parse_pair(tokens, 1, "pair")
+                idj, atomj = parse_pair(tokens, 2, "pair")
+                idk, atomk = parse_pair(tokens, 3, "pair")
                 theta_max = unwrap(tokens, 4, "degree")
                 last_reaction.angle_limits.append((
                     idi, atomi, idj, atomj, idk, atomk,
                     math.cos(0.), math.cos(theta_max)
                 ))
             case "angle_between":
-                idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
-                idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
-                idk, atomk = parse_pair(unwrap(tokens, 3, "pair"))
+                idi, atomi = parse_pair(tokens, 1, "pair")
+                idj, atomj = parse_pair(tokens, 2, "pair")
+                idk, atomk = parse_pair(tokens, 3, "pair")
                 theta_min = unwrap(tokens, 4, "degree")
                 theta_max = unwrap(tokens, 5, "degree")
                 last_reaction.angle_limits.append((
@@ -840,10 +1002,10 @@ def DaemonTopFile(
                     math.cos(theta_max), math.cos(math.pi)
                 ))
             case "dihedral_not":
-                idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
-                idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
-                idk, atomk = parse_pair(unwrap(tokens, 3, "pair"))
-                idl, atoml = parse_pair(unwrap(tokens, 4, "pair"))
+                idi, atomi = parse_pair(tokens, 1, "pair")
+                idj, atomj = parse_pair(tokens, 2, "pair")
+                idk, atomk = parse_pair(tokens, 3, "pair")
+                idl, atoml = parse_pair(tokens, 4, "pair")
                 theta_min = unwrap(tokens, 5, "degree")
                 theta_max = unwrap(tokens, 6, "degree")
                 # periodicity consideration
@@ -863,10 +1025,10 @@ def DaemonTopFile(
                         theta_min, math.tau
                     ))
             case "dihedral_between":
-                idi, atomi = parse_pair(unwrap(tokens, 1, "pair"))
-                idj, atomj = parse_pair(unwrap(tokens, 2, "pair"))
-                idk, atomk = parse_pair(unwrap(tokens, 3, "pair"))
-                idl, atoml = parse_pair(unwrap(tokens, 4, "pair"))
+                idi, atomi = parse_pair(tokens, 1, "pair")
+                idj, atomj = parse_pair(tokens, 2, "pair")
+                idk, atomk = parse_pair(tokens, 3, "pair")
+                idl, atoml = parse_pair(tokens, 4, "pair")
                 theta_max = unwrap(tokens, 5, "degree")
                 theta_min = unwrap(tokens, 6, "degree")
                 # periodicity consideration
@@ -888,7 +1050,10 @@ def DaemonTopFile(
             case "rate":
                 last_reaction.relative_rate = unwrap(tokens, 1, "positive")
             case _:
-                raise ValueError(f"Unknown key {key} in [conditions]")
+                raise TokenParseError(
+                    tokens[0],
+                    f"Unknown reaction condition {key}."
+                )
 
     p.add_level("conditions", process_conditions)
     # alias:
@@ -898,11 +1063,11 @@ def DaemonTopFile(
         nonlocal last_reaction
         n_reac = len(last_reaction.reactants)
         if n_reac == 0:
-            raise ValueError("[reactants] must come before [break]")
+            raise ParseError("[reactants] must come before [break]")
 
         atoms = []
         for i in range(len(tokens)):
-            atoms.append(parse_pair(unwrap(tokens, i, "pair")))
+            atoms.append(parse_pair(tokens, i, "pair"))
         last_reaction.break_groups.append(atoms)
 
     p.add_level("break", process_break)
@@ -911,11 +1076,11 @@ def DaemonTopFile(
         nonlocal last_reaction
         n_reac = len(last_reaction.reactants)
         if n_reac == 0:
-            raise ValueError("[reactants] must come before [update]")
+            raise ParseError("[reactants] must come before [update]")
 
         atoms = []
         for i in range(len(tokens)):
-            atoms.append(parse_pair(unwrap(tokens, i, "pair")))
+            atoms.append(parse_pair(tokens, i, "pair"))
         last_reaction.update_groups.append(atoms)
 
     p.add_level("update", process_update)
@@ -924,11 +1089,11 @@ def DaemonTopFile(
         nonlocal last_reaction
         n_reac = len(last_reaction.reactants)
         if n_reac == 0:
-            raise ValueError("[reactants] must come before [redefine]")
-        id, name = parse_pair(unwrap(tokens, 0, "pair"))
+            raise ParseError("[reactants] must come before [redefine]")
+        id, atomid = parse_pair(tokens, 0, "pair")
         changes = set()
         if len(tokens) % 2 != 1:
-            raise ValueError(
+            raise ParseError(
                 "[redefine] must contain an atom, and a list of pairs of"
                 " properties and new values. Found an even number of"
                 " tokens, expected an odd number."
@@ -936,28 +1101,32 @@ def DaemonTopFile(
         for i in range((len(tokens)-1) // 2):
             word = unwrap(tokens, 1+i*2, "word")
             if word in changes:
-                raise ValueError(f"Duplicate entry {word}.")
+                raise TokenParseError(
+                    tokens[1+i*2],
+                    f"Duplicate entry {word}."
+                )
             changes.add(word)
             match word:
                 # TODO unify this into a redefine
                 case "name":
                     last_reaction.renames.append((
-                        id, name, unwrap(tokens, 2+i*2, "word")
+                        id, atomid, unwrap(tokens, 2+i*2, "word")
                     ))
                 case "type":
                     last_reaction.retypes.append((
-                        id, name, unwrap(tokens, 2+i*2, "word")
+                        id, atomid, unwrap(tokens, 2+i*2, "word")
                     ))
                 case "charge":
                     last_reaction.recharges.append((
-                        id, name, unwrap(tokens, 2+i*2, "float")
+                        id, atomid, unwrap(tokens, 2+i*2, "float")
                     ))
                 case "mass":
                     last_reaction.remasses.append((
-                        id, name, unwrap(tokens, 2+i*2, "float")
+                        id, atomid, unwrap(tokens, 2+i*2, "float")
                     ))
                 case _:
-                    raise ValueError(
+                    raise TokenParseError(
+                        tokens[1+i*2],
                         f"Unknown atom property {word}."
                     )
 
@@ -967,9 +1136,9 @@ def DaemonTopFile(
         nonlocal last_reaction
         n_reac = len(last_reaction.reactants)
         if n_reac == 0:
-            raise ValueError("[reactants] must come before [retype]")
+            raise ParseError("[reactants] must come before [retype]")
 
-        i, j = parse_pair(unwrap(tokens, 0, "pair"))
+        i, j = parse_pair(tokens, 0, "pair")
         ntype = unwrap(tokens, 1, "word")
         last_reaction.retypes.append((i, j, ntype))
 
@@ -979,9 +1148,9 @@ def DaemonTopFile(
         nonlocal last_reaction
         n_reac = len(last_reaction.reactants)
         if n_reac == 0:
-            raise ValueError("[reactants] must come before [rename]")
+            raise ParseError("[reactants] must come before [rename]")
 
-        i, j = parse_pair(unwrap(tokens, 0, "pair"))
+        i, j = parse_pair(tokens, 0, "pair")
         nname = unwrap(tokens, 1, "word")
         last_reaction.renames.append((i, j, nname))
 
@@ -991,9 +1160,9 @@ def DaemonTopFile(
         nonlocal last_reaction
         n_reac = len(last_reaction.reactants)
         if n_reac == 0:
-            raise ValueError("[reactants] must come before [remass]")
+            raise ParseError("[reactants] must come before [remass]")
 
-        i, j = parse_pair(unwrap(tokens, 0, "pair"))
+        i, j = parse_pair(tokens, 0, "pair")
         nmass = unwrap(tokens, 1, "float")
         last_reaction.remasses.append((i, j, nmass))
 
@@ -1003,9 +1172,9 @@ def DaemonTopFile(
         nonlocal last_reaction
         n_reac = len(last_reaction.reactants)
         if n_reac == 0:
-            raise ValueError("[reactants] must come before [recharge]")
+            raise ParseError("[reactants] must come before [recharge]")
 
-        i, j = parse_pair(unwrap(tokens, 0, "pair"))
+        i, j = parse_pair(tokens, 0, "pair")
         ncharge = unwrap(tokens, 1, "float")
         last_reaction.recharges.append((i, j, ncharge))
 
@@ -1016,13 +1185,11 @@ def DaemonTopFile(
         require_complete_reaction()
         system_defined = True  # for a hack so that reactions are complete
 
-    p.add_level("system", process_system)
+    p.add_level("system", process_system, mandatory=True, unique=True)
 
     # run parser
     ok = p.parse(file, include_dir, defines)
     if not ok:
-        raise ValueError("Failed to parse input files.")
-    if not system_defined:
-        raise ValueError("The [system] directive is mandatory!")
-
-    return (system, topology)
+        return False, None
+    else:
+        return True, (system, topology)

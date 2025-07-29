@@ -50,7 +50,9 @@ class TestSingleFrame():
         # applies constraints and vsites and checks for position change
         platform = mm.Platform.getPlatformByName("Reference")
         _, respos, _ = read_gro(self.respos)
-        system, top = DaemonTopFile(self.top, NonBonded(), respos=respos)
+        ok, res = DaemonTopFile(self.top, NonBonded(), respos=respos)
+        assert ok
+        system, top = res
         box, pos, vel = read_gro(self.gro)
         system.build_context(mm.VerletIntegrator(20 * femtosecond),
                              box,
@@ -70,7 +72,9 @@ class TestSingleFrame():
     def compare_daemon_gmx(self):
         platform = mm.Platform.getPlatformByName("Reference")
         _, respos, _ = read_gro(self.respos)
-        system, top = DaemonTopFile(self.top, NonBonded(), respos=respos)
+        ok, res = DaemonTopFile(self.top, NonBonded(), respos=respos)
+        assert ok
+        system, top = res
         box, pos, vel = read_gro(self.gro)
         system.build_context(mm.VerletIntegrator(20 * femtosecond),
                              box,
