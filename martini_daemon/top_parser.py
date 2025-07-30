@@ -531,19 +531,127 @@ def DaemonTopFile(
 
     p.add_level("cmap", process_cmap, start=assert_last_molecule)
 
-    def process_custom_donor_acceptor(tokens):
+    def process_reactive_type(tokens):
+        filter = unwrap(tokens, 0, "word")
+
+        if system.custom_reactive.reactive_types.get(filter) is not None:
+            raise TokenParseError(
+                tokens[0],
+                f"Reactive type {filter} already defined."
+            )
+
+        i = 1
+
+        """
+        sigma = 0.
+        epsilon = 0.
+        barrier_height = 0.
+        barrier_position = 0.
+        barrier_width = 0.01
+        well_position = 0.
+        well_depth = 0.
+        well_width = 0.01
+        repulsive_strength = 0.
+        angle = 0.
+        angle_strength = 0.
+        dihedral = 0.
+        dihedral_depth = 0.
+        dihedral_width = 0.01
+        """
+
+        keys = set()
+        while i < len(tokens):
+            key = unwrap(tokens, i, "word")
+            if key in keys:
+                raise TokenParseError(
+                    tokens[i],
+                    f"Duplicate entry for key {key}."
+                )
+            keys.add(key)
+            match key:
+                case "LJ_negate":
+                    sigma = unwrap(tokens, i+1, "float")
+                    epsilon = unwrap(tokens, i+2, "float")
+                    i += 3
+                case "barrier":
+                    barrier_position = unwrap(tokens, i+2, "float")
+                    barrier_height = unwrap(tokens, i+1, "float")
+                    barrier_width = unwrap(tokens, i+3, "float")
+                    i += 4
+                case "well":
+                    well_position = unwrap(tokens, i+1, "float")
+                    well_depth = unwrap(tokens, i+2, "float")
+                    well_width = unwrap(tokens, i+3, "float")
+                    repulsive_strength = unwrap(tokens, i+4, "float")
+                    i += 5
+                case "angle":
+                    angle = unwrap(tokens, i+1, "degree")
+                    angle_strength = unwrap(tokens, i+2, "float")
+                    i += 3
+                case "dihedral":
+                    dihedral = unwrap(tokens, i+1, "degree")
+                    if dihedral < 0. or dihedral > math.pi:
+                        raise TokenParseError(
+                            tokens[i+1],
+                            "Value must be between 0 and 180 degrees."
+                        )
+                    dihedral_depth = unwrap(tokens, i+2, "float")
+                    dihedral_width = unwrap(tokens, i+3, "float")
+                    i += 4
+                case _:
+                    raise TokenParseError(
+                        tokens[i],
+                        f"Unknown key {key}."
+                    )
+
+        # TODO defaults, so it's not all mandatory
+        mandatory = {"LJ_negate", "barrier", "well", "angle", "dihedral"}
+        remaining = mandatory - keys
+        if len(remaining) > 0:
+            raise ParseError(
+                f"Missing entries {remaining}."
+            )
+        system.custom_reactive.reactive_types[filter] = (
+            sigma, epsilon,
+            barrier_position, barrier_height, barrier_width,
+            well_position, well_depth, well_width, repulsive_strength,
+            angle, angle_strength,
+            dihedral, dihedral_depth, dihedral_width
+        )
+
+    p.add_level(
+        "reactive_types", process_reactive_type
+    )
+
+    def process_custom_reactive(tokens):
         nonlocal last_molecule
         # just a test for now, hardcoded constants
         index_type = last_molecule.index_type
         i = parse_pair(tokens, 0, index_type)
         j = parse_pair(tokens, 1, index_type)
         k = parse_pair(tokens, 2, index_type)
+
+        type = unwrap(tokens, 3, "word")
+        if type not in {"d", "a", "s"}:
+            raise TokenParseError(
+                tokens[3],
+                f"Must be one of {'d', 'a', 's'}, got {type}."
+                " d=donor, a=acceptor, s=symmetric."
+            )
+        filter = unwrap(tokens, 4, "word")
+        if system.custom_reactive.reactive_types.get(filter) is None:
+            raise TokenParseError(
+                tokens[4],
+                f"Undefined reactive type {filter}."
+                "Define it in [reactive_types] first."
+            )
+
         last_molecule.interactions.append((
-            system.custom_donor_acceptor, [i, j, k], []
+            system.custom_reactive, [i, j, k], [type, filter]
         ))
 
     p.add_level(
-        "custom_donor_acceptor", process_custom_donor_acceptor,
+        "reactive_group", process_custom_reactive,
         start=assert_last_molecule
     )
 

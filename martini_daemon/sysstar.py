@@ -44,7 +44,7 @@ from .vsites.center_of_mass import VSiteCenterOfMass
 from .forces.position_restraint import PositionRestraint
 from .reporters.reporter import Reporter
 # custom forces not in Gromacs
-from .forces.custom_donor_acceptor import CustomDonorAcceptor
+from .forces.custom_reactive import CustomReactive
 from .forces.periodic_gaussian import PeriodicGaussian
 
 
@@ -96,7 +96,7 @@ class SysStar():
         self.vsite_avg = VSiteWeighedAverage(self)
         self.vsite_com = VSiteCenterOfMass(self)
         # custom forces not in Gromacs
-        self.custom_donor_acceptor = CustomDonorAcceptor(self)
+        self.custom_reactive = CustomReactive(self)
         self.periodic_gaussian = PeriodicGaussian(self)
 
         nonbonded._sysstar = self
@@ -122,7 +122,7 @@ class SysStar():
             self.vsite_avg, self.vsite_3fad, self.vsite_3out, self.vsite_com,
             self.nonbonded_force, self.exclusions, self.pairs, self.cmap,
             # custom forces not in Gromacs
-            self.custom_donor_acceptor, self.periodic_gaussian
+            self.custom_reactive, self.periodic_gaussian
         ]
 
         # total list of filters

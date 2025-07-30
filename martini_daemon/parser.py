@@ -230,6 +230,7 @@ class Parser():
             cumulative = ""
             for i, line in enumerate(fhandle):
                 self._linenum = i
+                line = line.strip("\n\r")
                 # handle ignoring line endings
                 if len(line) > 0 and line[-1] == "\\":
                     cumulative += line[:-1]
