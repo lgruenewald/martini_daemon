@@ -42,10 +42,12 @@ class Reporter():
             self._handle.write(self._comp.compress(a))
         else:
             self._handle.write(a)
+        self._handle.flush()
 
     def _print(self, a):
         assert self._comp is None and self._mode == "w", "only use _print with uncompressed text modes"
         self._handle.write(a + "\n")
+        self._handle.flush()
 
     def __del__(self):
         self.finish()
