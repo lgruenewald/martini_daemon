@@ -90,15 +90,22 @@ class BondReporter(Reporter):
         self._write(bonds.tobytes())
 
 
-def read_bonds(path: str) -> list[np.ndarray]:
+def read_bonds(path: str, read_n_atoms=True) -> list[np.ndarray]:
     """
         Reads a file written by BondReporter.
-        Returns: frames - a list of frames, each frame containing a numpy
+        Returns: n_frames, n_atoms, frames
+        frames = a list of frames, each frame containing a numpy
         array of (n_bonds, 2) shape, where n_bonds can vary per frame.
+
+        set read_n_atoms to False when reading old bond reporter outputs.
     """
     data = read_compressed(path)
-    n_atoms, = struct.unpack("=Q", data[0:8])
-    frame_start = 8
+    if read_n_atoms:
+        n_atoms, = struct.unpack("=Q", data[0:8])
+        frame_start = 8
+    else:
+        n_atoms = 0
+        frame_start = 0
     frames = []
     while frame_start < len(data):
         n_bonds, = struct.unpack("=Q", data[frame_start:frame_start+8])

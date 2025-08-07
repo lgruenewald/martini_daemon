@@ -1,13 +1,10 @@
-"""Daemon Simulation object (prototype)
-the D/M algorithm + wrappers
-"""
-
 from .forces.nonbonded import NonBonded
 from .top_parser import DaemonTopFile
 from .meta import alias
 from .gro_file import read_gro
 from .utils import backup_try
 from .reporters.checkpoint_reporter import load_checkpoint
+from .components.reaction_sensitive_integrator import DaemonIntegrator
 import sys
 import openmm as mm
 import logging
@@ -136,6 +133,17 @@ class Simulation():
                 1.0 / mm.unit.picosecond,
                 0.02 * mm.unit.picosecond
             )
+        if issubclass(type(integrator), DaemonIntegrator):
+            self.daemon_integrator = True
+        elif issubclass(type(integrator), mm.Integrator):
+            self.daemon_integrator = False
+        else:
+            raise ValueError(
+                "The provided integrator should be an OpenMM integrator"
+                " or a DaemonIntegrator class instance, or None."
+                f"Got: {integrator}."
+            )
+        self.integrator = integrator
         if coupling is None:
             coupling = [
                 mm.MonteCarloBarostat(
@@ -329,6 +337,8 @@ class Simulation():
             if len(reactions) > 0:
                 self.logger.info("Modification start")
                 self.reactions += len(reactions)
+                if self.daemon_integrator:
+                    self.integrator.set_reactions(reactions)
                 self.top.modification(self.i, reactions)
                 self.logger.info("Modification finished")
             if len(reactions) > 0 or self.force_reinitialize:

@@ -77,17 +77,26 @@ can be done with the `taskset` command. For example,
 
 # Including reactions
 
-1. determine mechanism
+A rough workflow for adding a reaction consists of several steps.
+First, the desired reactions should be broken down to a
+mechanism, that can be modelled. For each mechanistic step,
+the reactant and product molecules should be parametrized in
+Martini. The difference between the two should be written
+down as a list of new interactions, as well as old interactions
+to break.
 
-2. parametrize reactant and product in mechanism
+Second, a graph for the reactant should be constructed.
 
-3. write down difference in terms of new bonds, angles... and broken bonds, angles...
 
 4. make a graph for the reactant
 
 5. check if the graph works
 
+Third, the reaction template should be made.
+
 6. make a reaction template
+
+Fourth, the setup should be tested.
 
 7. run simulation
 

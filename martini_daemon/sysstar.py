@@ -3,6 +3,7 @@ from openmm.app import XTCFile, Topology
 from openmm.unit import nanometer, picosecond, md_unit_system
 from .utils import backup_try
 from .gro_file import write_gro
+from .components.reaction_sensitive_integrator import DaemonIntegrator
 from collections import OrderedDict
 import numpy as np
 
@@ -145,7 +146,7 @@ class SysStar():
 
         self._system: None | mm.System = None
         self._context: None | mm.Context = None
-        self._integrator: None | mm.Integrator = None
+        self._integrator: None | mm.Integrator | DaemonIntegrator = None
 
     def save(self, f, box):
         """
@@ -299,10 +300,14 @@ class SysStar():
         ]
         self._periodic_box = pbv
         self._system.setDefaultPeriodicBoxVectors(*pbv)
+        if issubclass(type(integrator), DaemonIntegrator):
+            mm_integrator = integrator.get_integrator()
+        else:
+            mm_integrator = integrator
         match platform, params:
             case None, None:
                 self._context = mm.Context(
-                    self._system, integrator
+                    self._system, mm_integrator
                 )
             case None, params:
                 raise ValueError(
@@ -310,11 +315,11 @@ class SysStar():
                 )
             case platform, None:
                 self._context = mm.Context(
-                    self._system, integrator, platform
+                    self._system, mm_integrator, platform
                 )
             case platform, params:
                 self._context = mm.Context(
-                    self._system, integrator, platform, params
+                    self._system, mm_integrator, platform, params
                 )
         self._context.setPeriodicBoxVectors(*pbv)
 
