@@ -1,4 +1,3 @@
-- test custom forces
 - verify dihedral detection testing again
 - Modification testing
 - checkpoint testing + integrate save()/load() into constructors

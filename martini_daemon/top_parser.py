@@ -19,7 +19,8 @@ def DaemonTopFile(
     nlist_cutoff: float = 1.1,
     max_absolute_rate: float | None = None,
     rate_highest_probability: float = 1.0,
-    logger=None, respos=None
+    logger=None, respos=None,
+    experimental=False
 ) -> tuple[SysStar, TopStar]:
     """
     Parses a Martini Top file for Gromacs and generates T*, sys and top
@@ -48,6 +49,14 @@ def DaemonTopFile(
     last_molecule: Molecule | None = None
     last_graph: Graph | None = None
     last_reaction: ReactionTemplate | None = None
+
+    def this_is_experimental(tokens, index, feature):
+        if not experimental:
+            raise TokenParseError(
+                tokens[index],
+                f"{feature} are an experimental feature, it may not work correctly."
+                " To enable it, pass the argument experimental=True."
+            )
 
     # a list of parsers for each directive
     def parse_pair(tokens, id, filter) -> int | tuple[int, int]:
@@ -391,6 +400,9 @@ def DaemonTopFile(
                     (system.combined_bending_torsion, [i, j, k, L], params)
                 )
             case 101:
+                this_is_experimental(
+                    tokens, 4, "Periodic gaussian dihedrals"
+                )
                 # custom type - periodic gaussian
                 theta = unwrap(tokens, 5, "degree")
                 depth = unwrap(tokens, 6, "float")
@@ -450,6 +462,9 @@ def DaemonTopFile(
             )
 
     def process_pairtypes(tokens):
+        this_is_experimental(
+            tokens, 0, "Pairs"
+        )
         t1 = unwrap_atomtype(tokens, 0)
         t2 = unwrap_atomtype(tokens, 1)
         type = unwrap(tokens, 2, "int")
@@ -465,6 +480,9 @@ def DaemonTopFile(
     p.add_level("pairtypes", process_pairtypes)
 
     def process_pairs(tokens):
+        this_is_experimental(
+            tokens, 0, "Pairs"
+        )
         nonlocal last_molecule
         index_type = last_molecule.index_type
         i = parse_pair(tokens, 0, index_type)
@@ -489,6 +507,9 @@ def DaemonTopFile(
     p.add_level("pairs", process_pairs, start=assert_last_molecule)
 
     def process_cmaptypes(tokens):
+        this_is_experimental(
+            tokens, 0, "Cmaps"
+        )
         parts = [
             unwrap_atomtype(tokens, i) for i in range(5)
         ]
@@ -516,6 +537,9 @@ def DaemonTopFile(
     p.add_level("cmaptypes", process_cmaptypes)
 
     def process_cmap(tokens):
+        this_is_experimental(
+            tokens, 0, "Cmaps"
+        )
         nonlocal last_molecule
         index_type = last_molecule.index_type
         members = [
@@ -532,6 +556,9 @@ def DaemonTopFile(
     p.add_level("cmap", process_cmap, start=assert_last_molecule)
 
     def process_reactive_type(tokens):
+        this_is_experimental(
+            tokens, 0, "Custom reactive types"
+        )
         filter = unwrap(tokens, 0, "word")
 
         if system.custom_reactive.reactive_types.get(filter) is not None:
@@ -624,6 +651,9 @@ def DaemonTopFile(
     )
 
     def process_custom_reactive(tokens):
+        this_is_experimental(
+            tokens, 0, "Custom reactive types"
+        )
         nonlocal last_molecule
         # just a test for now, hardcoded constants
         index_type = last_molecule.index_type
@@ -1156,6 +1186,9 @@ def DaemonTopFile(
                         theta_min, math.tau
                     ))
             case "rate":
+                this_is_experimental(
+                    tokens, 0, "Relative rate control"
+                )
                 last_reaction.relative_rate = unwrap(tokens, 1, "positive")
             case _:
                 raise TokenParseError(

@@ -88,6 +88,7 @@ class TopStar():
         f.dump(self.neighbor_atom_map)
         f.dump(self.absolute_rate)
         f.dump(self.initial_molecules)
+        f.dump(self.respos)
 
         # unpicklable because they reference force
         f.dump(len(self.molecules))
@@ -114,6 +115,7 @@ class TopStar():
         self.neighbor_atom_map = f.load()
         self.absolute_rate = f.load()
         self.initial_molecules = f.load()
+        self.respos = f.load()
 
         for i in range(f.load()):
             k = f.load()

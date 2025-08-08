@@ -49,6 +49,7 @@ class Simulation():
         force_reinitialize: bool = False,
         max_absolute_rate: float | None = None,
         rate_highest_probability: float = 1.0,
+        experimental=False
     ):
         """
         Input topology and geometry can be either:
@@ -92,6 +93,7 @@ class Simulation():
         highest_probability -> 0 to 1., for every rate controlled reaction,
             the probability of being accepted can be scaled by a value
             affects the general speed of reactions in most cases
+        experimental -> whether to enable experimental features
         """
 
         # Self initialization
@@ -189,7 +191,8 @@ class Simulation():
                 max_absolute_rate=max_absolute_rate,
                 rate_highest_probability=rate_highest_probability,
                 logger=self.logger,
-                respos=respos
+                respos=respos,
+                experimental=experimental
             )
             if not ok:
                 # idk how to return error values from constructors

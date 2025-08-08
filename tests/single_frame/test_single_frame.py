@@ -50,13 +50,18 @@ class TestSingleFrame():
         # applies constraints and vsites and checks for position change
         platform = mm.Platform.getPlatformByName("Reference")
         _, respos, _ = read_gro(self.respos)
-        ok, res = DaemonTopFile(self.top, NonBonded(), respos=respos)
+        ok, res = DaemonTopFile(
+            self.top, NonBonded(), respos=respos,
+            experimental=True
+        )
         assert ok
         system, top = res
         box, pos, vel = read_gro(self.gro)
-        system.build_context(mm.VerletIntegrator(20 * femtosecond),
-                             box,
-                             platform=platform)
+        system.build_context(
+            mm.VerletIntegrator(20 * femtosecond),
+            box,
+            platform=platform
+        )
         system.set_positions(pos)
         system.apply_constraints()
         newpos = system.get_state().getPositions(asNumpy=True)\
@@ -72,13 +77,18 @@ class TestSingleFrame():
     def compare_daemon_gmx(self):
         platform = mm.Platform.getPlatformByName("Reference")
         _, respos, _ = read_gro(self.respos)
-        ok, res = DaemonTopFile(self.top, NonBonded(), respos=respos)
+        ok, res = DaemonTopFile(
+            self.top, NonBonded(), respos=respos,
+            experimental=True
+        )
         assert ok
         system, top = res
         box, pos, vel = read_gro(self.gro)
-        system.build_context(mm.VerletIntegrator(20 * femtosecond),
-                             box,
-                             platform=platform)
+        system.build_context(
+            mm.VerletIntegrator(20 * femtosecond),
+            box,
+            platform=platform
+        )
         system.set_positions(pos)
         state = system.get_state()
         energy = state.getPotentialEnergy().value_in_unit(kilojoule_per_mole)
