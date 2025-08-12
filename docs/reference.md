@@ -35,6 +35,7 @@ The following arguments can be provided:
 - `force_reinitialize` (bool) - only used for benchmarking, don't use in production simulations. If set to true, the OpenMM context is reinitialized every step.
 - `max_absolute_rate` (float) - if set, relative rate controlled reactions relative rate will be limited to this value. See the section on rate control for more details.
 - `rate_highest_probability` (float) - between 0.0 and 1.0, default 1.0. All rate controlled reactions will have the highest probability of this to succeed. See the section on rate control for more details.
+- `experimental` (bool) - if True, it enables features that are considered unfinished.
 
 Once the Simulation class is constructed, the following methods can be called:
 
@@ -54,11 +55,39 @@ not be aware of them.
 
 # Graphs
 
-- graph input description
+The `graph` directive contains the following possible lines,
+each starting with a specific keyword:
 
-- rough description of the algorithm
-  - eagerness
-  - only useful information for users
+- `name graph_name` - specify the graph name
+- `atom name name_filter type_filter` - mandatory atoms
+- `atom? name name_filter type_filter` - optional atoms
+- `atom! name name_filter type_filter` - forbidden atoms
+- `equivalent name1 name2 ...` - specify a group of atoms,
+which when exchanged, do not represent a different graph match
+- `<interaction_name> name1 name2 ...` - specify a group of atoms,
+which are connected by the interaction filter. See section about
+interaction filters for valid filters.
+
+Atom names can contain ASCII letters, numbers and underscores.
+Name and type filters can contain the following substrings:
+
+- alphanumeric characters and underscores will match specific strings
+- `*` for any strings (including empty strings)
+- `?` for any single character
+- `{123}` braces will match one of the characters included within them.
+
+An important property of the graph match algorithm, is that it is
+eager. If there is a more complete match possible, all partial matches
+will be ignored. This means, if an optional atom is present, there
+will not be a match for the graph without the optional atom. If a
+forbidden atom match is possible, the graph match without the
+forbidden atom will not be a valid match.
+
+Another important property of the graph match algorithm is that
+it is exhaustive. All possible matches in the system will be
+included in the fragment list. If there is symmetry in a molecule,
+all permutations will be separate matches, unless the equivalent
+keyword is used.
 
 ## Interaction filters
 
@@ -105,11 +134,30 @@ not be aware of them.
 - `pair` - only matches pairs
 - `cmap` - only matched cmap
 
-# Reaction templates
+# Reaction conditions
 
-- describe all options and syntax
+The possible reaction conditions are:
+
+- `r_max atom1 atom2 distance` - reactions above the maximum distance (in nm) will be rejected
+- `r_min atom1 atom2 distancce` - reactions below the minimum distance (in nm) will be rejected
+- `angle_not atom1 atom2 atom3 min max` - angles between min and max (in degrees) are rejected
+- `angle_min atom1 atom2 atom3 min` - angles below min (in degrees) are rejected
+- `angle_max atom1 atom2 atom3 max` - angles above max will be rejected
+- `angle_between atom1 atom2 atom3 min max` - angles not between min and max will be rejected
+- `dihedral_not atom1 atom2 atom3 atom4 min max` - dihedrals starting at min, ending at max (in degrees) will be rejected. Example, if min=10, max=20, dihedrals between 10 and 20 degrees get rejected. Note the order sensitivity. min=20, max=10 means that anything between 20 and 10 get rejected, which rejects the entire unit circle except between 10 and 20. It goes towards larger/more positive angles from min until max is reached on the unit circle.
+- `dihedral_between atom1 atom2 atom3 atom4 min max` - inverse of dihedral_not, if it is not between, it is rejected.
+- `rate rel_rate` - see the rate control prototype section
+
+Each condition is evaluated separately. A single failing condition will reject the
+reaction. This is important for considering angle and dihedral conditions, as they
+will combine in this way too. If one of the angle conditions rejects the reaction,
+the reaction is rejected. Important consideration: angles are between 0 and 180
+degrees. Dihedrals are in degrees and get converted to be within the same period first,
+so both -180 to 180 or 0 to 360 are valid ways to specify them.
 
 # Rate control prototype
+
+Note: the experimental flag has to be set to True currently to enable this.
 
 ## Simulation parameters
 
@@ -153,43 +201,35 @@ not be aware of them.
   - Note: for the slowest reaction, `absolute_rate` = `observed_rate`, therefore this probability will be 100% (unless `max_absolute_rate` is smaller)
   - for every other reaction, `observed_rate` is bigger than `absolute_rate`, by a factor that estimates the relative frequency of geometry conditions becoming true between the two reactions
 
-# Reporters
+# Martini Daemon and Martini
 
-- for each:
-  - API + if helper present, its API
-  - output format
-
-# Helpers
-
-- for each:
-  - API
-  - explanation
-
-# OpenMM and Martini Daemon
-
-- currently implemented subset of Martini
+Currently, Martini Daemon implements a subset of what is possible in Gromacs topology
+input files. It is the hope, that most of the things relevant for Martini simulations
+are supported. Common things required for All Atom simulations are not supported.
+However, even with Martini simulations, there are common missing things, and
+there are some gotchas, some of which are described here.
 
 ## Periodic boundary condition
 
-The OpenMM FAQ describes how OpenMM handles periodic boundary conditions at https://github.com/openmm/openmm/wiki/Frequently-Asked-Questions. This is not quite true for Martini Daemon simulations.
+The OpenMM FAQ describes how OpenMM handles periodic boundary conditions at https://github.com/openmm/openmm/wiki/Frequently-Asked-Questions. This is not quite true for Martini Daemon simulations. This is how Martini Daemon handles the periodic boundary condition:
 
-TODO
+- Bonds, angles, etc. all have the usesPeriodicBoundaryCondition set to True, therefore they can be split in the input geometry file across the PBC.
+- Internally, OpenMM lets things "flow" out of the periodic box, but this is not a problem - during reactions, there is no PBC whole step required for e.g. bonds, since all the forces are pbc aware.
+- Contraints and Vsites are not possible to make PBC aware in OpenMM, so they are fixed from the start of the simulation, and it is assumed that the input geometry file does not contain constraints and vsites split across the PBC.
+- All particles are put back within the PBC box on their own when writing output geometries (xtc/gro), the user should PBC whole it themselves if required (using e.g. mdvwhole).
 
 # Limitations
 
-The number of particles cannot be changed during reactions.
-
-Constraints and virtual sites cannot be created or removed during
+- The number of particles cannot be changed during reactions.
+- Constraints and virtual sites cannot be created or removed during
 reactions. Cannot be created because of periodic boundary conditions
 inside openmm. In theory to support adding, the molecules would need
 to be made whole across the pbc first. To support removal, the
 indexing would need to be kept track of too. Currently the parameters
 for them also cannot be changed, as parameter changes are done using
 removal and readding currently.
-
-Fragments that overlap can't react.
-
-There is no checking for duplicate exclusions created between two
+- Fragments that overlap can't react.
+- There is no checking for duplicate exclusions created between two
 particles during reactions. If a reaction adds an exclusion (or a
 bond that excludes) during a reaction between two atoms that are
 already excluded (possibly through a bond), OpenMM will raise an
@@ -197,27 +237,36 @@ exception. Don't just add bonds to pairs of atoms already bonded.
 Exclusions are deduplicated within the same moleculetype or same
 reaction, though, so adding multiple bonds at once or excluding a
 bonded pair of atoms is fine.
-
-Reaction constraints and product interactions specified by the user
+- Reaction constraints and product interactions specified by the user
 should lead to forces during bond formation that maintain the
 numerical stability of the system, and it's the user's responsibility
 to ensure this.
-
-Center of Mass virtual sites will not change parameters if the
+- Center of Mass virtual sites will not change parameters if the
 constructing particle mass changes during a reaction.
-
-Only periodic boxes with 90 degree angles are supported.
-
-# Known bugs
-
-Pairs and CMAP are broken.
+- Only periodic boxes with 90 degree angles are supported.
 
 # Programmer's guide
 
 ## Code overview
 
-- a few sentences about each file or folder
+A brief description of the main components / source code files and their purpose is given
+in this section.
 
-## Adding new forces
-
-## Adding new reaction conditions
+- `simulation.py` - main API and some of the high level logic
+- `parser.py` - a generic Gromacs .top style input file parser
+- `top_parser.py` - a specific Gromacs .top parser, including the Martini Daemon additions
+- `sysstar.py` - Bookkeeping containing the OpenMM system, Context, list of atoms and list of forces
+- `forces/` - Each OpenMM Force in the system is wrapped in a child class of `forces/force.py`
+- `vsites/` - Each VSite type is wrapped in a child class of `vsites/vsite.py`
+- `topstar.py`
+- `utils.pyx` - helpers, mainly for PBC handling
+- `detection.pyx` - detection algorithm
+- `graph.py` - Graph class and matching algorithm
+- `topstar.py` - Reaction template and fragment information collection class, also contains `instantiate()` which is relied on when building the system initially. Also contains the modification algorithm. Could be split up in the future in theory as it has too many responsibilities.
+- `gro_file.py` - .gro format reader/writer
+- `fragment.py` - Fragment dataclass
+- `molecule.py` - represents a `[moleculetype]`, which is converted into just a list of atoms and forces when reaching the `[molecules]` directive using `instantiate()`.
+- `meta.py` - python metaprogramming helpers
+- `reporters/` - list of reporters, each inheriting `reporter.py`, which handles the automatic closing of files, backing them up and compression, if specified
+- `helpers/` - analysis and visualization helpers
+- `components/` - other components, currently just a special integrator type

@@ -1,3 +1,4 @@
+- proofread+improve docs, add more about helpers and reporters + more about examples
 - verify dihedral detection testing again
 - Modification testing
 - checkpoint testing + integrate save()/load() into constructors

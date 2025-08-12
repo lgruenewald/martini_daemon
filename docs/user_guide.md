@@ -242,6 +242,43 @@ from martini_daemon.reporters.topstar import ReactionReporter
 Then, it has to be constructed and added to the list of reporters within the simulation.
 This reporter also adds a cumulative reaction counter to the CLI during the simulation.
 
+# Specific simulation requirements
+
+It is possible to temporarily reduce the timestep of the simulation after reactions,
+if required using "reaction sensitive" integrators. See example for below.
+
+```
+#!/usr/bin/env python3
+
+from martini_daemon import simulation
+from martini_daemon.reporters.bond_reporter import BondReporter
+from martini_daemon.reporters.topstar import ReactionReporter
+from martini_daemon.components.reaction_sensitive_integrator import ReactionSensitiveLangevinIntegrator
+
+sim = simulation.Simulation(
+    top_path="system.top", gro_path="system.gro",
+    sim_name="out",
+    reporters=[
+        BondReporter(),
+        ReactionReporter(molid=True),
+    ],
+    md_steps=100000000, dm_frequency=100,
+    xtc_frequency=5000,
+    # 0.02 ps timestep, 298 K, 1 ps^-1 friction
+    # subdivision of 4, for 5 timesteps
+    integrator=ReactionSensitiveLangevinIntegrator(0.02, 298, 1., 4, 5),
+)
+sim.minimize_energy()
+sim.generate_velocities(300)
+sim.simulate()
+```
+
+The subdivision has to be a positive integer. During the short equilibration, each
+timestep is divided into this many sub-time steps. In this example, this means 5 fs
+timesteps. The number of steps in this example is 5, which get divided into 20 fs timesteps. It is ensured, that XTC frames remain evenly spaced, regradless whether there are reactions happening.
+
+Using this may have a performance impact, so it is recommended to try to specify reaction conditions that do not require this short post-reaction equilibration.
+
 # Reporting
 
 There are various other reporters which can be useful worth mentioning briefly
