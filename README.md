@@ -1,10 +1,10 @@
 # Martini Daemon
 
-Readme last updated: July 21 2025
+Martini Daemon is a tool facilitating template based chemical reactions in MD simulations with the [Martini force field](https://cgmartini.nl/) and the [OpenMM](https://openmm.org/) MD engine.
 
 ### Installation
 
-Pre-requisite: install the right version of OpenMM with support for your GPU
+Pre-requisite: install the right version of OpenMM with support for your GPU and install `git-lfs`.
 
 1. Clone the repository
 2. (optional) switch to the desired branch, tag or commit
@@ -14,14 +14,15 @@ Pre-requisite: install the right version of OpenMM with support for your GPU
 
 ## Docs
 
-You can find the User guide (`user_guide.md`) and Reference
-(`reference.md`) here.
+Currently, there is a User Guide and a Reference Guide in the wiki section of this Github repository.
+
+If any questions remain, feel free to open an Issue, so that we can help and also extend the documentation where necessary.
 
 ## Examples
 
-Example systems built with martini_daemon can be found here. The README in
-every example directory should provide further information about each
-system.
+Example systems built with martini_daemon can be found here.
+The README in every example directory should provide further
+information about each system.
 
 ## Tests
 
