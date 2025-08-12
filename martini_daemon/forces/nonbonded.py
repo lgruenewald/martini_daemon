@@ -1,6 +1,5 @@
 from __future__ import annotations
 import openmm as mm
-from openmm.unit import nanometer
 from .force import Force, Interaction
 from collections import OrderedDict
 
@@ -12,25 +11,23 @@ class NonBonded(Force):
     NB force, self exclusion force, exclusions and atomtypes.
     """
 
-    """Non bonded parameters are for building the C6/C12 table
-    values are (type1: string, type2: string), (V: float, W: float)
-    """
-    _nb_types: dict[(str, str), (float, float)]
-    _used_atom_types: OrderedDict[str, int]
-    _exclusions: ExclusionHelper
-    _rebuild: bool
-    _force_obj: mm.Force
+    def __init__(self, epsilon_r=15.0, cutoff_nm=1.1):
+        self.epsilon_r = epsilon_r
+        self.cutoff_nm = cutoff_nm
+        self._rebuild: bool = True
+        self._force_obj: None | mm.Force = None
+        self._used_atom_types: OrderedDict[str, int] = {}
+        self._nb_types: dict[tuple[str, str], tuple[float, float]] = {}
+        self._exclusions: None | ExclusionHelper = None
+        self._list = None
 
-    def __init__(self, sysstar):
-        self._sysstar = sysstar
-        self._rebuild = True
-        self._force_obj = None
-        self._used_atom_types = {}
-        self._nb_types = {}
-        self._exclusions = ExclusionHelper(self, sysstar)
+    def get_exclusion_helper(self):
+        """Called by S* before anything else is done with this class."""
+        self._exclusions = ExclusionHelper(self, self._sysstar)
+        return self._exclusions
 
-    def add(self, *params):
-        """Particle types are listed in S*, not here"""
+    def add(self, members, params):
+        """Atom types are listed in S*, not here"""
         raise NotImplementedError
 
     def get_members(self, i):
@@ -41,38 +38,38 @@ class NonBonded(Force):
         """Non bonded force, so invalid"""
         raise NotImplementedError
 
-    def update_params(self, i, part_type, charge, charge_changed):
-        part_type_id = self.use_atom_type(part_type)
-        self._force_obj.setParticleParameters(i, [part_type_id, charge])
+    def update_params(self, i, atom_type, charge, charge_changed):
+        atom_type_id = self.use_atom_type(atom_type)
+        self._force_obj.setParticleParameters(i, [atom_type_id, charge])
+        # TODO LJ type change event?
         self._sysstar.pairs._rebuild = True
+        self._sysstar.cmap._rebuild = True
         if charge_changed:
-            self._es_force._rebuild = True
+            self._exclusions._rebuild = True
 
     def _build(self):
         self._force_obj = mm.CustomNonbondedForce(
             "step(rcut-r)*(LJ - corr + ES);"
-            "LJ = (W(type1, type2) / r^12 - V(type1, type2) / r^6);"
-            "corr = (W(type1, type2) / rcut^12 - V(type1, type2) / rcut^6);"
+            "LJ = (C12(type1, type2) / r^12 - C6(type1, type2) / r^6);"
+            "corr = (C12(type1, type2) / rcut^12 - C6(type1, type2) / rcut^6);"
             "ES = f/epsilon_r*q1*q2 * (1/r + krf * r^2 - crf);"
             "crf = 1 / rcut + krf * rcut^2;"
             "krf = 1 / (2 * rcut^3);"
-            f"epsilon_r = {self._sysstar.epsilon_r};"
+            f"epsilon_r = {self.epsilon_r};"
             "f = 138.935458;"
-            f"rcut={self._sysstar.nonbonded_cutoff.value_in_unit(nanometer)};"
+            f"rcut={self.cutoff_nm};"
         )
         self._force_obj.addPerParticleParameter("type")
         self._force_obj.addPerParticleParameter("q")
         self._force_obj.setNonbondedMethod(
             mm.CustomNonbondedForce.CutoffPeriodic
         )
-        self._force_obj.setCutoffDistance(
-            self._sysstar.nonbonded_cutoff.value_in_unit(nanometer)
-        )
+        self._force_obj.setCutoffDistance(self.cutoff_nm)
 
-        for i in range(self._sysstar.len_particles()):
-            type, charge, _ = self._sysstar.get_particle_details(i)
-            part_type_id = self.use_atom_type(type)
-            self._force_obj.addParticle([part_type_id, charge])
+        for i in range(self._sysstar.len_atoms()):
+            type, charge, _ = self._sysstar.get_atom_details(i)
+            atom_type_id = self.use_atom_type(type)
+            self._force_obj.addParticle([atom_type_id, charge])
 
         for (i, j) in filter(None, self._exclusions._list):
             self._force_obj.addExclusion(i, j)
@@ -84,18 +81,20 @@ class NonBonded(Force):
         n = len(self._used_atom_types)
         for t1, i in self._used_atom_types.items():
             for t2, j in self._used_atom_types.items():
-                nb_params = self._nb_types.get((t1, t2)) or\
-                            self._nb_types.get((t2, t1)) or (0., 0.)
-                V, W = nb_params
-                c6 = 4 * W * (V ** 6)
-                c12 = 4 * W * (V ** 12)
+                sigma, epsilon = (
+                    self._nb_types.get((t1, t2))
+                    or self._nb_types.get((t2, t1))
+                    or (0., 0.)
+                )
+                c6 = 4 * epsilon * (sigma ** 6)
+                c12 = 4 * epsilon * (sigma ** 12)
                 C6.append(c6)
                 C12.append(c12)
         self._force_obj.addTabulatedFunction(
-            "V", mm.Discrete2DFunction(n, n, C6)
+            "C6", mm.Discrete2DFunction(n, n, C6)
         )
         self._force_obj.addTabulatedFunction(
-            "W", mm.Discrete2DFunction(n, n, C12)
+            "C12", mm.Discrete2DFunction(n, n, C12)
         )
 
     def build(self):
@@ -120,25 +119,31 @@ class NonBonded(Force):
                 return True
         return False
 
-    def _interaction(self):
-        raise NotImplementedError
-
-    def get_exclusion_helper(self):
-        return self._exclusions
-
-    def use_atom_type(self, part_type):
+    def use_atom_type(self, atom_type):
         """Add new atom types for LJ.
 
         It is not a problem to call this with atom types already present.
 
         Returns the atom type index
         """
-        id = self._used_atom_types.get(part_type)
+        id = self._used_atom_types.get(atom_type)
         if id is None:
             id = len(self._used_atom_types)
-            self._used_atom_types[part_type] = id
+            self._used_atom_types[atom_type] = id
             self._rebuild = True
         return id
+
+    def _additional_save(self, f):
+        f.dump(self.epsilon_r)
+        f.dump(self.cutoff_nm)
+        f.dump(self._nb_types)
+        f.dump(self._used_atom_types)
+
+    def _additional_load(self, f):
+        self.epsilon_r = f.load()
+        self.cutoff_nm = f.load()
+        self._nb_types = f.load()
+        self._used_atom_types = f.load()
 
 
 class ExclusionHelper(Force):
@@ -153,11 +158,7 @@ class ExclusionHelper(Force):
     See:
     https://manual.gromacs.org/documentation/current/reference-manual/functions/nonbonded-interactions.html
     """
-    # TODO is a dict based approach better, then duplicate additions of
-    # exclusions could return the same one
-    # does returning an existing exclusion create any problems? what if that
-    # exclusion gets removed in a reaction?
-    _list: list[(int, int)]
+    _list: list[tuple[int, int]]
     _nb: NonBonded
     _rebuild: bool
     _force_obj: mm.Force
@@ -170,8 +171,8 @@ class ExclusionHelper(Force):
         self._force_obj = None
 
     def es_self_correction_add(self, i, j):
-        _, q1, _ = self._sysstar.get_particle_details(i)
-        _, q2, _ = self._sysstar.get_particle_details(j)
+        _, q1, _ = self._sysstar.get_atom_details(i)
+        _, q2, _ = self._sysstar.get_atom_details(j)
         qprod = q1 * q2
         if i == j:
             qprod *= 0.5
@@ -186,14 +187,14 @@ class ExclusionHelper(Force):
             f"ES = f*q_product/epsilon_r * (krf * r^2 - crf);"
             f"crf = 1 / rcut + krf * rcut^2;"
             f"krf = 1 / (2 * rcut^3);"
-            f"epsilon_r = {self._sysstar.epsilon_r};"
+            f"epsilon_r = {self._nb.epsilon_r};"
             f"f = 138.935458;"
-            f"rcut={self._sysstar.nonbonded_cutoff.value_in_unit(nanometer)};"
+            f"rcut={self._nb.cutoff_nm};"
         )
         self._force_obj.addPerBondParameter("q_product")
         self._force_obj.setUsesPeriodicBoundaryConditions(True)
-        for i in range(self._sysstar.len_particles()):
-            _, charge, _ = self._sysstar.get_particle_details(i)
+        for i in range(self._sysstar.len_atoms()):
+            _, charge, _ = self._sysstar.get_atom_details(i)
             if charge != 0:
                 # self term in reaction field correction
                 self.es_self_correction_add(i, i)
@@ -209,13 +210,10 @@ class ExclusionHelper(Force):
             self._nb._force_obj.addExclusion(i, j)
             self._sysstar._reinitialize = True
 
-        return self._interaction()
+        return Interaction(self, len(self._list) - 1)
 
     def get_members(self, i):
         return self._list[i]
-
-    def update_params(self, i, *params):
-        raise NotImplementedError
 
     def remove(self, i):
         self._list[i] = None
@@ -245,6 +243,3 @@ class ExclusionHelper(Force):
                 self._sysstar._reinitialize = True
                 return True
         return False
-
-    def _interaction(self):
-        return Interaction(self, len(self._list) - 1)

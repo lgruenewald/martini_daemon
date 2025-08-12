@@ -1,8 +1,0 @@
-#include "../martini_v3.0.0.itp"
-#include "dimer.itp"
-
-[ system ]
-BDT dimer CG
-
-[ molecules ]
-DIM 1

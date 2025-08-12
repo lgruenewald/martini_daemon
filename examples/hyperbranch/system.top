@@ -1,0 +1,14 @@
+#include "../../itp/martini_v3.0.0.itp"
+#include "../../itp/martini_v3.0.0_solvents_v1.itp"
+#include "hyperbranch.itp"
+#ifdef DAEMON
+#include "hyperbranch.rx"
+#endif
+
+[ system ]
+polysmart test case 2
+
+[ molecules ]
+DBH 2500
+DHBA 2500
+DMF 5000

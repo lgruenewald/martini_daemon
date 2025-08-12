@@ -1,0 +1,8 @@
+# frame,reaction_name;reactant1_name,reactant1_id,atoms...;reactantn_id,reactantn_id,atoms...
+0,coh_nco_bond;coh_end,145,1112,1113,-1;nco_end,88,406,407,-1
+0,coh_nco_bond;coh_end,160,1480,1481,-1;nco_end,100,470,469,-1
+0,coh_nco_bond;coh_end,175,1847,1846,-1;nco_end,14,56,57,-1
+0,coh_nco_bond;coh_end,185,2032,2033,-1;nco_end,66,321,320,-1
+0,coh_nco_bond;coh_end,192,2216,2217,-1;nco_end,70,330,329,-1
+0,coh_nco_bond;coh_end,211,2675,2674,-1;nco_end,65,307,306,-1
+0,coh_nco_bond;coh_end,216,2768,2769,-1;nco_end,20,92,91,-1

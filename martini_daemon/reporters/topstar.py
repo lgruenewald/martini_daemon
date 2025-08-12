@@ -1,63 +1,128 @@
 from .reporter import Reporter
-from ..utils import backup_try
+from ..helpers.monomer import generate_mapping
 
 
 class TopStarLogger(Reporter):
     """A reporter that dumps the state of T* after every modification algorithm
-    run to topstar.log. Useful for debugging.
+    run to <name>.toplog. Useful for debugging.
     """
 
-    def init(self):
-        backup_try("topstar.log")
-        self.post_modification(-1)
+    def init_dm(self, name):
+        self._open(name + ".toplog")
 
-    def post_modification(self, i):
-        with open("topstar.log", "a") as file:
-            print(f"===== Frame {i} =====", file=file)
-            print("==== TopStar / Fragment Types ====", file=file)
-            for k, molfrag in self._topstar.type_lookup.items():
-                file.write(f"{k} ")
-            file.write("\n")
-            print("==== TopStar / ReactionTemplates ====", file=file)
-            for rx in self._topstar.reaction_list:
-                print(f"rx {rx.name} reactants {rx.reactants} products {rx.products}", file=file)
-            print("==== TopStar / Fragments ====", file=file)
-            for id, frag in self._topstar.frag_list.items():
-                print(f"{id}: <frag {frag.name} ps {frag.particles}>", file=file)
-            print("==== TopStar / defrag list ====", file=file)
-            for id, defrag in enumerate(self._topstar.defrag_list):
-                print(f"particle {id} is in fragments {defrag}", file=file)
-            print("==== TopStar / Interaction list ====", file=file)
-            for id, inter in enumerate(self._topstar.interaction_list):
-                print(f"particle {id} is in interactions {inter}", file=file)
+    def pre_detection(self, i, name) -> None:
+        # first ever frame
+        if i == 0:
+            self.post_modification(i, name)
+
+    def post_modification(self, i, name) -> None:
+        topstar = self._topstar
+        self._print(f"===== Frame {i} =====")
+        self._print("==== TopStar / Molecules ====")
+        for k, molfrag in topstar.molecules.items():
+            self._write(f"{k} ")
+        self._write("\n")
+        self._print("==== TopStar / Graphs ====")
+        for g in topstar.graphs.values():
+            self._write(f"{g.name}: ({[name for (name, _, _, _) in g.atoms]}) ")
+        self._write("\n")
+        self._print("==== TopStar / ReactionTemplates ====")
+        for _, rl in topstar.reactions.items():
+            for rx in rl:
+                self._print(f"rx {rx.name} reactants {rx.reactants}")
+        self._print("==== TopStar / Fragments ====")
+        for id, frag in topstar.frag_list.items():
+            self._print(f"{id}: <frag {frag.name} ps {frag.atoms}>")
+        self._print("==== TopStar / defrag list ====")
+        for id, defrag in enumerate(topstar.defrag_list):
+            self._print(f"atom {id} is in fragments {defrag}")
+            if id > 100:
+                break
 
 
 class ReactionReporter(Reporter):
-    """A reporter that reports all reactions to reactions.log"""
+    """A reporter that reports all reactions to <name>.reactions"""
 
-    def init(self):
-        backup_try("reactions.log")
+    def __init__(self, molid=False):
+        """
+        A reporter that reports all reactions to <name>.reactions.
 
-    def pre_modification(self, reactions, i):
-        with open("reactions.log", "a") as file:
-            print(f"Frame {i}", file=file)
-            for (frags, rx) in reactions:
-                frags = [(frag.name, frag.frag_id, frag.particles) for frag in frags]
-                print(
-                    f"Reaction {rx.name} reactants {frags}",
-                    file=file
-                )
+        The created file has a text format, where every line is a reaction.
+        First, the frame number and reaction name are separated by a comma,
+        then, each reactant is separated by a semicolon. Each reactant
+        will have its frag name, internal frag id, and atom indices
+        (-1 for missing optional or forbidden atoms) printed.
+
+        Example:
+        frame,reaction_name;reactant1_name,reactant1_id,atoms...;...reactantn_name,reactantn_id,atoms...
+
+        If molid is True, additionally the indices of initial molecules
+        (see helpers/monomer) are printed in parentheses, prefixed with mol:
+        after reactant IDs, before atoms.
+
+        Example:
+        frame,reaction_name;reactant1_name,reactant1_id(mol:molid1,...molidn),atoms...;...reactantn_name,reactantn_id(mol:molid1,...molidn),atoms...
+        """
+        self.molid = molid
+
+    def init_dm(self, name):
+        if self.molid:
+            _, _, self.mapping = generate_mapping(self._topstar.initial_molecules)
+        self._open(name + ".reactions")
+        if not self.molid:
+            self._print(
+                "# frame,reaction_name;"
+                "reactant1_name,reactant1_id,atoms...;..."
+                "reactantn_name,reactantn_id,atoms..."
+            )
+        else:
+            self._print(
+
+                "# frame,reaction_name;"
+                "reactant1_name,reactant1_id(mol:molid1,...molidn),atoms...;..."
+                "reactantn_name,reactantn_id(mol:molid1,...molidn),atoms...;"
+            )
+
+    def get_molids(self, atoms):
+        if not self.molid:
+            return ""
+        mols = set()
+        for atom in atoms:
+            if atom != -1:
+                mols.add(f"{self.mapping[atom]}")
+        return "(mol:" + ",".join(mols) + ")"
+
+    def pre_modification(self, i, reactions, name) -> None:
+        for (frags, rx) in reactions:
+            self._print(
+                f"{i},{rx.name};"
+                + ";".join([
+                    f"{frag.name},{frag.frag_id}"
+                    f"{self.get_molids(frag.atoms)},"
+                    + ",".join([
+                        f"{atom}"
+                        for atom in frag.atoms
+                    ])
+                    for frag in frags
+                ])
+            )
+
+    def interactive_line(self) -> str:
+        return f"reactions: {self._simulation.reactions}"
 
 
 class FragCountReporter(Reporter):
     """A reporter that logs the number of all fragments in T* at a given time
-    to fragment_counts.log"""
+    to <name>.frags"""
 
-    def init(self):
-        backup_try("fragment_counts.log")
+    def init_dm(self, name):
+        self._open(name + ".frags")
 
-    def pre_detection(self, i):
-        with open("fragment_counts.log", "a") as file:
-            init_map = self._topstar.get_init_map()
-            counts = [f"{key}: {len(values)}" for key, values in init_map.items()]
-            print(f"Frame {i} {counts}", file=file)
+    def pre_detection(self, i, name) -> None:
+        data = ",".join(
+            [f"{k}:{v}" for k, v in self._topstar.frag_counts.items()]
+        )
+        self._print(f"Frame:{i},{data}")
+
+    def interactive_line(self) -> str:
+        return f"fragments: {len(self._topstar.frag_list)}"

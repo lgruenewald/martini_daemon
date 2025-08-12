@@ -3,33 +3,18 @@ import openmm as mm
 
 
 class MorseBond(Force):
-    """All morse bonds in the system
-    indices are called bond_id
-    values are (i: part_id, j: part_id, length, D, beta: float)"""
+    _members = 2
 
-    visualize_as_bond = True
-
-    def _build(self):
+    def _set_force_obj(self):
         self._force_obj = mm.CustomBondForce(
             "D * (1 - exp(-beta * (r - b)))^2"
         )
         self._force_obj.addPerBondParameter("b")  # equilibrium length
         self._force_obj.addPerBondParameter("D")  # force constant
         self._force_obj.addPerBondParameter("beta")  # cubic force constant
-        for (i, j, length, D, beta) in filter(None, self._list):
-            self._force_obj.addBond(i, j, [length, D, beta])
 
-    def add(self, i, j, length, D, beta):
-        self._list.append((i, j, length, D, beta))
-        if not self._rebuild:
-            self._force_obj.addBond(i, j, [length, D, beta])
-            self._sysstar._reinitialize = True
-        return self._interaction()
+    def _add_to_force_obj(self, params):
+        i, j, length, D, beta = params
+        self._force_obj.addBond(i, j, [length, D, beta])
 
-    def get_members(self, id):
-        i, j, *_ = self._list[id]
-        return [i, j]
-
-    def update_params(self, id, length, kb, kcub):
-        raise NotImplementedError
-
+    _filters = {"bond", "morse_bond"}

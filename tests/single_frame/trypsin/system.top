@@ -1,0 +1,13 @@
+#include "../../../itp/martini_v3.0.0.itp"
+#include "trypsin.itp"
+#include "../../../itp/martini_v3.0.0_solvents_v1.itp"
+#include "../../../itp/martini_v3.0.0_ions_v1.itp"
+
+[ system ]
+Trypsin
+
+[ molecules ]
+Trypsin    1
+NA 48
+CL 36
+W 2515

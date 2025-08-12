@@ -1,0 +1,5 @@
+An equilibrated box with a coarse grained (elastic network) trypsin with
+position restraints.
+
+posres.gro contains the position restraint coordinates, and they are
+slightly displaced manually (compared to system.gro) for a few atoms.

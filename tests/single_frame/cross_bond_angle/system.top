@@ -1,0 +1,20 @@
+#include "../../../itp/martini_v3.0.0.itp"
+
+[ moleculetype ] 
+XX 1 
+
+[ atoms ]
+  1 TC5   1 XX XX1    1 0.0  60.0
+  2 TC5   1 XX XX2    2 0.0  60.0
+  3 TC5   1 XX XX3    3 0.0  60.0
+ 
+[ bonds ]
+
+[ angles ]
+  1 2 3  4 0.3 0.1 0.2 1000
+
+[ system ]
+Angle type 4 test
+
+[ molecules ]
+XX 1

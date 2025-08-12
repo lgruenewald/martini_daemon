@@ -1,0 +1,36 @@
+[ frag ]
+name coh_end
+atom 1 COH TP2
+atom 2 COC SN3r
+bond 1 2
+atom! 3 NCO *
+bond 1 3
+
+[ frag ]
+name nco_end
+atom 1 NCO SP3a
+atom 2 CC1 TC2
+bond 1 2
+atom! 3 COH *
+bond 1 3
+
+[ reaction ]
+coh_nco_bond
+[ reactants ]
+coh_end nco_end
+[ conditions ]
+r_max 1:1 2:1 0.4
+angle_between 2:2 2:1 1:1 120 160
+angle_between 1:2 1:1 2:1 100 140
+
+[ retype ]
+1:1 TN3
+2:1 SP4
+
+[ bonds ]
+  1:1 2:1   1   0.300  15000
+
+[ angles ]
+  2:2 2:1 1:1   2    140   100
+  1:2 1:1 2:1   2    120   80
+

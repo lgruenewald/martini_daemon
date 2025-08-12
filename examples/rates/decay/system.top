@@ -1,0 +1,9 @@
+#include "../../../itp/martini_v3.0.0.itp"
+#include "rates.itp"
+
+[system]
+radioactive decay chain
+
+[molecules]
+U 29000
+W 289

@@ -1,0 +1,8 @@
+#include "../../../itp/martini_v3.0.0.itp"
+#include "triangle.itp"
+
+[ system ]
+abc triangle test
+
+[ molecules ]
+triangle 1

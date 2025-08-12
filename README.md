@@ -1,36 +1,32 @@
 # Martini Daemon
 
-Readme last updated: Jan 30 2025
-
-First prototype version of martini_daemon.
+Martini Daemon is a tool facilitating template based chemical reactions in MD simulations with the [Martini force field](https://cgmartini.nl/) and the [OpenMM](https://openmm.org/) MD engine.
 
 ### Installation
 
+Pre-requisite: install the right version of OpenMM with support for your GPU and install `git-lfs`.
+
 1. Clone the repository
-2. Install with `pip install .` in the root directory of this repo, where `setup.py` is located.
-
-## Tests
-
-Single point energy and force calculation tests, that verify
-that Martini is implemented correctly by comparing it to GROMACS energies.
-
-The README in every test directory should talk about what every test is
-actually testing.
-
-## Examples
-
-Example systems built with martini_daemon can be found here. The README in
-every example directory should provide further information about each
-system.
+2. (optional) switch to the desired branch, tag or commit
+3. (optional) activate the desired conda, mamba or venv environment
+4. Install with `pip install .` in the root directory of this repo,
+   where `pyproject.toml` is located.
 
 ## Docs
 
-Currently contains three documents:
+Currently, there is a User Guide and a Reference Guide in the wiki section of this Github repository.
 
-- `architecure.md` discussing how daemon works internally
-- `file_formats.md` discussing the format of input files
-- `api.md` discussing the python API
+If any questions remain, feel free to open an Issue, so that we can help and also extend the documentation where necessary.
 
-## Experiments
+## Examples
 
-- Proof of concepts go here
+Example systems built with martini_daemon can be found here.
+The README in every example directory should provide further
+information about each system.
+
+## Tests
+
+- `single_frame` - single point energy and force calculation tests, that verify
+  that Martini is implemented correctly by comparing it to GROMACS energies.
+- `graph` - tests for the graph matching algorithm
+- `detection` - tests for the detection algorithm

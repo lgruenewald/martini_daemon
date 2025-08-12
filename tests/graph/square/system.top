@@ -1,0 +1,34 @@
+#include "../../../itp/martini_v3.0.0.itp"
+
+[ moleculetype ]
+XX 1
+
+[ atoms ]
+1 TC5 1 XX aa 1 0.0 60.0
+2 TC4 1 XX bb 2 0.0 60.0
+3 TC5 1 XX cc 3 0.0 60.0
+4 TC4 1 XX dd 4 0.0 60.0
+
+[ bonds ]
+1 2 1 1.0 1.0
+2 3 1 1.0 1.0
+3 4 1 1.0 1.0
+1 4 1 1.0 1.0
+
+[ frag ]
+name aa
+atom 1 * *
+atom 2 * *
+bond 1 2
+
+; without a rx fragments never actually get added to the system (optimization)
+[ rx ]
+placeholder
+[ reactants ]
+aa
+
+[ system ]
+Bond matching graph
+
+[ molecules ]
+XX 1

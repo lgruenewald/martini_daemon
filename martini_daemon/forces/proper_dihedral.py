@@ -3,26 +3,13 @@ import openmm as mm
 
 
 class ProperDihedral(Force):
-    """All the proper dihedrals in the system
-    indices are called proper_dihedral_id
-    values are (i: part_id, j: part_id, k: part_id, l: part_id,
-     theta: float, force: float, multiplicity: int)"""
+    _members = 4
 
-    def _build(self):
+    def _set_force_obj(self):
         self._force_obj = mm.PeriodicTorsionForce()
-        for (i, j, k, l, theta, force, mult) in filter(None, self._list):
-            self._force_obj.addTorsion(i, j, k, l, mult, theta, force)
 
-    def add(self, i, j, k, l, theta, force, mult):
-        self._list.append((i, j, k, l, theta, force, mult))
-        if not self._rebuild:
-            self._force_obj.addTorsion(i, j, k, l, mult, theta, force)
-            self._sysstar._reinitialize = True
-        return self._interaction()
+    def _add_to_force_obj(self, params):
+        i, j, k, l, theta, force, mult = params
+        self._force_obj.addTorsion(i, j, k, l, mult, theta, force)
 
-    def get_members(self, id):
-        i, j, k, l, _, _, _ = self._list[id]
-        return [i, j, k, l]
-
-    def update_params(self, id, theta, force, mult):
-        raise NotImplementedError
+    _filters = {"dihedral", "proper_dihedral"}

@@ -1,656 +1,634 @@
-#!/usr/bin/env python3
-from dataclasses import dataclass
-from .sysstar import SysStar
-from .forces.force import Force, Interaction
-from fnmatch import fnmatch
-from .utils import pdist, pcos_angle, pdihedral
 import random
+from .sysstar import SysStar
+from .forces.force import Interaction
 from .reporters.reporter import Reporter
-
-random.seed()
-
-
-@dataclass
-class FragFragment:
-    name: str  # when instantiated it has this name (e.g. in [ rx ])
-    mol: str
-    name_id: str  # internally it has this name for subfrag mapping
-    # list[(in_itp_id, type, name)]
-    atoms: list[(int, str, str)]
-
-
-@dataclass
-class MolFragment:
-    molecule_name: str
-    # atoms: type, resnum, resname, atomname, chargegr, charge, mass
-    atoms: list[(str, int, str, str, int, float, float)]
-    # force i j params
-    bonds: list[(Force, int, int, list)]
-    # force i j k params
-    angles: list[(Force, int, int, int, list)]
-    # force i j k l params
-    dihedrals: list[(Force, int, int, int, int, list)]
-    # exclusions: list of id's
-    exclusions: list[list[int]]
-    # interactions: generic members and params
-    interactions: list[(Force, list, list)]
-
-    def add_exclusion(self, i, j):
-        """Adds an exclusion to the list of exclusions
-        Does not add duplicate exclusions.
-        Adds it for both the i->j and j->i directions
-        Bounds checks and adds empty lists as needed"""
-
-        if i == j:
-            raise ValueError(f"add_exclusion({i}, {j}) where i==j was called.")
-        bigger = max(i, j)
-        if bigger >= len(self.atoms):
-            raise ValueError(f"{bigger} is out of bounds. "
-                             f"Particle count in MolFragment:{len(self.atoms)}"
-                             f", while add_exclusion({i}, {j}) was called.")
-        while len(self.exclusions) <= bigger:
-            self.exclusions.append([])
-
-        # this is a slow algorithm, but simple
-        if i not in self.exclusions[j]:
-            self.exclusions[j].append(i)
-            if j in self.exclusions[i]:
-                # should never happen actually if this algorithm behaves as
-                # I expect it to
-                raise AssertionError(f"ij desynced, {j} "
-                                     f"already in self.exclusions[{i}]")
-            self.exclusions[i].append(j)
-
-        if j not in self.exclusions[i]:
-            raise AssertionError(f"ij desynced, {j} not in "
-                                 f"self.exclusions[{i}]")
-
-
-class ReactionTemplate:
-    name: str
-    reactants: list[str]
-    products: list[list[str]]
-    distance_max: list[(int, int, float)]
-    distance_min: list[(int, int, float)]
-    probability: float
-    global_counter: int
-    global_limit: int
-    break_groups: list[list[int]]
-    update_groups: list[list[int]]
-    skip: int
-
-    def __init__(self, name):
-        self.name = name
-        self.reactants = []
-        self.products = []
-        self.distance_max = []
-        self.distance_min = []
-        self.angle_limits = []
-        self.dihedral_limits = []
-        self.probability = 1.0
-        self.global_counter = 0
-        self.global_limit = None
-        self.break_groups = []
-        self.update_groups = []
-        self.skip = None
-
-    def is_complete(self):
-        # when a reaction is finished parsing, if this returns False
-        # it is considered an error
-
-        return (
-            len(self.reactants) > 0
-        )
-
-
-class Fragment():
-    """Helper class for building and storing fragment information
-    fragment name is used for its type
-    fragment name can be molname (from .itps) or fragname (from .frag)
-
-    Constructed by either DaemonTopology (when instantiating fragments)
-
-    or constructed by the D/M algorithm (when dynamically generating complete
-    fragments)
-    """
-
-    name: str
-    particles: list[int]
-    frag_id: int
-
-    def __init__(self, name, id):
-        self.name = name
-        self.particles = []
-        self.frag_id = id
+from .graph import Graph, GraphMatch, GraphAtomType, match_atoms
+from .fragment import Fragment
+from .reaction_template import ReactionTemplate
+from .molecule import Molecule
+from .detection import detection_all
+#from .detection2 import detection_all
+import numpy as np
 
 
 class TopStar():
     # ======= (1/3) Building things =======
-    # T* fragment and defrag list
-    frag_list: dict[int, Fragment]
-    next_frag_id: int
-    # for every part_id have a list of fragments it is in
-    # and a list of interactions it is in
-    # type: list[list[frag_id]]
-    defrag_list: list[list[int]]
-    interaction_list: list[list[Interaction]]
+    def __init__(self, system, logger, nlist_cutoff, max_absolute_rate,
+                 highest_probability, respos):
+        # == 1. Fragments ==
+        # TODO rework this into a dense structure
+        # fragment by unique id
+        self.frag_list: dict[int, Fragment] = {}
+        # next unique id
+        self.next_frag_id: int = 0
+        # TODO rework this into a dense structure
+        # for every atom_id have a list of fragments it is in
+        # and a list of interactions it is in
+        self.defrag_list: list[list[int]] = []
+        # TODOish dense structure?
+        self.interaction_list: list[list[Interaction]] = []
+        # set by self.update_frag_counts()
+        # TODO too much state synchronization...
+        self.frag_counts: dict[str, int] = {}
 
-    # type name -> list of subfrag names
-    subfrag_map: dict[str, list[str]]
+        # == 2. Graphs ==
+        self.graphs: dict[str, Graph] = {}
 
-    # type name -> type
-    type_lookup: dict[str, FragFragment | MolFragment]
+        # == 3. Molecules ==
+        self.molecules: dict[str, Molecule] = {}
 
-    reaction_list: list[ReactionTemplate]
-    reactive_types: set[str]
+        # == 4. Reactions ==
+        # (rx1, rx2, rx3, rx4) -> templates for this reactant combo
+        self.reactions: dict[
+            tuple[str, str | None, str | None, str | None],
+            list[ReactionTemplate]
+        ] = {}
+        # are there any reactions that continue a certain combo of reactants
+        self.r_continue: dict[tuple[str, str | None, str | None], bool] = {}
+        # which atom to use within a fragment type for the neighbor listt
+        self.neighbor_atom_map: dict[str, int] = {}
 
-    system: SysStar
-
-    reporters: list[Reporter]
-
-    def __init__(self, system, logger):
-        self.frag_list = {}
-        self.next_frag_id = 0
-        self.defrag_list = []
-        self.interaction_list = []
-        self.frag_fragments = []
-        self.mol_fragments = []
-        self.reaction_list = []
-        self.type_lookup = {}
-        self.subfrag_map = {}
-        self.reactive_types = set()
-        self.reporters = []
-        self.system = system
+        # == 5. Misc ==
+        self.reporters: list[Reporter] = []
+        self.system: SysStar = system
         self.logger = logger
+        self.nlist_cutoff: float = nlist_cutoff
+        # warmup phase for rate control
+        self.absolute_rate: float = -1.
+        self.max_absolute_rate: float = max_absolute_rate
+        self.highest_probability: float = highest_probability
+        self.respos = respos
+        # a list of what was in [molecules] in the .top,
+        # used for analysis only at the moment
+        self.initial_molecules: list[tuple[str, int, int]] = []
+        # set in self.init_dm
+        self.out_name = None
+        random.seed()
 
-    def add_reporter(self, reporter):
+    # Save/load helpers - TODO make load an option in the constructor
+    def save(self, f):
+        """
+            Serializes T* into bytes, writes it to f
+
+            Data saved:
+            - frag_list
+            - graphs (graph fragment list)
+            - molecules (molecule definition list)
+            - reactions (reaction template list)
+        """
+        # relies on pickling to handle references to other classes right
+        f.dump(random.getstate())
+
+        f.dump(self.frag_list)
+        f.dump(self.graphs)
+        f.dump(self.reactions)
+        f.dump(self.next_frag_id)
+        f.dump(self.defrag_list)
+        f.dump(self.r_continue)
+        f.dump(self.neighbor_atom_map)
+        f.dump(self.absolute_rate)
+        f.dump(self.initial_molecules)
+        f.dump(self.respos)
+
+        # unpicklable because they reference force
+        f.dump(len(self.molecules))
+        for k, v in self.molecules.items():
+            f.dump(k)
+            assert k == v.molecule_name
+            v.save(f)
+
+    def load(self, f):
+        """
+            Deserializes bytes (read from f) into T* (self)
+
+            Should be called after S* is deserialized and set, because
+            of the interaction list.
+        """
+        random.setstate(f.load())
+
+        self.frag_list = f.load()
+        self.graphs = f.load()
+        self.reactions = f.load()
+        self.next_frag_id = f.load()
+        self.defrag_list = f.load()
+        self.r_continue = f.load()
+        self.neighbor_atom_map = f.load()
+        self.absolute_rate = f.load()
+        self.initial_molecules = f.load()
+        self.respos = f.load()
+
+        for i in range(f.load()):
+            k = f.load()
+            v = Molecule(k)
+            v.load(f, self.system)
+            self.molecules[k] = v
+
+        # interaction list gets loaded different because we can't pickle
+        # openmm things -> can't pickle Force objects
+        #
+        # but we can assume that everything added to any Force would have
+        # resulted in an interaction, except non bonded
+        #
+        # though this is still fragile code and should be improved later
+
+        self.interaction_list = [[] for _ in range(self.system.len_atoms())]
+        for force in self.system.modular_forces:
+            if force == self.system.nonbonded_force:
+                continue
+            for i in range(len(force)):
+                inter = Interaction(force, i)
+                # TODO make this better
+                if force._list[i] is None:
+                    continue
+                members = inter.get_members()
+                for member in members:
+                    self.interaction_list[member].append(inter)
+
+    def add_reporter(self, reporter) -> None:
         self.reporters.append(reporter)
 
-    def new_mol_fragment(self, name: str):
-        if self.type_lookup.get(name):
-            raise ValueError(f"Second definition of fragment type {name}")
-        mol_fragment = MolFragment(name, [], [], [], [], [], [])
-        self.type_lookup[name] = mol_fragment
-        return mol_fragment
+    def new_molecule(self, name: str) -> Molecule:
+        if self.molecules.get(name):
+            raise ValueError(f"Second definition of molecule type {name}")
+        molecule = Molecule(name)
+        self.molecules[name] = molecule
+        return molecule
 
-    def new_frag_fragment(self, name: str, parent: str):
-        name_id = name
-        i = 0
-        while self.type_lookup.get(name_id):
-            name_id = name + str(i)
-            i += 1
-        frag_fragment = FragFragment(name, parent, name_id, [])
-        self.type_lookup[name_id] = frag_fragment
-        if self.subfrag_map.get(parent):
-            self.subfrag_map[parent].append(name_id)
-        else:
-            self.subfrag_map[parent] = [name_id]
-        return frag_fragment
+    def new_graph(self, graph: Graph) -> None:
+        self.graphs[graph.name] = graph
 
-    def new_reaction(self, reaction: ReactionTemplate):
-        self.reaction_list.append(reaction)
-        for r in reaction.reactants:
-            self.reactive_types.add(r)
+    # TODO fix this monster
+    def new_reaction(self, reaction: ReactionTemplate) -> Molecule:
+        # reactant names
+        r1 = reaction.reactants[0]
+        r2 = reaction.reactants[1] if len(reaction.reactants) >= 2 else None
+        r3 = reaction.reactants[2] if len(reaction.reactants) >= 3 else None
+        r4 = reaction.reactants[3] if len(reaction.reactants) >= 4 else None
+        key = (r1, r2, r3, r4)
+        # r_max validation
+        if len(reaction.reactants) >= 2:
+            r_max_connected = []
+            for i in range(len(reaction.reactants)):
+                r_max_connected.append({i})
+            for i1, aindex1, i2, aindex2, dist in reaction.distance_max:
+                if i1 > len(reaction.reactants) or i2 > len(reaction.reactants):
+                    raise ValueError(
+                        "r_max with index higher than the number of reactants"
+                    )
+                name1 = key[i1]
+                name2 = key[i2]
+                if i1 == i2:
+                    continue
+                # distance warning
+                if dist * 2. > self.nlist_cutoff:
+                    self.logger.warn(
+                        f"Warning: r_max for reaction {reaction.name}"
+                        f" has a r_max between reactant {i1} and {i2}"
+                        f" atoms {aindex1} {aindex2} of {dist},"
+                        f" which is too large relative to the"
+                        f" neighborlist cutoff of {self.nlist_cutoff}."
+                    )
+                # graph 1 and 2
+                graph1 = self.graphs[name1]
+                graph2 = self.graphs[name2]
+                # index to type
+                _, _, _, type1 = graph1.atoms[aindex1]
+                _, _, _, type2 = graph2.atoms[aindex2]
+                # we only care about r_max that's guaranteed to be there
+                if not (type1 == type2 and type1 == GraphAtomType.NORMAL):
+                    continue
+                # save this as a valid r_max
+                r_max_connected[i1].add(i2)
+                r_max_connected[i2].add(i1)
+                _, dist1 = self.neighbor_atom_map.get(name1) or (0, 0.)
+                _, dist2 = self.neighbor_atom_map.get(name2) or (0, 0.)
+                if dist > dist1:
+                    self.neighbor_atom_map[name1] = (aindex1, dist)
+                if dist > dist2:
+                    self.neighbor_atom_map[name2] = (aindex2, dist)
+            # graph traversal to see all reactants have a distance cutoff
+            marked = set()
 
-    def add_frag_to_list(self, name: str):
-        if name in self.reactive_types:
-            inst = Fragment(name, self.next_frag_id)
+            def mark(n):
+                if n in marked:
+                    return
+                marked.add(n)
+                for i in r_max_connected[n]:
+                    mark(i)
+            mark(0)
+            if len(marked) != len(reaction.reactants):
+                marked_p1 = {x+1 for x in marked}
+                raise ValueError("Not all reactants are connected via an r_max"
+                                 f"condition of non-optional atoms, "
+                                 " therefore reaction "
+                                 f"{reaction.name} is invalid. "
+                                 f"{marked_p1} are connected to reactant 1.")
+        # reactant info buildup
+        if r2 is not None:
+            self.r_continue[(r1, None, None)] = True
+        if r3 is not None:
+            self.r_continue[(r1, r2, None)] = True
+        if r4 is not None:
+            self.r_continue[(r1, r2, r3)] = True
+
+        if self.reactions.get(key) is None:
+            self.reactions[key] = []
+        self.reactions[key].append(reaction)
+        return self.molecules[reaction.name]
+
+    # Graph helpers
+
+    def try_match_graphs(self, atoms: set[int], molname=None) -> None:
+        """
+        Given a set of atoms, find all graph matches of all known
+        graphs and add them to the fragment list.
+
+        Should be called after interactions (self.interaction_list) have
+        been updated.
+
+        Initial system construction: call this for every molecule, specify
+        molname.
+
+        Reaction: Atoms should be all affected atoms in a reaction,
+        and all their neighbors. Remove all fragments that contain atoms
+        on which try_match_graphs is called first.
+
+        If molname is specified, it means that we can be assured that
+        the same matches are going to happen when we call it with the
+        same molname again, so we can cache the results and speed up
+        this function call later.
+        """
+
+        matches: list[GraphMatch] = []
+        for graph in self.graphs.values():
+            # for each possible graph to match
+            # don't match if it's only the specific molecule
+            if len(graph.molecules) > 0:
+                if molname not in graph.molecules:
+                    continue
+            matches += match_atoms(
+                graph, atoms, self.system,
+                self.interaction_list
+            )
+
+        for m in matches:
+            inst = Fragment(m.graph, self.next_frag_id)
             self.frag_list[self.next_frag_id] = inst
             self.next_frag_id += 1
-            return inst
-        else:
-            return Fragment(name, -1)
 
-    def instantiate_subfrag(self, name_id, inst):
-        """Instantiates a subfragment subfrag, with forces in S* as seen in
-        inst.
+            for key, _, _, type in m.graph.atoms:
+                val = m.atoms.get(key)
+                # key - name in the graph
+                # val - atom id
+                if val is None:
+                    inst.atoms.append(-1)
+                else:
+                    inst.atoms.append(val)
+                    self.defrag_list[val].append(inst.frag_id)
 
-        args: subfrag: name_id, inst: Fragment"""
-        frag: FragFragment = self.type_lookup.get(name_id)
-        name = frag.name
-        if frag is None:
-            raise ValueError(f"Can't find frag {name_id}")
-        elif not isinstance(frag, FragFragment):
-            raise ValueError(f"Attempt to recursively instantiate {name_id}, "
-                             "but it's not a frag fragment type."
-                             f"It is: {name_id}")
-        subinst = self.add_frag_to_list(name)
-        all_indices = set()
-        # particles
-        for i, atom in enumerate(frag.atoms):
-            # remapping of parent_id's to frag_id's
-            parent_id, type, name = atom
-            # parent_id must be i range
-            if parent_id < 0 or parent_id >= len(inst.particles):
-                raise ValueError("Parent particle ID out of range")
-            part_index = inst.particles[parent_id]
-            # name and type must match S*
-            sname, stype = self.system.get_particle_name_type(part_index)
-            if not fnmatch(sname, name) or not fnmatch(stype, type):
-                raise ValueError("During subfrag instantiation name/type "
-                                 f"doesn't match. Expected name {sname} "
-                                 f"type {stype}. Got name {name} type {type}.")
-            # build up these sets that are used for constructing the forces
-            # prevent double inclusion of the same atom
-            if part_index in all_indices:
-                raise ValueError("Double inclusion of atom in subfrag")
-            all_indices.add(part_index)
-            # build up subinst
-            subinst.particles.append(part_index)
-            # frag_id, in_frag_id
-            if subinst.frag_id != -1:
-                self.defrag_list[part_index].append(subinst.frag_id)
+    def instantiate(self, molname: str) -> None:
+        """
+        Adds a fresh new copy of moleculetype molname to the system.
+        R
+        """
+        # molname must refer to a Molecule type
+        mol = self.molecules.get(molname)
+        if mol is None:
+            raise ValueError(f"Can't find mol {molname}")
 
-        # subfrags can contain further subfrags
-        self.instantiate_subfrags(name, subinst)
-
-    def instantiate_subfrags(self, frag_name, inst):
-        """Instantiates all subfrags of frag_name.
-        inst is a Fragment instance that contains the reference to all forces
-        in S*."""
-        subfrags = self.subfrag_map.get(frag_name)
-        if subfrags is not None:
-            for subfrag in subfrags:
-                self.instantiate_subfrag(subfrag, inst)
-
-    def instantiate(self, frag_name):
-        frag = self.type_lookup.get(frag_name)  # frag type
-        if frag is None:
-            raise ValueError(f"Can't find mol {frag_name}")
-        elif not isinstance(frag, MolFragment):
-            raise ValueError(f"Attempt to instantiate {frag_name}, but it's"
-                             " not a mol fragment type."
-                             f" It is: {frag}")
-        parts = []
+        # add atoms to S* and other bookkeeping
+        atoms = []
         prev_resnum = 0
-        for in_frag_id, atom in enumerate(frag.atoms):
+        for atom in mol.atoms:
             type, resnum, resname, atomname, chargegr, charge, mass = atom
             if resnum != prev_resnum:
                 self.system.new_residue()
                 prev_resnum = resnum
-            p = self.system.add_particle(atomname, resname, type, charge, mass)
-            parts.append(p)
+            p = self.system.add_atom(atomname, resname, type, charge, mass)
+            atoms.append(p)
             self.defrag_list.append([])
             self.interaction_list.append([])
-        return self.instantiate_over_existing(frag_name, parts)
 
-    def instantiate_over_existing(self, frag_name, particles, reaction=False):
-        """Takes a name of a mol fragment, adds interactions to those particles
-        according to the mol fragment.
-        Recursively instantiates all subfragments too.
+        # instantiate interactions
+        self.instantiate_over_existing(mol, atoms)
+
+        # add graphs to system
+        self.try_match_graphs(set(atoms), molname)
+
+        # do initial molecules info, used e.g. in helpers/monomer
+        if (
+            len(self.initial_molecules) > 0
+            and self.initial_molecules[-1][0] == molname
+        ):
+            _, n, n_atoms = self.initial_molecules[-1]
+            assert len(atoms) == n_atoms
+            self.initial_molecules[-1] = (molname, n+1, n_atoms)
+        else:
+            self.initial_molecules.append((molname, 1, len(atoms)))
+
+    def instantiate_over_existing(
+        self, mol: Molecule, atoms: list[Fragment] | list[int],
+    ) -> None:
         """
+        Takes a name of a molecule, adds interactions to those atoms
+        according to the molecule.
+        """
+        def index_pair(index: int | tuple[int, int]) -> int:
+            # abstraction, because of the duality of Molecule
+            if type(index) is int:
+                return atoms[index]
+            else:
+                idi, atomi = index
+                return atoms[idi].atoms[atomi]
 
-        frag = self.type_lookup.get(frag_name)  # frag type
-        if frag is None:
-            raise ValueError(f"Can't find mol {frag_name}")
-        elif not isinstance(frag, MolFragment):
-            raise ValueError(f"Attempt to instantiate {frag_name}, but it's"
-                             " not a mol fragment type."
-                             f" It is: {frag}")
-        inst = self.add_frag_to_list(frag_name)
-
-        # particles
-        for in_frag_id, part_id in enumerate(particles):
-            inst.particles.append(part_id)
-            # defrag
-            if inst.frag_id != -1:
-                self.defrag_list[part_id].append(inst.frag_id)
-            if reaction:
-                # update_types is only True if this is called during a reaction
-                type, resnum, resname, atomname, chargegr, charge, mass = \
-                    frag.atoms[in_frag_id]
-                oldtype, oldcharge, oldmass = \
-                    self.system.get_particle_details(part_id)
-                # Atom names are not updated.
-                # The * is only here as an option not to update types.
-                if oldtype == type or type == "*":
-                    # same type or type to remain same with *
-                    # update if charge or mass change
-                    if (charge is not None and oldcharge != charge) or \
-                            (mass is not None and oldmass != mass):
-                        self.system.update_particle(
-                            part_id, oldtype, charge, mass
-                        )
-                else:
-                    # new type, so gotta update anyway
-                    self.system.update_particle(
-                        part_id, type, charge, mass
-                    )
-        # bonds
-        for (force, i, j, params) in frag.bonds:
-            b = force.add(particles[i], particles[j], *params)
-            self.interaction_list[particles[i]].append(b)
-            self.interaction_list[particles[j]].append(b)
-        # angles
-        for (force, i, j, k, params) in frag.angles:
-            a = force.add(particles[i], particles[j], particles[k], *params)
-            self.interaction_list[particles[i]].append(a)
-            self.interaction_list[particles[j]].append(a)
-            self.interaction_list[particles[k]].append(a)
-        # dihedrals
-        for (force, i, j, k, l, params) in frag.dihedrals:
-            d = force.add(
-                particles[i], particles[j], particles[k], particles[l],
-                *params
-            )
-            self.interaction_list[particles[i]].append(d)
-            self.interaction_list[particles[j]].append(d)
-            self.interaction_list[particles[k]].append(d)
-            self.interaction_list[particles[l]].append(d)
         # exclusions
-        for i, excl in enumerate(frag.exclusions):
-            for j in excl:
-                if i < j:
-                    e = self.system.exclusions.add(particles[i], particles[j])
-                    self.interaction_list[particles[i]].append(e)
-                    self.interaction_list[particles[j]].append(e)
+        for (i, j) in mol.exclusions:
+            pi = index_pair(i)
+            pj = index_pair(j)
+            if pi == -1 or pj == -1:
+                # optional atom missing
+                continue
+            if pi < pj:
+                e = self.system.exclusions.add(pi, pj)
+                self.interaction_list[pi].append(e)
+                self.interaction_list[pj].append(e)
+        # posres
+        for (i, kx, ky, kz) in mol.posres:
+            if self.respos is None:
+                raise ValueError(
+                    "respos is None but there are position restraints."
+                )
+            pi = index_pair(i)
+            x0, y0, z0 = self.respos[pi]
+            self.system.posres.add((pi), (kx, ky, kz, x0, y0, z0))
         # generic interactions
-        for (force, members, params) in frag.interactions:
-            members = [particles[x] for x in members]
-            f = force.add(members, params)
-            for member in members:
+        for (force, members, params) in mol.interactions:
+            member_atoms = []
+            missing_opt = False
+            for x in members:
+                atom = index_pair(x)
+                if atom == -1:
+                    missing_opt = True
+                    break
+                member_atoms.append(atom)
+            if missing_opt:
+                # optional missing => skip
+                continue
+            f = force.add(member_atoms, params)
+            for member in member_atoms:
                 self.interaction_list[member].append(f)
 
-        self.instantiate_subfrags(frag_name, inst)
-        return inst
+    def update_frag_counts(self):
+        """
+        Sets self.frag_counts. Call after every modification.
 
-    # ======= (2/3) Detection things =======
-    def pre_detection(self, i):
-        for rx in self.reaction_list:
-            rx.global_counter = 0
+        self.frag_counts is used notably for rate calculation.
+        """
+        # TODO too much state sync..
+        self.frag_counts = {}
+        for v in self.frag_list.values():
+            k = v.name
+            if self.frag_counts.get(k) is None:
+                self.frag_counts[k] = 1
+            else:
+                self.frag_counts[k] += 1
+
+    # ======= (2/3) Detection things - see detection.pyx =======
+    def init_dm(self, name) -> None:
+        # TODO remove this function, reduce fragility that way
+        # called exactly once after parsing or loading from file is finished
+        self.update_frag_counts()
+        self.out_name = name
         for reporter in self.reporters:
-            reporter.pre_detection(i)
+            reporter.init_dm(name)
 
-    def detection(self,
-                  reactants: list[Fragment],
-                  rx: ReactionTemplate,
-                  pos,
-                  box
-                  ):
-        """Returns True if frag1 and frag2 fulfill constraints specified in rx
+    def update_observed_rate(self, rx: ReactionTemplate):
+        # update_observed_rate only called if it is defined => not none
+        # relative_rate is parsed as "positive" => non zero, safe to divide
+        rate = rx.reaction_counter / rx.relative_rate
+        for reactant in rx.reactants:
+            if self.frag_counts.get(reactant) in {0, None}:
+                # no reactant => no reaction
+                # keeps old observed_rate and we avoid divisions by 0
+                return
+            rate /= self.frag_counts[reactant]
 
-        Returns False if they should not react
+        # if it's not initialized yet make an initial value
+        if rx.observed_rate is None:
+            rx.observed_rate = rate
+        else:
+            # otherwise smooth it
+            rx.observed_rate = rate * 0.01 + rx.observed_rate * 0.99
+
+        predicted = rx.observed_rate * self.highest_probability
+
+        # if the prediction value goes below 0, 0 it and issue a warning
+        if predicted < 0.:
+            self.logger.warn(
+                f"The smoothed rate for reaction {rx.name} went below 0."
+            )
+            rx.observed_rate = 0.
+            predicted = 0.
+
+        # set the relative rate = 1 value to the slowest reaction
+        if self.absolute_rate is None or predicted < self.absolute_rate:
+            self.absolute_rate = predicted
+
+    def detection(
+        self, step: int, box, pos
+    ) -> list[tuple[list[Fragment], ReactionTemplate]]:
+        for reporter in self.reporters:
+            reporter.pre_detection(step, self.out_name)
+        rxs = []
+        for more_rxs in self.reactions.values():
+            for rx in more_rxs:
+                rxs.append(rx)
+        reactions = detection_all(
+            self, box, pos
+        )
         """
-        # the order of checks should be from fastest to slowest to maximize
-        # performance
-        # simple rules check
-        # fragments that were removed cannot react any more
-
-        # overlapping fragments can never react:
-
-        particles = []
-        pset = set()
-        for r in reactants:
-            for p in r.particles:
-                if p in pset:
-                    return False
-                pset.add(p)
-            particles += r.particles
-
-        # limiter checks, first for performance
-        if rx.global_limit is not None and rx.global_counter >= rx.global_limit:
-            return False
-        if random.random() > rx.probability:
-            return False
-
-        # position dependent checks
-        for (i, j, rmax) in rx.distance_max:
-            init1 = particles[i]
-            init2 = particles[j]
-            dist = pdist(pos[init1], pos[init2], box)
-            if dist > rmax:
-                return False
-
-        for (i, j, rmin) in rx.distance_min:
-            init1 = particles[i]
-            init2 = particles[j]
-            dist = pdist(pos[init1], pos[init2], box)
-            if dist < rmin:
-                return False
-
-        for (i, j, k, cos_min, cos_max) in rx.angle_limits:
-            # the particle positions of particle i, j, k
-            p1 = pos[particles[i]]
-            p2 = pos[particles[j]]
-            p3 = pos[particles[k]]
-            cos = pcos_angle(p1, p2, p3, box)
-            if cos < cos_min and cos > cos_max:
-                # inverted comparison because cosine is a constantly decreasing
-                # function, cos_min is the minimum angle => max cosine value
-                # cos_max is the maximum angle => min cosine value
-                return False
-
-        for (i, j, k, l, min, max) in rx.dihedral_limits:
-            # particle positions
-            p1 = pos[particles[i]]
-            p2 = pos[particles[j]]
-            p3 = pos[particles[k]]
-            p4 = pos[particles[l]]
-            theta = pdihedral(p1, p2, p3, p4, box)
-            if theta > min and theta < max:
-                return False
-
-        rx.global_counter += 1
-        return True
-
-    def get_init_map(self):
-        init_map: dict[str, list[int]] = {}
-        for key, frag in self.frag_list.items():
-            if init_map.get(frag.name) is None:
-                init_map[frag.name] = []
-            init_map[frag.name].append(key)
-
-        return init_map
-
-    def get_reaction_tree(self):
-        tree = {}
-        for rx in self.reaction_list:
-            reactants = rx.reactants
-            node = tree
-            for j, reactant in enumerate(reactants):
-                if rx.skip is not None and j >= rx.skip:
-                    # unelegant way of adding enum-like info in the k/v mapping
-                    # ideally this would be possible at the type level
-                    reactant = "*" + reactant
-                if node.get(reactant) is None:
-                    node[reactant] = {}
-                node = node[reactant]
-            node["_reaction"] = rx
-        return tree
-
-    def detection_over_types(
-            self,
-            reactions, skip, node, previous_types, previous_indices,
-            init_map, pos, box
-            ):
+        reactions = detection_all(
+            self.frag_list, rxs,
+            box, pos,
+            self.nlist_cutoff,
+            self.absolute_rate,
+            # TODO save state (not sure there is much point)
+            np.random.default_rng()
+        )
         """
-            Runs the detection algorithm over a single node in the reaction
-            "tree".
-
-            reactions - dynamic list of reactions that passed the D algo
-            skip - dynamic set of indices in self.frag_list that already reacted
-            so they cannot any more
-            node - (sub)tree of reaction types left to check
-            previous_types - reactant types already checked
-            previous_indicies - indicies in init_map[reactant_type] that were
-            already checked
-            init_map - dict of reactant_type -> list of indicies of that type
-            in self.frag_list
-            pos - numpy array of positions
-            box - periodic box info
-        """
-
-        for next_reactant, next_node in node.items():
-            if next_reactant == "_reaction":
-                # convert init_map indices to init_list indices
-                frag_ids = [init_map[name.lstrip("*")][id] for name, id in 
-                            zip(previous_types, previous_indices)]
-                frags = [self.frag_list[i] for i in frag_ids]
-                rx = next_node
-                if self.detection(frags, rx, pos, box):
-                    # only until rx.skip do we add things to skip and rxs
-                    # the rest are only for self.detection but nothing after
-                    if rx.skip is not None:
-                        frag_ids = frag_ids[:rx.skip]
-                        frags = frags[:rx.skip]
-                    for frag_id in frag_ids:
-                        skip.add(frag_id)
-                    reactions.append((frags, rx))
-                    return reactions, skip, True
-
-            if init_map.get(next_reactant.lstrip("*")) is None:
-                continue
-
-            # find out where to start indexing from
-            # this also works well with the * hack for rx.skip
-            # this used to be the if j <= i: continue check
-            # prevents both self reactions and double counting
-            start_at = 0
-            for i, prev_reactant in enumerate(previous_types):
-                if next_reactant == prev_reactant:
-                    start_at = max(start_at, previous_indices[i] + 1)
-            # go over all options for the next_reactant type
-            for j in range(start_at, len(init_map[next_reactant.lstrip("*")])):
-                # skip is a set of init_list indices that already reacted
-                # only check it if the current reactant is before rx.skip => not *
-                if next_reactant[0] != "*" and init_map[next_reactant][j] in skip:
-                    continue
-                previous_types.append(next_reactant)
-                previous_indices.append(j)
-                reactions, skip, reacted = self.detection_over_types(
-                    reactions, skip, next_node,
-                    previous_types, previous_indices,
-                    init_map, pos, box
-                )
-                previous_types.pop(-1)
-                previous_indices.pop(-1)
-                if reacted and len(previous_indices) > 0:
-                    # there was a reaction, so previous_indices[0] is now
-                    # skipped, so we can jump up all the way to root
-                    return reactions, skip, True
-
-        return reactions, skip, False
+        # preparations for the next step
+        self.absolute_rate = self.max_absolute_rate
+        for _, rxs in self.reactions.items():
+            for rx in rxs:
+                if rx.relative_rate is not None:
+                    self.update_observed_rate(rx)
+                rx.reaction_counter = 0
+        if self.absolute_rate is None:
+            self.absolute_rate = -1.
+        return reactions
 
     # ======= (3/3) Modification things =======
-    def remove_fragment(self, frag: Fragment):
-        """Removes a fragment from frag_list and defrag_list
-        """
+    def clean_defrag(self, frag: Fragment, atom: int) -> None:
+        """Removes references to frag in the defrag_list for atom_id atom."""
+        self.defrag_list[atom] = list(filter(
+            lambda x: x != frag.frag_id,
+            self.defrag_list[atom]
+        ))
 
-        for part in frag.particles:
-            self.defrag_list[part] = list(filter(
-                lambda x: x != frag.frag_id,
-                self.defrag_list[part]
-            ))
+    def remove_fragment(self, frag: Fragment) -> None:
+        """Removes a fragment from frag_list and defrag_list"""
+
+        for atom in frag.atoms:
+            if atom != -1:
+                self.clean_defrag(frag, atom)
 
         del self.frag_list[frag.frag_id]
 
-    def remove_interaction(self, interaction: Interaction):
-        """Removes an interaction from interaction_list and S*
-        """
-        for part in interaction.get_members():
-            self.interaction_list[part] = list(filter(
+    def remove_interaction(self, interaction: Interaction) -> None:
+        """Removes an interaction from interaction_list and S*"""
+        for atom in interaction.get_members():
+            self.interaction_list[atom] = list(filter(
                 lambda x: x != interaction,
-                self.interaction_list[part]
+                self.interaction_list[atom]
             ))
         interaction.remove()
 
     def process_break(self, frags: list[Fragment], rx: ReactionTemplate,
-                      particles: list[int]):
-        """
-            Process [rx_break] in rx over frags.
-        """
+                      ) -> None:
+        """Process [break] in rx over frags."""
 
         for group in rx.break_groups:
-            group = [particles[i] for i in group]
+            group_atoms = []
+            all_found = True
+            for id, atom in group:
+                atom = frags[id].atoms[atom]
+                if atom == -1:
+                    all_found = False
+                    break
+                group_atoms.append(atom)
+            if not all_found:
+                # missing optional
+                continue
             # breaking interactions
             # for every group in break_groups
             # check all interactions and break if all in group are in inter
-            for inter in self.interaction_list[group[0]][:]:
+            for inter in self.interaction_list[group_atoms[0]][:]:
                 if all(map(
                            lambda group_member:
                            group_member in inter.get_members(),
-                           group
+                           group_atoms
                        )):
                     self.remove_interaction(inter)
 
     def process_update(self, frags: list[Fragment], rx: ReactionTemplate,
-                       particles: list[int]):
-        """
-            Process [rx_update] in rx over frags.
-        """
+                       ) -> None:
+        """Process [rx_update] in rx over frags."""
 
         for group in rx.update_groups:
-            group = [particles[i] for i in group]
+            group_atoms = []
+            all_found = True
+            for id, atom in group:
+                atom = frags[id].atoms[atom]
+                if atom == -1:
+                    all_found = False
+                    break
+                group_atoms.append(atom)
+            if not all_found:
+                # missing optional
+                continue
             # breaking interactions
             # check that all in interaction are in group
-            for inter in self.interaction_list[group[0]][:]:
+            for inter in self.interaction_list[group_atoms[0]][:]:
                 if all(map(
-                           lambda inter_member: inter_member in group,
+                           lambda inter_member: inter_member in group_atoms,
                            inter.get_members()
                        )):
                     self.remove_interaction(inter)
 
-    def pre_modification(self, rx_list: list[(list, ReactionTemplate)], i):
-        # hook that gets called after detection, before modification
-        # only called if there is any modification going on
-        for reporter in self.reporters:
-            reporter.pre_modification(rx_list, i)
+    def populate_neighbors(self, atoms: set[int]) -> set[int]:
+        """
+        For a set of atoms, return a set that also contains their neighbors.
 
-    def modification(self, frags: list[Fragment], rx: ReactionTemplate):
+        Neighbor = shared interaction (e.g. bond, angle, exclusion...)
+        """
+        res = set()
+        for atom in atoms:
+            res.add(atom)
+            for inter in self.interaction_list[atom]:
+                for member in inter.get_members():
+                    res.add(member)
+        return res
+
+    def remove_overlapping_graphs(self, atoms: set[int]) -> None:
+        """Remove all fragments in T* that contain any of the given atoms."""
+        for atom in atoms:
+            for frag_id in self.defrag_list[atom][:]:
+                frag = self.frag_list.get(frag_id)
+                if frag is not None and frag.graph is not None:
+                    self.remove_fragment(frag)
+
+    def template_update_atoms(
+        self, frags: list[Fragment], rx: ReactionTemplate
+    ) -> None:
+        """Process [rename], [retype], [recharge], [remass]."""
+        # re* overrides everything
+        for (id, atom, new_name) in rx.renames:
+            atom_id = frags[id].atoms[atom]
+            if atom_id == -1:
+                continue
+            self.system.rename(atom_id, new_name)
+        for (id, atom, new_type) in rx.retypes:
+            atom_id = frags[id].atoms[atom]
+            if atom_id == -1:
+                continue
+            self.system.retype(atom_id, new_type)
+        for (id, atom, new_charge) in rx.recharges:
+            atom_id = frags[id].atoms[atom]
+            if atom_id == -1:
+                continue
+            self.system.recharge(atom_id, new_charge)
+        for (id, atom, new_mass) in rx.remasses:
+            atom_id = frags[id].atoms[atom]
+            if atom_id == -1:
+                continue
+            self.system.remass(atom_id, new_mass)
+
+    def modification(
+        self, 
+        i: int,
+        reactions: list[tuple[list[Fragment], ReactionTemplate]]
+    ) -> None:
         """Modification helper for the D/M algorithm
         """
-        product_particles = []
-        for f in frags:
-            product_particles += f.particles
-        # [rx_break]
-        self.process_break(frags, rx, product_particles)
-        # [rx_update]
-        self.process_update(frags, rx, product_particles)
-        # only non skipped get passed to modification, so we remove them all
-        for frag in frags:
-            self.remove_fragment(frag)
 
-        # the index of the next particle for which a new product needs to be
-        # instantiated
-
-        for product_line in rx.products:
-            product_particle_index = 0
-            for product in product_line:
-                start = product_particle_index
-                frag = self.type_lookup.get(product)  # frag type
-                if frag is None:
-                    raise ValueError(f"Can't find mol {product}.")
-                elif not isinstance(frag, MolFragment):
-                    raise ValueError(f"Product {product}, is"
-                                     " not a mol fragment type."
-                                     f" It is: {frag}"
-                                     "Use [frag_from] to create fragments "
-                                     "in reactions.")
-
-                end = start + len(frag.atoms)
-                parts = product_particles[start:end]
-                product_particle_index = end
-                self.instantiate_over_existing(product, parts, reaction=True)
-            assert product_particle_index == len(product_particles)
-
-    def post_modification(self, i):
-        # hook that only gets called after modification
         for reporter in self.reporters:
-            reporter.post_modification(i)
+            reporter.pre_modification(i, reactions, self.out_name)
 
-    def detection_modification(self, i):
-        self.pre_detection(i)
-        init_map = self.get_init_map()
-        pos, box = self.system.get_positions()
-        # tree of frag combinations to check
-        reactions, skip, _ = self.detection_over_types(
-            [], set(), self.get_reaction_tree(), [], [], init_map, pos, box
-        )
-
-        if len(reactions) == 0:
-            return 0
-        self.pre_modification(reactions, i)
         for (frags, rx) in reactions:
-            self.modification(frags, rx)
-        self.post_modification(i)
-        return len(reactions)
+            # just normal atoms to instantiate products over
+            product_atoms = []
+            # which atoms to recalculate graphs over
+            graph_recalc = set()
+            for f in frags:
+                product_atoms += list(filter(lambda x: x != -1, f.atoms))
+                graph_recalc |= set(filter(lambda x: x != -1, f.atoms))
+            # add neighbors since those can be changed too (opt/not atoms)
+            graph_recalc = self.populate_neighbors(set(product_atoms))
+
+            # [rx_break]
+            self.process_break(frags, rx)
+            # [rx_update]
+            self.process_update(frags, rx)
+
+            # graphs get recalculated later over the same atoms
+            self.remove_overlapping_graphs(graph_recalc)
+
+            self.template_update_atoms(frags, rx)
+            self.instantiate_over_existing(self.molecules[rx.name], frags)
+
+            self.try_match_graphs(graph_recalc)
+
+        self.update_frag_counts()
+
+        for reporter in self.reporters:
+            reporter.post_modification(i, self.out_name)

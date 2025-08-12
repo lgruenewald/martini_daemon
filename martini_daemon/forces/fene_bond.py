@@ -3,32 +3,18 @@ import openmm as mm
 
 
 class FENEBond(Force):
-    """All fene (finitely extensible nonlinear elastic) bonds in the system
-    indices are called bond_id
-    values are (i: part_id, j: part_id, length, D, beta: float)"""
+    _members = 2
 
-    visualize_as_bond = True
-
-    def _build(self):
+    def _set_force_obj(self):
         self._force_obj = mm.CustomBondForce(
             "- 0.5 * k * b^2 * log(1 - r^2 / b^2)"
         )
         self._force_obj.addPerBondParameter("b")  # equilibrium length
         self._force_obj.addPerBondParameter("k")  # force constant
-        for (i, j, length, k) in filter(None, self._list):
-            self._force_obj.addBond(i, j, [length, k])
 
-    def add(self, i, j, length, k):
-        self._list.append((i, j, length, k))
-        if not self._rebuild:
-            self._force_obj.addBond(i, j, [length, k])
-            self._sysstar._reinitialize = True
-        return self._interaction()
+    def _add_to_force_obj(self, params):
+        i, j, length, k = params
+        self._force_obj.addBond(i, j, [length, k])
 
-    def get_members(self, id):
-        i, j, _, _ = self._list[id]
-        return [i, j]
-
-    def update_params(self, id, length, kb, kcub):
-        raise NotImplementedError
+    _filters = {"bond", "fene_bond"}
 

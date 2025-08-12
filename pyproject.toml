@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm", "cython", "numpy"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "martini_daemon"
+authors = []
+description = ""
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = []
+classifiers = []
+dependencies = ["numpy", "openmm", "freud-analysis"]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+all = ["molly"]

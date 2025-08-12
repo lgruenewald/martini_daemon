@@ -1,0 +1,11 @@
+#include "../../itp/martini_v3.0.0.itp"
+#include "../../itp/martini_v3.0.0_solvents_v1.itp"
+#include "../../itp/martini_v3.0.0_small_molecules_v2.itp"
+#include "sticky.rx"
+
+[ system ]
+SIAC polymerization
+
+[ molecules ]
+SIAC 1000
+W 10036

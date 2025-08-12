@@ -1,0 +1,5 @@
+# frame,reaction_name;reactant1_name,reactant1_id,atoms...;reactantn_id,reactantn_id,atoms...
+0,zero;y,0,0,1;y,1,2,3
+0,ninety;y,2,4,5;y,3,6,7
+0,hundredeighty;y,4,8,9;y,5,10,11
+0,minus_ninety;y,6,12,13;y,7,14,15

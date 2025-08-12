@@ -1,0 +1,17 @@
+#include "../../../itp/martini_v3.0.0.itp"
+#include "../../../itp/martini_v3.0.0_phospholipids_v1.itp"
+#include "../../../itp/martini_v3.0.0_solvents_v1.itp"
+
+
+[ system ]
+; name
+INSANE Membrane DPPC DIPC 1 to 1
+
+
+[ molecules ]
+; name  number
+DPPC            50
+DIPC            50
+DPPC            50
+DIPC            50
+W             1879

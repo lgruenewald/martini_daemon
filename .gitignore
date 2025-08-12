@@ -9,16 +9,23 @@
 *.xtc
 # exclude out files
 out*
+whole*
+!whole.py
 # exclude xvg from tests directory (energy.xvg, forces.xvg usually)
 tests/**/*.xvg
 # exclude logs
 *.log
+# exclude benchmark results
+benchmarks/results
 # exclude python cache
 **/__pycache__/
 # exclude backed up files
 \#*
 # exclude hidden files
 .*
+# include specific hidden files
+!.gitignore
+!.gitattributes
 # exclude build products
 build/*
 martini_daemon.egg-info/*
@@ -27,3 +34,4 @@ martini_daemon/**/*.c
 build
 martini_daemon.egg-info
 dist
+*.so
