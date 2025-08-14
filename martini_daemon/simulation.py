@@ -343,10 +343,10 @@ class Simulation():
             self.logger.info("Detection finished")
             if len(reactions) > 0:
                 self.logger.info("Modification start")
-                self.reactions += len(reactions)
+                reactions = self.top.modification(self.i, reactions)
                 if self.daemon_integrator:
                     self.integrator.set_reactions(reactions, self.system)
-                self.top.modification(self.i, reactions)
+                self.reactions += len(reactions)
                 self.logger.info("Modification finished")
             if len(reactions) > 0 or self.force_reinitialize:
                 self.logger.info("Reinitialize start")
