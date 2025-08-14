@@ -13,6 +13,8 @@ class Connection(Force):
     def build(self):
         pass
 
+    _destroyable = False
+    
     def destroy(self):
         return False
 

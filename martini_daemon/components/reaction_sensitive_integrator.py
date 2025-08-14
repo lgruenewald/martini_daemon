@@ -18,7 +18,8 @@ class DaemonIntegrator():
 class ReactionSensitiveLangevinIntegrator(DaemonIntegrator):
 
     def __init__(
-        self, dt_ps, T_K, friction_ps1, subdivision=4, equilibration_length=50
+        self, dt_ps, T_K, friction_ps1, subdivision=4, equilibration_length=10,
+        minimization_steps=0
     ):
         self.dt = dt_ps
         self.T = T_K
@@ -37,10 +38,23 @@ class ReactionSensitiveLangevinIntegrator(DaemonIntegrator):
             )
         )
         self.remaining = 0
+        self.minsteps = minimization_steps
 
-    def set_reactions(self, reactions):
+    def set_reactions(self, reactions, system):
         self.remaining = self.eqlen
         self.integrator.setCurrentIntegrator(1)
+        if self.minsteps > 0:
+            state = system._context.getState(
+                velocities=True
+            )
+            system.minimize_energy(
+                max_steps=self.minsteps
+            )
+            system._context.setVelocities(
+                state.getVelocities(
+                    asNumpy=True
+                )
+            )
 
     def step(self, n_steps):
         if self.remaining >= n_steps:

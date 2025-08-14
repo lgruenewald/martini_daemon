@@ -126,3 +126,19 @@ class FragCountReporter(Reporter):
 
     def interactive_line(self) -> str:
         return f"fragments: {len(self._topstar.frag_list)}"
+
+
+# for debugging reactions
+class LastReactionGeometryReporter(Reporter):
+    def pre_modification(self, i, reactions, name):
+        self._sysstar.write_gro(name + "_last_reaction.gro")
+
+
+class ReactionException(Exception):
+    pass
+
+
+# for debugging reactions, to stop simulations after reaction
+class ReactionExceptionReporter(Reporter):
+    def post_modification(self, i, name):
+        raise ReactionException

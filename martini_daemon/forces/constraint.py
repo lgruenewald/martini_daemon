@@ -17,6 +17,8 @@ class Constraint(Force):
                 self._sysstar._system.addConstraint(i, j, length)
             self._rebuild = False
 
+    _destroyable = False
+
     def destroy(self):
         raise Exception("Can't destroy constraints.")
 
