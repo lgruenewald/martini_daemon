@@ -1322,6 +1322,19 @@ def DaemonTopFile(
 
     p.add_level("recharge", process_recharge)
 
+    def process_soft_core(tokens):
+        nonlocal last_reaction
+        n_reac = len(last_reaction.reactants)
+        if n_reac == 0:
+            raise ParseError("[reactants] must come before [recharge]")
+
+        i, j = parse_pair(tokens, 0, "pair")
+        sc_lam = unwrap(tokens, 1, "float")
+        sc_alpha = unwrap(tokens, 2, "float")
+        last_reaction.soft_core.append((i, j, sc_lam, sc_alpha))
+
+    p.add_level("soft_core", process_soft_core)
+
     def process_system(tokens):
         nonlocal system_defined
         require_complete_reaction()

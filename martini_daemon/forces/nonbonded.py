@@ -38,9 +38,9 @@ class NonBonded(Force):
         """Non bonded force, so invalid"""
         raise NotImplementedError
 
-    def update_params(self, i, atom_type, charge, charge_changed):
+    def update_params(self, i, atom_type, charge, sc_lam, sc_alpha, charge_changed):
         atom_type_id = self.use_atom_type(atom_type)
-        self._force_obj.setParticleParameters(i, [atom_type_id, charge])
+        self._force_obj.setParticleParameters(i, [atom_type_id, charge, sc_lam, sc_alpha])
         # TODO LJ type change event?
         self._sysstar.pairs._rebuild = True
         self._sysstar.cmap._rebuild = True
@@ -50,7 +50,9 @@ class NonBonded(Force):
     def _build(self):
         self._force_obj = mm.CustomNonbondedForce(
             "step(rcut-r)*(LJ - corr + ES);"
-            "LJ = (C12(type1, type2) / r^12 - C6(type1, type2) / r^6);"
+            "LJ = (1 - sc_lambda1) * (C12(type1, type2) / rA^12 - C6(type1, type2) / rA^6) + sc_lambda1 * (C12(type1, type2) / rB^12 - C6(type1, type2) / rB^6);"
+            "rA = (sc_alpha1 * sc_sigma(type1, type2)^6 * sc_lambda1^1 + r^6)^(1/6);"
+            "rB = (sc_alpha1 * sc_sigma(type1, type2)^6 * (1 - sc_lambda1)^1 + r^6)^(1/6);"
             "corr = (C12(type1, type2) / rcut^12 - C6(type1, type2) / rcut^6);"
             "ES = f/epsilon_r*q1*q2 * (1/r + krf * r^2 - crf);"
             "crf = 1 / rcut + krf * rcut^2;"
@@ -61,15 +63,17 @@ class NonBonded(Force):
         )
         self._force_obj.addPerParticleParameter("type")
         self._force_obj.addPerParticleParameter("q")
+        self._force_obj.addPerParticleParameter("sc_lambda")
+        self._force_obj.addPerParticleParameter("sc_alpha")
         self._force_obj.setNonbondedMethod(
             mm.CustomNonbondedForce.CutoffPeriodic
         )
         self._force_obj.setCutoffDistance(self.cutoff_nm)
 
         for i in range(self._sysstar.len_atoms()):
-            type, charge, _ = self._sysstar.get_atom_details(i)
+            type, charge, _, sc_lam, sc_alpha = self._sysstar.get_atom_details(i)
             atom_type_id = self.use_atom_type(type)
-            self._force_obj.addParticle([atom_type_id, charge])
+            self._force_obj.addParticle([atom_type_id, charge, sc_lam, sc_alpha])
 
         for (i, j) in filter(None, self._exclusions._list):
             self._force_obj.addExclusion(i, j)
@@ -77,6 +81,7 @@ class NonBonded(Force):
         # add LJ parameters to the system
         C6 = []
         C12 = []
+        sc_sigma = []
         # i,j => type index; t1,t2 => type names
         n = len(self._used_atom_types)
         for t1, i in self._used_atom_types.items():
@@ -90,11 +95,19 @@ class NonBonded(Force):
                 c12 = 4 * epsilon * (sigma ** 12)
                 C6.append(c6)
                 C12.append(c12)
+                if c6 == 0 or c12 == 0:
+                    sc_sigma_value = 0.3
+                else:
+                    sc_sigma_value = (c12 / c6) ** (1/6)
+                sc_sigma.append(sc_sigma_value)
         self._force_obj.addTabulatedFunction(
             "C6", mm.Discrete2DFunction(n, n, C6)
         )
         self._force_obj.addTabulatedFunction(
             "C12", mm.Discrete2DFunction(n, n, C12)
+        )
+        self._force_obj.addTabulatedFunction(
+            "sc_sigma", mm.Discrete2DFunction(n, n, sc_sigma)
         )
 
     def build(self):
@@ -171,8 +184,8 @@ class ExclusionHelper(Force):
         self._force_obj = None
 
     def es_self_correction_add(self, i, j):
-        _, q1, _ = self._sysstar.get_atom_details(i)
-        _, q2, _ = self._sysstar.get_atom_details(j)
+        _, q1, _, _, _ = self._sysstar.get_atom_details(i)
+        _, q2, _, _, _ = self._sysstar.get_atom_details(j)
         qprod = q1 * q2
         if i == j:
             qprod *= 0.5
@@ -194,7 +207,7 @@ class ExclusionHelper(Force):
         self._force_obj.addPerBondParameter("q_product")
         self._force_obj.setUsesPeriodicBoundaryConditions(True)
         for i in range(self._sysstar.len_atoms()):
-            _, charge, _ = self._sysstar.get_atom_details(i)
+            _, charge, _, _, _ = self._sysstar.get_atom_details(i)
             if charge != 0:
                 # self term in reaction field correction
                 self.es_self_correction_add(i, i)

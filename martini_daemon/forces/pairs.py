@@ -33,8 +33,8 @@ class Pairs(Force):
             params = (*params, None, None)
 
         i, j, sigma, epsilon = params
-        t1, q1, _ = self._sysstar.get_atom_details(i)
-        t2, q2, _ = self._sysstar.get_atom_details(j)
+        t1, q1, _, _, _ = self._sysstar.get_atom_details(i)
+        t2, q2, _, _, _ = self._sysstar.get_atom_details(j)
         qprod = q1 * q2
         if sigma is None or epsilon is None:
             if self.types.get((t1, t2)) is None:

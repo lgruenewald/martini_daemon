@@ -282,7 +282,7 @@ class AtomCache():
         self, name_filter: str, type_filter: str, atom_id: int
     ) -> bool:
         name = self.sysstar.get_atom_name(atom_id)
-        type, _, _ = self.sysstar.get_atom_details(atom_id)
+        type, _, _, _, _ = self.sysstar.get_atom_details(atom_id)
         return fnmatch(name, name_filter) and fnmatch(type, type_filter)
 
 

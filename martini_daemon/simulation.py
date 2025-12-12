@@ -349,8 +349,10 @@ class Simulation():
             if len(reactions) > 0 or self.force_reinitialize:
                 self.logger.info("Reinitialize start")
                 self.system.reinitialize(self.force_reinitialize)
+                self.top.toggle_sc(reactions, True)
                 if len(reactions) > 0 and self.daemon_integrator:
                     self.integrator.set_reactions(reactions, self.system)
+                self.top.toggle_sc(reactions, False)
                 self.logger.info("Reinitialize finished")
             self.logger.info(f"reactions {len(reactions)}")
 

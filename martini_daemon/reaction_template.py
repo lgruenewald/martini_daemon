@@ -14,6 +14,7 @@ class ReactionTemplate:
     retypes: list[tuple[int, int, str]]
     recharges: list[tuple[int, int, float]]
     remasses: list[tuple[int, int, float]]
+    soft_core: list[tuple[int, int, float, float]]
 
     def __init__(self, name):
         self.name = name
@@ -31,6 +32,7 @@ class ReactionTemplate:
         self.retypes = []
         self.recharges = []
         self.remasses = []
+        self.soft_core = []
 
     def is_complete(self) -> bool:
         # when a reaction is finished parsing, if this returns False

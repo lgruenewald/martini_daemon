@@ -53,7 +53,7 @@ class SysStar():
 
     def __init__(self, logger, nonbonded):
         # name, resid, resname, type, charge, mass
-        self._atom_list: list[tuple[str, int, str, str, float, float]] = []
+        self._atom_list: list[tuple[str, int, str, str, float, float, float, float]] = []
         # default charge and mass
         self._atom_types: OrderedDict[str, tuple[float, float]] = OrderedDict()
         self.context_initialized: bool = False
@@ -208,12 +208,12 @@ class SysStar():
     def new_residue(self):
         self.last_resid += 1
 
-    def add_atom(self, atom_name, resname, atom_type, charge, mass):
+    def add_atom(self, atom_name, resname, atom_type, charge, mass, sc_lam, sc_alpha):
         """Adds a atom to the list, and returns its atom_id"""
         if self.context_initialized:
             raise ValueError("Do this operation before context is initialized")
         charge, mass = self.get_defaults(atom_type, charge, mass)
-        self._atom_list.append((atom_name, self.last_resid, resname, atom_type, charge, mass))
+        self._atom_list.append((atom_name, self.last_resid, resname, atom_type, charge, mass, sc_lam, sc_alpha))
         return len(self._atom_list) - 1
 
     def rename(self, atom_id, new_name):
@@ -222,27 +222,35 @@ class SysStar():
         self._atom_list[atom_id] = tuple(elems)
 
     def retype(self, atom_id, new_type):
-        a, b, c, old_type, charge, d = self._atom_list[atom_id]
-        self._atom_list[atom_id] = (a, b, c, new_type, charge, d)
+        a, b, c, old_type, charge, d, sc_lam, sc_alpha = self._atom_list[atom_id]
+        self._atom_list[atom_id] = ((a, b, c, new_type, charge, d, sc_lam, sc_alpha))
         if self.context_initialized and old_type != new_type:
             self.nonbonded_force.update_params(
-                atom_id, new_type, charge, False
+                atom_id, new_type, charge, sc_lam, sc_alpha, False
             )
 
     def recharge(self, atom_id, new_charge):
-        a, b, c, type, old_charge, d = self._atom_list[atom_id]
-        self._atom_list[atom_id] = (a, b, c, type, new_charge, d)
+        a, b, c, type, old_charge, d, sc_lam, sc_alpha = self._atom_list[atom_id]
+        self._atom_list[atom_id] = ((a, b, c, type, new_charge, d, sc_lam, sc_alpha))
         if self.context_initialized and old_charge != new_charge:
             self.nonbonded_force.update_params(
-                atom_id, type, new_charge, True
+                atom_id, type, new_charge, sc_lam, sc_alpha, True
             )
 
     def remass(self, atom_id, new_mass):
-        a, b, c, d, e, old_mass = self._atom_list[atom_id]
-        self._atom_list[atom_id] = (a, b, c, d, e, new_mass)
+        a, b, c, d, e, old_mass, sc_lam, sc_alpha = self._atom_list[atom_id]
+        self._atom_list[atom_id] = ((a, b, c, d, e, new_mass, sc_lam, sc_alpha))
         if self.context_initialized and new_mass != old_mass:
             self._system.setParticleMass(atom_id, new_mass)
             self._reinitialize = True
+
+    def update_sc(self, atom_id, new_lam, new_alpha):
+        a, b, c, type, charge, d, old_lam, old_alpha = self._atom_list[atom_id]
+        self._atom_list[atom_id] = ((a, b, c, type, charge, d, new_lam, new_alpha))
+        if self.context_initialized and old_lam != new_lam:
+            self.nonbonded_force.update_params(
+                atom_id, type, charge, new_lam, new_alpha, False
+            )
 
     def update_atom(self, atom_id, atom_type, charge, mass):
         self.retype(atom_id, atom_type)
@@ -251,17 +259,17 @@ class SysStar():
 
     def build_system(self):
         self._system = mm.System()
-        for (_, _, _, _, _, mass) in filter(None, self._atom_list):
+        for (_, _, _, _, _, mass, _, _) in filter(None, self._atom_list):
             self._system.addParticle(mass)
 
     def get_atom_name(self, i):
-        name, _, _, _, _, _ = self._atom_list[i]
+        name, _, _, _, _, _, _, _ = self._atom_list[i]
         return name
 
     def get_atom_details(self, i):
         """Returns the atom's type, charge, mass"""
-        _, _, _, type, charge, mass = self._atom_list[i]
-        return (type, charge, mass)
+        _, _, _, type, charge, mass, sc_lam, sc_alpha = self._atom_list[i]
+        return (type, charge, mass, sc_lam, sc_alpha)
 
     def len_atoms(self):
         return len(self._atom_list)

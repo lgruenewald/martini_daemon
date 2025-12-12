@@ -42,10 +42,9 @@ tests = [
     "restricted_dihedral", "restricted_angle", "combined_bending_torsion",
 ]
 
-
 # == TEST CLASS ==
 class TestSingleFrame():
-
+    
     def apply_constraints(self):
         # applies constraints and vsites and checks for position change
         platform = mm.Platform.getPlatformByName("Reference")
