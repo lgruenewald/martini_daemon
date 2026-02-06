@@ -4,7 +4,7 @@ from .meta import alias
 from .gro_file import read_gro
 from .utils import backup_try
 from .reporters.checkpoint_reporter import load_checkpoint
-from .components.reaction_sensitive_integrator import DaemonIntegrator
+from .components.daemon_integrator import DaemonIntegrator
 import sys
 import openmm as mm
 import logging
@@ -249,6 +249,9 @@ class Simulation():
             rep._simulation = self
             self.system.add_reporter(rep)
             self.top.add_reporter(rep)
+            if self.daemon_integrator:
+                integrator.add_reporter(rep)
+
         self.reporters = reporters
 
         self.system.set_xtc_path(self.traj_path)
@@ -348,9 +351,20 @@ class Simulation():
                 self.logger.info("Modification finished")
             if len(reactions) > 0 or self.force_reinitialize:
                 self.logger.info("Reinitialize start")
+                # TODO fix redundant reinitializes with update parameter in context for softcore
                 self.system.reinitialize(self.force_reinitialize)
+                for rep in self.reporters:
+                    rep.post_reinitialize(self.i)
+                self.top.toggle_sc(reactions, True)
+                self.system.reinitialize(self.force_reinitialize)
+                for rep in self.reporters:
+                    rep.post_sc_enable(self.i)
                 if len(reactions) > 0 and self.daemon_integrator:
-                    self.integrator.set_reactions(reactions, self.system)
+                    self.integrator.set_reactions(reactions, self.system, self.top)
+                self.top.toggle_sc(reactions, False)
+                self.system.reinitialize(self.force_reinitialize)
+                for rep in self.reporters:
+                    rep.post_sc_disable(self.i)
                 self.logger.info("Reinitialize finished")
             self.logger.info(f"reactions {len(reactions)}")
 

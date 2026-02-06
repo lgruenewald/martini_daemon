@@ -24,6 +24,7 @@ def rootdir(request):
 
 tests = [
     # usual suspects
+    "cutoff_LJ",
     "cmap", "pairs", "pairs_VW", "pairs_VWQ", "pairs_type",
     # biomolecule tests
     "trypsin", "posres",
@@ -42,16 +43,15 @@ tests = [
     "restricted_dihedral", "restricted_angle", "combined_bending_torsion",
 ]
 
-
 # == TEST CLASS ==
 class TestSingleFrame():
-
+    
     def apply_constraints(self):
         # applies constraints and vsites and checks for position change
         platform = mm.Platform.getPlatformByName("Reference")
         _, respos, _ = read_gro(self.respos)
         ok, res = DaemonTopFile(
-            self.top, NonBonded(), respos=respos,
+            self.top, NonBonded(cutoff_nm=1.1), respos=respos,
             experimental=True
         )
         assert ok
@@ -78,7 +78,7 @@ class TestSingleFrame():
         platform = mm.Platform.getPlatformByName("Reference")
         _, respos, _ = read_gro(self.respos)
         ok, res = DaemonTopFile(
-            self.top, NonBonded(), respos=respos,
+            self.top, NonBonded(cutoff_nm=1.1), respos=respos,
             experimental=True
         )
         assert ok
@@ -99,7 +99,11 @@ class TestSingleFrame():
             forces[vsite * 3 + 1] = 0.
             forces[vsite * 3 + 2] = 0.
 
-        e_diff = math.fabs(self.gmx_energy / energy - 1)
+        if energy != 0.:
+            e_diff = math.fabs(self.gmx_energy / energy - 1)
+        else:
+            assert self.gmx_energy == energy, f"{self.gmx_energy} != {energy}"
+            e_diff = 0
         e_percent = e_diff * 100
         assert e_diff < e_tol, (
             f"Gmx and daemon energy different by {e_percent:.2f} %.\n"
@@ -118,7 +122,7 @@ class TestSingleFrame():
         atom_index = i_max // 3
         atom_dim = i_max % 3
         assert np.allclose(self.gmx_forces, forces, f_tol, 0), (
-            f"Gmx and daemon forces different by {f_percent:.2f}.\n"
+            f"Gmx and daemon forces different by {f_percent:.2f} %.\n"
             f"Particle {atom_index} "
             f"dimension {atom_dim}\n"
             f"Absolute diff: {abs_diff:.3e}    relative diff: {max:.3e}\n"

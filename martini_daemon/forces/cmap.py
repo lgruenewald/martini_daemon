@@ -26,6 +26,7 @@ class Cmap(Force):
             raise ValueError(f"Unknown CMAP type for {types}.")
         p1, p2, *ps = default
         assert p1 == p2
+        assert len(ps) == p1*p2
         
         # rearrangement as in https://github.com/openmm/openmm/blob/master/wrappers/python/openmm/app/gromacstopfile.py
         # lines 959-984

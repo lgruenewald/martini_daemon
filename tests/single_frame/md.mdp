@@ -47,6 +47,6 @@ gen_seed                 = 11111
 
 constraints              = none 
 constraint_algorithm     = Lincs
-continuation = no
+continuation = yes
 lincs_order = 4
 lincs_warnangle = 30

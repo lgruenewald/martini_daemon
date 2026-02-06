@@ -304,7 +304,7 @@ class TopStar():
             if resnum != prev_resnum:
                 self.system.new_residue()
                 prev_resnum = resnum
-            p = self.system.add_atom(atomname, resname, type, charge, mass)
+            p = self.system.add_atom(atomname, resname, type, charge, mass, 1, 0.5)
             atoms.append(p)
             self.defrag_list.append([])
             self.interaction_list.append([])
@@ -649,3 +649,28 @@ class TopStar():
             reporter.post_modification(i, self.out_name, completed_reactions)
 
         return completed_reactions
+
+    def toggle_sc(
+            self, reactions: list[tuple[list[Fragment], ReactionTemplate]],
+            toggle: bool
+    ) -> None:
+        for (frags, rx) in reactions:
+            for (id, atom, new_lam, new_alpha) in rx.soft_core:
+                atom_id = frags[id].atoms[atom]
+                if atom_id == -1:
+                    continue
+                if toggle:
+                    self.system.update_sc(atom_id, new_lam, new_alpha)
+                else:
+                    self.system.update_sc(atom_id, 1, 0.5)
+
+#            for f in frags:
+#                for atom_id in f.atoms:
+#                    if atom_id == -1:
+#                         continue
+#                    if toggle:
+#                        self.system.update_sc(atom_id, 0.6, 0.5)
+#                    else:
+#                        self.system.update_sc(atom_id, 1, 0.5)
+        return
+

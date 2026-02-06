@@ -1,0 +1,62 @@
+SysStar dump
+# of atoms 4
+
+==== Frame 0 ====
+Atom list
+(name, resname, type, charge, mass, sc_lam, sc_alpha)
+('X', 1, 'X1', 'W', 0.0, 72.0, 1, 0.5)
+('X', 1, 'X2', 'W', 0.0, 72.0, 1, 0.5)
+('X', 1, 'X3', 'W', 0.0, 72.0, 1, 0.5)
+('X', 1, 'X4', 'W', 0.0, 72.0, 1, 0.5)
+
+Force list
+Force <martini_daemon.forces.constraint.Constraint object at 0x72be9a8e56a0>
+Force <martini_daemon.forces.harmonic_bond.HarmonicBond object at 0x72be9a8e57f0>
+(0, 1, 0.5, 1000.0)
+(1, 2, 0.5, 1000.0)
+(2, 3, 0.5, 1000.0)
+Force <martini_daemon.forces.harmonic_angle.HarmonicAngle object at 0x72be9a8e5d30>
+(0, 1, 2, 1.0471975511965976, 100.0)
+(1, 2, 3, 1.0471975511965976, 100.0)
+Force <martini_daemon.forces.proper_dihedral.ProperDihedral object at 0x72be9a8e5e80>
+(0, 1, 2, 3, 1.0471975511965976, 30.0, 1)
+Force <martini_daemon.forces.improper_dihedral.ImproperDihedral object at 0x72be9a8e5fd0>
+Force <martini_daemon.forces.g96angle.G96Angle object at 0x72be9a8e6120>
+Force <martini_daemon.forces.restricted_angle.RestrictedAngle object at 0x72be9a8e6270>
+Force <martini_daemon.forces.combined_bending_torsion.CombinedBendingTorsion object at 0x72be9a8e63c0>
+Force <martini_daemon.forces.rbtorsion.RBTorsion object at 0x72be9a8e6510>
+Force <martini_daemon.forces.morse_bond.MorseBond object at 0x72be9a8e5940>
+Force <martini_daemon.forces.cubic_bond.CubicBond object at 0x72be9a8e5a90>
+Force <martini_daemon.forces.fene_bond.FENEBond object at 0x72be9a8e5be0>
+Force <martini_daemon.forces.g96bond.G96Bond object at 0x72be9a8e6660>
+Force <martini_daemon.forces.connection.Connection object at 0x72be9a8e67b0>
+Force <martini_daemon.forces.distance_restraint.DistanceRestraint object at 0x72be9a8e6900>
+Force <martini_daemon.forces.urey_bradley.UreyBradley object at 0x72be9a8e6a50>
+Force <martini_daemon.forces.restricted_dihedral.RestrictedDihedral object at 0x72be9a8e6ba0>
+Force <martini_daemon.forces.cross_bond_bond.CrossBondBond object at 0x72be9a8e6cf0>
+Force <martini_daemon.forces.cross_bond_angle.CrossBondAngle object at 0x72be9a8e6e40>
+Force <martini_daemon.forces.quartic_angle.QuarticAngle object at 0x72be9a8e6f90>
+Force <martini_daemon.forces.linear_angle.LinearAngle object at 0x72be9a8e70e0>
+Force <martini_daemon.forces.position_restraint.PositionRestraint object at 0x72be9a8e74d0>
+Force <martini_daemon.vsites.one.VSiteOne object at 0x72be9a8e7620>
+Force <martini_daemon.vsites.two.VSiteTwo object at 0x72be9a8e7770>
+Force <martini_daemon.vsites.three.VSiteThree object at 0x72be9a8e7a10>
+Force <martini_daemon.vsites.two_fd.VSite2fd object at 0x72be9a8e78c0>
+Force <martini_daemon.vsites.three_fd.VSite3fd object at 0x72be9a8e7b60>
+Force <martini_daemon.vsites.four_fdn.VSite4fdn object at 0x72be9a924050>
+Force <martini_daemon.vsites.weighed_average.VSiteWeighedAverage object at 0x72be9a9241a0>
+Force <martini_daemon.vsites.three_fad.VSite3fad object at 0x72be9a8e7cb0>
+Force <martini_daemon.vsites.three_out.VSite3out object at 0x72be9a8e7e00>
+Force <martini_daemon.vsites.center_of_mass.VSiteCenterOfMass object at 0x72be9a9242f0>
+Force <martini_daemon.forces.nonbonded.NonBonded object at 0x72be9a8e5010>
+List is none
+Force <martini_daemon.forces.nonbonded.ExclusionHelper object at 0x72be9a9246e0>
+(0, 1)
+(1, 2)
+(2, 3)
+Force <martini_daemon.forces.pairs.Pairs object at 0x72be9a8e7230>
+Force <martini_daemon.forces.cmap.Cmap object at 0x72be9a8e7380>
+Force <martini_daemon.forces.custom_reactive.CustomReactive object at 0x72be9a924440>
+Force <martini_daemon.forces.periodic_gaussian.PeriodicGaussian object at 0x72be9a924590>
+==== End of Frame 0 ====
+
