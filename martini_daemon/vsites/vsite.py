@@ -16,6 +16,8 @@ class VirtualSite():
 
     _filters = set()
 
+    _destroyable = False
+
     def is_instance(self, filter) -> bool:
         return filter in self._filters
 

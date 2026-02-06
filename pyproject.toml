@@ -14,4 +14,4 @@ dependencies = ["numpy", "openmm", "freud-analysis"]
 dynamic = ["version"]
 
 [project.optional-dependencies]
-all = ["molly"]
+all = ["molly@git+https://git.sr.ht/~ma3ke/molly#egg=molly&subdirectory=bindings/python"]

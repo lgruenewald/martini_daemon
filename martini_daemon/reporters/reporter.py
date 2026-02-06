@@ -103,9 +103,11 @@ class Reporter():
         # called before the modification algorithm with a list of reactions
         # to be processed in the modification algorithm
         # only called if len(reactions) > 0
+        # beware: some reactions can be rejected by the modification algorithm
+        # use post_modification for accurate reactions
         pass
 
-    def post_modification(self, i, name):
+    def post_modification(self, i, name, reactions):
         # called after the modification algorithm, before the system is
         # reinitialized. Only runs if there were reactions.
         pass

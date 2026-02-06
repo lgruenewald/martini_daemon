@@ -331,6 +331,64 @@ class SysStar():
         if self._reinitialize or force:
             self._context.reinitialize(preserveState=True)
 
+    def iterate_looking_for_NaN(self):
+        """
+        Destructive function! only call in error handling when
+        looking for the potential energy for each force.
+        """
+
+        def reinit():
+            self._context.reinitialize(preserveState=True)
+
+        def get_force(name):
+            try:
+                state = self._context.getState(energy=True)
+                pot = state.getPotentialEnergy().value_in_unit(
+                    mm.unit.kilojoules_per_mole
+                )
+                print(f"{name} potential - {pot}")
+            except mm.OpenMMException:
+                print(f"{name} - OpenMMException")
+
+        for force in self.modular_forces:
+            if not force._destroyable:
+                continue
+            force.destroy()
+
+        # remove barostat etc
+        for force in self._forces_list:
+            self._system.removeForce(0)
+        self._forces_list = []
+
+        reinit()
+
+        print()
+        print("===============================================")
+        print("Potential energies for each component (kJ/mol):")
+        get_force("Baseline")
+        for force in self.modular_forces:
+            if not force._destroyable:
+                continue
+
+            force._rebuild = True
+            force.build()
+            assert len(self._forces_list) == 1
+            assert self._system.getNumForces() == 1
+            reinit()
+            get_force(force.__class__.__name__)
+            force.destroy()
+
+        print("===============================================")
+        print()
+
+        for force in self.modular_forces:
+            if not force._destroyable:
+                continue
+            force._rebuild = True
+            force.build()
+
+        reinit()
+
     def set_positions(self, positions):
         if not self.context_initialized:
             raise Exception("Initialize the context first")

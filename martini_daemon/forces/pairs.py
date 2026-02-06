@@ -37,6 +37,11 @@ class Pairs(Force):
         t2, q2, _ = self._sysstar.get_atom_details(j)
         qprod = q1 * q2
         if sigma is None or epsilon is None:
+            if self.types.get((t1, t2)) is None:
+                raise ValueError(
+                    f"Unknown pair type ({t1}, {t2})."
+                    f" Valid types are: {self.types.keys()}."
+                )
             sigma, epsilon = self.types[(t1, t2)]
         c6 = 4 * epsilon * (sigma ** 6)
         c12 = 4 * epsilon * (sigma ** 12)

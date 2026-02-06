@@ -35,6 +35,7 @@ class Force():
     _members: int
     _pbc: bool = True
     _filters: set[string] = set()
+    _destroyable = True
 
     def add(self, members: list[int] | tuple[int], params: list[float] | tuple[float]) -> Interaction:
         params = tuple(members) + tuple(params)

@@ -30,3 +30,8 @@ information about each system.
   that Martini is implemented correctly by comparing it to GROMACS energies.
 - `graph` - tests for the graph matching algorithm
 - `detection` - tests for the detection algorithm
+
+# License
+
+Martini Daemon is licensed under the Apache 2.0 license.
+See LICENSE.txt for details.

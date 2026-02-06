@@ -604,7 +604,20 @@ class TopStar():
         for reporter in self.reporters:
             reporter.pre_modification(i, reactions, self.out_name)
 
+        completed_reactions = []
+
         for (frags, rx) in reactions:
+            # check if all reactants still exist
+            if any(
+                [self.frag_list.get(frag.frag_id) is None for frag in frags]
+            ):
+                # we have no way of detecting
+                # this in the detection algorithm, since this is
+                # about graphs being recalculated during reactions
+                # potentially invalidating other graphs that react
+                # in the same frame
+                continue
+
             # just normal atoms to instantiate products over
             product_atoms = []
             # which atoms to recalculate graphs over
@@ -628,7 +641,11 @@ class TopStar():
 
             self.try_match_graphs(graph_recalc)
 
+            completed_reactions.append((frags, rx))
+
         self.update_frag_counts()
 
         for reporter in self.reporters:
-            reporter.post_modification(i, self.out_name)
+            reporter.post_modification(i, self.out_name, completed_reactions)
+
+        return completed_reactions

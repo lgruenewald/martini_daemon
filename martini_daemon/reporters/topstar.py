@@ -15,7 +15,7 @@ class TopStarLogger(Reporter):
         if i == 0:
             self.post_modification(i, name)
 
-    def post_modification(self, i, name) -> None:
+    def post_modification(self, i, name, reactions) -> None:
         topstar = self._topstar
         self._print(f"===== Frame {i} =====")
         self._print("==== TopStar / Molecules ====")
@@ -92,7 +92,8 @@ class ReactionReporter(Reporter):
                 mols.add(f"{self.mapping[atom]}")
         return "(mol:" + ",".join(mols) + ")"
 
-    def pre_modification(self, i, reactions, name) -> None:
+    # need to be post, as the modification algorithm can reject some reactions
+    def post_modification(self, i, name, reactions) -> None:
         for (frags, rx) in reactions:
             self._print(
                 f"{i},{rx.name};"
@@ -126,3 +127,19 @@ class FragCountReporter(Reporter):
 
     def interactive_line(self) -> str:
         return f"fragments: {len(self._topstar.frag_list)}"
+
+
+# for debugging reactions
+class LastReactionGeometryReporter(Reporter):
+    def pre_modification(self, i, reactions, name):
+        self._sysstar.write_gro(name + "_last_reaction.gro")
+
+
+class ReactionException(Exception):
+    pass
+
+
+# for debugging reactions, to stop simulations after reaction
+class ReactionExceptionReporter(Reporter):
+    def post_modification(self, i, name):
+        raise ReactionException

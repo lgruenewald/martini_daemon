@@ -218,6 +218,8 @@ class Simulation():
                 neighbor_cutoff,
                 max_absolute_rate, rate_highest_probability
             )
+        if self.daemon_integrator:
+            integrator.system = self.system
         self.logger.info("Parsing finished")
 
         # Coupling and integrators
@@ -328,10 +330,12 @@ class Simulation():
             else:
                 time_fmt = f"Longer than a month ({time_left} seconds)"
             reporter_data = " ".join(filter(None, [r.interactive_line() for r in self.reporters]))
-            sys.stdout.write(f"\033[2K\rstep {self.i}"
-                             f"({ns_so_far:.2f} ns, "
-                             f"{percent:.1f}%) "
-                             f"{time_fmt} {reporter_data}")
+            sys.stdout.write(
+                f"\033[2K\rstep {self.i}"
+                f"({ns_so_far:.2f} ns, "
+                f"{percent:.1f}%) "
+                f"{time_fmt} {reporter_data}"
+            )
         if dm:
             self.logger.info("Detection start")
             pos, box = self.system.get_positions()
@@ -339,14 +343,14 @@ class Simulation():
             self.logger.info("Detection finished")
             if len(reactions) > 0:
                 self.logger.info("Modification start")
+                reactions = self.top.modification(self.i, reactions)
                 self.reactions += len(reactions)
-                if self.daemon_integrator:
-                    self.integrator.set_reactions(reactions)
-                self.top.modification(self.i, reactions)
                 self.logger.info("Modification finished")
             if len(reactions) > 0 or self.force_reinitialize:
                 self.logger.info("Reinitialize start")
                 self.system.reinitialize(self.force_reinitialize)
+                if len(reactions) > 0 and self.daemon_integrator:
+                    self.integrator.set_reactions(reactions, self.system)
                 self.logger.info("Reinitialize finished")
             self.logger.info(f"reactions {len(reactions)}")
 

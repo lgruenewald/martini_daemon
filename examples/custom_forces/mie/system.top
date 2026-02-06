@@ -1,5 +1,5 @@
-#include "../../itp/martini_v3.0.0.itp"
-#include "../../itp/martini_v3.0.0_solvents_v1.itp"
+#include "../../../itp/martini_v3.0.0.itp"
+#include "../../../itp/martini_v3.0.0_solvents_v1.itp"
 
 [ system ]
 ; name

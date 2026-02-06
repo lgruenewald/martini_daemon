@@ -460,6 +460,7 @@ def DaemonTopFile(
                 tokens[index],
                 f"Unknown atom type {type}."
             )
+        return type
 
     def process_pairtypes(tokens):
         this_is_experimental(

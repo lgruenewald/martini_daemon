@@ -43,7 +43,7 @@ def mie_2derivative(x, n, m, sigma, epsilon):
         + m * (m + 1) * (sigma ** m) / (x ** (m + 2))
     )
 
-def derivative_shifted(x, n, m, b, c, s, sigma, epsilon):
+def derivative_shifted(x, n, m, a, b, c, s, sigma, epsilon):
     """
     V'(x) shifted mie potential derivative for order m>n.
     Args:
@@ -55,7 +55,7 @@ def derivative_shifted(x, n, m, b, c, s, sigma, epsilon):
         + c * (x - s) ** 3 / 6
     )
 
-def potential_shifted(x, n, m, b, c, s, sigma, epsilon):
+def potential_shifted(x, n, m, a, b, c, s, sigma, epsilon):
     """
     V(x) shifted mie potential for order m>n.
     Args:
@@ -63,7 +63,8 @@ def potential_shifted(x, n, m, b, c, s, sigma, epsilon):
     n, m, sigma, epsilon - mie_potential() args
     """
     return mie_potential(x, n, m, sigma, epsilon) + (
-        b * (x - s) ** 3 / 6
+        a
+        + b * (x - s) ** 3 / 6
         + c * (x - s) ** 4 / 24
     )
 
@@ -77,8 +78,8 @@ def convert_parameters(n, m, sigma, epsilon, cutoff):
     - switch - switching distance
     """
     # new sigma calculation - keep minimum where it was
-    r_min_mie = mie_potential_minimum(m, n, sigma)
-    r_min_LJ = mie_potential_minimum(6, 12, sigma)
+    r_min_mie = mie_potential_minimum(n, m, sigma)
+    r_min_LJ = mie_potential_minimum(12, 6, sigma)
     new_sigma = sigma * r_min_LJ / r_min_mie
 
     # switching constant calculation
@@ -87,12 +88,18 @@ def convert_parameters(n, m, sigma, epsilon, cutoff):
     diff = cutoff - r_min_LJ
     b = 2 * Fpc / diff - 6 * Fc / (diff ** 2)
     c = 12 * Fc / (diff ** 3) - 6 * Fpc / (diff ** 2)
+    a = -potential_shifted(
+        cutoff, n, m, 0, b, c, r_min_LJ,
+        new_sigma, epsilon
+    )
 
     # epsilon adjustment - BROKEN?
     # mie integral
-    res = 100
+    res = 1000
     x = np.linspace(new_sigma, cutoff, res)
-    V = potential_shifted(x, n, m, b, c, r_min_LJ, new_sigma, epsilon)
+    V = potential_shifted(x, n, m, a, b, c, r_min_LJ, new_sigma, epsilon)
+    # it's not so easy writing an analytical integral for any n/m pair
+    # (with switch/shift)
     integral = np.trapz(V * (x ** 2), x)
     # LJ integral
     integral_LJ = -8/9 * sigma ** 3 * epsilon
@@ -102,7 +109,7 @@ def convert_parameters(n, m, sigma, epsilon, cutoff):
     return (
         new_sigma,
         new_epsilon,
-        b, c,
+        a, b, c,
         r_min_LJ
     )
     
@@ -121,7 +128,7 @@ class MiePotential(NonBonded):
         epsilon_r = self.epsilon_r
         C = (mie_n) / (mie_n-mie_m) * ((mie_n/mie_m) ** (mie_m/(mie_n-mie_m)))
         self._force_obj = mm.CustomNonbondedForce(
-            "step(rcut-r)*(F + S + ES);"
+            "step(rcut-r)*(F + S + a(type1,type2) + ES);"
             f"F={C}*epsilon(type1,type2)*(term^{mie_n}-term^{mie_m});"
             "term=sigma(type1,type2)/r;"
             "S=step(diff)*(b(type1,type2)/6*diff^3+c(type1,type2)/24*diff^4);"
@@ -164,20 +171,23 @@ class MiePotential(NonBonded):
         sigma = []
         # adjusted epsilons
         epsilon = []
-        # switch+shift param quadratic
+        # shift linear
+        a = []
+        # switch+shift param quadratic (in force)
         b = []
-        # switch+shift param cubic
+        # switch+shift param cubic (in force)
         c = []
         # switch point
         switch = []
         for i in range(len(lj_sigma)):
             (
                 new_sigma, new_epsilon,
-                new_b, new_c,
+                new_a, new_b, new_c,
                 new_switch
             ) = convert_parameters(mie_m, mie_n, lj_sigma[i], lj_epsilon[i], cutoff)
             sigma.append(new_sigma)
             epsilon.append(new_epsilon)
+            a.append(new_a)
             b.append(new_b)
             c.append(new_c)
             switch.append(new_switch)
@@ -188,6 +198,9 @@ class MiePotential(NonBonded):
         )
         self._force_obj.addTabulatedFunction(
             "epsilon", mm.Discrete2DFunction(n, n, epsilon)
+        )
+        self._force_obj.addTabulatedFunction(
+            "a", mm.Discrete2DFunction(n, n, a)
         )
         self._force_obj.addTabulatedFunction(
             "b", mm.Discrete2DFunction(n, n, b)
