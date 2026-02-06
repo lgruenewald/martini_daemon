@@ -1,0 +1,48 @@
+#include "../../../itp/martini_v3.0.0.itp"
+
+[moleculetype]
+X 1
+[atoms]
+1 W 1 X1 X 1
+2 W 1 X2 X 1
+3 W 1 X3 X 1
+4 W 1 X4 X 1
+
+[bonds]
+1 2 1 0.5 1000
+2 3 1 0.5 1000
+3 4 1 0.5 1000
+
+[angles]
+1 2 3 1 60 100
+2 3 4 1 60 100
+
+[dihedrals]
+1 2 3 4 1 60 30 1
+
+#ifdef DAEMON
+[graph]
+name x
+atom x X1 W
+atom y X2 W
+atom z X3 W
+atom w X4 W
+bond x y
+bond y z
+bond z w
+
+[reaction]
+x_break
+[reactants]
+x
+
+[conditions]
+r_min 1:y 1:z 0.4
+#endif
+
+[system]
+modification test
+
+[molecules]
+X 1
+

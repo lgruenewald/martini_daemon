@@ -1,19 +1,5 @@
 import openmm as mm
-
-
-class DaemonIntegrator():
-    def set_reactions(self, reactions):
-        pass
-
-    def step(self, n_steps):
-        pass
-
-    def get_integrator(self):
-        pass
-
-    def getStepSize(self):
-        pass
-
+from .daemon_integrator import DaemonIntegrator
 
 class ReactionSensitiveLangevinIntegrator(DaemonIntegrator):
 
@@ -40,7 +26,7 @@ class ReactionSensitiveLangevinIntegrator(DaemonIntegrator):
         self.remaining = 0
         self.minsteps = minimization_steps
 
-    def set_reactions(self, reactions, system):
+    def set_reactions(self, reactions, system, top):
         self.remaining = self.eqlen
         self.integrator.setCurrentIntegrator(1)
         if self.minsteps > 0:
@@ -55,16 +41,25 @@ class ReactionSensitiveLangevinIntegrator(DaemonIntegrator):
                     asNumpy=True
                 )
             )
+            if self.reporters is not None:
+                for rep in self.reporters:
+                    rep.post_di_minimize()
+
+    def finish_equilibration(self):
+        self.integrator.setCurrentIntegrator(0)
+        if self.reporters is not None:
+            for rep in self.reporters:
+                rep.post_di_equilibrate()
 
     def step(self, n_steps):
         if self.remaining >= n_steps:
             self.remaining -= n_steps
             self.integrator.step(n_steps * self.subdivision)
             if self.remaining == 0:
-                self.integrator.setCurrentIntegrator(0)
+                self.finish_equilibration()
         elif self.remaining > 0:
             self.integrator.step(self.remaining * self.subdivision)
-            self.integrator.setCurrentIntegrator(0)
+            self.finish_equilibration()
             self.integrator.step(n_steps - self.remaining)
             self.remaining = 0
         else:

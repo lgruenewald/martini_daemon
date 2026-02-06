@@ -15,6 +15,7 @@ class Force():
         self._sysstar = sysstar
         self._rebuild: bool = True
         self._force_obj: mm.Force = None
+        self._force_group: int | None = None
 
     # classes inheriting force must set these three functions and one int
     def _set_force_obj(self) -> None:
@@ -59,6 +60,8 @@ class Force():
         if self._rebuild:
             self.destroy()
             self._set_force_obj()
+            if self._force_group is not None:
+                self._force_obj.setForceGroup(self._force_group)
             for params in filter(None, self._list):
                 self._add_to_force_obj(params)
             if self._pbc:
@@ -103,6 +106,13 @@ class Force():
 
     def __len__(self) -> int:
         return len(self._list)
+
+    def set_force_group(self, fg: int) -> bool:
+        self._force_group = fg
+        return True
+
+    def get_force_group(self) -> int | None:
+        return self._force_group
 
 
 @dataclass

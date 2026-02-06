@@ -114,6 +114,8 @@ class NonBonded(Force):
         if self._rebuild:
             self.destroy()
             self._build()
+            if self._force_group is not None:
+                self._force_obj.setForceGroup(self._force_group)
             # self._force_obj.setUsesPeriodicBoundaryConditions(True)
             # not applicable for non bonded, they use setNonBondedMethod
             self._rebuild = False
@@ -240,6 +242,8 @@ class ExclusionHelper(Force):
         if self._rebuild:
             self.destroy()
             self._build()
+            if self._force_group is not None:
+                self._force_obj.setForceGroup(self._force_group)
             self._force_obj.setUsesPeriodicBoundaryConditions(True)
             self._rebuild = False
             self._sysstar._forces_list.append(self._force_obj)

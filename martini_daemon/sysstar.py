@@ -126,10 +126,16 @@ class SysStar():
             self.custom_reactive, self.periodic_gaussian
         ]
 
-        # total list of filters
+        # total list of filters, force groups
         self.filters = set()
+        cfg = 0
         for f in self.modular_forces:
             self.filters |= f._filters
+            # have to be careful, as max of 32 force groups possible
+            if f.set_force_group(cfg):
+                cfg += 1
+            if cfg == 33:
+                raise Exception("Too many forces, not enough force groups")
 
         # every vsite atom_id should be put here, this is useful for analysis
         self.vsites: list[int] = []
@@ -247,7 +253,7 @@ class SysStar():
     def update_sc(self, atom_id, new_lam, new_alpha):
         a, b, c, type, charge, d, old_lam, old_alpha = self._atom_list[atom_id]
         self._atom_list[atom_id] = ((a, b, c, type, charge, d, new_lam, new_alpha))
-        if self.context_initialized and old_lam != new_lam:
+        if self.context_initialized and (old_lam != new_lam or old_alpha != new_alpha):
             self.nonbonded_force.update_params(
                 atom_id, type, charge, new_lam, new_alpha, False
             )
@@ -538,3 +544,23 @@ class SysStar():
         )
         for reporter in self.reporters:
             reporter.on_write_gro(pos, box, path[:-4])
+
+    def get_energies_and_forces_by_group(self) -> str:
+        if not self.context_initialized:
+            raise Exception("Initialize the context first")
+        res = []
+        for f in self.modular_forces:
+            fg = f.get_force_group()
+            if fg is not None:
+                state = self._context.getState(
+                    energy=True, forces=True,
+                    groups={fg}
+                )
+                ener = state.getPotentialEnergy()
+                forces = np.abs(state.getForces(asNumpy=True))
+                max_force = np.max(forces)
+                max_index = np.argmax(forces) // 3
+                res.append(
+                    f"{f.__class__.__name__} energy: {ener} max_force {max_force} for particle {max_index}"
+                )
+        return "\n".join(res)

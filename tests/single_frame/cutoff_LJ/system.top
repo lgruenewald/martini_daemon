@@ -1,0 +1,27 @@
+#include "/martini/aster/martini_daemon/itp/martini_v3.0.0.itp"
+
+[ moleculetype ] 
+AA 1 
+
+[ atoms ]
+  1 TC5   1 X X   1 0.0  60.0
+  2 U   1 X X   2 0.0  60.0
+  3 U 1 X X   3 0.0  60.0
+  4 U   1 X X   4 0.0  60.0
+  5 U   1 X X   5 0.0  60.0
+  6 TC5   1 X X   6 0.0  60.0
+
+[ bonds ] 
+
+[ exclusions ]
+1 2 3
+2 3
+
+4 5 6
+5 6 
+
+[system]
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+[ molecules ]
+AA 1

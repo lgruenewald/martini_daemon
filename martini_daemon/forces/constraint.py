@@ -23,3 +23,6 @@ class Constraint(Force):
         raise Exception("Can't destroy constraints.")
 
     _filters = {"bond", "constraint"}
+
+    def set_force_group(self, fg):
+        return False

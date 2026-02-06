@@ -426,7 +426,7 @@ def DaemonTopFile(
         j = parse_pair(tokens, 1, index_type)
         last_molecule.add_exclusion(i, j)
         for k in range(2, len(tokens)):
-            c = unwrap(tokens, k, "index")
+            c = unwrap(tokens, k, index_type)
             last_molecule.add_exclusion(i, c)
 
     p.add_level("exclusions", process_exclusions, start=assert_last_molecule)
@@ -547,6 +547,12 @@ def DaemonTopFile(
             parse_pair(tokens, i, index_type)
             for i in range(5)
         ]
+        type = unwrap(tokens, 5, "int")
+        if type != 1:
+            raise TokenParseError(
+                tokens[5],
+                f"Unsupported cmap type {type}."
+            )
         # GromacsTopFile in openmm does support cmap types
         # here, but GROMACS seems to require [cmaptypes]
         # so we only support [cmaptypes]

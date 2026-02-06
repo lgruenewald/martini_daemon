@@ -112,6 +112,29 @@ class Reporter():
         # reinitialized. Only runs if there were reactions.
         pass
 
+    # ====== DaemonIntegrator hooks ======
+
+    def post_reinitialize(self, i):
+        # called after reinitializing post-reactions
+        pass
+
+    def post_sc_enable(self, i):
+        # called after enabling soft core
+        pass
+
+    def post_di_minimize(self):
+        # called after daemon integrator minimized
+        pass
+
+    def post_di_equilibrate(self):
+        # called after daemon integrator has equilibrated
+        pass
+
+    def post_sc_disable(self, i):
+        # called after soft core is disabled
+        pass
+
+
     # ====== Misc overloadable ======
     # adds something to the line shown interactively to the user
     def interactive_line(self) -> str:
