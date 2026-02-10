@@ -12,6 +12,7 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
 
     def __init__(
         self, dt_ps, T_K, friction_ps1, minimizer, minimization_steps=500,
+        report_every=0
     ):
         self.dt = dt_ps
         self.T = T_K
@@ -26,8 +27,18 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
         self.integrator.addIntegrator(minimizer)
         assert minimization_steps > 0, "Must specify minimization_steps > 0"
         self.minsteps = minimization_steps
+        self.report_every = report_every
 
-    def set_reactions(self, reactions, system, top):
+    def reset(self, shape):
+        self.minimizer.reset(shape)
+
+    def report(self, i, rem):
+        with open(f"{self.sim_name}_minimization{i}.log", "a") as f:
+            f.write(f"Simulation frame {i}, remaining steps {rem}\n")
+            f.write("==============================================\n")
+            f.write(self.minimizer.report())
+
+    def set_reactions(self, reactions, system, top, i):
         # save vels and zero them out
         vels = system._context.getState(
             velocities=True
@@ -37,8 +48,10 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
         system._context.setVelocities(
             np.zeros(shape=vels.shape)
         )
-        # set movable
         self.integrator.setCurrentIntegrator(1)
+        # integrator state setup
+        self.reset(vels.shape)
+        # set movable
         movable = np.zeros(shape=vels.shape)
         atoms = set()
         for (frags, _) in reactions:
@@ -57,12 +70,23 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
             movable
         )
         # minimize
-        self.integrator.step(self.minsteps)
+        if self.report_every == 0:
+            self.integrator.step(self.minsteps)
+        else:
+            # create/empty file
+            with open(f"{self.sim_name}_minimization{i}.log", "w") as f:
+                f.write("")
+            self.report(i, self.minsteps)
+            remaining = self.minsteps
+            while remaining > 0:
+                csteps = min(self.report_every, remaining)
+                self.integrator.step(csteps)
+                remaining -= csteps
+                self.report(i, remaining)
         # reporters and cleanup
         system._context.setVelocities(vels)
         for rep in self.reporters:
             rep.post_di_minimize()
-            rep.post_di_equilibrate()
         self.integrator.setCurrentIntegrator(0)
 
     def step(self, n_steps):

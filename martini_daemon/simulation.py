@@ -220,6 +220,7 @@ class Simulation():
             )
         if self.daemon_integrator:
             integrator.system = self.system
+            integrator.sim_name = sim_name
         self.logger.info("Parsing finished")
 
         # Coupling and integrators
@@ -360,7 +361,7 @@ class Simulation():
                 for rep in self.reporters:
                     rep.post_sc_enable(self.i)
                 if len(reactions) > 0 and self.daemon_integrator:
-                    self.integrator.set_reactions(reactions, self.system, self.top)
+                    self.integrator.set_reactions(reactions, self.system, self.top, self.i)
                 self.top.toggle_sc(reactions, False)
                 self.system.reinitialize(self.force_reinitialize)
                 for rep in self.reporters:

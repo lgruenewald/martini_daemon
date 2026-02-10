@@ -1332,7 +1332,7 @@ def DaemonTopFile(
         nonlocal last_reaction
         n_reac = len(last_reaction.reactants)
         if n_reac == 0:
-            raise ParseError("[reactants] must come before [recharge]")
+            raise ParseError("[reactants] must come before [soft_core]")
 
         i, j = parse_pair(tokens, 0, "pair")
         sc_lam = unwrap(tokens, 1, "float")

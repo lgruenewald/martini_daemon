@@ -5,7 +5,7 @@ from ..sysstar import SysStar
 
 class ReactionEnergyReporter(Reporter):
 
-    def __init__(self, write_coords=False, force_groups=False):
+    def __init__(self, write_coords=False, force_groups=False, softcore=False, volume=False):
         """
         Designed to work together with DaemonIntegrators (see martini_daemon.components subpackage)
 
@@ -16,6 +16,8 @@ class ReactionEnergyReporter(Reporter):
         """
         self.write_coords = write_coords
         self.force_groups = force_groups
+        self.softcore = softcore
+        self.volume = volume
 
     def on_set_xtc_path(self, xtc_name: str) -> None:
         self._open(xtc_name + ".rxener")
@@ -46,34 +48,39 @@ class ReactionEnergyReporter(Reporter):
         box_z = box[2][2].value_in_unit(mm.unit.nanometer)
         V = state.getPeriodicBoxVolume().value_in_unit(mm.unit.nanometer ** 3)
 
-        self._print(f"{title},{n},{ke},{pe},{te},{T},{box_x},{box_y},{box_z},{V}")
+        if self.volume:
+            self._print(f"{title},{n},{ke},{pe},{te},{T},{box_x},{box_y},{box_z},{V}")
+        else:
+            self._print(f"{title},{n},{ke},{pe},{te},{T}")
 
     def post_reinitialize(self, i):
         self.i = i
-        self.write_energies(f"After reaction frame {i}")
+        self.write_energies(f"Frame {i} after reinitialize")
         if self.write_coords:
             self._sysstar.write_gro(f"premin{i}.gro")
         self._write_force_groups(f"premin{self.i}")
 
     def post_sc_enable(self, i):
-        assert i == self.i
-        self.write_energies(f"After soft-core enable {i}")
+        if self.softcore:
+            assert i == self.i
+            self.write_energies(f"Frame {i} after sc enable")
 
     def post_di_minimize(self):
-        self.write_energies(f"After post-reaction minimization {self.i}")
+        self.write_energies(f"Frame {self.i} after minimization")
         if self.write_coords:
             self._sysstar.write_gro(f"postmin{self.i}.gro")
         self._write_force_groups(f"postmin{self.i}")
 
     def post_di_equilibrate(self):
-        self.write_energies(f"After post-reaction equilibration {self.i}")
+        self.write_energies(f"Frame {self.i} after equilibration")
         if self.write_coords:
             self._sysstar.write_gro(f"posteq{self.i}.gro")
         self._write_force_groups(f"posteq{self.i}")
 
     def post_sc_disable(self, i):
-        assert i == self.i
-        self.write_energies(f"After soft-core disable {i}")
+        if self.softcore:
+            assert i == self.i
+            self.write_energies(f"Frame {i} after sc disable")
 
     def _write_force_groups(self, title):
         if self.force_groups:

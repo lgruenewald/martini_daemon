@@ -594,7 +594,7 @@ class TopStar():
             self.system.remass(atom_id, new_mass)
 
     def modification(
-        self, 
+        self,
         i: int,
         reactions: list[tuple[list[Fragment], ReactionTemplate]]
     ) -> None:

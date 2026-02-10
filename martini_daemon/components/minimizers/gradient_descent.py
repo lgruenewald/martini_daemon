@@ -26,6 +26,7 @@ SOFTWARE.
 """
 
 import openmm as mm
+import numpy as np
 
 
 class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
@@ -41,14 +42,22 @@ class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
 
     """
 
-    def __init__(self, initial_step_size_nm=1., smoothing_factor=0.1, random_factor=0.0):
+    def __init__(self, initial_step_size_nm=1., smoothing_factor=0.1, random_factor=0.0, temperature=0):
         """
         Construct a gradient descent minimization integrator.
 
         Parameters
         ----------
         initial_step_size_nm
-        smoothing_factor
+
+        smoothing_factor - 0 to 1
+        the smaller the smoother but slower convergence
+
+        random_factor - 0=<, stddev for (1+random_factor*gaussian) multiplier
+        for random scaling of delta x
+
+        temperature - 0=<, acceptance criteria based on delta energy
+        the higher, the more likely the climbing of potential energy will be
 
         Notes
         -----
@@ -63,17 +72,29 @@ class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
         timestep = 0.
         super().__init__(timestep)
 
-        self.addGlobalVariable("step_size", initial_step_size_nm)
-        self.addGlobalVariable("energy_old", 0)
-        self.addGlobalVariable("energy_new", 0)
-        self.addGlobalVariable("delta_energy", 0)
-        self.addGlobalVariable("accept", 0)
-        self.addGlobalVariable("fnorm2", 0)
-        self.addPerDofVariable("x_old", 0)
-        self.addPerDofVariable("est_grad", 0)
-        self.addPerDofVariable("movable", 0)
-        self.addGlobalVariable("eta", smoothing_factor)
-        self.addGlobalVariable("random_factor", random_factor)
+        self.global_variables = {
+            "step_size": initial_step_size_nm,
+            "energy_old": 0,
+            "energy_new": 0,
+            "delta_energy": 0,
+            "accept": 0,
+            "fnorm2": 0,
+            "eta": smoothing_factor,
+            "random_factor": random_factor,
+            "probability": 0
+        }
+
+        self.per_dof_variables = {
+            "x_old": 0,
+            "est_grad": 0,
+            "movable": 0
+        }
+
+        for k, v in self.global_variables.items():
+            self.addGlobalVariable(k, v)
+
+        for k, v in self.per_dof_variables.items():
+            self.addPerDofVariable(k, v)
 
         # Update context state.
         self.addUpdateContextState()
@@ -86,20 +107,37 @@ class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
         self.addComputePerDof("x_old", "x")
 
         # Take step.
-        self.addComputePerDof("est_grad", "(1-eta)*est_grad + eta*f + random_factor*gaussian")
+        self.addComputePerDof("est_grad", "(1-eta)*est_grad + eta*f")
         self.addComputeSum("fnorm2", "est_grad^2")
-        self.addComputePerDof("x", "x+movable*step_size*est_grad/sqrt(fnorm2 + delta(fnorm2))")
+        self.addComputePerDof("x", "x+movable*step_size*(1+random_factor*gaussian)*est_grad/sqrt(fnorm2 + delta(fnorm2))")
         self.addConstrainPositions()
 
         # Ensure we only keep steps that go downhill in energy.
         self.addComputeGlobal("energy_new", "energy")
         self.addComputeGlobal("delta_energy", "energy_new-energy_old")
-        # Accept also checks for NaN
-        self.addComputeGlobal("accept", "step(-delta_energy) * delta(energy - energy_new)")
+        if temperature > 0:
+            self.addComputeGlobal("probability", "1/(1+exp(delta_energy / temperature))")
+            self.addComputeGlobal("accept", "step(probability-uniform) * delta(energy-energy_new)")
+        else:
+            # Accept also checks for NaN
+            self.addComputeGlobal("accept", "step(-delta_energy) * delta(energy - energy_new)")
 
         self.addComputePerDof("x", "accept*x + (1-accept)*x_old")
 
         # Update step size.
         self.addComputeGlobal("step_size", "step_size * (2.0*accept + 0.5*(1-accept))")
 
+    def reset(self, shape):
+        for k, v in self.global_variables.items():
+            self.setGlobalVariableByName(k, v)
 
+        for k, v in self.per_dof_variables.items():
+            assert v == 0
+            vals = np.zeros(shape)
+            self.setPerDofVariableByName(k, vals)
+
+    def report(self) -> str:
+        return "\n".join(
+            f"{k}: {self.getGlobalVariableByName(k)}"
+            for k in self.global_variables.keys()
+        ) + "\n"

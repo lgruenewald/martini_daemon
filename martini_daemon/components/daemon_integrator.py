@@ -2,7 +2,7 @@
 class DaemonIntegrator():
     reporters = None
 
-    def set_reactions(self, reactions, system, top):
+    def set_reactions(self, reactions, system, top, i):
         pass
 
     def step(self, n_steps):

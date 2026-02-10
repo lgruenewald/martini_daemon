@@ -404,6 +404,7 @@ class SysStar():
         reinit()
 
     def set_positions(self, positions):
+        # TODO - whole constraints and vsites
         if not self.context_initialized:
             raise Exception("Initialize the context first")
         if len(positions) != len(self._atom_list):

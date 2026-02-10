@@ -26,7 +26,7 @@ class ReactionSensitiveLangevinIntegrator(DaemonIntegrator):
         self.remaining = 0
         self.minsteps = minimization_steps
 
-    def set_reactions(self, reactions, system, top):
+    def set_reactions(self, reactions, system, top, i):
         self.remaining = self.eqlen
         self.integrator.setCurrentIntegrator(1)
         if self.minsteps > 0:
