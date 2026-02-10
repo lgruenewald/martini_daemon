@@ -2,7 +2,7 @@ from .forces.nonbonded import NonBonded
 from .top_parser import DaemonTopFile
 from .meta import alias
 from .gro_file import read_gro
-from .utils import backup_try
+from .utils import backup_try, format_time
 from .reporters.checkpoint_reporter import load_checkpoint
 from .components.daemon_integrator import DaemonIntegrator
 import sys
@@ -324,15 +324,7 @@ class Simulation():
         if self.md_steps > 0 and steps > 0:
             ns_so_far = self.dt_ns * self.i
             time_left = self.last_step_time * (self.md_steps - self.i)
-            time_fmt: str
-            if time_left < 3600:
-                time_fmt = time.strftime("%M:%S", time.gmtime(time_left))
-            elif time_left < 3600 * 24:
-                time_fmt = time.strftime("%H:%M:%S", time.gmtime(time_left))
-            elif time_left < 3600 * 24 * 30:
-                time_fmt = time.strftime("%dd %H:%M:%S", time.gmtime(time_left))
-            else:
-                time_fmt = f"Longer than a month ({time_left} seconds)"
+            time_fmt = format_time(time_left)
             reporter_data = " ".join(filter(None, [r.interactive_line() for r in self.reporters]))
             sys.stdout.write(
                 f"\033[2K\rstep {self.i}"

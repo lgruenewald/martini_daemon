@@ -21,6 +21,21 @@ def backup_try(path):
         print(f"Backed up {path} to {bkup_path}")
 
 
+def format_time(total):
+    c = int(total)
+    seconds = c % 60
+    c //= 60
+    minutes = c % 60
+    c //= 60
+    hours = c % 24
+    c //= 24
+    days = c
+
+    res = f"{hours:02}:{minutes:02}:{seconds:02}"
+    if days > 0:
+        res = f"{days}d " + res
+    return res
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cdef cnp.ndarray[cnp.float64_t] psub(double[:] v1, double[:] v2, double[:] size):
