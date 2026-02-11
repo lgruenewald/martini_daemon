@@ -42,7 +42,7 @@ class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
 
     """
 
-    def __init__(self, initial_step_size_nm=1., smoothing_factor=0.1, random_factor=0.0, temperature=0):
+    def __init__(self, initial_step_size_nm=0.1, smoothing_factor=0.1, random_factor=0.0, temperature=0):
         """
         Construct a gradient descent minimization integrator.
 

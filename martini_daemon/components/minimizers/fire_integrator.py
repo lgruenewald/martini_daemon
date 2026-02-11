@@ -27,6 +27,7 @@ SOFTWARE.
 
 import openmm as mm
 from openmm import unit
+import numpy as np
 
 
 class FIREMinimizationIntegrator(mm.CustomIntegrator):
@@ -93,23 +94,45 @@ class FIREMinimizationIntegrator(mm.CustomIntegrator):
         # Use high-precision constraints
         self.setConstraintTolerance(1.0e-8)
 
-        self.addGlobalVariable("alpha", alpha)  # alpha
-        self.addGlobalVariable("P", 0)  # P
-        self.addGlobalVariable("N_neg", 0.0)
-        self.addGlobalVariable("fmag", 0)  # |f|
-        self.addGlobalVariable("fmax", 0)  # max|f_i|
-        self.addGlobalVariable("ndof", 0)  # number of degrees of freedom
-        self.addGlobalVariable("ftol", tolerance.value_in_unit_system(unit.md_unit_system))  # convergence tolerance
-        self.addGlobalVariable("vmag", 0)  # |v|
-        self.addGlobalVariable("converged", 0) # 1 if convergence threshold reached, 0 otherwise
-        self.addPerDofVariable("x0", 0)
-        self.addPerDofVariable("v0", 0)
-        self.addPerDofVariable("x1", 0)
-        self.addGlobalVariable("E0", 0) # old energy associated with x0
-        self.addGlobalVariable("dE", 0)
-        self.addGlobalVariable("restart", 0)
-        self.addGlobalVariable("delta_t", timestep.value_in_unit_system(unit.md_unit_system))
-        self.addPerDofVariable("movable", 0)
+        self.global_variables = {
+            "alpha": alpha,
+            "P": 0,
+            "N_neg": 0.,
+            "fmag": 0,
+            "fmax": 0,
+            "ndof": 0,
+            "ftol": tolerance.value_in_unit_system(unit.md_unit_system),
+            "vmag": 0,
+            "converged": 0,
+            "E0": 0,
+            "dE": 0,
+            "restart": 0,
+            "sanity": 0,
+            "delta_t": timestep.value_in_unit_system(unit.md_unit_system)
+        }
+
+        self.per_dof_variables = {
+            "x0": 0,
+            "v0": 0,
+            "x1": 0,
+            "movable": 0
+        }
+
+        for k, v in self.global_variables.items():
+            self.addGlobalVariable(k, v)
+
+        for k, v in self.per_dof_variables.items():
+            self.addPerDofVariable(k, v)
+
+        # sanity = 0 -> finished normally
+        # sanity = 1 -> in progress
+        # sanity = 2 -> bad
+        self.beginIfBlock("sanity = 1")
+        self.addComputeGlobal("sanity", "2")
+        self.endBlock()
+        self.beginIfBlock("sanity = 0")
+        self.addComputeGlobal("sanity", "1")
+        self.endBlock()
 
         # Update context state.
         self.addUpdateContextState()
@@ -204,3 +227,23 @@ class FIREMinimizationIntegrator(mm.CustomIntegrator):
 
         # Close block that checks for convergence.
         self.endBlock()
+
+        # sanity back to 0
+        self.beginIfBlock("sanity = 1")
+        self.addComputeGlobal("sanity", "0")
+        self.endBlock()
+
+    def reset(self, shape):
+        for k, v in self.global_variables.items():
+            self.setGlobalVariableByName(k, v)
+
+        for k, v in self.per_dof_variables.items():
+            assert v == 0
+            vals = np.zeros(shape)
+            self.setPerDofVariableByName(k, vals)
+
+    def report(self) -> str:
+        return "\n".join(
+            f"{k}: {self.getGlobalVariableByName(k)}"
+            for k in self.global_variables.keys()
+        ) + "\n"
