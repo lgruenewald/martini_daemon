@@ -39,14 +39,11 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
             f.write(self.minimizer.report())
 
     def set_reactions(self, reactions, system, top, i):
-        # save vels and zero them out
+        # save vels
         vels = system._context.getState(
             velocities=True
         ).getVelocities(
             asNumpy=True
-        )
-        system._context.setVelocities(
-            np.zeros(shape=vels.shape)
         )
         self.integrator.setCurrentIntegrator(1)
         # integrator state setup
@@ -84,7 +81,8 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
                 remaining -= csteps
                 self.report(i, remaining)
         # reporters and cleanup
-        system._context.setVelocities(vels)
+        # TODO find out why velocities change significantly during minimization
+        system.set_velocities(vels)
         for rep in self.reporters:
             rep.post_di_minimize()
         self.integrator.setCurrentIntegrator(0)

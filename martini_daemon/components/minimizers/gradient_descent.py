@@ -2,6 +2,7 @@
 Modified version, originally from OpenMM Tools
 https://github.com/choderalab/openmmtools/blob/main/openmmtools/integrators.py
 
+Original license:
 MIT License
 
 Copyright (c) 2015-2019 Chodera lab // Memorial Sloan Kettering Cancer Center
@@ -31,43 +32,23 @@ import numpy as np
 
 class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
 
-    """Simple gradient descent minimizer implemented as an integrator.
-
-    Examples
-    --------
-
-    Create a gradient descent minimization integrator.
-
-    >>> integrator = GradientDescentMinimizationIntegrator()
-
-    """
-
-    def __init__(self, initial_step_size_nm=0.1, smoothing_factor=0.1, random_factor=0.0, temperature=0):
+    def __init__(self, initial_step_size_nm=0.1, etol=0.01, smoothing_factor=0.1):
         """
         Construct a gradient descent minimization integrator.
 
-        Parameters
-        ----------
         initial_step_size_nm
+        Only matters at the start.
+        An adaptive step size is used.
+
+        etol
+        energy tolerance, will stop doing anything once the change in energy reaches this for 1 step
 
         smoothing_factor - 0 to 1
         the smaller the smoother but slower convergence
-
-        random_factor - 0=<, stddev for (1+random_factor*gaussian) multiplier
-        for random scaling of delta x
-
-        temperature - 0=<, acceptance criteria based on delta energy
-        the higher, the more likely the climbing of potential energy will be
-
-        Notes
-        -----
-        An adaptive step size is used.
-
         """
 
         assert initial_step_size_nm > 0., "initial step size must be larger than 0"
         assert smoothing_factor > 0. and smoothing_factor <= 1., "smoothing factor must be between 0 and 1"
-        assert random_factor >= 0., "random factor must be 0 or larger"
 
         timestep = 0.
         super().__init__(timestep)
@@ -80,8 +61,9 @@ class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
             "accept": 0,
             "fnorm2": 0,
             "eta": smoothing_factor,
-            "random_factor": random_factor,
-            "probability": 0
+            "probability": 0,
+            "converged": 0,
+            "etol": etol,
         }
 
         self.per_dof_variables = {
@@ -96,6 +78,7 @@ class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
         for k, v in self.per_dof_variables.items():
             self.addPerDofVariable(k, v)
 
+        self.beginIfBlock("converged < 1")
         # Update context state.
         self.addUpdateContextState()
 
@@ -109,23 +92,24 @@ class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
         # Take step.
         self.addComputePerDof("est_grad", "(1-eta)*est_grad + eta*f")
         self.addComputeSum("fnorm2", "est_grad^2")
-        self.addComputePerDof("x", "x+movable*step_size*(1+random_factor*gaussian)*est_grad/sqrt(fnorm2 + delta(fnorm2))")
+        self.addComputePerDof("x", "x+movable*step_size*est_grad/sqrt(fnorm2 + delta(fnorm2))")
         self.addConstrainPositions()
 
         # Ensure we only keep steps that go downhill in energy.
         self.addComputeGlobal("energy_new", "energy")
         self.addComputeGlobal("delta_energy", "energy_new-energy_old")
-        if temperature > 0:
-            self.addComputeGlobal("probability", "1/(1+exp(delta_energy / temperature))")
-            self.addComputeGlobal("accept", "step(probability-uniform) * delta(energy-energy_new)")
-        else:
-            # Accept also checks for NaN
-            self.addComputeGlobal("accept", "step(-delta_energy) * delta(energy - energy_new)")
+
+        # Accept also checks for NaN
+        self.addComputeGlobal("accept", "step(-delta_energy) * delta(energy - energy_new)")
 
         self.addComputePerDof("x", "accept*x + (1-accept)*x_old")
 
         # Update step size.
         self.addComputeGlobal("step_size", "step_size * (2.0*accept + 0.5*(1-accept))")
+
+        # check convergence - must be not NaN and delta_energy < 0 and delta_energy > -etol
+        self.addComputeGlobal("converged", "delta(energy-energy_new) * step(-delta_energy) * step(delta_energy + etol)")
+        self.endBlock()
 
     def reset(self, shape):
         for k, v in self.global_variables.items():
