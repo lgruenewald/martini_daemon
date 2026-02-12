@@ -263,7 +263,7 @@ class Simulation():
         self.logger.info("Context build finished")
         self.logger.info("__init__ end")
 
-    def set_process_title(self):
+    def set_process_title(self, newname=b"daemon"):
         """
         Set process title to something else than "python"
 
@@ -274,7 +274,6 @@ class Simulation():
         """
         from ctypes import cdll, byref, create_string_buffer
         libc = cdll.LoadLibrary('libc.so.6')
-        newname = b"martini_daemon"
         buff = create_string_buffer(len(newname)+1)
         buff.value = newname
         libc.prctl(15, byref(buff), 0, 0, 0)

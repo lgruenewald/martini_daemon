@@ -32,7 +32,7 @@ import numpy as np
 
 class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
 
-    def __init__(self, initial_step_size_nm=0.1, etol=0.01, smoothing_factor=0.1):
+    def __init__(self, initial_step_size_nm=0.1, etol=0.0001, smoothing_factor=0.1):
         """
         Construct a gradient descent minimization integrator.
 

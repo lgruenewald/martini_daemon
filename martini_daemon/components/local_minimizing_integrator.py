@@ -1,6 +1,7 @@
 import openmm as mm
 import numpy as np
 from .daemon_integrator import DaemonIntegrator
+import math
 
 
 class LocalMinimizingIntegrator(DaemonIntegrator):
@@ -12,7 +13,7 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
 
     def __init__(
         self, dt_ps, T_K, friction_ps1, minimizer, minimization_steps=500,
-        report_every=0
+        report_every=0, check_convergence_every=10
     ):
         self.dt = dt_ps
         self.T = T_K
@@ -28,12 +29,13 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
         assert minimization_steps > 0, "Must specify minimization_steps > 0"
         self.minsteps = minimization_steps
         self.report_every = report_every
+        self.check_convergence_every = check_convergence_every
 
     def reset(self, shape):
         self.minimizer.reset(shape)
 
-    def report(self, i, rem):
-        with open(f"{self.sim_name}_minimization{i}.log", "a") as f:
+    def report(self, i, rem, op="a"):
+        with open(f"{self.sim_name}_minimization{i}.log", op) as f:
             f.write(f"Simulation frame {i}, remaining steps {rem}\n")
             f.write("==============================================\n")
             f.write(self.minimizer.report())
@@ -66,20 +68,26 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
             "movable",
             movable
         )
-        # minimize
-        if self.report_every == 0:
-            self.integrator.step(self.minsteps)
+
+        if self.report_every > 0:
+            gcd = math.gcd(self.report_every, self.check_convergence_every)
         else:
-            # create/empty file
-            with open(f"{self.sim_name}_minimization{i}.log", "w") as f:
-                f.write("")
-            self.report(i, self.minsteps)
-            remaining = self.minsteps
-            while remaining > 0:
-                csteps = min(self.report_every, remaining)
-                self.integrator.step(csteps)
-                remaining -= csteps
+            gcd = self.check_convergence_every
+        remaining = self.minsteps
+
+        if self.report_every > 0:
+            self.report(i, remaining, op="w")
+
+        while remaining > 0:
+            csteps = min(gcd, remaining)
+            self.integrator.step(csteps)
+            remaining -= csteps
+            if self.report_every > 0 and remaining % self.report_every == 0:
                 self.report(i, remaining)
+            # check convergence every is guaranteed to check AT LEAST as often as it says
+            if self.minimizer.getGlobalVariableByName("converged") == 1:
+                break
+            
         # reporters and cleanup
         # TODO find out why velocities change significantly during minimization
         system.set_velocities(vels)
