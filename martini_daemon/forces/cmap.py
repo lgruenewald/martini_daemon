@@ -16,33 +16,34 @@ class Cmap(Force):
         self._force_obj = mm.CMAPTorsionForce()
 
     def _add_to_force_obj(self, params):
-        i, j, k, L, m = params
+        i, j, k, l, m = params
         types = tuple([
             self._sysstar.get_atom_details(x)[0]
-            for x in [i, j, k, L, m]
+            for x in [i, j, k, l, m]
         ])
-        default = self.types.get(types)
+        default = self.types.get(types) or self.types.get(types[::-1])
         if default is None:
             raise ValueError(f"Unknown CMAP type for {types}.")
-        p1, p2, *ps = default
-        assert p1 == p2
-        assert len(ps) == p1*p2
-        
+        size, p2, *ps = default
+        assert size == p2
+        assert len(ps) == size*size
+         
         # rearrangement as in https://github.com/openmm/openmm/blob/master/wrappers/python/openmm/app/gromacstopfile.py
         # lines 959-984
-        map = []
-        size = p1
+        cmap = []
         midpoint = size // 2
+
         for n in range(size):
             column = (n + midpoint) % size
             for o in range(size):
                 row = (o + midpoint) % size
-                map.append(ps[size * row + column])
+                cmap.append(ps[size * row + column])
 
+        # TODO don't add a million maps
         self._force_obj.addTorsion(
-            self._force_obj.addMap(size, map),
-            i, j, k, L,
-            j, k, L, m
+            self._force_obj.addMap(size, cmap),
+            i, j, k, l,
+            j, k, l, m
         )
 
     _filters = {"cmap"}

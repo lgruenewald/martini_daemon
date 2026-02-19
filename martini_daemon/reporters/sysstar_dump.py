@@ -1,6 +1,4 @@
-from .reporter import Reporter, read_compressed
-import numpy as np
-import struct
+from .reporter import Reporter
 
 
 class SysStarDump(Reporter):
@@ -37,13 +35,12 @@ class SysStarDump(Reporter):
         self._print("")
         self._print("Force list")
         for force in sys.modular_forces:
-            self._print(f"Force {force}")
-            if force._list is None:
-                self._print("List is none")
+            if force._list is None or len(force._list) == 0:
+                continue
             else:
+                self._print(f"Force {force}")
                 for deets in force._list:
                     self._print(f"{deets}")
-
 
         self._print(f"==== End of Frame {i} ====")
         self._print("")

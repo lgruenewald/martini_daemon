@@ -2,6 +2,7 @@ import openmm as mm
 import numpy as np
 from .daemon_integrator import DaemonIntegrator
 import math
+from ..utils import pdist
 
 
 class LocalMinimizingIntegrator(DaemonIntegrator):
@@ -13,23 +14,46 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
 
     def __init__(
         self, dt_ps, T_K, friction_ps1, minimizer, minimization_steps=500,
-        report_every=0, check_convergence_every=10
+        report_every=0, check_convergence_every=10,
+        langevin=True, equilibration_length=0, subdivision=4,
+        r_movable = 0.
     ):
         self.dt = dt_ps
         self.T = T_K
         self.friction = friction_ps1
         self.integrator = mm.CompoundIntegrator()
-        self.integrator.addIntegrator(
-            mm.LangevinMiddleIntegrator(
-                T_K, friction_ps1, dt_ps
+        if langevin:
+            self.integrator.addIntegrator(
+                mm.LangevinMiddleIntegrator(
+                    T_K, friction_ps1, dt_ps
+                )
             )
-        )
+        else:
+            self.integrator.addIntegrator(
+                mm.VerletIntegrator(dt_ps)
+            )
         self.minimizer = minimizer
         self.integrator.addIntegrator(minimizer)
         assert minimization_steps > 0, "Must specify minimization_steps > 0"
+
+        if langevin:
+            self.integrator.addIntegrator(
+                mm.LangevinMiddleIntegrator(
+                    T_K, friction_ps1, dt_ps / subdivision
+                )
+            )
+        else:
+            self.integrator.addIntegrator(
+                mm.VerletIntegrator(dt_ps / subdivision)
+            )
+
         self.minsteps = minimization_steps
         self.report_every = report_every
         self.check_convergence_every = check_convergence_every
+        self.remaining_eq_steps = 0
+        self.eq_steps = equilibration_length
+        self.subdivision = subdivision
+        self.r_movable = r_movable
 
     def reset(self, shape):
         self.minimizer.reset(shape)
@@ -42,11 +66,17 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
 
     def set_reactions(self, reactions, system, top, i):
         # save vels
-        vels = system._context.getState(
-            velocities=True
-        ).getVelocities(
+        state = system._context.getState(
+            velocities=True,
+            positions=True
+        )
+        pos = state.getPositions(
+            asNumpy=True
+        ).value_in_unit(mm.unit.nanometer)
+        vels = state.getVelocities(
             asNumpy=True
         )
+        box = np.array(system.get_box(state))
         self.integrator.setCurrentIntegrator(1)
         # integrator state setup
         self.reset(vels.shape)
@@ -64,6 +94,16 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
                     atoms.add(member)
         for atom in atoms:
             movable[atom, :] = 1.
+
+        if self.r_movable > 0:
+            for i, cpos in enumerate(pos):
+                for j in atoms:
+                    if movable[i, 0] == 1.:
+                        break
+                    base = pos[j, :]
+                    if pdist(cpos, base, box) < self.r_movable:
+                        movable[i, :] = 1.
+
         self.minimizer.setPerDofVariableByName(
             "movable",
             movable
@@ -73,6 +113,9 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
             gcd = math.gcd(self.report_every, self.check_convergence_every)
         else:
             gcd = self.check_convergence_every
+        if gcd == 0:
+            gcd = self.minsteps
+
         remaining = self.minsteps
 
         if self.report_every > 0:
@@ -87,16 +130,37 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
             # check convergence every is guaranteed to check AT LEAST as often as it says
             if self.minimizer.getGlobalVariableByName("converged") == 1:
                 break
-            
+
         # reporters and cleanup
         # TODO find out why velocities change significantly during minimization
         system.set_velocities(vels)
         for rep in self.reporters:
             rep.post_di_minimize()
-        self.integrator.setCurrentIntegrator(0)
+        self.remaining_eq_steps = self.eq_steps
+        if self.remaining_eq_steps > 0:
+            self.integrator.setCurrentIntegrator(2)
+        else:
+            self.integrator.setCurrentIntegrator(0)
 
     def step(self, n_steps):
-        self.integrator.step(n_steps)
+        if self.remaining_eq_steps > n_steps:
+            self.remaining_eq_steps -= n_steps
+            self.integrator.step(n_steps * self.subdivision)
+        elif self.remaining_eq_steps > 0:
+            self.integrator.step(self.remaining_eq_steps * self.subdivision)
+            self.finish_equilibration()
+            remaining = n_steps - self.remaining_eq_steps
+            self.remaining_eq_steps = 0
+            if remaining > 0:
+                self.integrator.step(remaining)
+        else:
+            self.integrator.step(n_steps)
+
+    def finish_equilibration(self):
+        self.integrator.setCurrentIntegrator(0)
+        if self.reporters is not None:
+            for rep in self.reporters:
+                rep.post_di_equilibrate()
 
     def get_integrator(self):
         return self.integrator

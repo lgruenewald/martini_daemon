@@ -32,7 +32,7 @@ import numpy as np
 
 class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
 
-    def __init__(self, initial_step_size_nm=0.1, etol=0.0001, smoothing_factor=0.1):
+    def __init__(self, initial_step_size_nm=0.1, etol=0.0, smoothing_factor=0.1):
         """
         Construct a gradient descent minimization integrator.
 
@@ -42,6 +42,7 @@ class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
 
         etol
         energy tolerance, will stop doing anything once the change in energy reaches this for 1 step
+        0 -> no convergence check
 
         smoothing_factor - 0 to 1
         the smaller the smoother but slower convergence
@@ -78,7 +79,8 @@ class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
         for k, v in self.per_dof_variables.items():
             self.addPerDofVariable(k, v)
 
-        self.beginIfBlock("converged < 1")
+        if etol > 0:
+            self.beginIfBlock("converged < 1")
         # Update context state.
         self.addUpdateContextState()
 
@@ -107,9 +109,10 @@ class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
         # Update step size.
         self.addComputeGlobal("step_size", "step_size * (2.0*accept + 0.5*(1-accept))")
 
-        # check convergence - must be not NaN and delta_energy < 0 and delta_energy > -etol
-        self.addComputeGlobal("converged", "delta(energy-energy_new) * step(-delta_energy) * step(delta_energy + etol)")
-        self.endBlock()
+        if etol > 0:
+            # check convergence - must be not NaN and delta_energy < 0 and delta_energy > -etol
+            self.addComputeGlobal("converged", "delta(energy-energy_new) * step(-delta_energy) * step(delta_energy + etol)")
+            self.endBlock()
 
     def reset(self, shape):
         for k, v in self.global_variables.items():

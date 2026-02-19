@@ -80,3 +80,6 @@ class VirtualSite():
     def get_force_group(self) -> None:
         return None
 
+    def has_force_obj(self) -> bool:
+        return False
+

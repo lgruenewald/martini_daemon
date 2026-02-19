@@ -41,7 +41,7 @@ class Force():
     def add(self, members: list[int] | tuple[int], params: list[float] | tuple[float]) -> Interaction:
         params = tuple(members) + tuple(params)
         self._list.append(params)
-        if not self._rebuild:
+        if not self._rebuild and self.has_force_obj():
             self._add_to_force_obj(params)
             self._sysstar._reinitialize = True
         return Interaction(self, len(self._list) - 1)
@@ -59,23 +59,25 @@ class Force():
     def build(self) -> None:
         if self._rebuild:
             self.destroy()
-            self._set_force_obj()
-            if self._force_group is not None:
-                self._force_obj.setForceGroup(self._force_group)
-            for params in filter(None, self._list):
-                self._add_to_force_obj(params)
-            if self._pbc:
-                self._force_obj.setUsesPeriodicBoundaryConditions(True)
             self._rebuild = False
-            self._sysstar._forces_list.append(self._force_obj)
-            self._sysstar._system.addForce(self._force_obj)
             self._sysstar._reinitialize = True
+            if len(self._list) > 0:
+                self._set_force_obj()
+                if self._force_group is not None:
+                    self._force_obj.setForceGroup(self._force_group)
+                for params in filter(None, self._list):
+                    self._add_to_force_obj(params)
+                if self._pbc:
+                    self._force_obj.setUsesPeriodicBoundaryConditions(True)
+                self._sysstar._forces_list.append(self._force_obj)
+                self._sysstar._system.addForce(self._force_obj)
 
     def destroy(self) -> bool:
         if self._force_obj is None:
             return False
         for i, f in enumerate(self._sysstar._forces_list):
             if f == self._force_obj:
+                self._force_obj = None
                 del self._sysstar._forces_list[i]
                 self._sysstar._system.removeForce(i)
                 self._sysstar._reinitialize = True
@@ -113,6 +115,9 @@ class Force():
 
     def get_force_group(self) -> int | None:
         return self._force_group
+
+    def has_force_obj(self) -> bool:
+        return self._force_obj is not None
 
 
 @dataclass

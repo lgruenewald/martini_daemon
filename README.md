@@ -2,13 +2,20 @@
 
 Martini Daemon is a tool facilitating template based chemical reactions in MD simulations with the [Martini force field](https://cgmartini.nl/) and the [OpenMM](https://openmm.org/) MD engine.
 
+This is achieved by combining multiple components in one repo:
+- a friendly python API for running MD simulations with reactions
+- a parser for Martini `.top` files
+- a thin wrapper on top of OpenMM's API facilitating bond addition and removal
+- a graph matching system to find reactants
+- a detection/modification algorithm to execute reaction templates
+
 ### Installation
 
 Pre-requisite: install the right version of OpenMM with support for your GPU and install `git-lfs`.
 
 1. Clone the repository
 2. (optional) switch to the desired branch, tag or commit
-3. (optional) activate the desired conda, mamba or venv environment
+3. (optional) activate the desired conda, mamba, uv or venv environment
 4. Install with `pip install .` in the root directory of this repo,
    where `pyproject.toml` is located.
 
@@ -30,6 +37,7 @@ information about each system.
   that Martini is implemented correctly by comparing it to GROMACS energies.
 - `graph` - tests for the graph matching algorithm
 - `detection` - tests for the detection algorithm
+- `modification` - tests for the modification algorithm (WIP)
 
 # License
 
