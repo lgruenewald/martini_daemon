@@ -157,6 +157,36 @@ class TopStar():
     def new_graph(self, graph: Graph) -> None:
         self.graphs[graph.name] = graph
 
+    def rx_by_name(self, name) -> None | ReactionTemplate:
+        # TODO fix this
+        for _, rxs in self.reactions.items():
+            for rx in rxs:
+                if rx.name == name:
+                    return rx
+        return None
+
+    def frag_by_name_and_atoms(self, name, atoms) -> None | Fragment:
+        # TODO fix this
+        # assumptions made:
+        # first atom non-optional
+        # two frags with the same name and atoms can't exist
+        # these may not hold up
+        atom1 = atoms[0]
+        assert atom1 != -1
+        for frag_id in self.defrag_list[atom1]:
+            frag = self.frag_list[frag_id]
+            matched = True
+            if frag.name != name:
+                matched = False
+                continue
+            for i, atom in enumerate(atoms):
+                if frag.atoms[i] != atom:
+                    matched = False
+                    break
+            if matched:
+                return frag
+        return None
+
     # TODO fix this monster
     def new_reaction(self, reaction: ReactionTemplate) -> Molecule:
         # reactant names

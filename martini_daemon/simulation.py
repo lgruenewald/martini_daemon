@@ -317,6 +317,23 @@ class Simulation():
         for reporter in self.reporters:
             reporter.finish()
 
+    def replay(self, reactions: list[tuple[int, str, list[list[int]]]], until_frame=-1):
+        for frame, rx_name, frags in reactions:
+            if 0 <= until_frame <= frame:
+                break
+            # find rx
+            rx = self.top.rx_by_name(rx_name)
+            assert rx is not None, f"{rx} could not be found."
+            # find frags
+            frags = [
+                self.top.frag_by_name_and_atoms(frag_name, frag)
+                for frag_name, frag in zip(rx.reactants, frags)
+            ]
+            assert all(frag is not None for frag in frags)
+            # modifications
+            self.top.modification(frame, [(frags, rx)])
+        self.system.reinitialize()
+
     def step(self, steps=1, xtc=True, dm=True):
         """
             Do a step of the following:

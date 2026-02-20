@@ -35,7 +35,7 @@ class Force():
 
     _members: int
     _pbc: bool = True
-    _filters: set[string] = set()
+    _filters: set[str] = set()
     _destroyable = True
 
     def add(self, members: list[int] | tuple[int], params: list[float] | tuple[float]) -> Interaction:
@@ -69,6 +69,7 @@ class Force():
                     self._add_to_force_obj(params)
                 if self._pbc:
                     self._force_obj.setUsesPeriodicBoundaryConditions(True)
+                # TODO why not sysstar.add_force
                 self._sysstar._forces_list.append(self._force_obj)
                 self._sysstar._system.addForce(self._force_obj)
 

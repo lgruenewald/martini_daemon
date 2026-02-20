@@ -40,6 +40,7 @@ class TopStarLogger(Reporter):
                 break
 
 
+# TODO break up these into their own files + make parsing easier + publish canon parser
 class ReactionReporter(Reporter):
     """A reporter that reports all reactions to <name>.reactions"""
 
@@ -110,6 +111,34 @@ class ReactionReporter(Reporter):
 
     def interactive_line(self) -> str:
         return f"reactions: {self._simulation.reactions}"
+
+import re
+
+def read_reactions(path) -> list[tuple[str, str, list[list[int]]]]:
+    """
+    .reactions format reader suited for test_detection.py
+    """
+    reactions = []
+    with open(path, "r") as f:
+        lines = f.read().splitlines()
+        for line in lines:
+            if line[0] == "#" or len(line) == 0:
+                continue
+            # we don't care about molids
+            line, _ = re.subn(r"\([^)]*\)", "", line)
+            elems = line.split(";")
+            frame, rx = elems[0].split(",")
+            # list of atoms
+            frags = [
+                [
+                    int(atom)
+                    for atom in elem.split(",")[2:]
+                ] for elem in elems[1:]
+            ]
+            reactions.append(
+                (int(frame), rx, frags)
+            )
+    return reactions
 
 
 class FragCountReporter(Reporter):
