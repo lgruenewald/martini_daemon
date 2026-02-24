@@ -15,6 +15,11 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 all = [
+# Some helpers
   "molly@git+https://git.sr.ht/~ma3ke/molly#egg=molly&subdirectory=bindings/python",
-  "pytest"
+# Test
+  "pytest",
+# Docs
+  "sphinx",
+  "autoapi"
 ]

@@ -21,7 +21,8 @@ Pre-requisite: install the right version of OpenMM with support for your GPU and
 
 ## Docs
 
-Currently, there is a User Guide and a Reference Guide in the wiki section of this Github repository.
+Docs can be built using sphinx. Run `make html` in the `docs/` folder in the
+repo. The generated docs can then be found under `docs/build/html`.
 
 If any questions remain, feel free to open an Issue, so that we can help and also extend the documentation where necessary.
 

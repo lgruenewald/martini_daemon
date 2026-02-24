@@ -35,3 +35,5 @@ build
 martini_daemon.egg-info
 dist
 *.so
+docs/build/*
+docs/source/martini_daemon/*
