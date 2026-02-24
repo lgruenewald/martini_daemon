@@ -10,8 +10,11 @@ readme = "README.md"
 requires-python = ">=3.10"
 keywords = []
 classifiers = []
-dependencies = ["numpy", "openmm", "freud-analysis"]
+dependencies = ["numpy", "openmm", "freud-analysis", "tqdm"]
 dynamic = ["version"]
 
 [project.optional-dependencies]
-all = ["molly@git+https://git.sr.ht/~ma3ke/molly#egg=molly&subdirectory=bindings/python"]
+all = [
+  "molly@git+https://git.sr.ht/~ma3ke/molly#egg=molly&subdirectory=bindings/python",
+  "pytest"
+]
