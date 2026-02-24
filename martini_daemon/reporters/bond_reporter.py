@@ -2,6 +2,51 @@ from .reporter import Reporter, read_compressed
 import numpy as np
 import struct
 
+def collect_bonds(n, sstar, constraint_only=False):
+    bonds_len = 0
+    vsite_len = 0
+    bond_filter = "constraint" if constraint_only else "bond"
+    for force in sstar.modular_forces:
+        if force.is_instance(bond_filter):
+            for id in range(len(force)):
+                if force.get_members(id) is not None:
+                    bonds_len += 1
+        elif force.is_instance("vsite"):
+            for id in range(len(force)):
+                if force.get_members(id) is not None:
+                    vsite_len += len(force.get_members(id)) - 1
+    # allocate
+    n_bonds = bonds_len + vsite_len
+    bonds = np.empty((n_bonds, 2), dtype=np.uint32)
+    # write
+    bond_index = 0
+    for force in sstar.modular_forces:
+        if force.is_instance(bond_filter):
+            for id in range(len(force)):
+                members = force.get_members(id)
+                if members is None:
+                    continue
+                i, j = members
+                if i == j or i >= n or j >= n:
+                    continue
+                bonds[bond_index][0] = i
+                bonds[bond_index][1] = j
+                bond_index += 1
+        elif force.is_instance("vsite"):
+            for id in range(len(force)):
+                members = force.get_members(id)
+                if members is None:
+                    continue
+                vid, *others = members
+                for other in others:
+                    if vid == other or vid >= n or other >= n:
+                        continue
+                    bonds[bond_index][0] = vid
+                    bonds[bond_index][1] = other
+                    bond_index += 1
+
+    assert bond_index == n_bonds
+    return n_bonds, bonds
 
 class BondReporter(Reporter):
     """
@@ -44,49 +89,8 @@ class BondReporter(Reporter):
         self._write(struct.pack("=Q", n))
 
     def on_xtc_frame(self, frame_index, pos, box, xtc_name):
-        # count first
-        bonds_len = 0
-        vsite_len = 0
-        for force in self._sysstar.modular_forces:
-            if force.is_instance("bond"):
-                for id in range(len(force)):
-                    if force.get_members(id) is not None:
-                        bonds_len += 1
-            elif force.is_instance("vsite"):
-                for id in range(len(force)):
-                    if force.get_members(id) is not None:
-                        vsite_len += len(force.get_members(id)) - 1
-        # allocate
-        self._write(struct.pack("=Q", bonds_len + vsite_len))
-        bonds = np.empty((bonds_len + vsite_len, 2), dtype=np.uint32)
-        # write
-        bond_index = 0
-        for force in self._sysstar.modular_forces:
-            if force.is_instance("bond"):
-                for id in range(len(force)):
-                    members = force.get_members(id)
-                    if members is None:
-                        continue
-                    i, j = members
-                    if i == j or i >= self.n or j >= self.n:
-                        continue
-                    bonds[bond_index][0] = i
-                    bonds[bond_index][1] = j
-                    bond_index += 1
-            elif force.is_instance("vsite"):
-                for id in range(len(force)):
-                    members = force.get_members(id)
-                    if members is None:
-                        continue
-                    vid, *others = members
-                    for other in others:
-                        if vid == other or vid >= self.n or other >= self.n:
-                            continue
-                        bonds[bond_index][0] = vid
-                        bonds[bond_index][1] = other
-                        bond_index += 1
-
-        assert bond_index == vsite_len + bonds_len
+        n_bonds, bonds = collect_bonds(self.n, self._sysstar)
+        self._write(struct.pack("=Q", n_bonds))
         self._write(bonds.tobytes())
 
 

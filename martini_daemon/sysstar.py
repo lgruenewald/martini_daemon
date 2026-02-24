@@ -4,6 +4,8 @@ from openmm.unit import nanometer, picosecond, md_unit_system
 from .utils import backup_try
 from .gro_file import write_gro
 from .components.reaction_sensitive_integrator import DaemonIntegrator
+from .reporters.bond_reporter import collect_bonds
+from .helpers.cluster import make_cluster_frame, make_whole_frame
 from collections import OrderedDict
 import numpy as np
 
@@ -313,6 +315,7 @@ class SysStar():
             mm.Vec3(0., 0., box[2])
         ]
         self._periodic_box = pbv
+        self._box = box
         self._system.setDefaultPeriodicBoxVectors(*pbv)
         if issubclass(type(integrator), DaemonIntegrator):
             mm_integrator = integrator.get_integrator()
@@ -345,8 +348,23 @@ class SysStar():
         if self._reinitialize or force:
             self._context.reinitialize(preserveState=True)
 
+    def whole_constraints(self, pos, box):
+        """
+        MUTATES POS to make constraints whole wrt. box.
+        This means all constraints and virtual sites are in the same instance
+        of the pbc. All other interactions are ignored.
+        """
+        if not self.context_initialized:
+            raise Exception("Initialize the context first")
+        _, bonds = collect_bonds(self.len_atoms(), self, constraint_only=True)
+        clus = make_cluster_frame(bonds, self.len_atoms())
+        make_whole_frame(pos, box, clus, self.len_atoms())
+        """self._context.setPeriodicBoxVectors(
+            mm.Vec3(box[0], 0., 0.), mm.Vec3(0., box[1], 0.), mm.Vec3(0., 0., box[2])
+        )"""
+
     def set_positions(self, positions):
-        # TODO - whole constraints and vsites
+        # TODO - take box as an argument here
         if not self.context_initialized:
             raise Exception("Initialize the context first")
         if len(positions) != len(self._atom_list):
@@ -356,6 +374,9 @@ class SysStar():
                 f"Atom list contains {len(self._atom_list)} atoms."
                 "Please check your .gro file."
             )
+        positions = positions.copy()
+        # TODO self._periodic_box/self._box can be outdated
+        self.whole_constraints(positions, self._box)
         self._context.setPositions(positions)
 
     def set_velocities(self, velocities):
@@ -400,6 +421,7 @@ class SysStar():
     def write_xtc_frame(self, i, interval):
         pos, box = self.get_positions()
         self._xtc.interval = interval
+        # TODO write box properly
         self._xtc.writeModel(pos)
         for reporter in self.reporters:
             reporter.on_xtc_frame(i, pos, box, self._xtc_name)
