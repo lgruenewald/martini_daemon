@@ -5,19 +5,21 @@ from ..sysstar import SysStar
 
 class ReactionEnergyReporter(Reporter):
 
-    def __init__(self, write_coords=False, force_groups=False, softcore=False, volume=False):
+    def __init__(self, write_coords=False, force_groups=False, softcore=False, volume=False, ext="gro"):
         """
         Designed to work together with DaemonIntegrators (see martini_daemon.components subpackage)
 
         may not work without!
 
         write_coords, if set to True, it will print .gro files if daemon integrators are used
+        set ext to "xyz" to write xyz files
         force_groups, if set to True will print a breakdown of forces
         """
         self.write_coords = write_coords
         self.force_groups = force_groups
         self.softcore = softcore
         self.volume = volume
+        self.ext = ext
 
     def on_set_xtc_path(self, xtc_name: str) -> None:
         self._open(xtc_name + ".rxener")
@@ -57,7 +59,7 @@ class ReactionEnergyReporter(Reporter):
         self.i = i
         self.write_energies(f"Frame {i} after reinitialize")
         if self.write_coords:
-            self._sysstar.write_gro(f"premin{i}.gro")
+            self._sysstar.write_gro(f"premin{i}.{self.ext}")
         self._write_force_groups(f"premin{self.i}")
 
     def post_sc_enable(self, i):
@@ -68,13 +70,13 @@ class ReactionEnergyReporter(Reporter):
     def post_di_minimize(self):
         self.write_energies(f"Frame {self.i} after minimization")
         if self.write_coords:
-            self._sysstar.write_gro(f"postmin{self.i}.gro")
+            self._sysstar.write_gro(f"postmin{self.i}.{self.ext}")
         self._write_force_groups(f"postmin{self.i}")
 
     def post_di_equilibrate(self):
         self.write_energies(f"Frame {self.i} after equilibration")
         if self.write_coords:
-            self._sysstar.write_gro(f"posteq{self.i}.gro")
+            self._sysstar.write_gro(f"posteq{self.i}.{self.ext}")
         self._write_force_groups(f"posteq{self.i}")
 
     def post_sc_disable(self, i):

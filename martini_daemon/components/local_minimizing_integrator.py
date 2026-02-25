@@ -3,6 +3,8 @@ import numpy as np
 from .daemon_integrator import DaemonIntegrator
 import math
 from ..utils import pdist
+from ..reporters.bond_reporter import collect_bonds
+from ..helpers.cluster import make_cluster_frame
 
 
 class LocalMinimizingIntegrator(DaemonIntegrator):
@@ -16,8 +18,11 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
         self, dt_ps, T_K, friction_ps1, minimizer, minimization_steps=500,
         report_every=0, check_convergence_every=10,
         langevin=True, equilibration_length=0, subdivision=4,
-        r_movable = 0.
+        r_movable = 0., whole_molecule=False, toggle_couplings=False
     ):
+        """
+        ToggleCouplings is experimental, don't use that one
+        """
         self.dt = dt_ps
         self.T = T_K
         self.friction = friction_ps1
@@ -54,6 +59,8 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
         self.eq_steps = equilibration_length
         self.subdivision = subdivision
         self.r_movable = r_movable
+        self.whole_molecule = whole_molecule
+        self.toggle_couplings = toggle_couplings
 
     def reset(self, shape):
         self.minimizer.reset(shape)
@@ -78,6 +85,9 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
         )
         box = np.array(system.get_box(state))
         self.integrator.setCurrentIntegrator(1)
+        if self.toggle_couplings:
+            system.coupling(False)
+            system.reinitialize()
         # integrator state setup
         self.reset(vels.shape)
         # set movable
@@ -88,10 +98,27 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
                 for atom in frag.atoms:
                     if atom != -1:
                         atoms.add(atom)
-        for atom in atoms.copy():
-            for inter in top.interaction_list[atom]:
-                for member in inter.get_members():
-                    atoms.add(member)
+        if not self.whole_molecule:
+            # old code of 1 depth search
+            for atom in atoms.copy():
+                for inter in top.interaction_list[atom]:
+                    for member in inter.get_members():
+                        atoms.add(member)
+        else:
+            # make entire molecules whole, based on bonds, constraints, virtual sites graph
+            _, bonds = collect_bonds(system.len_atoms(), system)
+            clus = make_cluster_frame(bonds, len(vels))
+            done = set()
+            for atom in atoms.copy():
+                c = clus[atom]
+                assert c > 0
+                if c in done:
+                    continue
+                for natom in np.argwhere(clus == c):
+                    assert natom.shape == (1,)
+                    atoms.add(natom[0])
+                done.add(c)
+
         for atom in atoms:
             movable[atom, :] = 1.
 
@@ -137,6 +164,9 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
         for rep in self.reporters:
             rep.post_di_minimize()
         self.remaining_eq_steps = self.eq_steps
+        if self.toggle_couplings:
+            system.coupling(True)
+            system.reinitialize()
         if self.remaining_eq_steps > 0:
             self.integrator.setCurrentIntegrator(2)
         else:

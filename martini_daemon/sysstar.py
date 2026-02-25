@@ -49,6 +49,7 @@ from .reporters.reporter import Reporter
 # custom forces not in Gromacs
 from .forces.custom_reactive import CustomReactive
 from .forces.periodic_gaussian import PeriodicGaussian
+from .xyz_file import write_xyz
 
 
 class SysStar():
@@ -62,6 +63,7 @@ class SysStar():
         self._reinitialize: bool = True
         # for keeping track of indices, used for removing forces
         self._forces_list: list[mm.Force] = []
+        self._coupling: list[mm.Force] = []
 
         # modular forces
         self.constraint = Constraint(self)
@@ -398,21 +400,32 @@ class SysStar():
         mm.LocalEnergyMinimizer.minimize(self._context, tolerance, max_steps)
 
     def add_force(self, force):
-        """Adds a force to S*
-        returns if caller should call reinitialize"""
+        """
+        Adds a force to S*
+        returns if caller should call reinitialize
+        """
+        self._forces_list.append(force)
+
         if self.context_initialized:
-            self._forces_list.append(force)
             self._system.addForce(force)
             self._reinitialize = True
             return True
         else:
             # contents of _forces_list automatically get added to the system
             # during self.build_context()
-            self._forces_list.append(force)
             return False
 
+    def add_coupling(self, force):
+        """
+        Adds a coupling to S*
+
+        Registers it to the list of couplings, which means it can be turned off when appropriate
+        """
+        self._coupling.append(force)
+        return self.add_force(force)
+
     def remove_com_motion(self):
-        self.add_force(mm.CMMotionRemover())
+        self.add_coupling(mm.CMMotionRemover())
         self.remove_com = True
 
     def add_reporter(self, reporter):
@@ -494,20 +507,28 @@ class SysStar():
         self._xtc_name = path[:-4]
 
     def write_gro(self, path):
+        # TODO rename away from gro/xtc specific once
+        # TODO move write/read/setpos etc to a specific class, keep S* built on openmm system
+        # other formats are better supported
         if not self.context_initialized:
             raise Exception("Initialize the context first")
-        if len(path) < 5 or path[-4:] != ".gro":
+        # TODO splitext
+        if len(path) < 5 or path[-4:] not in {".gro", ".xyz"}:
             raise Exception("Gro path must end with .gro")
         state = self._context.getState(positions=True, velocities=True)
         pos, box = self.get_positions()
         vel = state.getVelocities(asNumpy=True).\
             value_in_unit_system(md_unit_system)
         time = state.getTime()
-        write_gro(
-            path, f"t={time.value_in_unit(picosecond):.1f} ps\n",
-            self._atom_list, box, pos, vel
-        )
+        if path[-4:] == ".gro":
+            write_gro(
+                path, f"t={time.value_in_unit(picosecond):.1f} ps\n",
+                self._atom_list, box, pos, vel
+            )
+        else:
+            write_xyz(path, self._atom_list, box, pos, vel)
         for reporter in self.reporters:
+            # TODO rename this in reporters
             reporter.on_write_gro(pos, box, path[:-4])
 
     def get_energies_and_forces_by_group(self) -> str:
@@ -531,3 +552,32 @@ class SysStar():
                     f"{f.__class__.__name__} energy: {ener} max_force {max_force} for particle {max_index}"
                 )
         return "\n".join(res)
+
+    def remove_force(self, force_obj):
+        # TODO make all forces/ use this
+        for i, f in enumerate(self._forces_list):
+            if f == force_obj:
+                del self._forces_list[i]
+                self._system.removeForce(i)
+                self._reinitialize = True
+                return True
+        return False
+
+
+    def coupling(self, on):
+        """
+        EXPERIMENT, DON'T USE THIS FUNCTION
+
+        Turns coupling on/off
+
+        You must reinitialize manually after calling this function
+        """
+        if not self.context_initialized:
+            raise Exception("Initialize the context first")
+
+        for f in self._coupling:
+            self.remove_force(f)
+        if on:
+            # TODO fix this
+            self.add_coupling(mm.MonteCarloBarostat(1., 298.))
+        self._reinitialize = True

@@ -13,6 +13,9 @@ import time
 from typing import Any
 import math
 import os
+from importlib.metadata import version
+
+from .xyz_file import read_xyz
 
 
 class Simulation():
@@ -107,6 +110,7 @@ class Simulation():
                 "Please specify: geom_path and top_path only OR chk_path only."
             )
         if restraint_coord_path is None:
+            # TODO check if this works with non gro
             restraint_coord_path = geom_path
         self.i: int = 0
         self.md_steps: int = md_steps
@@ -179,11 +183,22 @@ class Simulation():
                          f"steps: {md_steps} dm_freq: {dm_frequency} "
                          f"traj_freq: {traj_frequency} "
                          f"sim_name: {sim_name} platform: {platform}")
+        self.logger.info(f"Context parameters: {context_parameters}")
+        self.logger.info(f"Defines: {defines}")
+        self.logger.info(f"Nonbonded: {nonbonded_force}")
+        self.logger.info(f"Martini Daemon version: {version('martini_daemon')}")
+
 
         self.logger.info("Parsing start")
         # Parsing - No checkpoint
         if not use_checkpoint:
-            _, respos, _ = read_gro(restraint_coord_path)
+            # TODO non .gro
+            if geom_path[-4:] == ".gro":
+                _, respos, _ = read_gro(restraint_coord_path)
+            elif geom_path[-4:] == ".xyz":
+                _, respos, _ = read_xyz(restraint_coord_path)
+            else:
+                raise ValueError("restraint_coord_path must be .gro or .xyz")
             ok, res = DaemonTopFile(
                 top_path, nonbonded_force,
                 include_dir=include_dir, defines=defines,
@@ -203,7 +218,13 @@ class Simulation():
                 raise SystemExit("Terminated due to parsing error.")
             self.system, self.top = res
             # benefits of function based scope
-            box, pos, vel = read_gro(geom_path)
+            if geom_path[-4:] == ".gro":
+                box, pos, vel = read_gro(geom_path)
+            elif geom_path[-4:] == ".xyz":
+                box, pos, vel = read_xyz(geom_path)
+            else:
+                raise ValueError("geom_path must be .gro or .xyz")
+            self.logger.info(f"Read {len(pos)} atoms from {geom_path}. Box: {box}. Read velocities: {vel is not None}.")
         # Parsing - Checkpoint
         else:
             if (
@@ -221,13 +242,16 @@ class Simulation():
         if self.daemon_integrator:
             integrator.system = self.system
             integrator.sim_name = sim_name
+        self.logger.info(f"Integrator: {integrator}")
         self.logger.info("Parsing finished")
 
         # Coupling and integrators
         self.logger.info("Setup integrator and coupling start")
         for f in coupling:
-            self.system.add_force(f)
+            self.system.add_coupling(f)
+            self.logger.info(f"Coupling: {f}")
         if remove_com_motion:
+            self.logger.info("Removing com motion")
             self.system.remove_com_motion()
 
         # Context build and reporter initialization
@@ -252,6 +276,8 @@ class Simulation():
             self.top.add_reporter(rep)
             if self.daemon_integrator:
                 integrator.add_reporter(rep)
+            self.logger.info(f"Reporter: {rep}")
+
 
         self.reporters = reporters
 
@@ -318,6 +344,10 @@ class Simulation():
             reporter.finish()
 
     def replay(self, reactions: list[tuple[int, str, list[list[int]]]], until_frame=-1):
+        """
+        Replays reactions
+        = runs the modification algorithm based on reaction names and atom indices
+        """
         for frame, rx_name, frags in reactions:
             if 0 <= until_frame <= frame:
                 break
@@ -333,6 +363,8 @@ class Simulation():
             # modifications
             self.top.modification(frame, [(frags, rx)])
         self.system.reinitialize()
+        # note to self: we don't make constraints and vsites whole again as reactions can't modify those
+        # so if they are made whole when the sim is constructed that's enough
 
     def step(self, steps=1, xtc=True, dm=True):
         """
@@ -351,7 +383,13 @@ class Simulation():
         if steps > 0:
             self.logger.info(f"md_steps {steps}")
             self.logger.info("MD start")
-            self.system.do_steps(steps)
+            try:
+                self.system.do_steps(steps)
+            except mm.OpenMMException as e:
+                # TODO insert this to all openmm calls that can do an exception in some elegant manner, e.g. in Context
+                self.logger.error(f"!!! OpenMM Exception !!!\n{e}")
+                raise e
+
             self.logger.info("MD finished")
         if self.md_steps > 0 and steps > 0:
             ns_so_far = self.dt_ns * self.i
