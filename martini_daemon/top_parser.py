@@ -481,9 +481,6 @@ def DaemonTopFile(
     p.add_level("pairtypes", process_pairtypes)
 
     def process_pairs(tokens):
-        this_is_experimental(
-            tokens, 0, "Pairs"
-        )
         nonlocal last_molecule
         index_type = last_molecule.index_type
         i = parse_pair(tokens, 0, index_type)
@@ -508,9 +505,6 @@ def DaemonTopFile(
     p.add_level("pairs", process_pairs, start=assert_last_molecule)
 
     def process_cmaptypes(tokens):
-        this_is_experimental(
-            tokens, 0, "Cmaps"
-        )
         parts = [
             unwrap_atomtype(tokens, i) for i in range(5)
         ]
@@ -528,6 +522,11 @@ def DaemonTopFile(
             raise TokenParseError(
                 tokens[7],
                 "Non-square CMAPs are not supported."
+            )
+        if size < 8:
+            logger.warn(
+                f"CMAPs of size {size}x{size} are small. This might result in "
+                "slightly different behavior between GROMACS and OpenMM."
             )
         params = [
             unwrap(tokens, 8+i, "float")
