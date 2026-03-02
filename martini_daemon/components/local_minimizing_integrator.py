@@ -18,7 +18,8 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
         self, dt_ps, T_K, friction_ps1, minimizer, minimization_steps=500,
         report_every=0, check_convergence_every=10,
         langevin=True, equilibration_length=0, subdivision=4,
-        r_movable = 0., whole_molecule=False, toggle_couplings=False
+        r_movable = 0., whole_molecule=False, toggle_couplings=False,
+        max_retry = 0, harmonic_constraints=False
     ):
         """
         ToggleCouplings is experimental, don't use that one
@@ -61,21 +62,29 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
         self.r_movable = r_movable
         self.whole_molecule = whole_molecule
         self.toggle_couplings = toggle_couplings
+        self.max_retry = max_retry
+        self.harmonic_constraints = harmonic_constraints
 
     def reset(self, shape):
         self.minimizer.reset(shape)
 
-    def report(self, i, rem, op="a"):
+    def report(self, i, rem, system, op="a"):
         with open(f"{self.sim_name}_minimization{i}.log", op) as f:
-            f.write(f"Simulation frame {i}, remaining steps {rem}\n")
             f.write("==============================================\n")
+            f.write(f"Simulation frame {i}, remaining steps {rem}\n")
+            f.write("----------------------------------------------\n")
             f.write(self.minimizer.report())
+            f.write("----------------------------------------------\n")
+            f.write(system.get_energies_and_forces_by_group())
+            f.write("\n==============================================\n")
 
-    def set_reactions(self, reactions, system, top, i):
+
+    def set_reactions(self, reactions, system, top, i, retries_so_far=0):
         # save vels
         state = system._context.getState(
             velocities=True,
-            positions=True
+            positions=True,
+            energy=True
         )
         pos = state.getPositions(
             asNumpy=True
@@ -83,8 +92,12 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
         vels = state.getVelocities(
             asNumpy=True
         )
+        before_energy = state.getPotentialEnergy()
         box = np.array(system.get_box(state))
         self.integrator.setCurrentIntegrator(1)
+        if self.harmonic_constraints:
+            system.constraint.constraints_to_harmonic_bonds(True)
+            system.reinitialize()
         if self.toggle_couplings:
             system.coupling(False)
             system.reinitialize()
@@ -146,26 +159,38 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
         remaining = self.minsteps
 
         if self.report_every > 0:
-            self.report(i, remaining, op="w")
+            self.report(i, remaining, system, op="w")
 
         while remaining > 0:
             csteps = min(gcd, remaining)
             self.integrator.step(csteps)
             remaining -= csteps
             if self.report_every > 0 and remaining % self.report_every == 0:
-                self.report(i, remaining)
+                self.report(i, remaining, system)
             # check convergence every is guaranteed to check AT LEAST as often as it says
             if self.minimizer.getGlobalVariableByName("converged") == 1:
                 break
 
+        system.set_velocities(vels)
+        new_state = system._context.getState(energy=True)
+        new_energy = new_state.getPotentialEnergy()
+        if self.max_retry > retries_so_far and new_energy > before_energy:
+            with open(f"{self.sim_name}_minimization{i}.log", "a") as f:
+                f.write(f"\n\nENERGY WENT UP DURING MINIMIZATION!\nfrom: {before_energy} to: {new_energy}\nRETRYING, attempts left: {self.max_retry-retries_so_far}\n\n")
+                # TODO smarter scaling
+            self.minimizer.global_variables["step_size"] = self.minimizer.global_variables["step_size"] * 1.03
+            system.set_positions(pos)
+            return self.set_reactions(reactions, system, top, i, retries_so_far + 1)
         # reporters and cleanup
         # TODO find out why velocities change significantly during minimization
-        system.set_velocities(vels)
         for rep in self.reporters:
             rep.post_di_minimize()
         self.remaining_eq_steps = self.eq_steps
         if self.toggle_couplings:
             system.coupling(True)
+            system.reinitialize()
+        if self.harmonic_constraints:
+            system.constraint.constraints_to_harmonic_bonds(False)
             system.reinitialize()
         if self.remaining_eq_steps > 0:
             self.integrator.setCurrentIntegrator(2)

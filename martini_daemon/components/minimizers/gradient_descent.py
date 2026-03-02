@@ -65,10 +65,14 @@ class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
             "probability": 0,
             "converged": 0,
             "etol": etol,
+            "x_sum": 0,
+            "x_sum2": 0,
+            "v_sum": 0
         }
 
         self.per_dof_variables = {
             "x_old": 0,
+            "v_old": 0,
             "est_grad": 0,
             "movable": 0
         }
@@ -81,20 +85,28 @@ class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
 
         if etol > 0:
             self.beginIfBlock("converged < 1")
-        # Update context state.
-        self.addUpdateContextState()
 
+        # Update context state (=Virt Sites and coupling).
         # Constrain positions.
+        self.addUpdateContextState()
         self.addConstrainPositions()
 
         # Store old energy and positions.
         self.addComputeGlobal("energy_old", "energy")
         self.addComputePerDof("x_old", "x")
+        self.addComputePerDof("v_old", "v")
+        self.addComputeSum("x_sum", "x")
+        self.addComputeSum("x_sum2", "x*x")
+        self.addComputeSum("v_sum", "v")
 
-        # Take step.
+
+        # Take step, re-constraint positions.
         self.addComputePerDof("est_grad", "(1-eta)*est_grad + eta*f")
         self.addComputeSum("fnorm2", "est_grad^2")
         self.addComputePerDof("x", "x+movable*step_size*est_grad/sqrt(fnorm2 + delta(fnorm2))")
+        # x was changed, we need to do this again to actually be able to
+        # see the energy
+        self.addUpdateContextState()
         self.addConstrainPositions()
 
         # Ensure we only keep steps that go downhill in energy.
@@ -104,7 +116,14 @@ class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
         # Accept also checks for NaN
         self.addComputeGlobal("accept", "step(-delta_energy) * delta(energy - energy_new)")
 
-        self.addComputePerDof("x", "accept*x + (1-accept)*x_old")
+        self.beginIfBlock("accept = 0")
+        # revert DoF positions
+        self.addComputePerDof("x", "x_old")
+        # recalc vsites to old position
+#        self.addUpdateContextState()
+        self.endBlock()
+        self.addComputePerDof("v", "v_old")
+        #self.addComputePerDof("x", "accept*x + (1-accept)*x_old")
 
         # Update step size.
         self.addComputeGlobal("step_size", "step_size * (2.0*accept + 0.5*(1-accept))")
