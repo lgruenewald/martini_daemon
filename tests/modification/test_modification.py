@@ -4,6 +4,8 @@ import shutil
 import pytest
 from martini_daemon.simulation import Simulation
 from martini_daemon.reporters.sysstar_dump import SysStarDump
+from martini_daemon.reporters.topstar import FragCountReporter, ReactionReporter
+from math import isclose
 
 
 # == CONFIG ==
@@ -18,57 +20,52 @@ tests = [
 
 
 # == TEST CLASS ==
-class TestDetection():
-
-    def get_sim(self, top, gro):
+class TestDetection:
+    @staticmethod
+    def get_sim(top: str, gro: str) -> str:
         rep = SysStarDump()
         sim = Simulation(
             top, gro,
             reporters=[
-                rep
+                rep, FragCountReporter(), ReactionReporter()
             ]
         )
         sim.step(0, xtc=False, dm=True)
         # force closing of file
         # TODO oof
+        # it is what it is
         rep.__del__()
         return "out.sstar"
 
-    def read_dump(self, path):
-        """
-        .sstar dump reader
-        """
-        reactions = []
-        with open(path, "r") as f:
-            lines = f.read().splitlines()
-            for line in lines:
-                if line[0] == "#" or len(line) == 0:
-                    continue
-                elems = line.split(";")
-                frame, rx = elems[0].split(",")
-                # list of atoms
-                frags = [
-                    elem.split(",")[2:] for elem in elems[1:]
-                ]
-                reactions.append(
-                    (rx, frags)
-                )
-        return reactions
+    @staticmethod
+    def compare(dump_new: str, dump_reference: str) -> None:
+        reference = SysStarDump.read_dump(dump_reference)
+        new = SysStarDump.read_dump(dump_new)
+        assert len(new) == len(reference)
+        # structural equality with floats
+        # TODO surely this is an opportunity to discover something cool and new and simple
+        # TODO make it order insensitive for both forces and within forces
+        for i in range(len(new)):
+            frame, atoms, forces = new[i]
+            frame_ref, atoms_ref, forces_ref = reference[i]
+            assert frame == frame_ref
+            for j in range(len(atoms)):
+                assert atoms[j][0] == atoms_ref[j][0] # name
+                assert atoms[j][1] == atoms_ref[j][1] # resid
+                assert atoms[j][2] == atoms_ref[j][2] # res_name
+                assert atoms[j][3] == atoms_ref[j][3] # atom_type
+                assert isclose(atoms[j][4], atoms_ref[j][4]) # charge
+                assert isclose(atoms[j][5], atoms_ref[j][5]) # mass
+            assert len(forces) == len(forces_ref)
+            # each force obj
+            for (name, force), (name_ref, force_ref) in zip(forces, forces_ref):
+                assert name == name_ref
+                # single line of force
+                for inter, inter_ref in zip(force, force_ref):
+                    # atom ids and params
+                    for val, val_ref in zip(inter, inter_ref):
+                        assert isclose(val, val_ref)
 
-    def compare(self, reactions, expected):
-        dump = f"\nGot: {reactions}, expected: {expected}."
-        assert len(reactions) == len(expected), f"first len check {dump}"
-        for (r1, frags1), (r2, frags2) in zip(reactions, expected):
-            # while order in theory can be different, it is simpler
-            # to for now make systems where we just form the expected
-            # .reactions in the order detection will (deterministically)
-            # output them
-            assert r1 == r2, f"Name differs. {dump}"
-            assert len(frags1) == len(frags2), "second len check" + dump
-            for atoms1, atoms2 in zip(frags1, frags2):
-                assert len(atoms1) == len(atoms2), "third len check" + dump
-                for atom1, atom2 in zip(atoms1, atoms2):
-                    assert atom1 == atom2, f"Atom differs. {dump}"
 
     @pytest.mark.parametrize("x", tests)
     def test_detection(self, x, rootdir):
@@ -78,12 +75,10 @@ class TestDetection():
         os.chdir(x)
 
         # meat of the test
-        path = self.get_sim("system.top", "system.gro")
-#        reactions = self.read_reactions(rx_path)
-#        expected = self.read_reactions("expected.reactions")
-#        self.compare(reactions, expected)
+        dump_new = TestDetection.get_sim("system.top", "system.gro")
+        dump_reference = "reference.sstar"
+        TestDetection.compare(dump_new, dump_reference)
 
-        shutil.copy(path, "_" + path)
         # cleanup
         for filename in glob.glob("./out*"):
             os.remove(filename)

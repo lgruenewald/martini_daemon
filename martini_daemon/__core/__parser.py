@@ -10,6 +10,9 @@ from .__directive import Directive
 
 
 class ParseError(Exception):
+    """
+    Generic exception raised during parsing.
+    """
     def __init__(self, message: str):
         self.message = message
 

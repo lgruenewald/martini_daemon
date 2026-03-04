@@ -28,8 +28,10 @@ class Simulation:
     # Custom logger - into the main log file / screen
 
 
-    # Request trajectory, log file, text file, binary file, compressed binary file
-    # - this enforce simulation name prefixes and backing up in a single place
+    # Request trajectory, log file, text file, binary file, compressed binary file, ...
+    # - this enforce simulation name prefixes and backing up instead of overwriting files in a single place
+    # - the current __del__() thing in reporters is actually bad, make a single good implementation for these disk writes that ensures file closing
+    # TODO all reporter custom formats should be versioned and stabilized
 
     # event based architecture -- using not only reporters
     # TODO try to keep S* and T* free from reporter list and handle everything through simulation

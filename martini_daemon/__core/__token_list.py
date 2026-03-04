@@ -3,6 +3,9 @@ import re
 import math
 
 class TokenParseError(Exception):
+    """
+    Exception when .unwrap() fails
+    """
     def __init__(self, token: Token, message: str):
         self.token = token
         self.message = message

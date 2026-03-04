@@ -14,10 +14,12 @@ This is achieved by combining multiple components in one repo:
 Pre-requisite: install the right version of OpenMM with support for your GPU and install `git-lfs`.
 
 1. Clone the repository
-2. (optional) switch to the desired branch, tag or commit
-3. (optional) activate the desired conda, mamba, uv or venv environment
-4. Install with `pip install .` in the root directory of this repo,
-   where `pyproject.toml` is located.
+   - (optional) switch to the desired branch, tag or commit
+2. (optional) activate the desired conda, mamba, uv or venv environment
+3. (optional) Install OpenMM explicitly with CUDA or HIP support.
+4. Install with `pip install .` in the root directory of this repo, where `pyproject.toml` is located.
+   - (optional) Install with `pip install .[all]` if you want to run tests, benchmarks or build documentation yourself.
+
 
 ## Docs
 
@@ -34,11 +36,11 @@ information about each system.
 
 ## Tests
 
-- `single_frame` - single point energy and force calculation tests, that verify
-  that Martini is implemented correctly by comparing it to GROMACS energies.
-- `graph` - tests for the graph matching algorithm
-- `detection` - tests for the detection algorithm
-- `modification` - tests for the modification algorithm (WIP)
+- `test_pbc.py` - Test the PBC handling utility functions.
+- `single_frame` - Single point energy and force calculation tests, that verify that Martini is implemented correctly by comparing it to GROMACS energies.
+- `graph` - Tests for the graph matching algorithm.
+- `detection` - Tests for the detection algorithm.
+- `modification` - Tests for the modification algorithm (WIP).
 
 # License
 
