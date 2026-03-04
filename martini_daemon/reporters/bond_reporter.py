@@ -2,6 +2,7 @@ from .reporter import Reporter, read_compressed
 import numpy as np
 import struct
 
+# TODO deprecate and move to cluster.py's version, if cluster.py version can be verified to be fast and correct
 def collect_bonds(n, sstar, constraint_only=False):
     bonds_len = 0
     vsite_len = 0

@@ -4,7 +4,9 @@ from .reporter import Reporter
 import pickle
 import os
 
-
+# TODO needs automated testing
+# TODO save() and load() should be part of constructors
+# TODO should this be removed?
 class CheckpointReporter(Reporter):
     """
         Reporter that enables simple continuable

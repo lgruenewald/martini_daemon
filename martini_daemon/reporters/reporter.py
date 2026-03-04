@@ -119,7 +119,7 @@ class Reporter():
         pass
 
     def post_sc_enable(self, i):
-        # called after enabling soft core
+        # called after enabling soft __core
         pass
 
     def post_di_minimize(self):
@@ -131,7 +131,7 @@ class Reporter():
         pass
 
     def post_sc_disable(self, i):
-        # called after soft core is disabled
+        # called after soft __core is disabled
         pass
 
 

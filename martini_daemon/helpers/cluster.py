@@ -6,6 +6,38 @@ from tqdm import tqdm
 from functools import partial
 import molly
 
+def collect_bonds(sstar, filters: None | list[str] = None):
+    n = sstar.len_atoms()
+    bonds = []
+    for force in sstar.modular_forces:
+        # do we include this force
+        do_force = False
+        if filters is None:
+            do_force = True
+        else:
+            for filt in filters:
+                if force.is_instance(filt):
+                    do_force = True
+                    break
+        for index in range(len(force)):
+            members = force.get_members(index)
+            if members is None:
+                continue
+            if force.is_instance("vsite"):
+                # hardcoded special case, modeled as vsite bonded to all constructing particles
+                i = members[0]
+                for j in members[1:]:
+                    if i == j:
+                        continue
+                    bonds.append((i, j))
+            else:
+                # modeled as each particle bonded to the next one
+                for i, j in zip(members[:-1], members[1:]):
+                    if i == j:
+                        continue
+                    bonds.append((i, j))
+    return bonds
+
 
 def make_cluster_frame(
     frame, n_atoms

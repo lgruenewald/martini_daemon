@@ -15,7 +15,8 @@ documentation for details.
    :maxdepth: 1
    :caption: Contents:
 
-   api
-   reference
    user_guide
+   reference
+   benchmark
+   test
 

@@ -289,10 +289,10 @@ class SysStar():
             raise ValueError("Cannot do this after context is initialized")
         self._atom_types[type] = (charge, mass)
 
-    def add_nb_type(self, type1, type2, V, W):
+    def add_nb_type(self, type1, type2, sigma, epsilon):
         if self.context_initialized:
             raise ValueError("Cannot do this after context is initialized")
-        self.nonbonded_force._nb_types[(type1, type2)] = (V, W)
+        self.nonbonded_force._nb_types[(type1, type2)] = (sigma, epsilon)
 
     def build_context(self, integrator, box, platform=None, params=None):
         """context_initialized flips the state of S* in a way

@@ -11,6 +11,7 @@ class Force():
     # or when removing interactions
 
     def __init__(self, sysstar):
+        # TODO make these actually private, more modular and use a dictionary
         self._list = []
         self._sysstar = sysstar
         self._rebuild: bool = True

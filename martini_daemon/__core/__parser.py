@@ -4,119 +4,20 @@ Can be customized by adding your own directives.
 """
 
 import re
-from dataclasses import dataclass
 from enum import Enum
 import os
-import math
-from typing import Callable
 import traceback
-
-
-@dataclass
-class Token:
-    content: str
-    path: str
-    line: int
-    start: int
-    end: int
-
-
-int_pat = re.compile("[-+]?[0-9]+")
-float_pat = re.compile("[-+]?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?")
-word_pat = re.compile("[a-zA-Z0-9_.]+")
-pattern_pat = re.compile("[a-zA-Z0-9_?!*{}]+")
-pair_pat = re.compile(r"[0-9]+:[a-zA-Z0-9_.]+")
-
-
-class TokenParseError(Exception):
-    def __init__(self, token: Token, message: str):
-        self.token = token
-        self.message = message
-
+from typing import Type
+from .__token import Token
+from .__token_list import TokenParseError
+from .__directive import Directive
+from .__simulation import Simulation
 
 class ParseError(Exception):
     def __init__(self, message: str):
         self.message = message
 
-
-def unwrap(tokens, index, type_filter, default="default placeholder"):
-    """
-    Given a list of tokens, try to index it and convert to a useable value
-    based on type_filter. If the index would be out of range, a default
-    value can be specified in place.
-
-    Possible filters:
-    int - returns int type, no processing
-    float - returns float type, no processing
-    positive - float, but raises an exception if 0 or smaller
-    index - int, but subtracts 1, exception if 0 or smaller
-    degree - degree to radian and makes sure it's in the range 0 to 2pi
-    word - a string with only alphanumerics and no whitespace in it
-    pattern - fnmatch pattern, converts {} to [] so {} can be used for sets
-    pair - a tuple of an index (which reactant) and a word (which graph atom)
-    """
-    if len(tokens) <= index:
-        if default == "default placeholder":
-            # hack so "None" can also be used as a default value
-            raise TokenParseError(
-                tokens[-1],
-                f"Not enough tokens, expected token at index {index}."
-            )
-        else:
-            return default
-
-    tok = tokens[index].content
-    match type_filter:
-        case "int":
-            if int_pat.match(tok):
-                return int(tok)
-        case "float":
-            if float_pat.match(tok):
-                return float(tok)
-        case "positive":
-            if float_pat.match(tok):
-                if float(tok) <= 0.:
-                    raise TokenParseError(
-                        tokens[index],
-                        "Expected a positive non-zero real number."
-                    )
-                return float(tok)
-        case "index":
-            if int_pat.match(tok):
-                if int(tok) <= 0:
-                    raise TokenParseError(
-                        tokens[index],
-                        "Expected index, got an integer 0 or smaller."
-                        "Note: indexing in .itp/.top files is usually 1 based."
-                    )
-                return int(tok) - 1
-        case "degree":
-            if float_pat.match(tok):
-                angle = float(tok) * math.pi / 180.0
-                while angle < 0.:
-                    angle += math.tau
-                while angle > math.tau:
-                    angle -= math.tau
-                return angle
-        case "word":
-            if word_pat.match(tok):
-                return tok
-        case "pattern":
-            if pattern_pat.match(tok):
-                return tok.replace("{", "[").replace("}", "]")
-        case "pair":
-            # specialized index:word construct for [reaction] stuff
-            if pair_pat.match(tok):
-                items = tok.split(":")
-                return (int(items[0])-1, items[1])
-
-    raise TokenParseError(
-        tokens[index],
-        f"Expected token of type {type_filter}."
-     )
-
-
-class Parser():
+class Parser:
     """
     A parser for gromacs topology file-like config files with limited C
     style preprocessing, that should be sufficient for most input files.
@@ -137,22 +38,26 @@ class Parser():
         # there was an error
     """
 
-    def __init__(self):
-        self._levels: dict[str, Callable] = {}
-        self._start: dict[str, Callable] = {}
-        self._end: dict[str, Callable] = {}
-        self._mandatory: set[str] = set()
-        self._unique: set[str] = set()
-
-    def parse(self, path, include_dir, defines={}):
-        """The main interface for using a TopParser class
+    def __init__(self, simulation: Simulation, path: str, include_dir: str | None = None, defines: dict[str, str] | None = None):
         """
-        self._linenum: int = 0
-        self._path: str = path
-        self._defines: dict[str, str] = defines
-        self._include_dir: str | None = include_dir
-        self._included: set[str] = set()
-        self._past_directives: set[str] = set()
+        Create a Parser object to parse a certain file at path.
+        """
+        # stores types, not instances
+        self.__directives: dict[str, Type] = {}
+        self.__line_num: int = 0
+        self.__path: str = path
+        self.__defines: dict[str, str] | None = defines
+        self.__include_dir: str | None = include_dir
+        self.__included: set[str] = set()
+        self.__past_directives: set[str] = set()
+        # stores instances
+        self.__level_stack: list[Directive] = []
+
+
+    def parse(self, path, include_dir, defines=None):
+        """
+        The main interface for using a TopParser class
+        """
         self._current_level = None
         try:
             self._parse(path)

@@ -21,5 +21,5 @@ all = [
   "pytest",
 # Docs
   "sphinx",
-  "autoapi"
+  "sphinx-autoapi"
 ]

@@ -6,7 +6,7 @@ from ..utils import pdist
 from ..reporters.bond_reporter import collect_bonds
 from ..helpers.cluster import make_cluster_frame
 
-
+# TODO integrate this more closely with core, resp. always use compound integrators?
 class LocalMinimizingIntegrator(DaemonIntegrator):
     """
         Inspired by

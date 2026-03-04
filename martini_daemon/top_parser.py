@@ -523,7 +523,7 @@ def DaemonTopFile(
                 tokens[7],
                 "Non-square CMAPs are not supported."
             )
-        if size < 8:
+        if size[0] < 8:
             logger.warn(
                 f"CMAPs of size {size}x{size} are small. This might result in "
                 "slightly different behavior between GROMACS and OpenMM."

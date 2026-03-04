@@ -82,6 +82,15 @@ as seen in the example above. Selecting CPU cores for the simulation can
 be done with the ``taskset`` command. For example,
 ``taskset -c 0-31 ./run.py`` will limit run.py to cores 0 to 31.
 
+
+Extracting the OpenMM system
+============================
+
+In case you want to use Martini Daemon as a Gromacs .top file parser to
+run your (martini) simulations in OpenMM, you might want to just obtain
+an OpenMM system, rather than use the abstraction layer provided on top
+of it here. TODO -- write up
+
 Including reactions
 ===================
 
