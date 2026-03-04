@@ -71,7 +71,7 @@ tests = [
     "restricted_dihedral", "restricted_angle", "combined_bending_torsion",
 ]
 
-
+# TODO: use Simulation, not TopParser
 # == TEST CLASS ==
 class TestSingleFrame():
     def apply_constraints(self):

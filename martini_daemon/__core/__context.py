@@ -1,4 +1,3 @@
 """
 Context inheriting openmm context
-
 """

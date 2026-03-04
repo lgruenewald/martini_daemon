@@ -1,22 +1,37 @@
-"""
-More elegant simulation object that gets passed around everywhere
-EVERY COMPONENT SHOULD GET ACCESS TO LOGGING - main log file, screen logging
-CUSTOM LOGGER
-Current step, current time, reporters, list of open trajectories, log files, reporter files etc inside it, T*, S*, integrator
-Request trajectory
-Request gro file
-Request log file
-Request text file
-Request uncompressed binary file
-Request compressed binary file
-improve the passing around of values, remove all default values except in Simulation
-Tests should use Simulation not TopParser - clear internal/external
-Plugin architecture + split into plugins (mietini, custom H bond, periodic gaussian)
-Components / simulation
-Topology meta-info – constraints, vsites, coupling, extra forces
-EVENT BASED ARCHITECTURE
-
-"""
 
 class Simulation:
-    pass
+
+    # user API
+    def __init__(
+        self,
+        top_path: str,
+        geom_path: str,
+        sim_name: str,
+
+    ):
+        # TODO all default values should be in simulation only !!
+
+        # the data based on which the simulation was constructed
+        self.top_path = top_path
+        self.geom_path = geom_path
+        self.sim_name = sim_name
+
+        # the "when" in the simulation
+        self.simulation_step: int = 0
+        self.simulation_time_ps: float = 0.
+
+    def write_geometry(self, path: str) -> None:
+        pass
+
+    # programmer API
+
+    # Custom logger - into the main log file / screen
+
+
+    # Request trajectory, log file, text file, binary file, compressed binary file
+    # - this enforce simulation name prefixes and backing up in a single place
+
+    # event based architecture -- using not only reporters
+    # TODO try to keep S* and T* free from reporter list and handle everything through simulation
+
+    # Topology meta-info -- constraints, vsites, coupling, extra forces

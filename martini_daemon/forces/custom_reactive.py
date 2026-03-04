@@ -1,7 +1,7 @@
 from .force import Force
 import openmm as mm
 
-
+# TODO split into plugin and own repo
 class CustomReactive(Force):
     _members = 3
     _pbc = False
