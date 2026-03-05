@@ -15,7 +15,12 @@ def rootdir(request):
 
 
 tests = [
-    "bond_break"
+    # adding new interactions
+    "bond_make",
+    # [break]
+    "bond_break", "dihedral_break",
+    # [update]
+    "update_group", "update_group4"
 ]
 
 

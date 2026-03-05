@@ -568,12 +568,13 @@ class TopStar():
                 continue
             # breaking interactions
             # check that all in interaction are in group
-            for inter in self.interaction_list[group_atoms[0]][:]:
-                if all(map(
-                           lambda inter_member: inter_member in group_atoms,
-                           inter.get_members()
-                       )):
-                    self.remove_interaction(inter)
+            for group_atom in group_atoms:
+                for inter in self.interaction_list[group_atom][:]:
+                    if all(map(
+                               lambda inter_member: inter_member in group_atoms,
+                               inter.get_members()
+                           )):
+                        self.remove_interaction(inter)
 
     def populate_neighbors(self, atoms: set[int]) -> set[int]:
         """
