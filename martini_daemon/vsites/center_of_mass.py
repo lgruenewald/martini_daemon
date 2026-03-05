@@ -8,7 +8,7 @@ class VSiteCenterOfMass(VirtualSite):
         masses = []
         sum = 0.
         for i in members:
-            _, _, m = self._sysstar.get_atom_details(i)
+            _, _, m, _, _ = self._sysstar.get_atom_details(i)
             masses.append(m)
             sum += m
         weights = [m/sum for m in masses]

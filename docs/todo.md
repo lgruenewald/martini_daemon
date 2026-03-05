@@ -1,7 +1,0 @@
-- proofread+improve docs, add more about helpers and reporters + more about examples
-- pbc whole constraints + vsites? when loading .gro files, warn if not possible
-- verify dihedral detection testing again
-- Modification testing
-- checkpoint testing + integrate save()/load() into constructors
-- friendlier angle/dihedral syntax
-- cluster+pbc whole

@@ -157,6 +157,36 @@ class TopStar():
     def new_graph(self, graph: Graph) -> None:
         self.graphs[graph.name] = graph
 
+    def rx_by_name(self, name) -> None | ReactionTemplate:
+        # TODO fix this
+        for _, rxs in self.reactions.items():
+            for rx in rxs:
+                if rx.name == name:
+                    return rx
+        return None
+
+    def frag_by_name_and_atoms(self, name, atoms) -> None | Fragment:
+        # TODO fix this
+        # assumptions made:
+        # first atom non-optional
+        # two frags with the same name and atoms can't exist
+        # these may not hold up
+        atom1 = atoms[0]
+        assert atom1 != -1
+        for frag_id in self.defrag_list[atom1]:
+            frag = self.frag_list[frag_id]
+            matched = True
+            if frag.name != name:
+                matched = False
+                continue
+            for i, atom in enumerate(atoms):
+                if frag.atoms[i] != atom:
+                    matched = False
+                    break
+            if matched:
+                return frag
+        return None
+
     # TODO fix this monster
     def new_reaction(self, reaction: ReactionTemplate) -> Molecule:
         # reactant names
@@ -181,7 +211,7 @@ class TopStar():
                     continue
                 # distance warning
                 if dist * 2. > self.nlist_cutoff:
-                    self.logger.warn(
+                    self.logger.warning(
                         f"Warning: r_max for reaction {reaction.name}"
                         f" has a r_max between reactant {i1} and {i2}"
                         f" atoms {aindex1} {aindex2} of {dist},"
@@ -304,7 +334,7 @@ class TopStar():
             if resnum != prev_resnum:
                 self.system.new_residue()
                 prev_resnum = resnum
-            p = self.system.add_atom(atomname, resname, type, charge, mass)
+            p = self.system.add_atom(atomname, resname, type, charge, mass, 1, 0.5)
             atoms.append(p)
             self.defrag_list.append([])
             self.interaction_list.append([])
@@ -538,12 +568,13 @@ class TopStar():
                 continue
             # breaking interactions
             # check that all in interaction are in group
-            for inter in self.interaction_list[group_atoms[0]][:]:
-                if all(map(
-                           lambda inter_member: inter_member in group_atoms,
-                           inter.get_members()
-                       )):
-                    self.remove_interaction(inter)
+            for group_atom in group_atoms:
+                for inter in self.interaction_list[group_atom][:]:
+                    if all(map(
+                               lambda inter_member: inter_member in group_atoms,
+                               inter.get_members()
+                           )):
+                        self.remove_interaction(inter)
 
     def populate_neighbors(self, atoms: set[int]) -> set[int]:
         """
@@ -594,7 +625,7 @@ class TopStar():
             self.system.remass(atom_id, new_mass)
 
     def modification(
-        self, 
+        self,
         i: int,
         reactions: list[tuple[list[Fragment], ReactionTemplate]]
     ) -> None:
@@ -649,3 +680,28 @@ class TopStar():
             reporter.post_modification(i, self.out_name, completed_reactions)
 
         return completed_reactions
+
+    def toggle_sc(
+            self, reactions: list[tuple[list[Fragment], ReactionTemplate]],
+            toggle: bool
+    ) -> None:
+        for (frags, rx) in reactions:
+            for (id, atom, new_lam, new_alpha) in rx.soft_core:
+                atom_id = frags[id].atoms[atom]
+                if atom_id == -1:
+                    continue
+                if toggle:
+                    self.system.update_sc(atom_id, new_lam, new_alpha)
+                else:
+                    self.system.update_sc(atom_id, 1, 0.5)
+
+#            for f in frags:
+#                for atom_id in f.atoms:
+#                    if atom_id == -1:
+#                         continue
+#                    if toggle:
+#                        self.system.update_sc(atom_id, 0.6, 0.5)
+#                    else:
+#                        self.system.update_sc(atom_id, 1, 0.5)
+        return
+

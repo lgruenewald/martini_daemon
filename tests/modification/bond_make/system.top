@@ -1,0 +1,45 @@
+#include "../../../itp/martini_v3.0.0.itp"
+
+[moleculetype]
+X 1
+[atoms]
+; id type resnr resname atom cgnr
+1 W 1 X X1 1
+2 W 1 X X1 1
+
+[bonds]
+1 2 1 0.5 1000
+
+#ifdef DAEMON
+[graph]
+name x
+atom x X1 W
+atom y X1 W
+bond x y
+
+[reaction]
+x_form
+[reactants]
+x x
+
+[conditions]
+r_max 1:y 2:y 0.9
+
+[bonds]
+1:y 2:y 1 0.5 1200
+
+[angles]
+1:x 1:y 2:y 1 60 120
+1:y 2:y 2:x 1 60 120
+
+[dihedrals]
+1:x 1:y 2:y 2:x 1 60 20 1
+
+#endif
+
+[system]
+modification test
+
+[molecules]
+X 2
+

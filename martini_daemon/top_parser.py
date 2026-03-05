@@ -426,7 +426,7 @@ def DaemonTopFile(
         j = parse_pair(tokens, 1, index_type)
         last_molecule.add_exclusion(i, j)
         for k in range(2, len(tokens)):
-            c = unwrap(tokens, k, "index")
+            c = unwrap(tokens, k, index_type)
             last_molecule.add_exclusion(i, c)
 
     p.add_level("exclusions", process_exclusions, start=assert_last_molecule)
@@ -481,9 +481,6 @@ def DaemonTopFile(
     p.add_level("pairtypes", process_pairtypes)
 
     def process_pairs(tokens):
-        this_is_experimental(
-            tokens, 0, "Pairs"
-        )
         nonlocal last_molecule
         index_type = last_molecule.index_type
         i = parse_pair(tokens, 0, index_type)
@@ -508,9 +505,6 @@ def DaemonTopFile(
     p.add_level("pairs", process_pairs, start=assert_last_molecule)
 
     def process_cmaptypes(tokens):
-        this_is_experimental(
-            tokens, 0, "Cmaps"
-        )
         parts = [
             unwrap_atomtype(tokens, i) for i in range(5)
         ]
@@ -528,6 +522,11 @@ def DaemonTopFile(
             raise TokenParseError(
                 tokens[7],
                 "Non-square CMAPs are not supported."
+            )
+        if size[0] < 8:
+            logger.warn(
+                f"CMAPs of size {size}x{size} are small. This might result in "
+                "slightly different behavior between GROMACS and OpenMM."
             )
         params = [
             unwrap(tokens, 8+i, "float")
@@ -547,6 +546,12 @@ def DaemonTopFile(
             parse_pair(tokens, i, index_type)
             for i in range(5)
         ]
+        type = unwrap(tokens, 5, "int")
+        if type != 1:
+            raise TokenParseError(
+                tokens[5],
+                f"Unsupported cmap type {type}."
+            )
         # GromacsTopFile in openmm does support cmap types
         # here, but GROMACS seems to require [cmaptypes]
         # so we only support [cmaptypes]
@@ -1191,6 +1196,8 @@ def DaemonTopFile(
                     tokens, 0, "Relative rate control"
                 )
                 last_reaction.relative_rate = unwrap(tokens, 1, "positive")
+            case "probability":
+                last_reaction.probability = unwrap(tokens, 1, "positive")
             case _:
                 raise TokenParseError(
                     tokens[0],
@@ -1321,6 +1328,19 @@ def DaemonTopFile(
         last_reaction.recharges.append((i, j, ncharge))
 
     p.add_level("recharge", process_recharge)
+
+    def process_soft_core(tokens):
+        nonlocal last_reaction
+        n_reac = len(last_reaction.reactants)
+        if n_reac == 0:
+            raise ParseError("[reactants] must come before [soft_core]")
+
+        i, j = parse_pair(tokens, 0, "pair")
+        sc_lam = unwrap(tokens, 1, "float")
+        sc_alpha = unwrap(tokens, 2, "float")
+        last_reaction.soft_core.append((i, j, sc_lam, sc_alpha))
+
+    p.add_level("soft_core", process_soft_core)
 
     def process_system(tokens):
         nonlocal system_defined

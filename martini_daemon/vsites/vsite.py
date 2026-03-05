@@ -74,3 +74,12 @@ class VirtualSite():
     def __len__(self) -> int:
         return len(self._list)
 
+    def set_force_group(self, fg) -> bool:
+        return False
+
+    def get_force_group(self) -> None:
+        return None
+
+    def has_force_obj(self) -> bool:
+        return False
+

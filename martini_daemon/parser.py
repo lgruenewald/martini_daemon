@@ -1,4 +1,7 @@
-# gromacs-style .ini format parser (used for .top/.itp files)
+"""
+Gromacs-style .ini format parser (used for .top/.itp files).
+Can be customized by adding your own directives.
+"""
 
 import re
 from dataclasses import dataclass

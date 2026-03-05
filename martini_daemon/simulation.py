@@ -2,9 +2,9 @@ from .forces.nonbonded import NonBonded
 from .top_parser import DaemonTopFile
 from .meta import alias
 from .gro_file import read_gro
-from .utils import backup_try
+from .utils import backup_try, format_time
 from .reporters.checkpoint_reporter import load_checkpoint
-from .components.reaction_sensitive_integrator import DaemonIntegrator
+from .components.daemon_integrator import DaemonIntegrator
 import sys
 import openmm as mm
 import logging
@@ -13,6 +13,9 @@ import time
 from typing import Any
 import math
 import os
+from importlib.metadata import version
+
+from .xyz_file import read_xyz
 
 
 class Simulation():
@@ -107,6 +110,7 @@ class Simulation():
                 "Please specify: geom_path and top_path only OR chk_path only."
             )
         if restraint_coord_path is None:
+            # TODO check if this works with non gro
             restraint_coord_path = geom_path
         self.i: int = 0
         self.md_steps: int = md_steps
@@ -179,11 +183,22 @@ class Simulation():
                          f"steps: {md_steps} dm_freq: {dm_frequency} "
                          f"traj_freq: {traj_frequency} "
                          f"sim_name: {sim_name} platform: {platform}")
+        self.logger.info(f"Context parameters: {context_parameters}")
+        self.logger.info(f"Defines: {defines}")
+        self.logger.info(f"Nonbonded: {nonbonded_force}")
+        self.logger.info(f"Martini Daemon version: {version('martini_daemon')}")
+
 
         self.logger.info("Parsing start")
         # Parsing - No checkpoint
         if not use_checkpoint:
-            _, respos, _ = read_gro(restraint_coord_path)
+            # TODO non .gro
+            if geom_path[-4:] == ".gro":
+                _, respos, _ = read_gro(restraint_coord_path)
+            elif geom_path[-4:] == ".xyz":
+                _, respos, _ = read_xyz(restraint_coord_path)
+            else:
+                raise ValueError("restraint_coord_path must be .gro or .xyz")
             ok, res = DaemonTopFile(
                 top_path, nonbonded_force,
                 include_dir=include_dir, defines=defines,
@@ -203,7 +218,13 @@ class Simulation():
                 raise SystemExit("Terminated due to parsing error.")
             self.system, self.top = res
             # benefits of function based scope
-            box, pos, vel = read_gro(geom_path)
+            if geom_path[-4:] == ".gro":
+                box, pos, vel = read_gro(geom_path)
+            elif geom_path[-4:] == ".xyz":
+                box, pos, vel = read_xyz(geom_path)
+            else:
+                raise ValueError("geom_path must be .gro or .xyz")
+            self.logger.info(f"Read {len(pos)} atoms from {geom_path}. Box: {box}. Read velocities: {vel is not None}.")
         # Parsing - Checkpoint
         else:
             if (
@@ -220,13 +241,17 @@ class Simulation():
             )
         if self.daemon_integrator:
             integrator.system = self.system
+            integrator.sim_name = sim_name
+        self.logger.info(f"Integrator: {integrator}")
         self.logger.info("Parsing finished")
 
         # Coupling and integrators
         self.logger.info("Setup integrator and coupling start")
         for f in coupling:
-            self.system.add_force(f)
+            self.system.add_coupling(f)
+            self.logger.info(f"Coupling: {f}")
         if remove_com_motion:
+            self.logger.info("Removing com motion")
             self.system.remove_com_motion()
 
         # Context build and reporter initialization
@@ -249,6 +274,11 @@ class Simulation():
             rep._simulation = self
             self.system.add_reporter(rep)
             self.top.add_reporter(rep)
+            if self.daemon_integrator:
+                integrator.add_reporter(rep)
+            self.logger.info(f"Reporter: {rep}")
+
+
         self.reporters = reporters
 
         self.system.set_xtc_path(self.traj_path)
@@ -258,6 +288,21 @@ class Simulation():
             self.logger.info("Initial geometry XTC frame written")
         self.logger.info("Context build finished")
         self.logger.info("__init__ end")
+
+    def set_process_title(self, newname=b"daemon"):
+        """
+        Set process title to something else than "python"
+
+        Nothing critical, just a nice thing to have for top/htop/btop/mu ;)
+
+        based on: https://stackoverflow.com/questions/564695/is-there-a-way-to-change-effective-process-name-in-python
+        Only works on linux
+        """
+        from ctypes import cdll, byref, create_string_buffer
+        libc = cdll.LoadLibrary('libc.so.6')
+        buff = create_string_buffer(len(newname)+1)
+        buff.value = newname
+        libc.prctl(15, byref(buff), 0, 0, 0)
 
     def generate_velocities(self, T=300):
         """Generate velocities at temp T (in kelvin)."""
@@ -298,6 +343,29 @@ class Simulation():
         for reporter in self.reporters:
             reporter.finish()
 
+    def replay(self, reactions: list[tuple[int, str, list[list[int]]]], until_frame=-1):
+        """
+        Replays reactions
+        = runs the modification algorithm based on reaction names and atom indices
+        """
+        for frame, rx_name, frags in reactions:
+            if 0 <= until_frame <= frame:
+                break
+            # find rx
+            rx = self.top.rx_by_name(rx_name)
+            assert rx is not None, f"{rx} could not be found."
+            # find frags
+            frags = [
+                self.top.frag_by_name_and_atoms(frag_name, frag)
+                for frag_name, frag in zip(rx.reactants, frags)
+            ]
+            assert all(frag is not None for frag in frags)
+            # modifications
+            self.top.modification(frame, [(frags, rx)])
+        self.system.reinitialize()
+        # note to self: we don't make constraints and vsites whole again as reactions can't modify those
+        # so if they are made whole when the sim is constructed that's enough
+
     def step(self, steps=1, xtc=True, dm=True):
         """
             Do a step of the following:
@@ -315,20 +383,18 @@ class Simulation():
         if steps > 0:
             self.logger.info(f"md_steps {steps}")
             self.logger.info("MD start")
-            self.system.do_steps(steps)
+            try:
+                self.system.do_steps(steps)
+            except mm.OpenMMException as e:
+                # TODO insert this to all openmm calls that can do an exception in some elegant manner, e.g. in Context
+                self.logger.error(f"!!! OpenMM Exception !!!\n{e}")
+                raise e
+
             self.logger.info("MD finished")
         if self.md_steps > 0 and steps > 0:
             ns_so_far = self.dt_ns * self.i
             time_left = self.last_step_time * (self.md_steps - self.i)
-            time_fmt: str
-            if time_left < 3600:
-                time_fmt = time.strftime("%M:%S", time.gmtime(time_left))
-            elif time_left < 3600 * 24:
-                time_fmt = time.strftime("%H:%M:%S", time.gmtime(time_left))
-            elif time_left < 3600 * 24 * 30:
-                time_fmt = time.strftime("%dd %H:%M:%S", time.gmtime(time_left))
-            else:
-                time_fmt = f"Longer than a month ({time_left} seconds)"
+            time_fmt = format_time(time_left)
             reporter_data = " ".join(filter(None, [r.interactive_line() for r in self.reporters]))
             sys.stdout.write(
                 f"\033[2K\rstep {self.i}"
@@ -348,9 +414,20 @@ class Simulation():
                 self.logger.info("Modification finished")
             if len(reactions) > 0 or self.force_reinitialize:
                 self.logger.info("Reinitialize start")
+                # TODO fix redundant reinitializes with update parameter in context for softcore
                 self.system.reinitialize(self.force_reinitialize)
+                for rep in self.reporters:
+                    rep.post_reinitialize(self.i)
+                self.top.toggle_sc(reactions, True)
+                self.system.reinitialize(self.force_reinitialize)
+                for rep in self.reporters:
+                    rep.post_sc_enable(self.i)
                 if len(reactions) > 0 and self.daemon_integrator:
-                    self.integrator.set_reactions(reactions, self.system)
+                    self.integrator.set_reactions(reactions, self.system, self.top, self.i)
+                self.top.toggle_sc(reactions, False)
+                self.system.reinitialize(self.force_reinitialize)
+                for rep in self.reporters:
+                    rep.post_sc_disable(self.i)
                 self.logger.info("Reinitialize finished")
             self.logger.info(f"reactions {len(reactions)}")
 

@@ -2,7 +2,7 @@ from .force import Force
 import openmm as mm
 import math
 
-
+# TODO split into plugin and own repo
 class PeriodicGaussian(Force):
     _members = 4
 

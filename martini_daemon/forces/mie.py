@@ -3,7 +3,7 @@ import openmm as mm
 from .nonbonded import NonBonded
 import numpy as np
 
-
+# TODO split into plugin and own repo
 def C(n, m):
     """
     C factor for Mie n, m
