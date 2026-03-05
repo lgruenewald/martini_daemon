@@ -1196,6 +1196,8 @@ def DaemonTopFile(
                     tokens, 0, "Relative rate control"
                 )
                 last_reaction.relative_rate = unwrap(tokens, 1, "positive")
+            case "probability":
+                last_reaction.probability = unwrap(tokens, 1, "positive")
             case _:
                 raise TokenParseError(
                     tokens[0],

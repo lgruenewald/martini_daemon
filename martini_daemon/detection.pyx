@@ -103,6 +103,12 @@ cdef bint detection_one(
         if theta >= min and theta <= max:
             return False
 
+    if rx.probability is not None:
+        if rx.probability < random.random():
+            #prob=0 - always return False
+            #prob=1 - never return here
+            return False
+
     # rate limiting, as a last condition
     if rx.relative_rate is not None:
         rx.reaction_counter += 1

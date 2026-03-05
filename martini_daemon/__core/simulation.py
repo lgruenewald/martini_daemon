@@ -9,8 +9,7 @@ class Simulation:
         sim_name: str,
 
     ):
-        # TODO all default values should be in simulation only !!
-
+        # TODO - try to have as little hardcoded defaults in __core as reasonable
         # the data based on which the simulation was constructed
         self.top_path = top_path
         self.geom_path = geom_path

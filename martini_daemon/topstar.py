@@ -211,7 +211,7 @@ class TopStar():
                     continue
                 # distance warning
                 if dist * 2. > self.nlist_cutoff:
-                    self.logger.warn(
+                    self.logger.warning(
                         f"Warning: r_max for reaction {reaction.name}"
                         f" has a r_max between reactant {i1} and {i2}"
                         f" atoms {aindex1} {aindex2} of {dist},"

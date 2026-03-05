@@ -1,5 +1,10 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm", "cython", "numpy"]
+requires = [
+  "setuptools",
+  "setuptools-scm",
+  "cython",
+  "numpy"
+]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,14 +15,18 @@ readme = "README.md"
 requires-python = ">=3.10"
 keywords = []
 classifiers = []
-dependencies = ["numpy", "openmm", "freud-analysis", "tqdm"]
+dependencies = [
+  "numpy",
+  "openmm",
+  "freud-analysis",
+  "tqdm",
+  "molly@git+https://git.sr.ht/~ma3ke/molly#egg=molly&subdirectory=bindings/python",
+]
 dynamic = ["version"]
 
 [project.optional-dependencies]
 all = [
-# Some helpers
-  "molly@git+https://git.sr.ht/~ma3ke/molly#egg=molly&subdirectory=bindings/python",
-# Test
+# Testing
   "pytest",
 # Docs
   "sphinx",

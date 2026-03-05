@@ -4,9 +4,9 @@ import os
 import traceback
 from sys import stderr
 from typing import Type
-from .__token import Token
-from .__token_list import TokenParseError, TokenList
-from .__directive import Directive
+from .token import Token
+from .token_list import TokenParseError, TokenList
+from .directive import Directive
 
 
 class ParseError(Exception):
@@ -416,11 +416,6 @@ class Parser:
                             assert False
                 else:
                     # data lines
-                    if len(self.__directive_stack) == 0:
-                        raise TokenParseError(
-                            token0,
-                            "Data line encountered outside of any directive."
-                        )
                     self.__directive_stack[-1].line(token_list)
 
         if len(if_stack) > 1:

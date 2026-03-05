@@ -1,4 +1,4 @@
-from .__token import Token
+from .token import Token
 import re
 import math
 

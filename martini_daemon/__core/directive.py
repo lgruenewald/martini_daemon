@@ -1,9 +1,9 @@
 from __future__ import annotations
-from .__simulation import Simulation
 from typing import Any
-from .__token_list import TokenList
+from abc import abstractmethod, ABC
+from .token_list import TokenList
 
-class Directive:
+class Directive(ABC):
     """
     Base class for directives.
 
@@ -12,6 +12,7 @@ class Directive:
     Directives should implement all of the methods.
     """
 
+    @abstractmethod
     def __init__(self, parent: Any, path: str, line_num: int) -> None:
         """
         Called when a directive occurs in the source file.
@@ -22,12 +23,14 @@ class Directive:
         """
         raise NotImplementedError
 
+    @abstractmethod
     def where(self) -> tuple[str, int]:
         """
         Should return the path and line number passed in the constructor for error messages.
         """
         raise NotImplementedError
 
+    @abstractmethod
     def line(self, tokens: TokenList) -> None:
         """
         Called on every non-empty source line inside the directive.
@@ -36,6 +39,7 @@ class Directive:
         """
         raise NotImplementedError
 
+    @abstractmethod
     def finish(self):
         """
         Called when a directive ends.
@@ -45,6 +49,7 @@ class Directive:
         raise NotImplementedError
 
     @staticmethod
+    @abstractmethod
     def is_mandatory():
         """
         Whether this directive is mandatory.
@@ -54,6 +59,7 @@ class Directive:
         raise NotImplementedError
 
     @staticmethod
+    @abstractmethod
     def is_unique():
         """
         Whether this directive is unique.
@@ -63,6 +69,7 @@ class Directive:
         raise NotImplementedError
 
     @staticmethod
+    @abstractmethod
     def is_valid_parent(parent: Any) -> bool:
         """
         Whether the provided object instance is of a valid type for parent of this directive.
@@ -75,6 +82,7 @@ class Directive:
         raise NotImplementedError
 
     @staticmethod
+    @abstractmethod
     def get_name() -> str:
         """
         Should return the name for the directive used in [].

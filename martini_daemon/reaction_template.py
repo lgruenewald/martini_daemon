@@ -16,6 +16,7 @@ class ReactionTemplate:
         self.recharges: list[tuple[int, int, float]] = []
         self.remasses: list[tuple[int, int, float]] = []
         self.soft_core: list[tuple[int, int, float, float]] = []
+        self.probability: None | float = None
 
     def is_complete(self) -> bool:
         # when a reaction is finished parsing, if this returns False

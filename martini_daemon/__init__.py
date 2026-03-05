@@ -1,3 +1,4 @@
+"""
 # Core
 # .top parsing, and abstraction layer over OpenMM
 from .__core import *
@@ -10,3 +11,6 @@ from .forces import *
 
 # Topology* -- reactive topologies
 from .__topstar import *
+
+# TODO - defaults for simulation should be only here
+"""
