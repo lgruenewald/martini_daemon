@@ -4,7 +4,7 @@ from .token_list import TokenList
 from .directive import Directive
 from .parser import Parser
 # Top Parser and root of Force and Virtual Sites
-from .gromacs_top_format import GromacsTopFormat
+from .gromacs_top_file import GromacsTopFile, directive, InvalidTopologyError
 from .force import Force
 from .vsite import VirtualSite
 from .molecule import Molecule

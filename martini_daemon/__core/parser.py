@@ -5,11 +5,11 @@ import traceback
 from sys import stderr
 from typing import Type
 from .token import Token
-from .token_list import TokenParseError, TokenList
+from .token_list import TokenParseException, TokenList
 from .directive import Directive
 
 
-class ParseError(Exception):
+class ParseException(Exception):
     """
     Generic exception raised during parsing.
     """
@@ -99,24 +99,22 @@ class Parser:
             self.__parse(self.__path)
             for key, directive in self.__directives.items():
                 if directive.is_mandatory() and key not in self.__past_directives_at_root:
-                    raise ParseError(
+                    raise ParseException(
                         f"Mandatory directive [{key}] not found."
                     )
             return True
-        except TokenParseError as pe:
+        except TokenParseException as pe:
             self.__error_message_location(
                 pe.message,
                 pe.token.path, pe.token.line_num,
                 pe.token.line,
                 pe.token.start, pe.token.end
             )
-            print()
-        except ParseError as pe:
+        except ParseException as pe:
             self.__error_message_location(
                 pe.message,
                 self.__path, self.__line_num
             )
-            print()
         except Exception:
             # yes it's broad, but we want to print where it happened
             traceback.print_exc()
@@ -132,14 +130,15 @@ class Parser:
         print(message, file=stderr)
         print(f"In file {path} at line {line_num + 1}.", file=stderr)
 
-        if line is not None and (start is None or end is None):
-            print(line, file=stderr)
-        else:
-            print(
-                f"{line[0:start]}"
-                f"\033[1;33m{line[start:end]}\033[0m"
-                f"{line[end:]}",
-                file=stderr
+        if line is not None:
+            if start is None or end is None:
+                print(line, file=stderr)
+            else:
+                print(
+                    f"{line[0:start]}"
+                    f"\033[1;33m{line[start:end]}\033[0m"
+                    f"{line[end:]}",
+                    file=stderr
             )
 
     # A token is either:
@@ -175,7 +174,7 @@ class Parser:
     def __start_directive(self, dirname: str) -> None:
         directive_type = self.__directives.get(dirname)
         if directive_type is None:
-            raise ParseError(
+            raise ParseException(
                 f"Directive {dirname} not found.",
             )
         # == search for the right parent ==
@@ -199,13 +198,13 @@ class Parser:
                 self.__path, self.__line_num = old_path, old_ln
         parent = self.__directive_stack[-1]
         if not directive_type.is_valid_parent(parent):
-            raise ParseError(
+            raise ParseException(
                 f"Parent directive search for {dirname} failed. {parent.get_name()} is invalid parent."
             )
         # == check uniques (currently only for root) ==
         if len(self.__directive_stack) == 1:
             if directive_type.is_unique() and dirname in self.__past_directives_at_root:
-                raise ParseError(
+                raise ParseException(
                     f"Unique directive {dirname} present more than once."
                 )
             self.__past_directives_at_root.add(dirname)
@@ -231,15 +230,16 @@ class Parser:
             # make lines whole through \
             cumulative = ""
             for i, line in enumerate(f):
+                line = line.strip("\r\n")
                 self.__line_num = i
                 # ignore comments first to enable
                 # blah blah \; comment
                 # handle ignoring line endings
                 if len(line) > 0 and line[-1] == "\\":
-                    # must maintain whitespace, let's not strip
-                    # note this will have implications for ; comment \
-                    # but I think people shouldn't put \ after comment lines anyway
-                    cumulative += line
+                    # note this will have implications for comments ending lines with '\'
+
+                    # must maintain some whitespace
+                    cumulative += line[:-1] + "\n"
                     continue
                 if len(cumulative) > 0:
                     line = cumulative + line
@@ -262,8 +262,8 @@ class Parser:
                 if token0.content[0] == "#":
                     match token0.content:
                         case "#ifdef":
-                            if token1 is None:
-                                raise TokenParseError(
+                            if token1 is None or len(token_list) > 2:
+                                raise TokenParseException(
                                     token0, "#ifdef takes one argument."
                                 )
                             if if_stack[-1] in {
@@ -278,8 +278,8 @@ class Parser:
                                 if_stack.append(IfStackElem.SkippedIf)
                             continue
                         case "#ifndef":
-                            if token1 is None:
-                                raise TokenParseError(
+                            if token1 is None or len(token_list) > 2:
+                                raise TokenParseException(
                                     token0, "#ifndef takes one argument."
                                 )
                             if if_stack[-1] in {
@@ -295,7 +295,7 @@ class Parser:
                             continue
                         case "#else":
                             if token1 is not None:
-                                raise TokenParseError(
+                                raise TokenParseException(
                                     token0, "#else takes no argument."
                                 )
                             match if_stack[-1]:
@@ -306,28 +306,28 @@ class Parser:
                                 case IfStackElem.SkippedIf:
                                     pass
                                 case IfStackElem.Root:
-                                    raise TokenParseError(
+                                    raise TokenParseException(
                                         token0, "#else unmatched."
                                     )
                             continue
                         case "#endif":
                             if token1 is not None:
-                                raise TokenParseError(
+                                raise TokenParseException(
                                     token0, "#endif takes no argument."
                                 )
                             if if_stack[-1] == IfStackElem.Root:
-                                raise TokenParseError(
+                                raise TokenParseException(
                                     token0, "#endif unmatched."
                                 )
                             if_stack.pop()
                             continue
                         case "#end":
                             # possibly common mistake?
-                            raise TokenParseError(
+                            raise TokenParseException(
                                 token0, "Please use #endif."
                             )
                         case "#if" | "#elif":
-                            raise TokenParseError(
+                            raise TokenParseException(
                                 token0, "Only #ifdef is implemented. #if, #elif is not."
                             )
                         case "#include" | "#define" | "#undef":
@@ -335,7 +335,7 @@ class Parser:
                             pass
                         case _:
                             # error at unknown macros
-                            raise TokenParseError(
+                            raise TokenParseException(
                                 token0, "Unknown preprocessor directive."
                             )
 
@@ -350,11 +350,11 @@ class Parser:
                 if token0.content == "[":
                     # directives
                     if token_list[-1].content != "]":
-                        raise TokenParseError(
+                        raise TokenParseException(
                             token_list[-1], "Invalid directive, not closed by ']'."
                         )
                     if len(token_list) != 3:
-                        raise TokenParseError(
+                        raise TokenParseException(
                             token_list[-1],
                             "Invalid directive, three tokens expected: '[', directive name, ']'."
                         )
@@ -363,6 +363,11 @@ class Parser:
                 elif token0.content[0] == "#":
                     match token0.content:
                         case "#include":
+                            if len(token_list) != 2:
+                                raise TokenParseException(
+                                    token0,
+                                    "#include takes one argument."
+                                )
                             name = token_list.unwrap(
                                 1,
                                 "string",
@@ -377,7 +382,7 @@ class Parser:
                                 new_path = os.path.join(cdir, name)
                                 if os.path.isfile(new_path):
                                     if new_path in self.__included:
-                                        raise TokenParseError(
+                                        raise TokenParseException(
                                             token1,
                                             f"Double inclusion of {new_path}."
                                         )
@@ -385,30 +390,29 @@ class Parser:
                                     found = True
                                     break
                             if not found:
-                                raise TokenParseError(
+                                raise TokenParseException(
                                     token1,
                                     f"File not found: {name}."
                                 )
                         case "#define":
                             if len(token_list) not in {2, 3}:
-                                raise TokenParseError(
+                                raise TokenParseException(
                                     token0,
                                     "#define takes one or two tokens arguments. "
                                     "Note: Only single token -> single token mappings are supported. "
                                     "Preprocessor macros are not supported."
                                 )
-                            # let's be sane and not allow #define "blah.itp" "blah2.itp" and similar
-                            key = token_list.unwrap(1, "word")
+                            key = token1.content
                             # now we can actually use an empty line, as long as it is in the dict #ifdef supports it
-                            value = token_list.unwrap(2, "raw", default="")
+                            value = token_list[2].content
                             self.__defines[key] = value
                         case "#undef":
                             if len(token_list) != 2:
-                                raise TokenParseError(
+                                raise TokenParseException(
                                     token0,
                                     "#undef takes one argument."
                                 )
-                            key = token_list.unwrap(1, "word")
+                            key = token1.content
                             if self.__defines.get(key):
                                 self.__defines.pop(key)
                         case _:
@@ -419,7 +423,9 @@ class Parser:
                     self.__directive_stack[-1].line(token_list)
 
         if len(if_stack) > 1:
-            raise ParseError(
+            raise ParseException(
                 "Unmatched #ifdef or #ifndef. #ifdef/#ifndef crossing file boundaries are not supported."
             )
+        while len(self.__directive_stack) > 0:
+            self.__directive_stack.pop().finish()
         self.__path = old_path

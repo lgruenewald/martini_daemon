@@ -2,7 +2,7 @@ from .token import Token
 import re
 import math
 
-class TokenParseError(Exception):
+class TokenParseException(Exception):
     """
     Exception when .unwrap() fails
     """
@@ -81,7 +81,7 @@ class TokenList:
             if default == self.__DEFAULT:
                 # hack so "None" can also be used as a default value.
                 # if it's still __DEFAULT it means no value was specified by the user.
-                raise TokenParseError(
+                raise TokenParseException(
                     self.__tokens[-1],
                     f"Not enough tokens, expected token at index {index}."
                 )
@@ -104,7 +104,7 @@ class TokenList:
             case "positive":
                 if self.__float_pat.match(content):
                     if float(content) <= 0.:
-                        raise TokenParseError(
+                        raise TokenParseException(
                             tok,
                             error_msg or "Expected a positive non-zero real number."
                         )
@@ -112,7 +112,7 @@ class TokenList:
             case "index":
                 if self.__int_pat.match(content):
                     if int(content) <= 0:
-                        raise TokenParseError(
+                        raise TokenParseException(
                             tok,
                             error_msg or "Expected index, got an integer 0 or smaller."
                             "Note: indexing in .itp/.top files is usually 1 based."
@@ -143,12 +143,12 @@ class TokenList:
             case "raw":
                 return content
             case _:
-                raise TokenParseError(
+                raise TokenParseException(
                     tok,
                     f"Filter {type_filter} couldn't be understood."
                 )
 
-        raise TokenParseError(
+        raise TokenParseException(
             tok,
             error_msg or f"Expected token of type {type_filter}."
         )

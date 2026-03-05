@@ -3,10 +3,12 @@ from .directive import Directive
 from .parser import Parser
 from .force import Force
 from .vsite import VirtualSite
-from .token_list import TokenList, TokenParseError
-from .. import TokenList
+from .token_list import TokenList, TokenParseException
 
-class GromacsTopFormat(Directive):
+class InvalidTopologyError(Exception):
+    pass
+
+class GromacsTopFile(Directive):
     """
     This class is:
     * Metadata about the .top format, allowing for the construction of parsers and generators of said format.
@@ -14,6 +16,13 @@ class GromacsTopFormat(Directive):
     """
     # static fields
     __top_directives: list[Type[Directive]] = []
+
+    @staticmethod
+    def add_top_directive(directive_: Type[Directive]) -> None:
+        """
+        Add a directive to the global .top format parser.
+        """
+        GromacsTopFile.__top_directives.append(directive_)
 
     def __init__(
         self, path: str, include_dirs: list[str] | None = None,
@@ -32,20 +41,29 @@ class GromacsTopFormat(Directive):
             defines=defines
         )
         # Directive's __init__ is raise NotImplementedError
-        for directive_ in GromacsTopFormat.__top_directives:
+        for directive_ in GromacsTopFile.__top_directives:
             self.__parser.add_directive(directive_)
+
+        ok = self.__parser.parse()
+        if not ok:
+            # error was already printed, but we re-raise here
+            raise InvalidTopologyError
 
     # === implementing Directive ===
     def line(self, tokens: TokenList) -> None:
-        raise TokenParseError(
+        raise TokenParseException(
             tokens[0],
             "Data line encountered outside of any directive."
         )
 
-    # the other methods of Directive should not get called on the root, so it's fine
     def finish(self):
-        raise NotImplementedError()
+        pass
 
+    @staticmethod
+    def get_name() -> str:
+        return "<root GromacsTopFile>"
+
+    # the other methods of Directive should not get called on the root, so it's fine
     @staticmethod
     def is_mandatory():
         raise NotImplementedError()
@@ -58,24 +76,14 @@ class GromacsTopFormat(Directive):
     def is_valid_parent(parent: Any) -> bool:
         raise NotImplementedError()
 
-    @staticmethod
-    def get_name() -> str:
-        raise NotImplementedError()
-
     def where(self) -> tuple[str, int]:
         raise NotImplementedError()
 
-    @staticmethod
-    def add_top_directive(directive_: Type[Directive]) -> None:
-        """
-        Add a directive to the global .top format parser.
-        """
-        GromacsTopFormat.__top_directives.append(directive_)
-
 def directive(class_: Type[Directive]) -> Type[Directive]:
-    GromacsTopFormat.add_top_directive(class_)
+    GromacsTopFile.add_top_directive(class_)
     return class_
 
+"""
 # these classes have decorators compatible with .force.Force
 @directive
 class __Exclusion(Directive):
@@ -140,3 +148,4 @@ class __VirtualSiteN(Directive):
 
 def virtualsiteN(class_: Type[VirtualSite], type_: int) -> Type[VirtualSite]:
     pass
+"""
