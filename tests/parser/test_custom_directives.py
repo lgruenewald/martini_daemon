@@ -1,13 +1,13 @@
 import pytest
 import os
 from typing import Any
-from martini_daemon import GromacsTopFile, Directive, directive, TokenList
+from martini_daemon import GromacsTopFile, Directive, register_directive, TokenList
 
 @pytest.fixture
 def rootdir(request):
     return os.path.dirname(request.path)
 
-@directive
+@register_directive
 class Custom(Directive):
     def __init__(self, parent: GromacsTopFile, path, num):
         self.lines = []

@@ -39,7 +39,6 @@ class TokenList:
         self.__tokens = tokens
         self.__defines = defines
 
-    @property
     def get_line(self) -> str:
         return self.__line
 
@@ -51,6 +50,13 @@ class TokenList:
 
     def __setitem__(self, index: int, token: Token) -> None:
         self.__tokens[index] = token
+
+    def assert_no_more_than(self, count: int) -> None:
+        if len(self.__tokens) > count:
+            raise TokenParseException(
+                self.__tokens[count],
+                "Received unexpected additional tokens."
+            )
 
     def unwrap(self, index: int, type_filter: str, default=__DEFAULT, error_msg: str | None = None):
         """
@@ -70,7 +76,7 @@ class TokenList:
         * float - returns float type, no processing.
         * positive - float, but raises an exception if 0 or smaller.
         * index - int, but subtracts 1, since GROMACS uses 1 based indexing, but OpenMM 0 based, exception if 0 or smaller.
-        * degree - degree to radian and makes sure it's in the range 0 to 2 pi, by adding or subtracting 2 pi.
+        * degree - degree to radian and makes sure it's in the range -pi to pi, by adding or subtracting 2 pi.
         * word - a string with only alphanumerics and no whitespace in it.
         * pattern - fnmatch pattern, converts {} to [], as [] is used in fnmatch, but would conflict with directives.
         * pair - a tuple of an index (which reactant) and a word (which graph atom), separated by a colon.
@@ -121,9 +127,9 @@ class TokenList:
             case "degree":
                 if self.__float_pat.match(content):
                     angle = float(content) * math.pi / 180.0
-                    while angle < 0.:
+                    while angle < math.pi:
                         angle += math.tau
-                    while angle > math.tau:
+                    while angle > math.pi:
                         angle -= math.tau
                     return angle
             case "word":

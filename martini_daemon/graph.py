@@ -1,7 +1,7 @@
 # helper function for T* graph based fragments
 from __future__ import annotations
 from enum import Enum
-from .forces.force import Interaction
+from .__forces.force import Interaction
 from .sysstar import SysStar
 from fnmatch import fnmatch
 

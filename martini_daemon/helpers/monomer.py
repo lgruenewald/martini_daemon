@@ -43,7 +43,7 @@ def read_monomer_graph(bond_frames: list[np.ndarray], mapping: np.ndarray):
         The result graph can have multiple connections between monomers,
         if there are multiple bonds between the monomers. Bonds, constraints
         and virtual sites are considered bonds, based on how BondReporter
-        reports it. In case of vsites, the virtual particle is considered
+        reports it. In case of __vsites, the virtual particle is considered
         bonded to all constructing particles.
     """
     # input data and uninitialized result

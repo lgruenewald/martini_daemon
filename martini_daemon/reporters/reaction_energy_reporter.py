@@ -13,7 +13,7 @@ class ReactionEnergyReporter(Reporter):
 
         write_coords, if set to True, it will print .gro files if daemon integrators are used
         set ext to "xyz" to write xyz files
-        force_groups, if set to True will print a breakdown of forces
+        force_groups, if set to True will print a breakdown of __forces
         """
         self.write_coords = write_coords
         self.force_groups = force_groups

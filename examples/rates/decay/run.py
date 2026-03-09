@@ -3,7 +3,7 @@
 from martini_daemon import simulation
 from martini_daemon.reporters.topstar import ReactionReporter, FragCountReporter
 
-sim = simulation.DaemonSimulation(
+sim = simulation.Simulation(
     top_path="system.top", gro_path="system.gro",
     sim_name="out",
     p_bar=1., friction_ps_1=2.0,

@@ -9,7 +9,7 @@ import pytest
 
 from martini_daemon.top_parser import DaemonTopFile
 from martini_daemon.gro_file import read_gro
-from martini_daemon.forces.nonbonded import NonBonded
+from martini_daemon.__forces import NonBonded
 from martini_daemon.utils import pdist
 
 # == CONFIG ==
@@ -162,9 +162,9 @@ class TestSingleFrame():
             dist = pdist(pos[atom_index], pos[other_atom], box)
             if np.isclose(dist, cutoff_nm):
                 print(f"Atoms {atom_index+1} and {other_atom}+1 are exactly cutoff apart!")
-                print("This can cause artifacts in forces.")
+                print("This can cause artifacts in __forces.")
         assert np.allclose(self.gmx_forces, forces, cftol, 0), (
-            f"Gmx and daemon forces different by {f_percent:.2f} %.\n"
+            f"Gmx and daemon __forces different by {f_percent:.2f} %.\n"
             f"Particle {atom_index+1} (<-- indexes start from 1) "
             f"dimension {atom_dim}\n"
             f"Absolute diff: {abs_diff:.3e}    relative diff: {max:.3e}\n"
@@ -181,11 +181,11 @@ class TestSingleFrame():
         os.chdir(x)
         os.system("../gmxrun.sh")
         assert os.path.isfile("energy.xvg"), f"./gmxrun.sh failure for {x} (E)"
-        assert os.path.isfile("forces.xvg"), f"./gmxrun.sh failure for {x} (F)"
+        assert os.path.isfile("__forces.xvg"), f"./gmxrun.sh failure for {x} (F)"
         with open("energy.xvg") as f:
             lines = [line for line in f]
             self.gmx_energy = float(lines[-1].split()[-1])
-        with open("forces.xvg") as f:
+        with open("__forces.xvg") as f:
             lines = [line for line in f]
             gmx_force_line = lines[-1].split()
             self.gmx_forces = np.array([float(x) for x in gmx_force_line][1:])
@@ -198,4 +198,4 @@ class TestSingleFrame():
         self.apply_constraints()
         self.compare_daemon_gmx()
         os.remove("energy.xvg")
-        os.remove("forces.xvg")
+        os.remove("__forces.xvg")

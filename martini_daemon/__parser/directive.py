@@ -48,9 +48,9 @@ class Directive(ABC):
         """
         raise NotImplementedError
 
-    @staticmethod
+    @classmethod
     @abstractmethod
-    def is_mandatory():
+    def is_mandatory(cls):
         """
         Whether this directive is mandatory.
 
@@ -58,9 +58,9 @@ class Directive(ABC):
         """
         raise NotImplementedError
 
-    @staticmethod
+    @classmethod
     @abstractmethod
-    def is_unique():
+    def is_unique(cls):
         """
         Whether this directive is unique.
 
@@ -68,9 +68,9 @@ class Directive(ABC):
         """
         raise NotImplementedError
 
-    @staticmethod
+    @classmethod
     @abstractmethod
-    def is_valid_parent(parent: Any) -> bool:
+    def is_valid_parent(cls, parent: Any) -> bool:
         """
         Whether the provided object instance is of a valid type for parent of this directive.
 
@@ -81,9 +81,9 @@ class Directive(ABC):
         """
         raise NotImplementedError
 
-    @staticmethod
+    @classmethod
     @abstractmethod
-    def get_name() -> str:
+    def get_name(cls) -> str:
         """
         Should return the name for the directive used in [].
         """

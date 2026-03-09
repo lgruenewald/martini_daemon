@@ -29,7 +29,7 @@ class TopStarLogger(Reporter):
         self._print("==== TopStar / ReactionTemplates ====")
         for _, rl in topstar.reactions.items():
             for rx in rl:
-                self._print(f"rx {rx.name} reactants {rx.reactants}")
+                self._print(f"rx {rx.name} reactants {rx.__reactants}")
         self._print("==== TopStar / Fragments ====")
         for id, frag in topstar.frag_list.items():
             self._print(f"{id}: <frag {frag.name} ps {frag.atoms}>")

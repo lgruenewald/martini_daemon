@@ -1,6 +1,6 @@
 import random
 from .sysstar import SysStar
-from .forces.force import Interaction
+from .__forces.force import Interaction
 from .reporters.reporter import Reporter
 from .graph import Graph, GraphMatch, GraphAtomType, match_atoms
 from .fragment import Fragment

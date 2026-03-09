@@ -52,7 +52,7 @@ def collect_bonds(n, sstar, constraint_only=False):
 class BondReporter(Reporter):
     """
     Bond, constraint and vsite network graph connectivity reporter.
-    In case of vsites, the virtual particle is considered bonded to all
+    In case of __vsites, the virtual particle is considered bonded to all
     constructing particles.
 
     Can be used for:

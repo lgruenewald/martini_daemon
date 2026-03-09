@@ -1,4 +1,4 @@
-from .forces.nonbonded import NonBonded
+from .__forces.nonbonded import NonBonded
 from .top_parser import DaemonTopFile
 from .meta import alias
 from .gro_file import read_gro
@@ -73,7 +73,7 @@ class Simulation():
         sim_name -> prefix for simulation output files
         integrator -> integrator to use, by default LangevinMiddleIntegrator,
             0.02 ps timestep, 1 ps^-1 friction, 300K temp
-        coupling -> additional openmm forces to add to the system.
+        coupling -> additional openmm __forces to add to the system.
         Useful for T/p coupling. By default contains a monte carlo barostat
         set to 300K temp and 1 bar.
         remove_com_motion -> should we remove center of mass motion?
@@ -357,13 +357,13 @@ class Simulation():
             # find frags
             frags = [
                 self.top.frag_by_name_and_atoms(frag_name, frag)
-                for frag_name, frag in zip(rx.reactants, frags)
+                for frag_name, frag in zip(rx.__reactants, frags)
             ]
             assert all(frag is not None for frag in frags)
             # modifications
             self.top.modification(frame, [(frags, rx)])
         self.system.reinitialize()
-        # note to self: we don't make constraints and vsites whole again as reactions can't modify those
+        # note to self: we don't make constraints and __vsites whole again as reactions can't modify those
         # so if they are made whole when the sim is constructed that's enough
 
     def step(self, steps=1, xtc=True, dm=True):

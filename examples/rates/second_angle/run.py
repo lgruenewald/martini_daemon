@@ -6,7 +6,7 @@ from martini_daemon.reporters.topstar import ReactionReporter, FragCountReporter
 
 for rate, highest_prob in [("0", 0.1), ("1", 0.1), ("1", 0.5), ("1", 1.0)]:
     for rep in range(3):
-        sim = simulation.DaemonSimulation(
+        sim = simulation.Simulation(
             top_path="system.top", gro_path="system.gro",
             sim_name=f"out_r{rate}_p{highest_prob}_rep{rep}",
             p_bar=1., friction_ps_1=2.0,

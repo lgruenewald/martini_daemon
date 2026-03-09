@@ -1,28 +1,20 @@
 
-class Simulation:
+class Interchange:
+    """
+    A class that handles some of the things "Simulation" and the base "Reporter" class used to.
 
-    # user API
-    def __init__(
-        self,
-        top_path: str,
-        geom_path: str,
-        sim_name: str,
+    The goal of this class is to:
+    * hold simulation metadata, such as current step, simulation name.
+    * own all open file handles and loggers.
+    * provide a friendly interface for requesting output files.
+    * be passed around to all reporters to provide the required metadata for reporting.
+    * own all reporters, and provide an API for calling them all whenever a certain event occurs.
 
-    ):
-        # TODO - try to have as little hardcoded defaults in __core as reasonable
-        # the data based on which the simulation was constructed
-        self.top_path = top_path
-        self.geom_path = geom_path
-        self.sim_name = sim_name
-
-        # the "when" in the simulation
-        self.simulation_step: int = 0
-        self.simulation_time_ps: float = 0.
+    Simulation should inherit this class.
+    """
 
     def write_geometry(self, path: str) -> None:
         pass
-
-    # programmer API
 
     # Custom logger - into the main log file / screen
 

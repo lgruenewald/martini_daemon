@@ -1,4 +1,4 @@
-from .forces.force import Force
+from .__forces.force import Force
 
 
 class Molecule():
@@ -34,7 +34,7 @@ class Molecule():
         self.exclusions.add((i, j))
         self.exclusions.add((j, i))
 
-    # custom save/load necessary, because forces contain
+    # custom save/load necessary, because __forces contain
     # references to unpickled Force instances
     def save(self, f) -> None:
         f.dump(self.molecule_name)

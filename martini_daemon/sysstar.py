@@ -9,46 +9,46 @@ from .helpers.cluster import make_cluster_frame, make_whole_frame
 from collections import OrderedDict
 import numpy as np
 
-from .forces.combined_bending_torsion import CombinedBendingTorsion
-from .forces.constraint import Constraint
-from .forces.force import Force
-from .forces.g96angle import G96Angle
-from .forces.harmonic_angle import HarmonicAngle
-from .forces.harmonic_bond import HarmonicBond
-from .forces.cubic_bond import CubicBond
-from .forces.morse_bond import MorseBond
-from .forces.fene_bond import FENEBond
-from .forces.improper_dihedral import ImproperDihedral
-from .forces.nonbonded import NonBonded, ExclusionHelper
-from .forces.pairs import Pairs
-from .forces.cmap import Cmap
-from .forces.proper_dihedral import ProperDihedral
-from .forces.rbtorsion import RBTorsion
-from .forces.restricted_angle import RestrictedAngle
-from .forces.restricted_dihedral import RestrictedDihedral
-from .forces.g96bond import G96Bond
-from .forces.connection import Connection
-from .forces.distance_restraint import DistanceRestraint
-from .forces.urey_bradley import UreyBradley
-from .forces.cross_bond_bond import CrossBondBond
-from .forces.cross_bond_angle import CrossBondAngle
-from .forces.quartic_angle import QuarticAngle
-from .forces.linear_angle import LinearAngle
-from .vsites.one import VSiteOne
-from .vsites.two import VSiteTwo
-from .vsites.two_fd import VSite2fd
-from .vsites.three import VSiteThree
-from .vsites.three_fd import VSite3fd
-from .vsites.three_fad import VSite3fad
-from .vsites.three_out import VSite3out
-from .vsites.four_fdn import VSite4fdn
-from .vsites.weighed_average import VSiteWeighedAverage
-from .vsites.center_of_mass import VSiteCenterOfMass
-from .forces.position_restraint import PositionRestraint
+from .__forces.combined_bending_torsion import CombinedBendingTorsion
+from .__forces.constraint import Constraint
+from .__forces.force import Force
+from .__forces.g96angle import G96Angle
+from .__forces.harmonic_angle import HarmonicAngle
+from .__forces.harmonic_bond import HarmonicBond
+from .__forces.cubic_bond import CubicBond
+from .__forces.morse_bond import MorseBond
+from .__forces.fene_bond import FENEBond
+from .__forces.improper_dihedral import ImproperDihedral
+from .__forces.nonbonded import NonBonded, ExclusionHelper
+from .__forces.pairs import Pairs
+from .__forces.cmap import Cmap
+from .__forces.proper_dihedral import ProperDihedral
+from .__forces.rbtorsion import RBTorsion
+from .__forces.restricted_angle import RestrictedAngle
+from .__forces.restricted_dihedral import RestrictedDihedral
+from .__forces.g96bond import G96Bond
+from .__forces.connection import Connection
+from .__forces.distance_restraint import DistanceRestraint
+from .__forces.urey_bradley import UreyBradley
+from .__forces.cross_bond_bond import CrossBondBond
+from .__forces.cross_bond_angle import CrossBondAngle
+from .__forces.quartic_angle import QuarticAngle
+from .__forces.linear_angle import LinearAngle
+from .__vsites.one import VSiteOne
+from .__vsites.two import VSiteTwo
+from .__vsites.two_fd import VSite2fd
+from .__vsites.three import VSiteThree
+from .__vsites.three_fd import VSite3fd
+from .__vsites.three_fad import VSite3fad
+from .__vsites.three_out import VSite3out
+from .__vsites.four_fdn import VSite4fdn
+from .__vsites.weighed_average import VSiteWeighedAverage
+from .__vsites.center_of_mass import VSiteCenterOfMass
+from .__forces.position_restraint import PositionRestraint
 from .reporters.reporter import Reporter
-# custom forces not in Gromacs
-from .forces.custom_reactive import CustomReactive
-from .forces.periodic_gaussian import PeriodicGaussian
+# custom __forces not in Gromacs
+from .__forces.custom_reactive import CustomReactive
+from .__forces.periodic_gaussian import PeriodicGaussian
 from .xyz_file import write_xyz
 
 
@@ -61,11 +61,11 @@ class SysStar():
         self._atom_types: OrderedDict[str, tuple[float, float]] = OrderedDict()
         self.context_initialized: bool = False
         self._reinitialize: bool = True
-        # for keeping track of indices, used for removing forces
+        # for keeping track of indices, used for removing __forces
         self._forces_list: list[mm.Force] = []
         self._coupling: list[mm.Force] = []
 
-        # modular forces
+        # modular __forces
         self.constraint = Constraint(self)
         self.harmonic_bond = HarmonicBond(self)
         self.morse_bond = MorseBond(self)
@@ -100,7 +100,7 @@ class SysStar():
         self.vsite_4fdn = VSite4fdn(self)
         self.vsite_avg = VSiteWeighedAverage(self)
         self.vsite_com = VSiteCenterOfMass(self)
-        # custom forces not in Gromacs
+        # custom __forces not in Gromacs
         self.custom_reactive = CustomReactive(self)
         self.periodic_gaussian = PeriodicGaussian(self)
 
@@ -126,7 +126,7 @@ class SysStar():
             self.vsite_2fd, self.vsite_3fd, self.vsite_4fdn,
             self.vsite_avg, self.vsite_3fad, self.vsite_3out, self.vsite_com,
             self.nonbonded_force, self.exclusions, self.pairs, self.cmap,
-            # custom forces not in Gromacs
+            # custom __forces not in Gromacs
             self.custom_reactive, self.periodic_gaussian
         ]
 
@@ -139,7 +139,7 @@ class SysStar():
             if f.set_force_group(cfg):
                 cfg += 1
             if cfg == 33:
-                raise Exception("Too many forces, not enough force groups")
+                raise Exception("Too many __forces, not enough force groups")
 
         # every vsite atom_id should be put here, this is useful for analysis
         self.vsites: list[int] = []
@@ -165,7 +165,7 @@ class SysStar():
             Data saved:
             - _atom_types (default mass, charge and similar)
             - _atom_list (atom information)
-            - modular forces and all their data (all interactions, we 
+            - modular __forces and all their data (all interactions, we
                 recursively call save on them)
             - openmm Context (containing positions, velocities, ...)
         """
@@ -200,7 +200,7 @@ class SysStar():
         """
             Finishes self.load()
 
-            Must be called after the other forces were added, hence the
+            Must be called after the other __forces were added, hence the
             split up into two functions.
         """
         self.build_context(integrator, self.partial_box, platform, params)
@@ -301,7 +301,7 @@ class SysStar():
         """
         if self.context_initialized:
             raise ValueError("Cannot do this after context is initialized")
-        # Build system+forces
+        # Build system+__forces
         self.build_system()
         for force in self._forces_list:
             self._system.addForce(force)
@@ -477,7 +477,7 @@ class SysStar():
         return pos, np.array([box_x, box_y, box_z])
 
     def get_state(self):
-        """Returns a state with forces and energies, used in test.py."""
+        """Returns a state with __forces and energies, used in test.py."""
         if not self.context_initialized:
             raise Exception("Initialize the context first")
         state = self._context.getState(positions=True, velocities=True,
@@ -554,7 +554,7 @@ class SysStar():
         return "\n".join(res)
 
     def remove_force(self, force_obj):
-        # TODO make all forces/ use this
+        # TODO make all __forces/ use this
         for i, f in enumerate(self._forces_list):
             if f == force_obj:
                 del self._forces_list[i]

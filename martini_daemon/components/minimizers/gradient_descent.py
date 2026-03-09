@@ -119,8 +119,6 @@ class GradientDescentMinimizationIntegrator(mm.CustomIntegrator):
         self.beginIfBlock("accept = 0")
         # revert DoF positions
         self.addComputePerDof("x", "x_old")
-        # recalc vsites to old position
-#        self.addUpdateContextState()
         self.endBlock()
         self.addComputePerDof("v", "v_old")
         #self.addComputePerDof("x", "accept*x + (1-accept)*x_old")

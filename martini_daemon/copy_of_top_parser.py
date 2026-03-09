@@ -1,186 +1,3 @@
-"""
-A more modular
-parser that constructs S* and T* rather than openmm's internal objects
-"""
-
-from .parser import Parser, unwrap, TokenParseError, ParseError
-from .topstar import TopStar
-from .molecule import Molecule
-from .reaction_template import ReactionTemplate
-from .sysstar import SysStar
-from .graph import Graph, GraphAtomType
-import math
-import logging
-import difflib
-
-
-def DaemonTopFile(
-    file, nonbonded, include_dir=None, defines: dict[str, str] = {},
-    nlist_cutoff: float = 1.1,
-    max_absolute_rate: float | None = None,
-    rate_highest_probability: float = 1.0,
-    logger=None, respos=None,
-    experimental=False
-) -> tuple[SysStar, TopStar]:
-    """
-    Parses a Martini Top file for Gromacs and generates T*, sys and top
-    from it. Also parses .frag and .rx files included in the .top file.
-    """
-
-    if logger is None:
-        logging.basicConfig(filename="out.log", level=logging.INFO)
-        logger = logging.getLogger(__name__)
-    # field init
-    system = SysStar(logger, nonbonded)
-    topology = TopStar(
-        system, logger, nlist_cutoff,
-        max_absolute_rate, rate_highest_probability,
-        respos
-    )
-
-    # so .top files can be compatible with gromacs
-    defines["DAEMON"] = "1"
-
-    # make parser
-    p = Parser()
-
-    # state of the parser
-    system_defined = False  # whether the [system] happened yet
-    last_molecule: Molecule | None = None
-    last_graph: Graph | None = None
-    last_reaction: ReactionTemplate | None = None
-
-    def this_is_experimental(tokens, index, feature):
-        if not experimental:
-            raise TokenParseError(
-                tokens[index],
-                f"{feature} are an experimental feature, it may not work correctly."
-                " To enable it, pass the argument experimental=True."
-            )
-
-    # a list of parsers for each directive
-    def parse_pair(tokens, id, filter) -> int | tuple[int, int]:
-        nonlocal last_reaction
-        pair = unwrap(tokens, id, filter)
-        if type(pair) is int:
-            return pair
-        if last_reaction is None:
-            raise TokenParseError(
-                tokens[id],
-                "Attempt to pair-index before a [reaction] was defined"
-            )
-        n_reac = len(last_reaction.reactants)
-        idi, namei = pair
-        if idi < 0 or idi >= n_reac:
-            raise TokenParseError(
-                tokens[id],
-                f"Reactant index {idi+1} out of range: 1 to {n_reac}."
-            )
-        graph_name = last_reaction.reactants[idi]
-        graph = topology.graphs.get(graph_name)
-        if graph is None:
-            raise TokenParseError(
-                tokens[id],
-                f"Reactant graph {graph_name} not found."
-            )
-        atomi = graph.atom_name_to_index.get(namei)
-        if atomi is None:
-            raise TokenParseError(
-                tokens[id],
-                f"Atom {namei} not found in reactant {graph_name}."
-            )
-        if graph.atoms[atomi][3] not in {
-            GraphAtomType.NORMAL, GraphAtomType.OPT
-        }:
-            raise TokenParseError(
-                tokens[id],
-                "Attempt to reference a forbidden atom!"
-            )
-        return idi, atomi
-
-    def process_defaults(tokens):
-        nb_type = unwrap(tokens, 0, "int")
-        if nb_type != 1:
-            raise TokenParseError(
-                tokens[0],
-                f"Unsupported nonbonded type {nb_type}."
-            )
-        combination_rule = unwrap(tokens, 1, "int")
-        if combination_rule != 2:
-            raise TokenParseError(
-                tokens[1],
-                f"Unsupported combination rule {combination_rule}."
-            )
-        if len(tokens) > 2:
-            raise TokenParseError(
-                tokens[2],
-                "Too many tokens in [defaults] directive, "
-                f"got {len(tokens)}, expect 2."
-            )
-
-    p.add_level("defaults", process_defaults)
-
-    def process_moltype(tokens):
-        nonlocal last_molecule
-        name = unwrap(tokens, 0, "word")
-        nrexcl = unwrap(tokens, 1, "int")
-        if nrexcl != 1:
-            raise TokenParseError(
-                tokens[1],
-                f"nrexcl is {nrexcl}, only nrexcl=1 is supported."
-            )
-        last_molecule = topology.new_molecule(name)
-
-    p.add_level("moleculetype", process_moltype)
-
-    def molecules_start():
-        if not system_defined:
-            raise ParseError(
-                "[molecules] must come after [system]."
-            )
-
-    def process_molecule(tokens):
-        name = unwrap(tokens, 0, "word")
-        if topology.molecules.get(name) is None:
-            raise TokenParseError(
-                tokens[0],
-                f"Undefined molecule type {name}."
-            )
-        count = unwrap(tokens, 1, "int")
-        for i in range(count):
-            topology.instantiate(name)
-
-    p.add_level("molecules", process_molecule, start=molecules_start)
-
-    def assert_last_molecule():
-        nonlocal last_molecule
-        if last_molecule is None:
-            raise ParseError("No [moleculetype] given.")
-
-    def process_atoms(tokens):
-        nonlocal last_molecule
-        if last_molecule.index_type != "index":
-            raise ParseError("[atoms] only valid in [moleculetype]")
-        id = unwrap(tokens, 0, "index")
-        type = unwrap(tokens, 1, "word")
-        resnum = unwrap(tokens, 2, "int")
-        resname = unwrap(tokens, 3, "word")
-        atomname = unwrap(tokens, 4, "word")
-        charge_group_num = unwrap(tokens, 5, "int")
-        charge = unwrap(tokens, 6, "float") if len(tokens) > 6 else None
-        mass = unwrap(tokens, 7, "float") if len(tokens) > 7 else None
-        atom_index = len(last_molecule.atoms)
-        if id != atom_index:
-            raise TokenParseError(
-                tokens[0],
-                "Bad atom ID, are they out of order?"
-                f" got id {id} but expected {atom_index}"
-            )
-        last_molecule.atoms.append(
-            (type, resnum, resname, atomname, charge_group_num, charge, mass)
-        )
-
-    p.add_level("atoms", process_atoms, start=assert_last_molecule)
 
     def process_bonds(tokens):
         nonlocal last_molecule
@@ -399,18 +216,6 @@ def DaemonTopFile(
                 last_molecule.interactions.append(
                     (system.combined_bending_torsion, [i, j, k, L], params)
                 )
-            case 101:
-                this_is_experimental(
-                    tokens, 4, "Periodic gaussian dihedrals"
-                )
-                # custom type - periodic gaussian
-                theta = unwrap(tokens, 5, "degree")
-                depth = unwrap(tokens, 6, "float")
-                force = unwrap(tokens, 7, "float")
-                last_molecule.interactions.append((
-                    system.periodic_gaussian, [i, j, k, L],
-                    [theta, depth, force]
-                ))
             case _:
                 raise TokenParseError(
                     tokens[4],
@@ -561,135 +366,6 @@ def DaemonTopFile(
 
     p.add_level("cmap", process_cmap, start=assert_last_molecule)
 
-    def process_reactive_type(tokens):
-        this_is_experimental(
-            tokens, 0, "Custom reactive types"
-        )
-        filter = unwrap(tokens, 0, "word")
-
-        if system.custom_reactive.reactive_types.get(filter) is not None:
-            raise TokenParseError(
-                tokens[0],
-                f"Reactive type {filter} already defined."
-            )
-
-        i = 1
-
-        """
-        sigma = 0.
-        epsilon = 0.
-        barrier_height = 0.
-        barrier_position = 0.
-        barrier_width = 0.01
-        well_position = 0.
-        well_depth = 0.
-        well_width = 0.01
-        repulsive_strength = 0.
-        angle = 0.
-        angle_strength = 0.
-        dihedral = 0.
-        dihedral_depth = 0.
-        dihedral_width = 0.01
-        """
-
-        keys = set()
-        while i < len(tokens):
-            key = unwrap(tokens, i, "word")
-            if key in keys:
-                raise TokenParseError(
-                    tokens[i],
-                    f"Duplicate entry for key {key}."
-                )
-            keys.add(key)
-            match key:
-                case "LJ_negate":
-                    sigma = unwrap(tokens, i+1, "float")
-                    epsilon = unwrap(tokens, i+2, "float")
-                    i += 3
-                case "barrier":
-                    barrier_position = unwrap(tokens, i+2, "float")
-                    barrier_height = unwrap(tokens, i+1, "float")
-                    barrier_width = unwrap(tokens, i+3, "float")
-                    i += 4
-                case "well":
-                    well_position = unwrap(tokens, i+1, "float")
-                    well_depth = unwrap(tokens, i+2, "float")
-                    well_width = unwrap(tokens, i+3, "float")
-                    repulsive_strength = unwrap(tokens, i+4, "float")
-                    i += 5
-                case "angle":
-                    angle = unwrap(tokens, i+1, "degree")
-                    angle_strength = unwrap(tokens, i+2, "float")
-                    i += 3
-                case "dihedral":
-                    dihedral = unwrap(tokens, i+1, "degree")
-                    if dihedral < 0. or dihedral > math.pi:
-                        raise TokenParseError(
-                            tokens[i+1],
-                            "Value must be between 0 and 180 degrees."
-                        )
-                    dihedral_depth = unwrap(tokens, i+2, "float")
-                    dihedral_width = unwrap(tokens, i+3, "float")
-                    i += 4
-                case _:
-                    raise TokenParseError(
-                        tokens[i],
-                        f"Unknown key {key}."
-                    )
-
-        # TODO defaults, so it's not all mandatory
-        mandatory = {"LJ_negate", "barrier", "well", "angle", "dihedral"}
-        remaining = mandatory - keys
-        if len(remaining) > 0:
-            raise ParseError(
-                f"Missing entries {remaining}."
-            )
-        system.custom_reactive.reactive_types[filter] = (
-            sigma, epsilon,
-            barrier_position, barrier_height, barrier_width,
-            well_position, well_depth, well_width, repulsive_strength,
-            angle, angle_strength,
-            dihedral, dihedral_depth, dihedral_width
-        )
-
-    p.add_level(
-        "reactive_types", process_reactive_type
-    )
-
-    def process_custom_reactive(tokens):
-        this_is_experimental(
-            tokens, 0, "Custom reactive types"
-        )
-        nonlocal last_molecule
-        # just a test for now, hardcoded constants
-        index_type = last_molecule.index_type
-        i = parse_pair(tokens, 0, index_type)
-        j = parse_pair(tokens, 1, index_type)
-        k = parse_pair(tokens, 2, index_type)
-
-        type = unwrap(tokens, 3, "word")
-        if type not in {"d", "a", "s"}:
-            raise TokenParseError(
-                tokens[3],
-                f"Must be one of {'d', 'a', 's'}, got {type}."
-                " d=donor, a=acceptor, s=symmetric."
-            )
-        filter = unwrap(tokens, 4, "word")
-        if system.custom_reactive.reactive_types.get(filter) is None:
-            raise TokenParseError(
-                tokens[4],
-                f"Undefined reactive type {filter}."
-                "Define it in [reactive_types] first."
-            )
-
-        last_molecule.interactions.append((
-            system.custom_reactive, [i, j, k], [type, filter]
-        ))
-
-    p.add_level(
-        "reactive_group", process_custom_reactive,
-        start=assert_last_molecule
-    )
 
     def process_atomtypes(tokens):
         if len(tokens) != 6:
@@ -1053,9 +729,9 @@ def DaemonTopFile(
                 )
         if len(tokens) > 4:
             raise ParseError("Only up to 4 reactants are allowed.")
-        if len(last_reaction.reactants) > 0:
+        if len(last_reaction.__reactants) > 0:
             raise ParseError("Only one set of reactants per reaction.")
-        last_reaction.reactants = rxs
+        last_reaction.__reactants = rxs
 
     p.add_level("reactants", process_reactants)
     # alias:
@@ -1063,7 +739,7 @@ def DaemonTopFile(
 
     def process_conditions(tokens):
         nonlocal last_reaction
-        n_reac = len(last_reaction.reactants)
+        n_reac = len(last_reaction.__reactants)
         if n_reac == 0:
             raise ParseError("[reactants] must come before [conditions]")
         key = unwrap(tokens, 0, "word")
@@ -1210,7 +886,7 @@ def DaemonTopFile(
 
     def process_break(tokens):
         nonlocal last_reaction
-        n_reac = len(last_reaction.reactants)
+        n_reac = len(last_reaction.__reactants)
         if n_reac == 0:
             raise ParseError("[reactants] must come before [break]")
 
@@ -1223,7 +899,7 @@ def DaemonTopFile(
 
     def process_update(tokens):
         nonlocal last_reaction
-        n_reac = len(last_reaction.reactants)
+        n_reac = len(last_reaction.__reactants)
         if n_reac == 0:
             raise ParseError("[reactants] must come before [update]")
 
@@ -1236,7 +912,7 @@ def DaemonTopFile(
 
     def process_redefine(tokens):
         nonlocal last_reaction
-        n_reac = len(last_reaction.reactants)
+        n_reac = len(last_reaction.__reactants)
         if n_reac == 0:
             raise ParseError("[reactants] must come before [redefine]")
         id, atomid = parse_pair(tokens, 0, "pair")
@@ -1283,7 +959,7 @@ def DaemonTopFile(
 
     def process_retype(tokens):
         nonlocal last_reaction
-        n_reac = len(last_reaction.reactants)
+        n_reac = len(last_reaction.__reactants)
         if n_reac == 0:
             raise ParseError("[reactants] must come before [retype]")
 
@@ -1295,7 +971,7 @@ def DaemonTopFile(
 
     def process_rename(tokens):
         nonlocal last_reaction
-        n_reac = len(last_reaction.reactants)
+        n_reac = len(last_reaction.__reactants)
         if n_reac == 0:
             raise ParseError("[reactants] must come before [rename]")
 
@@ -1307,7 +983,7 @@ def DaemonTopFile(
 
     def process_remass(tokens):
         nonlocal last_reaction
-        n_reac = len(last_reaction.reactants)
+        n_reac = len(last_reaction.__reactants)
         if n_reac == 0:
             raise ParseError("[reactants] must come before [remass]")
 
@@ -1319,7 +995,7 @@ def DaemonTopFile(
 
     def process_recharge(tokens):
         nonlocal last_reaction
-        n_reac = len(last_reaction.reactants)
+        n_reac = len(last_reaction.__reactants)
         if n_reac == 0:
             raise ParseError("[reactants] must come before [recharge]")
 
@@ -1331,7 +1007,7 @@ def DaemonTopFile(
 
     def process_soft_core(tokens):
         nonlocal last_reaction
-        n_reac = len(last_reaction.reactants)
+        n_reac = len(last_reaction.__reactants)
         if n_reac == 0:
             raise ParseError("[reactants] must come before [soft_core]")
 

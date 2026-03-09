@@ -6,7 +6,7 @@ from collections import OrderedDict
 
 class NonBonded(Force):
     """
-    S* modular_forces implementation of non bonded forces.
+    S* modular_forces implementation of non bonded __forces.
     Different to other Force objects because of the interplay between the
     NB force, self exclusion force, exclusions and atomtypes.
     """
