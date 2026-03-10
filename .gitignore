@@ -1,8 +1,7 @@
-# exclude .gro files, except in examples, tests and experiments
+# exclude .gro files, except in examples, tests and benchmarks
 *.gro
 !tests/**/*.gro
 !examples/**/*.gro
-!experiments/**/*.gro
 !benchmarks/**/*.gro
 # exclude all xyz and xtc trajectory files
 *.xyz
@@ -21,6 +20,8 @@ benchmarks/results
 **/__pycache__/
 # exclude backed up files
 \#*
+# exclude cargo lock
+Cargo.lock
 # exclude hidden files
 .*
 # include specific hidden files
@@ -37,3 +38,4 @@ dist
 *.so
 docs/build/*
 docs/source/martini_daemon/*
+target/*

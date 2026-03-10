@@ -17,7 +17,7 @@ class MoleculeType(Directive):
         # type, res num, res name, atomname, charge_gr, charge, mass
         self.atoms: list[tuple[str, int, str, str, int, float | None, float | None]] = []
         self.exclusions: set[tuple[int, int]] = set()
-        self.interactions: list[tuple[str, list[int], list[float], bool, bool, bool]] = []
+        self.interactions: list[tuple[str, list[int], list[float], bool]] = []
 
     def where(self) -> tuple[str, int]:
         return self.path, self.line_num

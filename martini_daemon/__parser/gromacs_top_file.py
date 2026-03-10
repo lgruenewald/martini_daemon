@@ -2,6 +2,7 @@ from typing import Type, Any
 from .directive import Directive
 from .parser import Parser
 from .token_list import TokenList, TokenParseException
+from ..__core import System
 
 class InvalidTopologyError(Exception):
     pass
@@ -24,7 +25,7 @@ class GromacsTopFile(Directive):
 
     def __init__(
         self,
-        result: dict[str, Any],
+        system: System,
         path: str,
         include_dirs: list[str] | None = None,
         defines: dict[str, str] | None = None,
@@ -49,8 +50,10 @@ class GromacsTopFile(Directive):
         for directive_ in self.__top_directives:
             self.__parser.add_directive(directive_)
 
-        # result of parsing
-        self.__result: dict[str, Any] = result
+        # results of parsing
+        # TODO reconsider if __result should even exist
+        self.__result: dict[str, Any] = {}
+        self.system = system
 
         ok = self.__parser.parse()
         if not ok:

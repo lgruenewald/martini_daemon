@@ -42,8 +42,6 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
             self.read_members(tokens),
             self.read_params(tokens),
             self.is_exclusion(type_),
-            self.is_virtual_site(type_),
-            self.is_constraint(type_)
         ))
 
     # reasonable defaults that still can be overridden for e.g. virtual_sitesn
@@ -90,15 +88,6 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
     @classmethod
     def is_exclusion(cls, type_: str) -> bool:
         return False
-
-    @classmethod
-    def is_virtual_site(cls, type_: str) -> bool:
-        return False
-
-    @classmethod
-    def is_constraint(cls, type_: str) -> bool:
-        return False
-
 
     # each class should have its own way of registering new types, if they'd like to provide it
     @classmethod

@@ -1,0 +1,14 @@
+[package]
+name = "martini_daemon"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "martini_daemon"
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+glam = "0.32.1"
+numpy = "0.28.0"
+pyo3 = "0.28.2"

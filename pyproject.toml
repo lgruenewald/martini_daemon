@@ -1,11 +1,6 @@
 [build-system]
-requires = [
-  "setuptools",
-  "setuptools-scm",
-  "cython",
-  "numpy"
-]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
 
 [project]
 name = "martini_daemon"
@@ -20,9 +15,12 @@ dependencies = [
   "openmm",
   "freud-analysis",
   "tqdm",
-  "molly@git+https://git.sr.ht/~ma3ke/molly#egg=molly&subdirectory=bindings/python",
+  "molly@git+https://git.sr.ht/~ma3ke/molly#egg=molly&subdirectory=bindings/python"
 ]
 dynamic = ["version"]
+
+[tool.maturin]
+module-name = "martini_daemon.__rust"
 
 [project.optional-dependencies]
 all = [
