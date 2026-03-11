@@ -40,7 +40,7 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
         self.parent.interactions.append((
             type_,
             self.read_members(tokens),
-            self.read_params(tokens),
+            self.read_params(tokens, type_),
             self.is_exclusion(type_),
         ))
 
@@ -54,14 +54,28 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
             for i in range(self.get_number_members())
         ]
 
-    def read_params(self, tokens: TokenList) -> list[float]:
-        return [
-            tokens.unwrap(
-                j, "float"
+    def read_params(self, tokens: TokenList, type_: int) -> list[float]:
+        min_params, max_params = self.get_number_params(type_)
+        tokens.assert_no_more_than(
+            self.get_number_members() + 1 + max_params
+        )
+        tokens.assert_at_least(
+            self.get_number_members() + 1 + min_params
+        )
+        params_start = self.get_number_members() + 1
+        params = []
+        for j, filter_ in enumerate(self.get_type_args(type_)):
+            # ignore optional params
+            if params_start + j >= len(tokens):
+                break
+            params.append(
+                tokens.unwrap(
+                    params_start + j,
+                    filter_,
+                )
             )
-            # skip 0 to n and n+1 (type)
-            for j in range(self.get_number_members()+1, len(tokens))
-        ]
+
+        return params
 
     def read_type(self, tokens: TokenList) -> str:
         type_num = tokens.unwrap(
@@ -82,6 +96,14 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
     @classmethod
     @abstractmethod
     def get_number_members(cls) -> int:
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def get_number_params(cls, type_: int) -> tuple[int, int]:
+        """
+        Return the minimum and maximum number of params.
+        """
         raise NotImplementedError
 
     # metadata for molecule type

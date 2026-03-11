@@ -226,4 +226,5 @@ fn test_pbc() {
 
     assert!(pbc.crosses_box(v1, v2));
     assert!(!pbc.crosses_box(v1, v3));
+    // TODO: test all functions, test on non orthogonal boxes
 }

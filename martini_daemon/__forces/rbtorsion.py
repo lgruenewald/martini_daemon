@@ -1,15 +1,59 @@
-from .force import Force
 import openmm as mm
+from ..__core import BondedForce
+from ..__parser import register_dihedral_type
 
+@register_dihedral_type(type_=3, args=["float" for _ in range(6)])
+class RBTorsion(BondedForce):
 
-class RBTorsion(Force):
-    _members = 4
+    def _add_to_force(self, members: list[int], params: list[float]) -> None:
+        self.force.addTorsion(*members, *params)
+
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return params
+
+    @staticmethod
+    def uses_pbc() -> bool:
+        return True
+
+    def delta_degrees_of_freedom(self) -> int:
+        return 0
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "rb_torsion"
 
     def _set_force_obj(self):
-        self._force_obj = mm.RBTorsionForce()
+        self.force = mm.RBTorsionForce()
 
-    def _add_to_force_obj(self, params):
-        i, j, k, l, c0, c1, c2, c3, c4, c5 = params
-        self._force_obj.addTorsion(i, j, k, l, c0, c1, c2, c3, c4, c5)
+    filters = {"dihedral"}
 
-    _filters = {"dihedral", "rb_torsion"}
+@register_dihedral_type(type_=5, args=["float" for _ in range(4)])
+class FourierDihedral(BondedForce):
+    def _add_to_force(self, members: list[int], params: list[float]) -> None:
+        self.force.addTorsion(*members, *params)
+
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return [
+            params[1] + 0.5 * (params[0] + params[2]),
+            0.5 * (-params[0] + 3 * params[2]),
+            -params[1] + 4 * params[3],
+            -2 * params[2],
+            -4 * params[3],
+            0.,
+        ]
+
+    @staticmethod
+    def uses_pbc() -> bool:
+        return True
+
+    def delta_degrees_of_freedom(self) -> int:
+        return 0
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "fourier_dihedral"
+
+    def _set_force_obj(self):
+        self.force = mm.RBTorsionForce()
+
+    filters = {"dihedral"}

@@ -7,7 +7,7 @@ def collect_bonds(system: System, filters: list[str]):
     n = system.atom_count()
     bonds = []
     for force in system.get_forces():
-        if not issubclass(BondedForce, force):
+        if not issubclass(type(force), BondedForce):
             continue
         # do we include this force
         do_force = False
@@ -18,10 +18,7 @@ def collect_bonds(system: System, filters: list[str]):
                 if force.passes_filter(filt):
                     do_force = True
                     break
-        for index in range(len(force)):
-            members = force.get_members(index)
-            if members is None:
-                continue
+        for members, _ in force.iterate_bonds():
             if force.passes_filter("vsite"):
                 # hardcoded special case, modeled as vsite bonded to all constructing particles
                 i = members[0]
@@ -37,6 +34,20 @@ def collect_bonds(system: System, filters: list[str]):
                     bonds.append((i, j))
     return bonds
 
+def collect_bonds_for_whole(system: System):
+    n = system.atom_count()
+    bonds = []
+    for force in system.get_forces():
+        # do we include this force
+        if not issubclass(type(force), BondedForce) or force.uses_pbc():
+            continue
+        for members, _ in force.iterate_bonds():
+            i = members[0]
+            for j in members[1:]:
+                if i == j:
+                    continue
+                bonds.append((i, j))
+    return bonds
 
 def make_cluster_frame(n_atoms, frame):
     """

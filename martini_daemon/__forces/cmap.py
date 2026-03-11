@@ -1,6 +1,38 @@
-from .force import Force
 import openmm as mm
+from ..__parser import InteractionDirective, register_directive, Directive
 
+"""
+@register_directive
+class CMAPDirective(InteractionDirective):
+    @classmethod
+    def get_number_members(cls) -> int:
+        return 2
+
+    __type_data: dict[int, tuple[str, list[str]]] = {}
+    __is_exclusion: dict[str, bool] = {}
+
+    @classmethod
+    def register_type(cls, type_: int, name: str, args: list[str], is_excl: bool) -> None:
+        cls.__type_data[type_] = (name, args)
+        cls.__is_exclusion[name] = is_excl
+
+    @classmethod
+    def get_type(cls, type_int: int) -> str | None:
+        got = cls.__type_data.get(type_int)
+        return got or got[0]
+
+    @classmethod
+    def get_type_args(cls, type_int: int) -> list[str]:
+        return cls.__type_data.get(type_int)[1]
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "bonds"
+
+    @classmethod
+    def is_exclusion(cls, type_: str) -> bool:
+        return cls.__is_exclusion[type_]
+"""
 
 class Cmap(Force):
     _members = 5

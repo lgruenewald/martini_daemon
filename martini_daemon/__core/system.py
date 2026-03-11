@@ -1,7 +1,9 @@
 import openmm as mm
-from typing import Iterable
+from typing import Iterable, Type
 from collections import OrderedDict
 from .force import Force
+from .bonded_force import BondedForce
+
 
 class System:
 
@@ -20,8 +22,9 @@ class System:
         self.__context = None
         self.__system: mm.System = mm.System()
         self.__forces: dict[str, Force] = {}
+        self.__available_forces: dict[str, Type[BondedForce]] = {}
 
-        self.__interactions_by_atom: list[list[tuple[str, int]]]
+        self.__interactions_by_atom: list[list[tuple[str, int]]] = []
 
         self.__last_resid = 0
         self.__last_force_group = 1
@@ -57,6 +60,7 @@ class System:
         self.__masses.append(mass)
         self.__system.addParticle(mass)
         self.__softcore.append(sc)
+        self.__interactions_by_atom.append([])
         assert (
             len(self.__names) == len(self.__res_ids) == len(self.__res_names) == len(self.__types)
             == len(self.__charges) == len(self.__masses) == len(self.__softcore)
@@ -121,55 +125,142 @@ class System:
             return
         self.__context.reinitialize = True
 
-    def flag_nonbonded(self, atom_id: int, change_charge: bool = False) -> None:
-        if self.__context is None:
-            return
-        # 1. flag all NonBonded forces
-        # nonbonded forces should flag their own exclusion helpers
-        raise NotImplementedError
+    def flag_atom_change(self, atom_id: int, change_charge: bool = False) -> None:
+        for f in self.__forces.values():
+            f.flag_atom_change(atom_id, change_charge)
 
     # ==== API helpers ====
 
-    def add_force(self, force: Force) -> None:
-        self.__forces[force.get_name()] = force
-        force.build()
-
-    def get_forces(self) -> Iterable[Force]:
+    # PROTECTED API for __core
+    def _add_mm_force(self, force: mm.Force) -> None:
         """
-        WARNING! Assume Force provided is read-only.
-        """
-        return self.__forces.values()
+        Add an OpenMM force to the system. The name provided must be unique.
 
-    def add_mm_force(self, force: mm.Force) -> None:
+        Should only be called by Force/BondedForce. Should be only called if Force is in __forces.
+        """
         self.__system.addForce(force)
         self.flag_reinitialize()
 
-    def rebuild(self) -> None:
+    def _rebuild(self) -> None:
+        """
+        Call this before initializing or reinitializing the context.
+
+        Should only be called by Context
+        """
         for force in self.__forces.values():
             force.build()
 
-    def remove_mm_force(self, force: mm.Force) -> None:
+    def _remove_mm_force(self, force: mm.Force) -> None:
+        """
+        Remove an OpenMM force from the system, using its unique name.
+
+        Should only be called by Force/BondedForce.
+        """
         name = force.getName()
-        assert name is not None and name in self.__forces
+        assert name is not None and name in self.__forces.keys()
         for i in range(self.__system.getNumForces()):
             if name == self.__system.getForce(i).getName():
                 self.__system.removeForce(i)
         self.flag_reinitialize()
 
-    def bind_context(self, context):
+    def _bind_context(self, context):
+        """
+        Should only be called by context.
+        """
         self.__context = context
 
+    # PUBLIC API
+    def add_force(self, force: Force) -> None:
+        """
+        Add a wrapped Force to the system.
+        """
+        self.__forces[force.get_name()] = force
+        force.build()
+
+    def provide_force(self, force_class: Type[BondedForce]):
+        """
+        Register a class to the list of available forces.
+
+        If attempting to add a new interaction, it will get instantiated and added to Forces.
+        """
+        assert force_class.get_name() not in self.__available_forces.keys() and force_class.get_name() not in self.__forces.keys()
+        self.__available_forces[force_class.get_name()] = force_class
+
+    def get_forces(self) -> Iterable[Force]:
+        """
+        Get an Iterator over all Forces added to System.
+
+        WARNING! Assume Force provided is read-only.
+        """
+        return self.__forces.values()
+
+    def get_force(self, force_name: str) -> Force | None:
+        """
+        Get a Force by name, if present in System. None otherwise.
+
+        WARNING! Assume Force provided is read-only.
+        """
+        return self.__forces.get(force_name)
+
     def get_openmm_system(self):
+        """
+        Get the OpenMM system. Useful if you want to use Martini Daemon only as a .top file parser, and get an OpenMM
+        system that you can use. Calling this will also make sure that all OpenMM Force objects get constructed
+        into an appropriate state for context initialization.
+        """
+        self._rebuild()
         return self.__system
 
-    def add_bond(self, name: str, members: list[int], params: list[float]) -> None:
-        raise NotImplementedError
+    def add_interaction(self, name: str, members: list[int], params: list[float]) -> None:
+        f = self.__forces.get(name)
+        bond_id = f._add_bond(members, params)
+        for member in members:
+            self.__interactions_by_atom[member].append((name, bond_id))
 
-    def remove_bond(self, name: str, bond_id: int) -> None:
-        raise NotImplementedError
+    def remove_interaction(self, force_name: str, bond_id: int) -> None:
+        f = self.__forces[force_name]
+        members = f.get_members(bond_id)
+        for member in members:
+            self.__interactions_by_atom[member] = [
+                (name, index)
+                for name, index in self.__interactions_by_atom[member]
+                if name != force_name or index != bond_id
+            ]
+        f._remove_bond(bond_id)
+
+    def break_group(self, break_group: set[int]) -> None:
+        """
+        Break all interactions that include all atoms in break_group.
+        """
+        choice = break_group.pop()
+        break_group.add(choice)
+        for force_name, bond_id in self.__interactions_by_atom[choice].copy():
+            f = self.__forces.get(force_name)
+            members = f.get_members(bond_id)
+            if all(group_element in members for group_element in break_group):
+                self.remove_interaction(force_name, bond_id)
+
+    def update_group(self, update_group: set[int]) -> None:
+        """
+        Break all interactions that are fully contained within update_group.
+        """
+        for choice in update_group:
+            for force_name, bond_id in self.__interactions_by_atom[choice].copy():
+                f = self.__forces.get(force_name)
+                members = f.get_members(bond_id)
+                if all(member in update_group for member in members):
+                    self.remove_interaction(force_name, bond_id)
 
     def get_interactions_for_atom(self, atom_id: int) -> list[tuple[str, int]]:
-        raise NotImplementedError
+        """
+        Get a list of force names and bond_ids that atom_id is in.
+
+        WARNING! do not edit the list returned.
+        """
+        return self.__interactions_by_atom[atom_id]
 
     def get_number_of_degrees_of_freedom(self) -> int:
-        raise NotImplementedError
+        return self.atom_count() - sum(
+            f.delta_degrees_of_freedom()
+            for f in self.__forces.values()
+        )

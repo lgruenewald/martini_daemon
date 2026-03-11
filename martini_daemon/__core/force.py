@@ -13,17 +13,28 @@ class Force(metaclass=ABCMeta):
         # Happens e.g. during construction or if a bond was removed.
 
     def build(self) -> None:
+        """
+        Call this before initializing or reinitializing the context. It actually creates the OpenMM force
+        and adds it to the system.
+        """
         if self.force is None and self.should_build():
-            self.set_force_obj()
+            self._set_force_obj()
             assert self.force is not None
-            self.prepare_force_obj()
-            self.system.add_mm_force(self.force)
+            self._prepare_force_obj()
+            self.system._add_mm_force(self.force)
 
-    def destroy(self) -> None:
-        self.system.remove_mm_force(self.force)
+    def _destroy(self) -> None:
+        """
+        Will destroy the OpenMM force and remove it from the OpenMM system.
+
+        Note: the force will automatically get rebuilt before continuing the simulation.
+
+        Protected because it should only be called by this class.
+        """
+        self.system._remove_mm_force(self.force)
         self.force = None
 
-    def prepare_force_obj(self) -> None:
+    def _prepare_force_obj(self) -> None:
         self.force.setName(self.get_name())
 
     def should_build(self) -> bool:
@@ -35,17 +46,28 @@ class Force(metaclass=ABCMeta):
     @classmethod
     @abstractmethod
     def is_coupling(cls):
+        """
+        Whether this Force wraps an OpenMM Force that is a type of coupling (temperature, pressure, COMM removal).
+        """
         raise NotImplementedError
 
     @abstractmethod
     def delta_degrees_of_freedom(self) -> int:
+        """
+        How many degrees of freedom does this force remove from the system.
+
+        For example, COMM removal should return -3.
+        Virtual sites should return -3N where N is the number of virtual sites in the force.
+        """
         raise NotImplementedError
 
     @abstractmethod
-    def set_force_obj(self) -> None:
+    def _set_force_obj(self) -> None:
         """
         Define self.force, set it to an OpenMM force object. This will get added to the OpenMM System by the
         martini_daemon.System that owns this Force.
+
+        Protected because it should only be called by this class.
         """
         raise NotImplementedError
 
@@ -60,4 +82,5 @@ class Force(metaclass=ABCMeta):
     def has_force_obj(self) -> bool:
         return self.force is not None
 
-    # TODO - reinitialize handling, atom type/charge change handling
+    def flag_atom_change(self, atom_id: int, change_charge: bool = False) -> None:
+        pass

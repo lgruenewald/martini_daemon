@@ -1,21 +1,33 @@
 import openmm as mm
-from .force import Force
+from ..__core import BondedForce
+from ..__parser import register_angle_type
 
+@register_angle_type(type_=3, args=["float", "float", "float"])
+class CrossBondBond(BondedForce):
+    def _add_to_force(self, members: list[int], params: list[float]) -> None:
+        self.force.addBond(members, params)
 
-class CrossBondBond(Force):
-    _members = 3
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return params
+
+    @staticmethod
+    def uses_pbc() -> bool:
+        return True
+
+    def delta_degrees_of_freedom(self) -> int:
+        return 0
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "cross_bond_bond"
 
     def _set_force_obj(self):
-        self._force_obj = mm.CustomCompoundBondForce(
+        self.force = mm.CustomCompoundBondForce(
             3,  # 3 particles per compund bond force
             "k*(distance(p1,p2)-r1)*(distance(p3,p2)-r2)"
         )
-        self._force_obj.addPerBondParameter("r1")
-        self._force_obj.addPerBondParameter("r2")
-        self._force_obj.addPerBondParameter("k")
+        self.force.addPerBondParameter("r1")
+        self.force.addPerBondParameter("r2")
+        self.force.addPerBondParameter("k")
 
-    def _add_to_force_obj(self, params):
-        i, j, k, r1, r2, force = params
-        self._force_obj.addBond((i, j, k), (r1, r2, force))
-
-    _filters = {"angle", "cross_bond_bond"}
+    filters = {"angle"}

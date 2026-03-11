@@ -1,20 +1,32 @@
-from .force import Force
 import openmm as mm
+from ..__core import BondedForce
+from ..__parser import register_bond_type
 
+@register_bond_type(type_=4, args=["float", "float", "float"], is_excl=True)
+class CubicBond(BondedForce):
+    def _add_to_force(self, members: list[int], params: list[float]) -> None:
+        self.force.addBond(*members, params)
 
-class CubicBond(Force):
-    _members = 2
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return params
 
-    def _set_force_obj(self):
-        self._force_obj = mm.CustomBondForce(
+    @staticmethod
+    def uses_pbc() -> bool:
+        return True
+
+    def delta_degrees_of_freedom(self) -> int:
+        return 0
+
+    def _set_force_obj(self) -> None:
+        self.force = mm.CustomBondForce(
             "kb * (r - b)^2 + kb * kcub * (r - b)^3"
         )
-        self._force_obj.addPerBondParameter("b")  # equilibrium length
-        self._force_obj.addPerBondParameter("kb")  # force constant
-        self._force_obj.addPerBondParameter("kcub")  # cubic force constant
+        self.force.addPerBondParameter("b")  # equilibrium length
+        self.force.addPerBondParameter("kb")  # force constant
+        self.force.addPerBondParameter("kcub")  # cubic force constant
 
-    def _add_to_force_obj(self, params):
-        i, j, length, kb, kcub = params
-        self._force_obj.addBond(i, j, [length, kb, kcub])
+    @classmethod
+    def get_name(cls) -> str:
+        return "cubic_bond"
 
-    _filters = {"bond", "cubic_bond"}
+    filters = {"bond"}

@@ -13,6 +13,7 @@ class MoleculeType(Directive):
         self.molecule_name: str | None = None
         self.nrexcl: int | None = None
         self.parent = parent
+        self.system = parent.system
 
         # type, res num, res name, atomname, charge_gr, charge, mass
         self.atoms: list[tuple[str, int, str, str, int, float | None, float | None]] = []

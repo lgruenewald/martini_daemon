@@ -4,6 +4,7 @@ from .parser import Parser, TokenParseException, ParseException
 from .token_list import TokenList
 from .token import Token
 from .molecule_type import MoleculeType
-from .angles_directive import AnglesDirective
-from .bonds_directive import BondsDirective
-from .dihedrals_directive import DihedralsDirective
+from .interaction_directive import InteractionDirective
+from .angles_directive import register_angle_type
+from .bonds_directive import register_bond_type
+from .dihedrals_directive import register_dihedral_type

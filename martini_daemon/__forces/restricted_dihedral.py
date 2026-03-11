@@ -1,19 +1,32 @@
-from .force import Force
 import openmm as mm
+from ..__core import BondedForce
+from ..__parser import register_dihedral_type
 
+@register_dihedral_type(type_=10, args=["degree", "float"])
+class RestrictedDihedral(BondedForce):
 
-class RestrictedDihedral(Force):
-    _members = 4
+    def _add_to_force(self, members: list[int], params: list[float]) -> None:
+        self.force.addTorsion(*members, params)
+
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return params
+
+    @staticmethod
+    def uses_pbc() -> bool:
+        return True
+
+    def delta_degrees_of_freedom(self) -> int:
+        return 0
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "restricted_dihedral"
 
     def _set_force_obj(self):
-        self._force_obj = mm.CustomTorsionForce(
+        self.force = mm.CustomTorsionForce(
             "0.5*k*((cos(theta)-cos(theta0))^2)/((sin(theta))^2)"
         )
-        self._force_obj.addPerTorsionParameter("theta0")
-        self._force_obj.addPerTorsionParameter("k")
+        self.force.addPerTorsionParameter("theta0")
+        self.force.addPerTorsionParameter("k")
 
-    def _add_to_force_obj(self, params):
-        i, j, k, l, theta, force = params
-        self._force_obj.addTorsion(i, j, k, l, [theta, force])
-
-    _filters = {"dihedral", "restricted_dihedral"}
+    filters = {"dihedral"}

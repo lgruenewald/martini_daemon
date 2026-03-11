@@ -1,27 +1,39 @@
 import openmm as mm
-from .force import Force
+from ..__core import BondedForce
+from ..__parser import register_angle_type
 
+@register_angle_type(type_=6, args=["degree", "float", "float", "float", "float", "float"])
+class QuarticAngle(BondedForce):
+    def _add_to_force(self, members: list[int], params: list[float]) -> None:
+        self.force.addAngle(*members, params)
 
-class QuarticAngle(Force):
-    _members = 3
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return params
+
+    @staticmethod
+    def uses_pbc() -> bool:
+        return True
+
+    def delta_degrees_of_freedom(self) -> int:
+        return 0
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "quartic_angle"
 
     def _set_force_obj(self):
-        self._force_obj = mm.CustomAngleForce(
+        self.force = mm.CustomAngleForce(
             "c0+"
             "c1*(theta-theta0)+"
             "c2*(theta-theta0)^2+"
             "c3*(theta-theta0)^3+"
             "c4*(theta-theta0)^4"
         )
-        self._force_obj.addPerAngleParameter("theta0")
-        self._force_obj.addPerAngleParameter("c0")
-        self._force_obj.addPerAngleParameter("c1")
-        self._force_obj.addPerAngleParameter("c2")
-        self._force_obj.addPerAngleParameter("c3")
-        self._force_obj.addPerAngleParameter("c4")
+        self.force.addPerAngleParameter("theta0")
+        self.force.addPerAngleParameter("c0")
+        self.force.addPerAngleParameter("c1")
+        self.force.addPerAngleParameter("c2")
+        self.force.addPerAngleParameter("c3")
+        self.force.addPerAngleParameter("c4")
 
-    def _add_to_force_obj(self, params):
-        i, j, k, angle, c0, c1, c2, c3, c4 = params
-        self._force_obj.addAngle(i, j, k, (angle, c0, c1, c2, c3, c4))
-
-    _filters = {"angle", "quartic_angle"}
+    filters = {"angle"}

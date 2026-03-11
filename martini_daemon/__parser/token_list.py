@@ -55,7 +55,14 @@ class TokenList:
         if len(self.__tokens) > count:
             raise TokenParseException(
                 self.__tokens[count],
-                "Received unexpected additional tokens."
+                f"Received unexpected additional tokens. Maximum number of tokens on this line is {count}."
+            )
+
+    def assert_at_least(self, count: int) -> None:
+        if len(self.__tokens) < count:
+            raise TokenParseException(
+                self.__tokens[count],
+                f"Minimum number of tokens on this line is {count}."
             )
 
     def unwrap(self, index: int, type_filter: str, default=__DEFAULT, error_msg: str | None = None):

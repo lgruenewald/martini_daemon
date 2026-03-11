@@ -11,6 +11,7 @@ class DihedralsDirective(InteractionDirective):
 
     @classmethod
     def register_type(cls, type_: int, name: str, args: list[str]) -> None:
+        assert type_ not in cls.__type_data.keys()
         cls.__type_data[type_] = (name, args)
 
     @classmethod
@@ -25,3 +26,15 @@ class DihedralsDirective(InteractionDirective):
     @classmethod
     def get_name(cls) -> str:
         return "dihedrals"
+
+    @classmethod
+    def get_number_params(cls, type_: int) -> tuple[int, int]:
+        _, args = cls.__type_data[type_]
+        return len(args), len(args)
+
+def register_dihedral_type(type_: int, args: list[str]):
+    def inner(class_):
+        name = class_.get_name()
+        DihedralsDirective.register_type(class_, type_, name, args)
+        return class_
+    return inner

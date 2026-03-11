@@ -5,7 +5,7 @@ import openmm as mm
 import numpy as np
 from .system import System
 from ..__rust import PeriodicBox
-from .utils import collect_bonds, make_whole_frame, make_cluster_frame
+from .utils import collect_bonds_for_whole, make_whole_frame, make_cluster_frame
 
 
 class Context(mm.Context):
@@ -31,30 +31,19 @@ class Context(mm.Context):
         self.reinitialize = False
 
     def __reinitialize(self):
+        """
+        Call this before stepping, reading energies or forces.
+        """
         if not self.reinitialize:
             return
-        self.system.rebuild()
+        self.system._rebuild()
         self.__context.reinitialize(preserveState=True)
-
-    """
-        def whole_constraints(self, pos, box):
-            ""
-            MUTATES POS to make constraints whole wrt. box.
-            This means all constraints and virtual sites are in the same instance
-            of the pbc. All other interactions are ignored.
-            ""
-            if not self.context_initialized:
-                raise Exception("Initialize the context first")
-            _, bonds = collect_bonds(self.len_atoms(), self, constraint_only=True)
-            clus = make_cluster_frame(bonds, self.len_atoms())
-            make_whole_frame(pos, box, clus, self.len_atoms())
-    """
 
     def set_positions(self, positions: np.ndarray, box: PeriodicBox) -> None:
         if positions.shape != (self.N, 3):
             raise ValueError(f"Positions must have shape ({self.N}, 3), got {positions.shape}.")
         positions = positions.copy()
-        bonds = collect_bonds(self.system, ["constraint", "vsite"])
+        bonds = collect_bonds_for_whole(self.system)
         clus = make_cluster_frame(self.N, bonds)
         make_whole_frame(self.N, positions, box, clus)
         self.__context.setPositions(positions)

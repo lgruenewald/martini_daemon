@@ -12,6 +12,7 @@ class BondsDirective(InteractionDirective):
 
     @classmethod
     def register_type(cls, type_: int, name: str, args: list[str], is_excl: bool) -> None:
+        assert type_ not in cls.__type_data.keys()
         cls.__type_data[type_] = (name, args)
         cls.__is_exclusion[name] = is_excl
 
@@ -22,7 +23,7 @@ class BondsDirective(InteractionDirective):
 
     @classmethod
     def get_type_args(cls, type_int: int) -> list[str]:
-        return cls.__type_data.get(type_int)[1]
+        return cls.__type_data[type_int][1]
 
     @classmethod
     def get_name(cls) -> str:
@@ -32,8 +33,15 @@ class BondsDirective(InteractionDirective):
     def is_exclusion(cls, type_: str) -> bool:
         return cls.__is_exclusion[type_]
 
-# TODO import and add types to class_
-def register_bond_type(class_, type_: int, args: list[str], is_excl: bool) -> None:
-    name = class_.get_name()
-    BondsDirective.register_type(type_, name, args, is_excl)
-    return class_
+    @classmethod
+    def get_number_params(cls, type_: int) -> tuple[int, int]:
+        _, args = cls.__type_data[type_]
+        return len(args), len(args)
+
+
+def register_bond_type(type_: int, args: list[str], is_excl: bool):
+    def inner(class_):
+        name = class_.get_name()
+        BondsDirective.register_type(class_, type_, name, args, is_excl)
+        return class_
+    return inner

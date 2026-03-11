@@ -1,9 +1,26 @@
 import openmm as mm
-from .force import Force
+from ..__core import BondedForce
+from ..__parser import register_dihedral_type
 
+@register_dihedral_type(type_=11, args=["float" for _ in range(6)])
+class CombinedBendingTorsion(BondedForce):
 
-class CombinedBendingTorsion(Force):
-    _members = 4
+    def _add_to_force(self, members: list[int], params: list[float]) -> None:
+        self._force_obj.addBond(members, params)
+
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return params
+
+    @staticmethod
+    def uses_pbc() -> bool:
+        return True
+
+    def delta_degrees_of_freedom(self) -> int:
+        return 0
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "combined_bending_torsion"
 
     def _set_force_obj(self):
         self._force_obj = mm.CustomCompoundBondForce(
@@ -20,9 +37,4 @@ class CombinedBendingTorsion(Force):
         self._force_obj.addPerBondParameter("a3")
         self._force_obj.addPerBondParameter("a4")
 
-    def _add_to_force_obj(self, params):
-        members = params[:4]
-        params = params[4:]
-        self._force_obj.addBond(members, params)
-
-    _filters = {"dihedral", "combined_bending_torsion"}
+    _filters = {"dihedral"}

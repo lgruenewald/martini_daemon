@@ -1,20 +1,31 @@
-from .force import Force
 import openmm as mm
+from ..__core import BondedForce
+from ..__parser import register_bond_type
 
+@register_bond_type(type_=2, args=["float", "float"], is_excl=True)
+class G96Bond(BondedForce):
+    def _add_to_force(self, members: list[int], params: list[float]) -> None:
+        self.force.addBond(*members, params)
 
-class G96Bond(Force):
-    _members = 2
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return params
 
-    def _set_force_obj(self):
-        # Fourth power G96 potential
-        self._force_obj = mm.CustomBondForce(
+    @staticmethod
+    def uses_pbc() -> bool:
+        return True
+
+    def delta_degrees_of_freedom(self) -> int:
+        return 0
+
+    def _set_force_obj(self) -> None:
+        self.force = mm.CustomBondForce(
             "0.25 * k * (r^2-b^2)^2"
         )
-        self._force_obj.addPerBondParameter("b")  # equilibrium length
-        self._force_obj.addPerBondParameter("k")  # force constant
+        self.force.addPerBondParameter("b")  # equilibrium length
+        self.force.addPerBondParameter("k")  # force constant
 
-    def _add_to_force_obj(self, params):
-        i, j, length, force = params
-        self._force_obj.addBond(i, j, [length, force])
+    @classmethod
+    def get_name(cls) -> str:
+        return "g96_bond"
 
-    _filters = {"bond", "g96_bond"}
+    filters = {"bond"}

@@ -1,12 +1,29 @@
 import openmm as mm
-from .force import Force
+from ..__core import BondedForce
+from ..__parser import register_angle_type
 
+@register_angle_type(type_=9, args=["float", "float"])
+class LinearAngle(BondedForce):
 
-class LinearAngle(Force):
-    _members = 3
+    def _add_to_force(self, members: list[int], params: list[float]) -> None:
+        self.force.addBond(members, params)
+
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return params
+
+    @staticmethod
+    def uses_pbc() -> bool:
+        return True
+
+    def delta_degrees_of_freedom(self) -> int:
+        return 0
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "linear_angle"
 
     def _set_force_obj(self):
-        self._force_obj = mm.CustomCompoundBondForce(
+        self.force = mm.CustomCompoundBondForce(
             3,  # 3 particles per compund bond force
             "0.5*k*distj2; "
             "distj2=(xj-x2)^2+(yj-y2)^2+(zj-z2)^2; "
@@ -14,11 +31,7 @@ class LinearAngle(Force):
             "yj=a*y1+(1-a)*y3; "
             "zj=a*z1+(1-a)*z3;"
         )
-        self._force_obj.addPerBondParameter("a")
-        self._force_obj.addPerBondParameter("k")
+        self.force.addPerBondParameter("a")
+        self.force.addPerBondParameter("k")
 
-    def _add_to_force_obj(self, params):
-        i, j, k, a, force = params
-        self._force_obj.addBond((i, j, k), (a, force))
-
-    _filters = {"angle", "linear_angle"}
+    filters = {"angle"}
