@@ -3,6 +3,9 @@ from ..__parser import register_bond_type
 
 @register_bond_type(type_=5, args=[], is_excl=True)
 class Connection(BondedForce):
+    def build(self, must=False) -> None:
+        pass
+
     def _set_force_obj(self) -> None:
         pass
 

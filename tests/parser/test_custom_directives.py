@@ -10,14 +10,10 @@ def rootdir(request):
 @register_directive
 class Custom(Directive):
     def __init__(self, parent: GromacsTopFile, path, num):
+        super().__init__(parent, path, num)
         self.lines = []
-        self.path = path
-        self.num = num
         # not the cleanest code, since this test was written before GromacsTopFile's API was finished
         parent.injected = self
-
-    def where(self) -> tuple[str, int]:
-        return self.path, self.num
 
     def line(self, tokens: TokenList) -> None:
         self.lines.append(" ".join([

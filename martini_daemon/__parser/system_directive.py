@@ -6,14 +6,6 @@ from .token_list import TokenList
 
 @register_directive
 class SystemDirective(Directive):
-    def __init__(self, parent: GromacsTopFile, path: str, line_num: int) -> None:
-        self.parent = parent
-        self.path = path
-        self.line_num = line_num
-
-    def where(self) -> tuple[str, int]:
-        return self.path, self.line_num
-
     def line(self, tokens: TokenList) -> None:
         self.parent.set("title", tokens.get_line())
 

@@ -12,12 +12,15 @@ class Force(metaclass=ABCMeta):
         # If rebuild is set to True, it means that self.force is  no longer valid, or does not exist.
         # Happens e.g. during construction or if a bond was removed.
 
-    def build(self) -> None:
+    def build(self, must=False) -> None:
         """
         Call this before initializing or reinitializing the context. It actually creates the OpenMM force
         and adds it to the system.
+
+        If must is True, then assume that the force object has been deleted and a new one is needed, don't check.
+        Currently must=True is used for constraints <=> virtual sites
         """
-        if self.force is None and self.should_build():
+        if must or self.should_build():
             self._set_force_obj()
             assert self.force is not None
             self._prepare_force_obj()
@@ -41,7 +44,7 @@ class Force(metaclass=ABCMeta):
         """
         May be used by bonded forces e.g. to indicate whether there is anything added to it.
         """
-        return True
+        return self.force is None
 
     @classmethod
     @abstractmethod

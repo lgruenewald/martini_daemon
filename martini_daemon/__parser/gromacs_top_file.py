@@ -32,10 +32,11 @@ class GromacsTopFile(Directive):
     ):
         """
         :param path: Path to the .top file.
-        :param result: Dictionary containing .
+        :param system: __core.System.
         :param include_dirs: List of directories to be searched if #include fails to find a file in the current dir.
         :param defines: dict[str, str] of keys and values for token replacements by the limited C preprocessor impl.
         """
+        super().__init__(None, "", 0)
         if defines is None:
             defines = {}
         defines["DAEMON"] = ""
@@ -51,8 +52,6 @@ class GromacsTopFile(Directive):
             self.__parser.add_directive(directive_)
 
         # results of parsing
-        # TODO reconsider if __result should even exist
-        self.__result: dict[str, Any] = {}
         self.system = system
 
         ok = self.__parser.parse()
@@ -60,17 +59,14 @@ class GromacsTopFile(Directive):
             # error was already printed, but we re-raise here
             raise InvalidTopologyError
 
-    # === result handling ===
-    def get(self, key: str, default: Any = None) -> Any:
-        if self.__result.get(key) is None:
-            self.__result[key] = default
-        return self.__result[key]
-
-    def set(self, key: str, value: Any) -> None:
-        self.__result[key] = value
-
-    def get_all(self) -> dict[str, Any]:
-        return self.__result
+    def unwrap_atom_type(self, tokens: TokenList, index: int) -> str:
+        type_ = tokens.unwrap(index, "word")
+        if self.system.get_atom_type(type_) is None:
+            raise TokenParseException(
+                tokens[index],
+                f"Unknown atom type {type_}."
+            )
+        return type_
 
     # === implementing Directive ===
     def line(self, tokens: TokenList) -> None:

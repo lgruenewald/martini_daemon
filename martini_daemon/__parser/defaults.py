@@ -6,14 +6,6 @@ from .gromacs_top_file import GromacsTopFile, register_directive
 
 @register_directive
 class Defaults(Directive):
-    def __init__(self, parent: GromacsTopFile, path: str, line_num: int) -> None:
-        self.parent = parent
-        self.path = path
-        self.line_num = line_num
-
-    def where(self) -> tuple[str, int]:
-        return self.path, self.line_num
-
     def line(self, tokens: TokenList) -> None:
         nb_type = tokens.unwrap(0, "int")
         if nb_type != 1:

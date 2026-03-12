@@ -1,13 +1,15 @@
 import openmm as mm
-from typing import Iterable, Type
+from typing import Iterable, Type, Any
 from collections import OrderedDict
+import numpy as np
+
 from .force import Force
 from .bonded_force import BondedForce
-
+from .molecule_type import MoleculeType
 
 class System:
 
-    def __init__(self):
+    def __init__(self, epsilon_r: float, cutoff: float, position_restraint_reference: np.ndarray):
         self.__names: list[str] = []
         self.__res_ids: list[int] = []
         self.__res_names: list[str] = []
@@ -28,6 +30,17 @@ class System:
 
         self.__last_resid = 0
         self.__last_force_group = 1
+
+        self.__harmonic_constraints = None
+
+        self.molecule_types: dict[str, MoleculeType] = {}
+        self.initial_molecules: list[tuple[str, int]] = []
+        self.additional_data: dict[str, Any] = {}
+
+        self.epsilon_r = epsilon_r
+        self.cutoff = cutoff
+
+        self.position_restraint_reference = position_restraint_reference
 
     def __assert_no_context(self):
         if self.__context is not None:
@@ -114,6 +127,9 @@ class System:
         self.__assert_no_context()
         self.__atom_types[atom_type] = (charge, mass)
 
+    def get_atom_type(self, atom_type: str) -> None | tuple[float, float]:
+        return self.__atom_types.get(atom_type)
+
     # ==== STATE SYNCHRONIZATION ====
 
     def flag_reinitialize(self) -> None:
@@ -131,7 +147,7 @@ class System:
 
     # ==== API helpers ====
 
-    # PROTECTED API for __core
+    # PROTECTED API for __core and Forces
     def _add_mm_force(self, force: mm.Force) -> None:
         """
         Add an OpenMM force to the system. The name provided must be unique.
@@ -163,13 +179,45 @@ class System:
                 self.__system.removeForce(i)
         self.flag_reinitialize()
 
+    def _add_constraint(self, i, j, length) -> System:
+        """
+        Called by constraint force sometimes.
+        """
+        self.__system.addConstraint(i, j, length)
+
+    def __del_all_constraints(self) -> None:
+        """
+        Used for constraints <=> harmonic bond replace.
+        """
+        for i in range(self.__system.getNumConstraints(), 0, -1):
+            self.__system.removeConstraint(i)
+        assert self.__system.getNumConstraints() == 0
+
+    def _toggle_constraints_as_harmonic_bonds(self, harmonic: bool) -> None:
+        constraints = self.get_force("constraint")
+        if harmonic:
+            self.__harmonic_constraints = mm.HarmonicBondForce()
+            self.__harmonic_constraints.setName("harmonic_replacement_for_constraints")
+            self.__del_all_constraints()
+            for _, (members, params) in constraints.iterate_bonds():
+                self.__harmonic_constraints.addBond(*members, *params, 10000)
+            # this sets reinitialize to True
+            self._add_mm_force(self.__harmonic_constraints)
+        else:
+            # we assume that only a small minimization has taken place
+            # and thus no constraints were broken across pbc
+            # this also flags reinitialize btw
+            self._remove_mm_force(self.__harmonic_constraints)
+            self.__harmonic_constraints = None
+            constraints.build(must=True)
+
     def _bind_context(self, context):
         """
         Should only be called by context.
         """
         self.__context = context
 
-    # PUBLIC API
+    # PUBLIC API for users
     def add_force(self, force: Force) -> None:
         """
         Add a wrapped Force to the system.
@@ -189,16 +237,12 @@ class System:
     def get_forces(self) -> Iterable[Force]:
         """
         Get an Iterator over all Forces added to System.
-
-        WARNING! Assume Force provided is read-only.
         """
         return self.__forces.values()
 
     def get_force(self, force_name: str) -> Force | None:
         """
         Get a Force by name, if present in System. None otherwise.
-
-        WARNING! Assume Force provided is read-only.
         """
         return self.__forces.get(force_name)
 
@@ -212,6 +256,9 @@ class System:
         return self.__system
 
     def add_interaction(self, name: str, members: list[int], params: list[float]) -> None:
+        """
+        Main API for getting bonds
+        """
         f = self.__forces.get(name)
         bond_id = f._add_bond(members, params)
         for member in members:
@@ -254,8 +301,6 @@ class System:
     def get_interactions_for_atom(self, atom_id: int) -> list[tuple[str, int]]:
         """
         Get a list of force names and bond_ids that atom_id is in.
-
-        WARNING! do not edit the list returned.
         """
         return self.__interactions_by_atom[atom_id]
 

@@ -25,7 +25,7 @@ class BondedForce(Force, metaclass=ABCMeta):
         raise NotImplementedError
 
     def should_build(self) -> bool:
-        return len(self.__entries) > 0
+        return len(self.__entries) > 0 and self.force is None
 
     @abstractmethod
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
@@ -84,6 +84,9 @@ class BondedForce(Force, metaclass=ABCMeta):
         WARNING! Do not edit the bonds given by this function!
         """
         return self.__entries.items()
+
+    def num_bonds(self) -> int:
+        return len(self.__entries)
 
     def get_members(self, bond_id: int) -> list[int]:
         members, _ = self.__entries[bond_id]

@@ -9,6 +9,7 @@ def rootdir(request):
 
 class Root(Directive):
     def __init__(self):
+        super().__init__(None, "", 0)
         self.root_lines = []
         self.a_s = []
         self.b_s = []
@@ -25,33 +26,28 @@ class Root(Directive):
     def finish(self):
         pass
 
-    @staticmethod
-    def is_mandatory():
+    @classmethod
+    def is_mandatory(cls):
         raise NotImplementedError()
 
-    @staticmethod
-    def is_unique():
+    @classmethod
+    def is_unique(cls):
         raise NotImplementedError()
 
-    @staticmethod
-    def is_valid_parent(parent: Any) -> bool:
+    @classmethod
+    def is_valid_parent(cls, parent: Any) -> bool:
         raise NotImplementedError()
 
-    @staticmethod
-    def get_name() -> str:
+    @classmethod
+    def get_name(cls) -> str:
         return "root"
 
 
 class A(Directive):
     def __init__(self, parent: Any, path: str, line_num: int):
-        self.parent = parent
+        super().__init__(parent, path, line_num)
         parent.a_s.append(self)
-        self.path = path
-        self.line_num = line_num
         self.lines = []
-
-    def where(self) -> tuple[str, int]:
-        return self.path, self.line_num
 
     def line(self, tokens: TokenList) -> None:
         self.lines.append([
@@ -62,35 +58,30 @@ class A(Directive):
     def finish(self):
         self.parent.finish_events.append("a")
 
-    @staticmethod
-    def is_mandatory():
+    @classmethod
+    def is_mandatory(cls):
         return True
 
-    @staticmethod
-    def is_unique():
+    @classmethod
+    def is_unique(cls):
         return True
 
-    @staticmethod
-    def is_valid_parent(parent: Any) -> bool:
+    @classmethod
+    def is_valid_parent(cls, parent: Any) -> bool:
         return type(parent) is Root
 
-    @staticmethod
-    def get_name() -> str:
+    @classmethod
+    def get_name(cls) -> str:
         return "a"
 
 
 class B(Directive):
 
     def __init__(self, parent: Any, path: str, line_num: int):
-        self.parent = parent
+        super().__init__(parent, path, line_num)
         parent.b_s.append(self)
-        self.path = path
-        self.line_num = line_num
         self.lines = []
         self.finish_events = parent.finish_events
-
-    def where(self) -> tuple[str, int]:
-        return self.path, self.line_num
 
     def line(self, tokens: TokenList) -> None:
         self.lines.append([
@@ -100,34 +91,29 @@ class B(Directive):
     def finish(self):
         self.parent.finish_events.append("b")
 
-    @staticmethod
-    def is_mandatory():
+    @classmethod
+    def is_mandatory(cls):
         return False
 
-    @staticmethod
-    def is_unique():
+    @classmethod
+    def is_unique(cls):
         return False
 
-    @staticmethod
-    def is_valid_parent(parent: Any) -> bool:
+    @classmethod
+    def is_valid_parent(cls, parent: Any) -> bool:
         return type(parent) is Root
 
-    @staticmethod
-    def get_name() -> str:
+    @classmethod
+    def get_name(cls) -> str:
         return "b"
 
 
 class C(Directive):
 
     def __init__(self, parent: Any, path: str, line_num: int):
-        self.parent = parent
+        super().__init__(parent, path, line_num)
         self.lines = parent.lines
         self.lines.append(["START OF C"])
-        self.path = path
-        self.line_num = line_num
-
-    def where(self) -> tuple[str, int]:
-        return self.path, self.line_num
 
     def line(self, tokens: TokenList) -> None:
         self.lines.append([
@@ -137,20 +123,20 @@ class C(Directive):
     def finish(self):
         self.parent.finish_events.append("c")
 
-    @staticmethod
-    def is_mandatory():
+    @classmethod
+    def is_mandatory(cls):
         return False
 
-    @staticmethod
-    def is_unique():
+    @classmethod
+    def is_unique(cls):
         return False
 
-    @staticmethod
-    def is_valid_parent(parent: Any) -> bool:
+    @classmethod
+    def is_valid_parent(cls, parent: Any) -> bool:
         return type(parent) is B
 
-    @staticmethod
-    def get_name() -> str:
+    @classmethod
+    def get_name(cls) -> str:
         return "c"
 
 def parse(path) -> tuple[bool, Root]:

@@ -2,7 +2,7 @@ from typing import Any
 
 from .directive import Directive
 from .gromacs_top_file import register_directive
-from .molecule_type import MoleculeType
+from .molecule_type_directive import MoleculeType
 from .token_list import TokenList, TokenParseException
 
 

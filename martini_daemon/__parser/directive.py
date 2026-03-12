@@ -12,7 +12,6 @@ class Directive(ABC):
     Directives should implement all of the methods.
     """
 
-    @abstractmethod
     def __init__(self, parent: Any, path: str, line_num: int) -> None:
         """
         Called when a directive occurs in the source file.
@@ -21,14 +20,15 @@ class Directive(ABC):
         :param path: Path to where it occurs.
         :param line_num: Line number where it occurs.
         """
-        raise NotImplementedError
+        self.parent = parent
+        self.path = path
+        self.line_num = line_num
 
-    @abstractmethod
     def where(self) -> tuple[str, int]:
         """
         Should return the path and line number passed in the constructor for error messages.
         """
-        raise NotImplementedError
+        return self.path, self.line_num
 
     @abstractmethod
     def line(self, tokens: TokenList) -> None:

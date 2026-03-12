@@ -9,7 +9,7 @@ from .distance_restraint import DistanceRestraint
 from .fene_bond import FENEBond
 from .g96bond import G96Bond
 from .g96angle import G96Angle
-from .harmonic_bond import HarmonicBond, HarmonicPotential
+from .harmonic_bond import HarmonicBond
 from .harmonic_angle import HarmonicAngle
 from .improper_dihedral import ImproperDihedral
 from .linear_angle import LinearAngle
@@ -17,7 +17,7 @@ from .morse_bond import MorseBond
 from .nonbonded import NonBonded, ExclusionHelper
 from .pairs import Pairs
 from .position_restraint import PositionRestraint
-from .proper_dihedral import ProperDihedral, PeriodicImproperDihedral, ProperDihedralMultiple
+from .proper_dihedral import ProperDihedral
 from .quartic_angle import QuarticAngle
 from .rbtorsion import RBTorsion, FourierDihedral
 from .restricted_angle import RestrictedAngle

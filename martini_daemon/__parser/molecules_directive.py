@@ -8,13 +8,6 @@ from .gromacs_top_file import GromacsTopFile
 
 @register_directive
 class MoleculesDirective(Directive):
-    def __init__(self, parent: GromacsTopFile, path: str, line_num: int) -> None:
-        self.path = path
-        self.line_num = line_num
-        self.parent = parent
-
-    def where(self) -> tuple[str, int]:
-        return self.path, self.line_num
 
     def line(self, tokens: TokenList) -> None:
         self.parent.get("molecules", []).append((

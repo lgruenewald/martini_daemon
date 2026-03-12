@@ -1,102 +1,147 @@
+from typing import Any
 import openmm as mm
-from ..__parser import InteractionDirective, register_directive, Directive
 
-"""
+from ..__core import BondedForce
+from ..__parser import InteractionDirective, register_directive, Directive, GromacsTopFile, TokenList, TokenParseException
+
 @register_directive
-class CMAPDirective(InteractionDirective):
-    @classmethod
-    def get_number_members(cls) -> int:
-        return 2
+class CMAPTypeDirective(Directive):
+    def line(self, tokens: TokenList) -> None:
+        parts = tuple(
+            self.parent.unwrap_atom_type(tokens, i)
+            for i in range(5)
+        )
+        type_ = tokens.unwrap(5, "int")
+        if type_ != 1:
+            raise TokenParseException(
+                tokens[5],
+                f"Unsupported CMAP type {type_}"
+            )
+        size = tokens.unwrap(6, "int")
+        if size != tokens.unwrap(7, "int"):
+            raise TokenParseException(
+                tokens[7],
+                "Non-square CMAPs are not supported."
+            )
+        if size < 8:
+            raise TokenParseException(
+                tokens[6],
+                "CMAPs of size below 8 are too small. This might result in large errors in interpolation (compared to GROMACS)."
+            )
 
-    __type_data: dict[int, tuple[str, list[str]]] = {}
-    __is_exclusion: dict[str, bool] = {}
+        params = [
+            tokens.unwrap(8+i, "float") for i in range(size*size)
+        ]
 
-    @classmethod
-    def register_type(cls, type_: int, name: str, args: list[str], is_excl: bool) -> None:
-        cls.__type_data[type_] = (name, args)
-        cls.__is_exclusion[name] = is_excl
-
-    @classmethod
-    def get_type(cls, type_int: int) -> str | None:
-        got = cls.__type_data.get(type_int)
-        return got or got[0]
-
-    @classmethod
-    def get_type_args(cls, type_int: int) -> list[str]:
-        return cls.__type_data.get(type_int)[1]
-
-    @classmethod
-    def get_name(cls) -> str:
-        return "bonds"
-
-    @classmethod
-    def is_exclusion(cls, type_: str) -> bool:
-        return cls.__is_exclusion[type_]
-"""
-
-class Cmap(Force):
-    _members = 5
-
-    def __init__(self, sysstar):
-        super().__init__(sysstar)
-        self.types = {}
-        self.maps = []
-
-    def add_type(self, members, params):
         # rearrangement as in
         # https://github.com/openmm/openmm/blob/master/wrappers/python/openmm/app/gromacstopfile.py
         # lines 959-984
-        size, p2, *ps = params
-        assert size == p2
-        assert len(ps) == size*size
-        cmap = []
-        midpoint = size // 2
-
         # based on testing:
         # gromacs CMAPs start at -180,-180
         # rows are the second dihedral, going from -180 to +180
         # columns are the first dihedral, going from -180 to +180
 
+        cmap = []
+        midpoint = size // 2
         for n in range(size):
             column = (n + midpoint) % size
             for o in range(size):
                 row = (o + midpoint) % size
-                cmap.append(ps[size * row + column])
+                cmap.append(params[size * row + column])
 
-        self.maps.append((size, cmap))
-        if self._force_obj is not None:
-            i = self._force_obj.addMap(size, cmap),
-            assert len(self.maps) - 1 == i
-        self.types[tuple(members)] = len(self.maps) - 1
 
-    def _set_force_obj(self):
-        self._force_obj = mm.CMAPTorsionForce()
-        for index, (size, cmap) in enumerate(self.maps):
-            i = self._force_obj.addMap(size, cmap)
-            assert i == index
+        cmaps = self.parent.system.additional_data.get("cmap_maps")
+        types = self.parent.system.additional_data.get("cmap_types")
+        if types is None:
+            types = {}
+            self.parent.system.additional_data["cmap_types"] = types
+        if cmaps is None:
+            cmaps = []
+            self.parent.system.additional_data["cmap_maps"] = cmaps
 
-    def _add_to_force_obj(self, params):
-        i, j, k, l, m = params
-        types = tuple([
-            self._sysstar.get_atom_details(x)[0]
-            for x in [i, j, k, l, m]
-        ])
-        default = self.types.get(types)
-        if default is None:
+        types[parts] = len(cmaps)
+        cmaps.append((size, cmap))
+
+    def finish(self):
+        pass
+
+    @classmethod
+    def is_mandatory(cls):
+        return False
+
+    @classmethod
+    def is_unique(cls):
+        return False
+
+    @classmethod
+    def is_valid_parent(cls, parent: Any) -> bool:
+        return isinstance(parent, GromacsTopFile)
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "cmaptypes"
+
+
+@register_directive
+class CMAPDirective(InteractionDirective):
+    @classmethod
+    def get_number_members(cls) -> int:
+        return 5
+
+    @classmethod
+    def get_type(cls, type_int: int) -> str | None:
+        if type_int != 1:
+            return None
+        return "cmap"
+
+    @classmethod
+    def get_type_args(cls, type_int: int) -> list[str]:
+        return []
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "cmap"
+
+    @classmethod
+    def is_exclusion(cls, type_: str) -> bool:
+        return False
+
+
+class Cmap(BondedForce):
+
+    def _add_to_force(self, members: list[int], params: list[float]) -> None:
+        assert len(params) == 0
+        types = tuple(
+            self.system.get_type(member) for member in members
+        )
+        map = self.system.additional_data["cmap_types"].get(types)
+        if map is None:
             raise ValueError(f"Unknown CMAP type for {types}.")
 
-        self._force_obj.addTorsion(
-            default,
+        i, j, k, l, m = members
+        self.force.addTorsion(
+            map,
             i, j, k, l,
             j, k, l, m
         )
 
-    _filters = {"cmap"}
 
-    def _additional_save(self, f):
-        f.dump(self.types)
-        f.dump(self.maps)
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return params
 
-    def _additional_load(self, f):
-        self.types = f.load()
-        self.maps = f.load()
+    @staticmethod
+    def uses_pbc() -> bool:
+        return True
+
+    def delta_degrees_of_freedom(self) -> int:
+        return 0
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "cmap"
+
+    def _set_force_obj(self):
+        self.force = mm.CMAPTorsionForce()
+        for index, (size, cmap) in enumerate(self.system.additional_data["cmap_maps"]):
+            i = self.force.addMap(size, cmap)
+            assert i == index

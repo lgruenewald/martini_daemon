@@ -1,47 +1,49 @@
-from .force import Force
 import openmm as mm
+from ..__core import BondedForce
+from ..__parser import register_constraint_type
 
+@register_constraint_type(type_=1, args=["float"], is_excl=True)
+@register_constraint_type(type_=2, args=["float"], is_excl=False)
+class Constraint(BondedForce):
 
-class Constraint(Force):
-    _members = 2
+    def __init__(self, system) -> None:
+        super().__init__(system)
+        self.__built = False
 
-    def _add_to_force_obj(self):
-        raise Exception("Can't add constraints after starting the run due"
-                        " to periodic boundary conditions")
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return params
+
+    def build(self, must=False) -> None:
+        if not self.__built or must:
+            self.__built = True
+            for index, (members, params) in self.iterate_bonds():
+                self.system._add_constraint(*members, *params)
+
+    @staticmethod
+    def uses_pbc() -> bool:
+        return False
+
+    def delta_degrees_of_freedom(self) -> int:
+        # works for *most* constraint constructs I think
+        return self.num_bonds()
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "constraint"
+
+    filters = {"bond"}
+
+    def _set_force_obj(self) -> None:
+        assert False
 
     def remove(self, i):
         raise Exception("Can't remove constraints")
 
-    def build(self):
-        if self._rebuild:
-            for (i, j, length) in self._list:
-                self._sysstar._system.addConstraint(i, j, length)
-            self._rebuild = False
+    def should_build(self) -> bool:
+        assert False
 
-    _destroyable = False
+    def _add_to_force(self, members: list[int], params: list[float]) -> None:
+        assert False
 
-    def destroy(self):
+    def _destroy(self):
         raise Exception("Can't destroy constraints.")
-
-    _filters = {"bond", "constraint"}
-
-    def set_force_group(self, fg):
-        return False
-
-    def constraints_to_harmonic_bonds(self, harmonic=False):
-        if harmonic:
-            self.harmonic = mm.HarmonicBondForce()
-            for i in range(len(self._list)):
-                self._sysstar._system.removeConstraint(0)
-                i, j, r = self._list[i]
-                self.harmonic.addBond(i, j, r, 10000)
-            # this sets reinitialize to True
-            self._sysstar.add_force(self.harmonic)
-        else:
-            # we assume that only a small minimization has taken place
-            # and thus no constraints were broken across pbc
-            self._sysstar.remove_force(self.harmonic)
-            self.harmonic = 0
-            self._rebuild = True
-            self.build()
-            self._sysstar._reinitialize = True

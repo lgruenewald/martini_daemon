@@ -3,19 +3,11 @@ from abc import ABCMeta, abstractmethod
 
 from .directive import Directive
 from .token_list import TokenList, TokenParseException
-from .molecule_type import MoleculeType
+from .molecule_type_directive import MoleculeType
 
 
 class InteractionDirective(Directive, metaclass=ABCMeta):
     # default Directive boilerplate
-    def __init__(self, parent: MoleculeType, path: str, line_num: int) -> None:
-        self.parent = parent
-        self.path = path
-        self.line_num = line_num
-
-    def where(self) -> tuple[str, int]:
-        return self.path, self.line_num
-
     def finish(self):
         pass
 
@@ -47,9 +39,7 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
     # reasonable defaults that still can be overridden for e.g. virtual_sitesn
     def read_members(self, tokens: TokenList) -> list[int]:
         return [
-            tokens.unwrap(
-                i, "index"
-            )
+            self.parent.parse_index(tokens, i)
             # 0 to n
             for i in range(self.get_number_members())
         ]
