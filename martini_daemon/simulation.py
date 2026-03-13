@@ -413,18 +413,20 @@ class Simulation():
                 self.reactions += len(reactions)
                 self.logger.info("Modification finished")
             if len(reactions) > 0 or self.force_reinitialize:
-                self.logger.info("Reinitialize start")
                 # TODO fix redundant reinitializes with update parameter in context for softcore
-                self.system.reinitialize(self.force_reinitialize)
+#                self.system.reinitialize(self.force_reinitialize)
                 for rep in self.reporters:
                     rep.post_reinitialize(self.i)
+                self.logger.info("Minimization start")
                 self.top.toggle_sc(reactions, True)
-                self.system.reinitialize(self.force_reinitialize)
-                for rep in self.reporters:
-                    rep.post_sc_enable(self.i)
+#                self.system.reinitialize(self.force_reinitialize)
+#                for rep in self.reporters:
+#                    rep.post_sc_enable(self.i)
                 if len(reactions) > 0 and self.daemon_integrator:
                     self.integrator.set_reactions(reactions, self.system, self.top, self.i)
+                self.logger.info("Minimization finished")
                 self.top.toggle_sc(reactions, False)
+                self.logger.info("Reinitialize start")
                 self.system.reinitialize(self.force_reinitialize)
                 for rep in self.reporters:
                     rep.post_sc_disable(self.i)

@@ -19,7 +19,7 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
         report_every=0, check_convergence_every=10,
         langevin=True, equilibration_length=0, subdivision=4,
         r_movable = 0., whole_molecule=False, toggle_couplings=False,
-        max_retry = 0, harmonic_constraints=False
+        harmonic_constraints=False
     ):
         """
         ToggleCouplings is experimental, don't use that one
@@ -62,7 +62,7 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
         self.r_movable = r_movable
         self.whole_molecule = whole_molecule
         self.toggle_couplings = toggle_couplings
-        self.max_retry = max_retry
+        self.max_retry = 0
         self.harmonic_constraints = harmonic_constraints
 
     def reset(self, shape):
@@ -97,10 +97,9 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
         self.integrator.setCurrentIntegrator(1)
         if self.harmonic_constraints:
             system.constraint.constraints_to_harmonic_bonds(True)
-            system.reinitialize()
         if self.toggle_couplings:
             system.coupling(False)
-            system.reinitialize()
+        system.reinitialize()
         # integrator state setup
         self.reset(vels.shape)
         # set movable
@@ -188,10 +187,8 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
         self.remaining_eq_steps = self.eq_steps
         if self.toggle_couplings:
             system.coupling(True)
-            system.reinitialize()
         if self.harmonic_constraints:
             system.constraint.constraints_to_harmonic_bonds(False)
-            system.reinitialize()
         if self.remaining_eq_steps > 0:
             self.integrator.setCurrentIntegrator(2)
         else:
