@@ -1,6 +1,6 @@
 # generate vmd bond info to visualize from .bonds and .xtc
 
-# TODO move meta.py, gro_file.py and xtc file read/write to utils
+# TODO move old_meta.py, gro_file.py and xtc file read/write to utils
 # TODO give option for different xtc readers
 import numpy as np
 import zlib
@@ -23,7 +23,7 @@ def generate_vmd_readable_bonds(
 ) -> None:
     """
     Given a list of bonds (from a .bonds file, loaded with
-    reporters.bond_reporter.read_bonds), and a matching trajectory .xtc file
+    old_reporters.bond_reporter.read_bonds), and a matching trajectory .xtc file
     (input) write a file in a format that is
     currently suitable for visualization by daemon.tcl.
 

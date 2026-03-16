@@ -1,8 +1,8 @@
 import os
 import glob
 import pytest
-from martini_daemon.simulation import Simulation
-from martini_daemon.reporters.topstar import ReactionReporter
+from martini_daemon.old_simulation import Simulation
+from martini_daemon.old_reporters.topstar import ReactionReporter
 
 
 # == CONFIG ==

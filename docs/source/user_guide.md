@@ -1,19 +1,36 @@
+# Overview
+
+Martini Daemon is a tool facilitating template based chemical reactions in MD simulations with the [Martini force field](https://cgmartini.nl/) and the [OpenMM](https://openmm.org/) MD engine.
+
+This is achieved by combining multiple components in one repo:
+- a friendly python API for running MD simulations with reactions
+- a parser for Martini `.top` files
+- a thin wrapper on top of OpenMM's API facilitating bond addition and removal
+- a graph matching system to find reactants
+- a detection/modification algorithm to execute reaction templates
+
 # Installation
 
-First, it's recommended to install OpenMM (http://docs.openmm.org/latest/userguide/application/01_getting_started.html) with CUDA (if nvidia) or HIP (if AMD) support. A conda environment or a virtual environment is recommended. Second, clone the repository and install using pip:
+Pre-requisites:
+- Make and activate a Python virtual environment or conda environment. Python 3.13 is recommended.
+- It's recommended to explicitly install the right version of OpenMM with support for your GPU.
+   - e.g. `pip install openmm[cuda12]`
+- Install `git-lfs` (`sudo apt install git-lfs` on Ubuntu).
+- Install Cargo and Rust. Installation via [rustup](https://rustup.rs/) is recommended.
 
-```
-git clone https://github.com/lgruenewald/martini_daemon
-cd martini_daemon
-pip install .
-```
+Installation process:
+
+- Download the source code. Clone the repository and switch to the desired branch, tag or commit.
+- Install with `pip install .` in the root directory of this repo, where `pyproject.toml` is located.
+- (optional) Install with `pip install .[all]` if you want to run tests, benchmarks or build documentation yourself.
+
 
 # Running a simulation
 
 Simulations in Martini Daemon are ran using python run scripts.
 These contain calls to Martini Daemon's API, specifying simulation
-parameters and input files. A simple energy minimization run script
-is provided below, which should be adjustable to meet various
+parameters and input files. A simple energy minimization and equilibration
+run script is provided below, which should be adjustable to meet various
 needs.
 
 ```
@@ -33,7 +50,7 @@ eq = Simulation(
   md_steps=400000,
   # how often to write to the .xtc
   traj_frequency=5000,
-  # no reactions during equilibration
+  # setting this to 0 for simulations with no reactions
   dm_frequency=0,
   # report thermodynamic variables, other reporters go here too...
   reporters=[
@@ -61,8 +78,8 @@ eq = Simulation(
   ],
   # use CUDA with nvidia GPUs
   platform="CUDA"
-  # Run on GPU 1 only
-  context_parameters={"DeviceIndex": "1"}
+  # Run on GPU 0 only
+  context_parameters={"DeviceIndex": "0"}
 )
 # minimize energy first, saving the minimized coordinates to min.gro
 eq.minimize_energy(out="min.gro")
@@ -71,21 +88,53 @@ eq.generate_velocities(298)
 # run equilibration
 eq.simulate()
 ```
+`Link text <https://domain.invalid/>`__
+To edit this into a production simulation, load an equilibrated input
+geometry and remove the minimize_energy and generate_velocities method
+calls. (As well as change the simulation name to something other than "eq"
+for data organization purposes).
 
 Selecting GPUs for the simulation can be done using context parameters,
-as seen in the example above. Selecting CPU cores for the simulation
+as seen in the example above.
+
+Selecting CPU cores for the simulation
 can be done with the `taskset` command. For example,
-`taskset -c 0-31 ./run.py` will limit run.py to cores 0 to 31.
+`taskset -c 0-62:2 ./run.py` will limit run.py to even numbered cores 0 to 62
+(total of 32 cores).
 
-# Including reactions
+# Reactive Simulations
 
-A rough workflow for adding a reaction consists of several steps.
-First, the desired reactions should be broken down to a
-mechanism, that can be modelled. For each mechanistic step,
-the reactant and product molecules should be parametrized in
-Martini. The difference between the two should be written
-down as a list of new interactions, as well as old interactions
-to break.
+The example above is great for running regular Martini simulations in OpenMM.
+However, if you're reading this, you likely want to include template based
+reactions in your Martini simulations. The rest of this document provides
+a broad introduction to the Martini Daemon workflow:
+
+1. Define a reaction mechanism to be modelled.
+2. Parametrize the (coarse grain) reactants and products, preferably in a way where their bead mappings are comparable.
+3. List the changes in topology required to go from reactants to products -- new interactions, as well as interactions to break.
+4. Come up with reaction conditions for the reaction to proceed. Usually this includes a maximum distance for any bond that is formed, a minimum distance for bonds being broken, as well as potentially further constraints for any angles or dihedrals being formed.
+5. Translate the topology changes and conditions into input files.
+  a. The `[graph]` directive tells Martini Daemon how to find reactive fragments in the topology.
+  b. The `[reaction]` directive contains the reactants, reaction conditions and list of topology changes to be made during a reaction.
+
+## Define a reaction mechanism
+
+
+
+## Parametrize the (coarse grain) reactants and products
+
+
+## List the changes in topology
+
+
+## About reaction conditions
+
+
+## Making the input files
+
+
+## Tips and Tricks
+
 
 Second, a graph for the reactant should be constructed. Each
 graph match will be added to a list of active known reactants
@@ -236,7 +285,7 @@ each reaction, along with the frame it happens, the internal fragment ID of reac
 and a list of atoms within the fragment. It can be imported as:
 
 ```py
-from martini_daemon.reporters.topstar import ReactionReporter
+from martini_daemon.old_reporters.topstar import ReactionReporter
 ```
 
 Then, it has to be constructed and added to the list of reporters within the simulation.
@@ -291,7 +340,7 @@ temperature and box size. A new entry is written every time the XTC trajectory
 file is written, for easy analysis.
 
 ```py
-from martini_daemon.reporters.variables_reporter import VariablesReporter
+from martini_daemon.old_reporters.variables_reporter import VariablesReporter
 ```
 
 ## Checkpoint Reporter
@@ -301,7 +350,7 @@ it will write simulation checkpoints. A simulation can be continued
  from these checkpoints, when using the exact same martini daemon version.
 
 ```py
-from martini_daemon.reporters.checkpoint_reporter import CheckpointReporter
+from martini_daemon.old_reporters.checkpoint_reporter import CheckpointReporter
 ```
 
 Checkpoints can be loaded by specifying the chk_path argument of
@@ -313,7 +362,7 @@ The atom reporter writes atom information (name, type, charge, mass) for
 each XTC frame.
 
 ```py
-from martini_daemon.reporters.atom_reporter import AtomReporter, read_atoms
+from martini_daemon.old_reporters.atom_reporter import AtomReporter, read_atoms
 
 ...
 
@@ -325,10 +374,10 @@ n_frames, natoms, names, types, charges, masses = read_atoms("out.atoms")
 The bond reporter writes a list of bonds in the system for each XTC frame.
 All entries in the `[bonds]` directive, constraints are considered bonds.
 Virtual sites are considered bonds too, between the virtual particle and
-all constructing particles respectively. 
+all constructing particles respectively.
 
 ```py
-from martini_daemon.reporters.bond_reporter import BondReporter, read_bonds
+from martini_daemon.old_reporters.bond_reporter import BondReporter, read_bonds
 
 ...
 
@@ -351,14 +400,14 @@ those should be done first.
 2. Generate the file that is read by the VMD script from the `.bonds` and `.xtc` files.
 
 ```py
-from martini_daemon.helpers.vmd import generate_vmd_readable_bonds
+from martini_daemon.old_helpers.vmd import generate_vmd_readable_bonds
 from martini_daemon.bond_reporter import read_bonds
 
 n_frames, n_atoms, bond_frames = read_bonds("out.bonds")
 generate_vmd_readable_bonds(
-  bond_frames,
-  "out.xtc",  # XTC path
-  "out.z"  # output path
+    bond_frames,
+    "out.xtc",  # XTC path
+    "out.z"  # output path
 )
 ```
 

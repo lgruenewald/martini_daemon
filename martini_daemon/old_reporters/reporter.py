@@ -4,7 +4,7 @@ import zlib
 
 class Reporter():
     """
-    Placeholder / base class for DaemonSimulation reporters.
+    Placeholder / base class for DaemonSimulation old_reporters.
     """
 
     # filled out by DaemonSimulation
@@ -61,7 +61,7 @@ class Reporter():
             self._handle = None
 
     # ====== S* reporting overloadable ======
-    # on_set_xtc_path, on_xtc_frame, on_write_gro -> should be used to reporters that try to mirror trajectories
+    # on_set_xtc_path, on_xtc_frame, on_write_gro -> should be used to old_reporters that try to mirror trajectories
     def on_set_xtc_path(self, xtc_name):
         """
             Called when xtc_name is first known, before writing any xtc.
@@ -91,7 +91,7 @@ class Reporter():
         pass
 
     # ====== T* reporting overloadable ======
-    # init_dm, pre_detection, pre_modification, post_modification -> should be used for reporters that want to report on T* and D/M
+    # init_dm, pre_detection, pre_modification, post_modification -> should be used for old_reporters that want to report on T* and D/M
     def init_dm(self, name):
         pass
 

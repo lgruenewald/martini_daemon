@@ -2,9 +2,9 @@ import os
 import glob
 import shutil
 import pytest
-from martini_daemon.simulation import Simulation
-from martini_daemon.reporters.sysstar_dump import SysStarDump
-from martini_daemon.reporters.topstar import FragCountReporter, ReactionReporter
+from martini_daemon.old_simulation import Simulation
+from martini_daemon.old_reporters.sysstar_dump import SysStarDump
+from martini_daemon.old_reporters.topstar import FragCountReporter, ReactionReporter
 from math import isclose
 
 

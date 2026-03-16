@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-from martini_daemon import simulation
-from martini_daemon.reporters.atom_reporter import AtomReporter
-from martini_daemon.reporters.topstar import ReactionReporter, FragCountReporter
+from martini_daemon import old_simulation
+from martini_daemon.old_reporters.atom_reporter import AtomReporter
+from martini_daemon.old_reporters.topstar import ReactionReporter, FragCountReporter
 
 for rate, highest_prob in [("0", 0.1), ("1", 0.1), ("1", 0.5), ("1", 1.0)]:
     for rep in range(3):

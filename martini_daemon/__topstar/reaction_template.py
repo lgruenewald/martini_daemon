@@ -1,5 +1,5 @@
 from ..__parser import MoleculeType, TokenList, ParseException, TokenParseException, GromacsTopFile
-from ..graph import GraphAtomType
+from ..old_graph import GraphAtomType
 
 
 class ReactionTemplate(MoleculeType):

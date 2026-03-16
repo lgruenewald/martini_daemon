@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-from martini_daemon import simulation
-from martini_daemon.reporters.bond_reporter import BondReporter
-from martini_daemon.reporters.topstar import ReactionReporter
-from martini_daemon.components.reaction_sensitive_integrator import ReactionSensitiveLangevinIntegrator
+from martini_daemon import old_simulation
+from martini_daemon.old_reporters.bond_reporter import BondReporter
+from martini_daemon.old_reporters.topstar import ReactionReporter
+from martini_daemon.old_components.reaction_sensitive_integrator import ReactionSensitiveLangevinIntegrator
 
 sim = simulation.Simulation(
     top_path="system.top", gro_path="system.gro",

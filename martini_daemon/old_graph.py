@@ -2,7 +2,7 @@
 from __future__ import annotations
 from enum import Enum
 from .__forces.force import Interaction
-from .sysstar import SysStar
+from .old_sysstar import SysStar
 from fnmatch import fnmatch
 
 

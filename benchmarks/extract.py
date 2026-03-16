@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # quick python script that parses Daemon .log files to generate a cost
-# overview of different components (MD, D/M, reinit, xtc write)
+# overview of different old_components (MD, D/M, reinit, xtc write)
 
-from martini_daemon.helpers.log_extract import extract
+from martini_daemon.old_helpers.log_extract import extract
 import sys
 
 path = sys.argv[1]

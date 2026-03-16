@@ -1,17 +1,6 @@
 Installation
 ============
 
-First, it’s recommended to install OpenMM
-(http://docs.openmm.org/latest/userguide/application/01_getting_started.html)
-with CUDA (if nvidia) or HIP (if AMD) support. A conda environment or a
-virtual environment is recommended. Second, clone the repository and
-install using pip:
-
-::
-
-   git clone https://github.com/lgruenewald/martini_daemon
-   cd martini_daemon
-   pip install .
 
 Running a simulation
 ====================

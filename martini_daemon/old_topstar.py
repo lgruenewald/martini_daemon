@@ -1,11 +1,11 @@
 import random
-from .sysstar import SysStar
+from .old_sysstar import SysStar
 from .__forces.force import Interaction
-from .reporters.reporter import Reporter
-from .graph import Graph, GraphMatch, GraphAtomType, match_atoms
-from .fragment import Fragment
-from .reaction_template import ReactionTemplate
-from .molecule import Molecule
+from .old_reporters.reporter import Reporter
+from .old_graph import Graph, GraphMatch, GraphAtomType, match_atoms
+from .old_fragment import Fragment
+from .old_reaction_template import ReactionTemplate
+from .old_molecule import Molecule
 from .detection import detection_all
 #from .detection2 import detection_all
 import numpy as np
@@ -65,7 +65,7 @@ class TopStar():
         self.out_name = None
         random.seed()
 
-    # Save/load helpers - TODO make load an option in the constructor
+    # Save/load old_helpers - TODO make load an option in the constructor
     def save(self, f):
         """
             Serializes T* into bytes, writes it to f
@@ -266,7 +266,7 @@ class TopStar():
         self.reactions[key].append(reaction)
         return self.molecules[reaction.name]
 
-    # Graph helpers
+    # Graph old_helpers
 
     def try_match_graphs(self, atoms: set[int], molname=None) -> None:
         """
@@ -345,7 +345,7 @@ class TopStar():
         # add graphs to system
         self.try_match_graphs(set(atoms), molname)
 
-        # do initial molecules info, used e.g. in helpers/monomer
+        # do initial molecules info, used e.g. in old_helpers/monomer
         if (
             len(self.initial_molecules) > 0
             and self.initial_molecules[-1][0] == molname
@@ -423,7 +423,7 @@ class TopStar():
             else:
                 self.frag_counts[k] += 1
 
-    # ======= (2/3) Detection things - see detection.pyx =======
+    # ======= (2/3) Detection things - see old_detection.pyx =======
     def init_dm(self, name) -> None:
         # TODO remove this function, reduce fragility that way
         # called exactly once after parsing or loading from file is finished

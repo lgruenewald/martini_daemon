@@ -1,13 +1,13 @@
 from .reporter import Reporter
 import openmm as mm
-from ..sysstar import SysStar
+from ..old_sysstar import SysStar
 
 
 class ReactionEnergyReporter(Reporter):
 
     def __init__(self, write_coords=False, force_groups=False, softcore=False, volume=False, ext="gro"):
         """
-        Designed to work together with DaemonIntegrators (see martini_daemon.components subpackage)
+        Designed to work together with DaemonIntegrators (see martini_daemon.old_components subpackage)
 
         may not work without!
 

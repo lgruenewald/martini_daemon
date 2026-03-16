@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-from martini_daemon import simulation
-from martini_daemon.reporters.topstar import ReactionReporter, FragCountReporter
+from martini_daemon import old_simulation
+from martini_daemon.old_reporters.topstar import ReactionReporter, FragCountReporter
 
 sim = simulation.Simulation(
     top_path="system.top", gro_path="system.gro",

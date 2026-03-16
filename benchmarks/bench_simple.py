@@ -2,8 +2,8 @@
 # New benchmark, designed to be simple to run and fast to finish in contrast
 # with ./benchmark.py. Only runs 25 md steps, D/M step and xtc step once.
 
-from martini_daemon.simulation import Simulation
-from martini_daemon.helpers.log_extract import extract
+from martini_daemon.old_simulation import Simulation
+from martini_daemon.old_helpers.log_extract import extract
 import os
 import sys
 import time

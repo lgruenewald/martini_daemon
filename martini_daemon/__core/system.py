@@ -145,7 +145,7 @@ class System:
         for f in self.__forces.values():
             f.flag_atom_change(atom_id, change_charge)
 
-    # ==== API helpers ====
+    # ==== API old_helpers ====
 
     # PROTECTED API for __core and Forces
     def _add_mm_force(self, force: mm.Force) -> None:

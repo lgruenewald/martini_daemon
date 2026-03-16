@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from martini_daemon.helpers.rates import parse_frag_counts, parse_old_reactions
+from martini_daemon.old_helpers.rates import parse_frag_counts, parse_old_reactions
 
 import numpy as np
 import matplotlib.pyplot as plt

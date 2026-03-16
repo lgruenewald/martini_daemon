@@ -1,10 +1,10 @@
 import os
 import pytest
 import json
-from martini_daemon.topstar import TopStar
+from martini_daemon.old_topstar import TopStar
 from martini_daemon.top_parser import DaemonTopFile
 from martini_daemon.__forces import NonBonded
-from martini_daemon.fragment import Fragment
+from martini_daemon.old_fragment import Fragment
 
 
 # == CONFIG ==

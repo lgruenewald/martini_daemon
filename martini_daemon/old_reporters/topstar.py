@@ -1,5 +1,5 @@
 from .reporter import Reporter
-from ..helpers.monomer import generate_mapping
+from ..old_helpers.monomer import generate_mapping
 
 
 class TopStarLogger(Reporter):
@@ -58,7 +58,7 @@ class ReactionReporter(Reporter):
         frame,reaction_name;reactant1_name,reactant1_id,atoms...;...reactantn_name,reactantn_id,atoms...
 
         If molid is True, additionally the indices of initial molecules
-        (see helpers/monomer) are printed in parentheses, prefixed with mol:
+        (see old_helpers/monomer) are printed in parentheses, prefixed with mol:
         after reactant IDs, before atoms.
 
         Example:

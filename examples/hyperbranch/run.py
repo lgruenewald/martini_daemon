@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
-from martini_daemon import simulation
-from martini_daemon.reporters.bond_reporter import BondReporter
-from martini_daemon.reporters.atom_reporter import AtomReporter
-from martini_daemon.reporters.variables_reporter import VariablesReporter
-from martini_daemon.reporters.topstar import FragCountReporter, ReactionReporter
-from martini_daemon.reporters.checkpoint_reporter import CheckpointReporter
+from martini_daemon import old_simulation
+from martini_daemon.old_reporters.bond_reporter import BondReporter
+from martini_daemon.old_reporters.atom_reporter import AtomReporter
+from martini_daemon.old_reporters.variables_reporter import VariablesReporter
+from martini_daemon.old_reporters.topstar import FragCountReporter, ReactionReporter
+from martini_daemon.old_reporters.checkpoint_reporter import CheckpointReporter
 
 sim = simulation.Simulation(
     "system.top", "system.gro",

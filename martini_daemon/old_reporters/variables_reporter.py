@@ -1,6 +1,6 @@
 from .reporter import Reporter
 import openmm as mm
-from ..sysstar import SysStar
+from ..old_sysstar import SysStar
 
 
 class VariablesReporter(Reporter):

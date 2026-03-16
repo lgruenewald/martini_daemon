@@ -2,10 +2,10 @@ import openmm as mm
 from openmm.app import XTCFile, Topology
 from openmm.unit import nanometer, picosecond, md_unit_system
 from .utils import backup_try
-from .gro_file import write_gro
-from .components.reaction_sensitive_integrator import DaemonIntegrator
-from .reporters.bond_reporter import collect_bonds
-from .helpers.cluster import make_cluster_frame, make_whole_frame
+from .old_gro_file import write_gro
+from .old_components.reaction_sensitive_integrator import DaemonIntegrator
+from .old_reporters.bond_reporter import collect_bonds
+from .old_helpers.cluster import make_cluster_frame, make_whole_frame
 from collections import OrderedDict
 import numpy as np
 
@@ -45,11 +45,11 @@ from .__vsites.four_fdn import VSite4fdn
 from .__vsites.weighed_average import VSiteWeighedAverage
 from .__vsites.center_of_mass import VSiteCenterOfMass
 from .__forces.position_restraint import PositionRestraint
-from .reporters.reporter import Reporter
+from .old_reporters.reporter import Reporter
 # custom __forces not in Gromacs
 from .__forces.custom_reactive import CustomReactive
 from .__forces.periodic_gaussian import PeriodicGaussian
-from .xyz_file import write_xyz
+from .old_xyz_file import write_xyz
 
 
 class SysStar():
@@ -528,7 +528,7 @@ class SysStar():
         else:
             write_xyz(path, self._atom_list, box, pos, vel)
         for reporter in self.reporters:
-            # TODO rename this in reporters
+            # TODO rename this in old_reporters
             reporter.on_write_gro(pos, box, path[:-4])
 
     def get_energies_and_forces_by_group(self) -> str:

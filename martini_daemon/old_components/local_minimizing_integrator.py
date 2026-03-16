@@ -3,8 +3,8 @@ import numpy as np
 from .daemon_integrator import DaemonIntegrator
 import math
 from ..utils import pdist
-from ..reporters.bond_reporter import collect_bonds
-from ..helpers.cluster import make_cluster_frame
+from ..old_reporters.bond_reporter import collect_bonds
+from ..old_helpers.cluster import make_cluster_frame
 
 # TODO integrate this more closely with core, resp. always use compound integrators?
 class LocalMinimizingIntegrator(DaemonIntegrator):
@@ -181,7 +181,7 @@ class LocalMinimizingIntegrator(DaemonIntegrator):
             self.minimizer.global_variables["step_size"] = self.minimizer.global_variables["step_size"] * 1.03
             system.set_positions(pos)
             return self.set_reactions(reactions, system, top, i, retries_so_far + 1)
-        # reporters and cleanup
+        # old_reporters and cleanup
         # TODO find out why velocities change significantly during minimization
         for rep in self.reporters:
             rep.post_di_minimize()

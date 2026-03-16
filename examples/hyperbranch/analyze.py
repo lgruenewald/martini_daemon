@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-from martini_daemon import simulation
-from martini_daemon.reporters.bond_reporter import read_bonds
-from martini_daemon.helpers.vmd import generate_vmd_readable_bonds
+from martini_daemon import old_simulation
+from martini_daemon.old_reporters.bond_reporter import read_bonds
+from martini_daemon.old_helpers.vmd import generate_vmd_readable_bonds
 
 # just to get the initial molecules from the .top file
 init_mol = simulation.Simulation(

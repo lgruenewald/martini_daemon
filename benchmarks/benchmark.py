@@ -13,7 +13,7 @@ import logging
 import shutil
 from datetime import datetime
 
-from martini_daemon.simulation import Simulation
+from martini_daemon.old_simulation import Simulation
 from martini_daemon.utils import backup_try
 
 # setup logging
@@ -150,7 +150,7 @@ categories = [
 def extract(log_path, result_prefix, result_hist_prefix):
     """
     Takes daemon .log file at log_path, returns data about how much time
-    the different components took (md, detection, reinit, ...)
+    the different old_components took (md, detection, reinit, ...)
 
     Also writes the processed log file data to result_paths
     and histograms to result_hist_path, in .dat format

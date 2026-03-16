@@ -2,6 +2,7 @@ use pyo3::prelude::*;
 use numpy::{PyReadwriteArray, Ix2, PyUntypedArrayMethods};
 
 use glam::DVec3;
+use pyo3::exceptions::PyValueError;
 
 #[pyclass]
 pub struct PeriodicBox {
@@ -9,29 +10,91 @@ pub struct PeriodicBox {
     b: DVec3,
     c: DVec3,
 }
+
+fn sanitize(pbc: &PeriodicBox) -> PyResult<()> {
+    if pbc.a.y != 0. || pbc.a.z != 0. || pbc.b.z != 0. {
+        return Err(PyValueError::new_err("a.y, a.z and b.z of periodic boxes must be 0."));
+    }
+    if pbc.a.x <= 0. || pbc.b.y <= 0. || pbc.c.z <= 0. {
+        return Err(PyValueError::new_err("a.x, b.y and c.z of periodic boxes must be positive."));
+    }
+    if pbc.b.x.abs() * 2. > pbc.a.x || pbc.c.x.abs() * 2. > pbc.a.x || pbc.c.y.abs() * 2. > pbc.b.y {
+        return Err(PyValueError::new_err("b.x, c.x must be smaller in magnitude than a.x/2. Likewise c.y must be smaller in magnitude than b.y/2."))
+    }
+
+    Ok(())
+}
 #[pymethods]
 impl PeriodicBox {
     #[new]
-    pub fn new(a: [f64; 3], b: [f64; 3], c: [f64; 3]) -> Self {
-        Self { a: a.into(), b: b.into(), c: c.into() }
+    pub fn new(a: [f64; 3], b: [f64; 3], c: [f64; 3]) -> PyResult<Self> {
+        let pbc = Self { a: a.into(), b: b.into(), c: c.into() };
+        sanitize(&pbc)?;
+        Ok(pbc)
     }
 
     #[staticmethod]
-    pub fn cubic(d: f64) -> Self {
-        Self {
+    pub fn from_gro(ax: f64, by: f64, cz: f64, ay: Option<f64>, az: Option<f64>, bx: Option<f64>, bz: Option<f64>, cx: Option<f64>, cy: Option<f64>) -> PyResult<Self> {
+        let pbc = Self {
+            a: [ax, ay.unwrap_or(0.), az.unwrap_or(0.)].into(),
+            b: [bx.unwrap_or(0.), by, bz.unwrap_or(0.)].into(),
+            c: [cx.unwrap_or(0.), cy.unwrap_or(0.), cz].into()
+        };
+        sanitize(&pbc)?;
+        Ok(pbc)
+    }
+
+    pub fn to_gro(&self) -> String {
+        if self.b.x == 0. && self.c.x == 0. && self.c.y == 0. {
+            format!(
+                "{} {} {}", self.a.x, self.b.y, self.c.z
+            )
+        } else {
+            format!(
+                "{} {} {} {} {} {} {} {} {}", self.a.x, self.b.y, self.c.z, self.a.y, self.a.z, self.b.x, self.b.z, self.c.x, self.c.y
+            )
+        }
+    }
+
+    #[staticmethod]
+    pub fn triclinic(ax: f64, bx: f64, by: f64, cx: f64, cy: f64, cz: f64) -> PyResult<Self> {
+        let pbc = Self {
+            a: [ax, 0., 0.].into(),
+            b: [bx, by, 0.].into(),
+            c: [cx, cy, cz].into()
+        };
+        sanitize(&pbc)?;
+        Ok(pbc)
+    }
+
+    pub fn to_lattice(&self) -> String {
+        format!(
+            "{} {} {} {} {} {} {} {} {}", self.a.x, self.a.y, self.a.z, self.b.x, self.b.y, self.b.z, self.c.x, self.c.y, self.c.z
+        )
+    }
+
+    #[staticmethod]
+    pub fn cubic(d: f64) -> PyResult<Self> {
+        if d <= 0. {
+            return Err(PyValueError::new_err("d must be positive."));
+        }
+        Ok(Self {
             a: [d, 0., 0.].into(),
             b: [0., d, 0.].into(),
             c: [0., 0., d].into()
-        }
+        })
     }
 
     #[staticmethod]
-    pub fn orthogonal(x: f64, y: f64, z: f64) -> Self {
-        Self {
+    pub fn orthogonal(x: f64, y: f64, z: f64) -> PyResult<Self> {
+        if x <= 0. || y <= 0. || z <= 0. {
+            return Err(PyValueError::new_err("x, y, z must be positive."));
+        }
+        Ok(Self {
             a: [x, 0., 0.].into(),
             b: [0., y, 0.].into(),
             c: [0., 0., z].into()
-        }
+        })
     }
 
     pub fn move_within(&self, v: [f64; 3]) -> [f64; 3] {
@@ -137,8 +200,8 @@ fn is_close(a: f64, b: f64) -> bool {
 fn test_pbc() {
     use std::f64::consts::{PI, SQRT_2};
 
-    let pbc = PeriodicBox::orthogonal(5., 5., 5.);
-    let pbc2 = PeriodicBox::orthogonal(1., 2., 3.);
+    let pbc = PeriodicBox::orthogonal(5., 5., 5.).unwrap();
+    let pbc2 = PeriodicBox::orthogonal(1., 2., 3.).unwrap();
 
     let origin = [0., 0., 0.];
     let v1 = [0., 0., 1.];

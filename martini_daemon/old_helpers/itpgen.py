@@ -1,5 +1,5 @@
 # generate .itp, .top and .gro from a DaemonSimulation
-from ..simulation import Simulation
+from ..old_simulation import Simulation
 import datetime
 
 def generate_top_monolith(sim: Simulation, path: str):

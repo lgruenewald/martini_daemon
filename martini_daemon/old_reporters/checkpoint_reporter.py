@@ -1,5 +1,5 @@
-from ..sysstar import SysStar
-from ..topstar import TopStar
+from ..old_sysstar import SysStar
+from ..old_topstar import TopStar
 from .reporter import Reporter
 import pickle
 import os

@@ -1,6 +1,6 @@
 # vectorized detection algorithm
 from .utils cimport pdist, pdihedral, pcos_angle, i64
-from .fragment import Fragment
+from .old_fragment import Fragment
 import numpy as np
 from freud.box import Box
 from freud.locality import NeighborList, AABBQuery

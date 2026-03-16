@@ -8,7 +8,7 @@ import math
 import pytest
 
 from martini_daemon.top_parser import DaemonTopFile
-from martini_daemon.gro_file import read_gro
+from martini_daemon.old_gro_file import read_gro
 from martini_daemon.__forces import NonBonded
 from martini_daemon.utils import pdist
 

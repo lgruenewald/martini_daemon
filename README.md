@@ -2,24 +2,27 @@
 
 Martini Daemon is a tool facilitating template based chemical reactions in MD simulations with the [Martini force field](https://cgmartini.nl/) and the [OpenMM](https://openmm.org/) MD engine.
 
-This is achieved by combining multiple components in one repo:
-- a friendly python API for running MD simulations with reactions
-- a parser for Martini `.top` files
-- a thin wrapper on top of OpenMM's API facilitating bond addition and removal
-- a graph matching system to find reactants
-- a detection/modification algorithm to execute reaction templates
+This is achieved by combining multiple components in one repo / one python package:
+- a friendly Python API for running MD simulations with reactions (`simulation.py`)
+- a parser for GROMACS `.top` files targeting OpenMM (`__parser`, `__forces` and `__vsites`)
+- a thin wrapper on top of OpenMM's API facilitating bond addition and removal (`__core`)
+- a graph matching system to find reactants (`__topstar`)
+- a detection/modification algorithm to execute reaction templates (`__topstar`)
 
 ### Installation
 
-Pre-requisite: install the right version of OpenMM with support for your GPU and install `git-lfs`.
+Pre-requisites:
+- Make and activate a Python virtual environment or conda environment. Python 3.13 is recommended.
+- It's recommended to explicitly install the right version of OpenMM with support for your GPU.
+   - e.g. `pip install openmm[cuda12]`
+- Install `git-lfs` (`sudo apt install git-lfs` on Ubuntu).
+- Install Cargo and Rust. Installation via [rustup](https://rustup.rs/) is recommended.
 
-1. Clone the repository
-   - (optional) switch to the desired branch, tag or commit
-2. (optional) activate the desired conda, mamba, uv or venv environment
-3. (optional) Install OpenMM explicitly with CUDA or HIP support.
-4. Install with `pip install .` in the root directory of this repo, where `pyproject.toml` is located.
-   - (optional) Install with `pip install .[all]` if you want to run tests, benchmarks or build documentation yourself.
+Installation process:
 
+- Download the source code. Clone the repository and switch to the desired branch, tag or commit.
+- Install with `pip install .` in the root directory of this repo, where `pyproject.toml` is located.
+- (optional) Install with `pip install .[all]` if you want to run tests, benchmarks or build documentation yourself.
 
 ## Docs
 
