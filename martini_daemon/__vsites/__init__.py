@@ -6,5 +6,5 @@ from .three_fd import VSite3fd
 from .three_fad import VSite3fad
 from .three_out import VSite3out
 from .four_fdn import VSite4fdn
-from weighed_average import VSiteWeighedAverage
+from .weighted_average import VSiteWeightedAverage
 from .center_of_mass import VSiteCenterOfMass

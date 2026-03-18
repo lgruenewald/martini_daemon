@@ -28,7 +28,7 @@ class TrajectoryWriter:
                 assert False
 
 
-    def write_frame(self, sim_step: int, time_ns: float, box: PeriodicBox, pos, vel=None):
+    def write_frame(self, sim_step: int, time_ns: float, box: PeriodicBox, pos: np.ndarray, vel: np.ndarray = None) -> None:
         match self.backend:
             case "xtc_openmm_internal":
                 from openmm.app.internal.xtc_utils import xtc_write_frame
@@ -42,6 +42,8 @@ class TrajectoryWriter:
                     ], dtype=np.float32
                 )
                 assert box.shape == (3, 3)
+                if pos.dtype != np.float32:
+                    pos = np.array(pos, dtype=np.float32)
                 xtc_write_frame(
                     self.path.encode("utf-8"), # title as byte string
                     pos, # positions as float[:, :]

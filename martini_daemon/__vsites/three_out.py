@@ -1,14 +1,20 @@
 import openmm as mm
-from .vsite import VirtualSite
+from ..__core import VirtualSite
 
 
 class VSite3out(VirtualSite):
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return params
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "3out"
+
     def _make_vsite(self, vid, members, params):
         i, j, k = members
         a, b, c = params
-        vsite = mm.OutOfPlaneSite(
+        return mm.OutOfPlaneSite(
             i, j, k, a, b, c
         )
-        self._sysstar._system.setVirtualSite(vid, vsite)
 
-    _filters = {"virtual_site", "vsite", "3out"}
+    filters = {"virtual_site", "vsite"}

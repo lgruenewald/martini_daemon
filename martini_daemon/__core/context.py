@@ -9,7 +9,6 @@ from .utils import collect_bonds_for_whole, make_whole_frame, make_cluster_frame
 
 
 class Context(mm.Context):
-    # TODO - hide reinitalize from the API
     # automatically read it out from the System and all Force's if there should be a reinitialize!
     # when any state is queried or when there is steps forward, check if reinitializing is needed first, reinitialize
     # and then proceed. MAYBE: have a separate reinitialize only for timing purposes

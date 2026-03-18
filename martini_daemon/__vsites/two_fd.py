@@ -1,18 +1,23 @@
 import openmm as mm
-from .vsite import VirtualSite
+from ..__core import VirtualSite
 
 
 class VSite2fd(VirtualSite):
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return params
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "2fd"
+
     def _make_vsite(self, vid, members, params):
         i, j = members
-        (d,) = params
-        vsite = mm.LocalCoordinatesSite(
+        return mm.LocalCoordinatesSite(
             [i, j, j],  # atoms
             [1.0, 0.0, 0.0],  # origin weights
             [-0.5, 0.5, 0.0],  # x direction weight
             [0.0, 0.0, 0.0],  # y direction weight
-            [d, 0.0, 0.0]  # coordinatesI
+            [params[0], 0.0, 0.0]  # coordinatesI
         )
-        self._sysstar._system.setVirtualSite(vid, vsite)
 
-    _filters = {"virtual_site", "vsite", "2fd"}
+    filters = {"virtual_site", "vsite"}

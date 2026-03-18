@@ -1,24 +1,28 @@
 import openmm as mm
-from .vsite import VirtualSite
-
+from ..__core import VirtualSite
 
 class VSiteCenterOfMass(VirtualSite):
-    def _make_vsite(self, vid, members, params):
-        n = len(members)
-        masses = []
-        sum = 0.
-        for i in members:
-            _, _, m, _, _ = self._sysstar.get_atom_details(i)
-            masses.append(m)
-            sum += m
-        weights = [m/sum for m in masses]
-        vsite = mm.LocalCoordinatesSite(
-            members,  # atoms
+
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return params
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "center_of_mass"
+
+    def _make_vsite(self, vid, others, params) -> mm.VirtualSite:
+        n = len(others)
+        masses = [
+            self.system.get_mass(i)
+            for i in others
+        ]
+        weights = [m/sum(masses) for m in masses]
+        return mm.LocalCoordinatesSite(
+            others,  # atoms
             weights,  # origin weights
             [0.0] * n,  # x direction weight
             [0.0] * n,  # y direction weight
             [0.0, 0.0, 0.0]  # coordinates
         )
-        self._sysstar._system.setVirtualSite(vid, vsite)
 
-    _filters = {"virtual_site", "vsite", "com"}
+    filters = {"virtual_site", "vsite", "com"}

@@ -1,82 +1,55 @@
-class VirtualSite():
-    # A parent class for virtual sites to use
-    # Same interface as Force, so Interactions can be used
+from .bonded_force import BondedForce
+from abc import ABCMeta, abstractmethod
+import openmm as mm
 
-    def __init__(self, sysstar):
-        self._list = []
-        self._sysstar = sysstar
+
+class VirtualSite(BondedForce, metaclass=ABCMeta):
+
+    def __init__(self, system):
+        super().__init__(system)
         self._built = False
 
-    # overriden in child classes
-    def _make_vsite(self, vid, members, params):
+    @abstractmethod
+    def _make_vsite(self, vid, other, params) -> mm.VirtualSite:
         raise NotImplementedError
 
-    _filters = set()
+    def build(self, must=False) -> None:
+        if self._built:
+            return
+        self._built = True
+        for index, (members, params) in self.iterate_bonds():
+            vid, *other = members
+            self.system._add_vsite(
+                vid, self._make_vsite(vid, other, params)
+            )
 
-    _destroyable = False
+    def delta_degrees_of_freedom(self) -> int:
+        return self.num_bonds() * 3
 
-    def is_instance(self, filter) -> bool:
-        return filter in self._filters
-
-    def add(self, members, params):# -> Interaction:
+    def _add_bond(self, members: list[int], params: list[float]) -> int:
         if self._built:
             raise ValueError(
                 "Virtual sites cannot be added during the simulation."
             )
-        vid, *other = members
-        self._list.append((vid, other, params))
-        self._sysstar.vsites.append(vid)
-#        return Interaction(self, len(self._list) - 1)
+        return super()._add_bond(members, params)
 
-    def get_members(self, i):
-        vid, members, _ = self._list[i]
-        return [vid, *members]
+    @staticmethod
+    def uses_pbc() -> bool:
+        return False
 
-    def remove(self, i):
+    def _remove_bond(self, bond_id: int) -> None:
         raise ValueError(
             "Virtual sites cannot be removed during the simulation."
         )
 
-    def build(self) -> None:
-        if not self._built:
-            self._built = True
-            for vid, members, params in self._list:
-                self._make_vsite(vid, members, params)
-
-    def get_index(self) -> int | None:
-        for i, f in enumerate(self._sysstar.modular_forces):
-            if f == self:
-                return i
-        return None
-
-    def get_class_name(self) -> str:
-        return type(self).__name__
-
-    def save(self, f) -> None:
-        f.dump(self.get_class_name())
-        f.dump(self.get_index())
-        f.dump(self._list)
-
-    def load(self, f) -> None:
-        if self._built:
-            raise ValueError("Can only load before _built")
-        assert f.load() == self.get_class_name(), (
-            "Attempt to load a checkpoint from a different version of daemon."
+    def _destroy(self) -> None:
+        raise ValueError(
+            "Virtual sites can't be destoryed."
         )
-        assert f.load() == self.get_index(), (
-            "Attempt to load a checkpoint from a different version of daemon."
-        )
-        self._list = f.load()
 
-    def __len__(self) -> int:
-        return len(self._list)
+    def _set_force_obj(self) -> None:
+        assert False # unreachable
 
-    def set_force_group(self, fg) -> bool:
-        return False
-
-    def get_force_group(self) -> None:
-        return None
-
-    def has_force_obj(self) -> bool:
-        return False
+    def _add_to_force(self, members: list[int], params: list[float]) -> None:
+        assert False # unreachable
 

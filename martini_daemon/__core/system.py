@@ -9,7 +9,7 @@ from .molecule_type import MoleculeType
 
 class System:
 
-    def __init__(self, epsilon_r: float, cutoff: float, position_restraint_reference: np.ndarray):
+    def __init__(self, options=None):
         self.__names: list[str] = []
         self.__res_ids: list[int] = []
         self.__res_names: list[str] = []
@@ -35,12 +35,7 @@ class System:
 
         self.molecule_types: dict[str, MoleculeType] = {}
         self.initial_molecules: list[tuple[str, int]] = []
-        self.additional_data: dict[str, Any] = {}
-
-        self.epsilon_r = epsilon_r
-        self.cutoff = cutoff
-
-        self.position_restraint_reference = position_restraint_reference
+        self.additional_data: dict[str, Any] = options or {}
 
     def __assert_no_context(self):
         if self.__context is not None:
@@ -88,6 +83,15 @@ class System:
 
     def get_name(self, atom_id: int) -> str:
         return self.__names[atom_id]
+
+    def get_atom_names(self) -> list[str]:
+        return self.__names
+
+    def get_res_ids(self) -> list[int]:
+        return self.__res_ids
+
+    def get_res_names(self) -> list[str]:
+        return self.__res_names
 
     def rename(self, atom_id: int, new_name: str) -> None:
         self.__names[atom_id] = new_name
@@ -179,11 +183,17 @@ class System:
                 self.__system.removeForce(i)
         self.flag_reinitialize()
 
-    def _add_constraint(self, i, j, length) -> System:
+    def _add_constraint(self, i, j, length) -> None:
         """
         Called by constraint force sometimes.
         """
         self.__system.addConstraint(i, j, length)
+
+    def _add_vsite(self, atom_id: int, vsite) -> None:
+        """
+        Called by vsite.py.
+        """
+        self.__system.setVirtualSite(atom_id, vsite)
 
     def __del_all_constraints(self) -> None:
         """

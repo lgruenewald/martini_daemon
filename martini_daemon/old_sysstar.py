@@ -42,7 +42,7 @@ from .__vsites.three_fd import VSite3fd
 from .__vsites.three_fad import VSite3fad
 from .__vsites.three_out import VSite3out
 from .__vsites.four_fdn import VSite4fdn
-from .__vsites.weighed_average import VSiteWeighedAverage
+from .__vsites.weighted_average import VSiteWeighedAverage
 from .__vsites.center_of_mass import VSiteCenterOfMass
 from .__forces.position_restraint import PositionRestraint
 from .old_reporters.reporter import Reporter

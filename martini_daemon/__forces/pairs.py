@@ -120,3 +120,6 @@ class Pairs(BondedForce):
         self.force.addPerBondParameter("C6")
         self.force.addPerBondParameter("C12")
 
+    def flag_atom_change(self, atom_id, change_charge) -> None:
+        # TODO
+        raise NotImplementedError

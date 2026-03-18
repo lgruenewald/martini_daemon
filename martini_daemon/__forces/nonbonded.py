@@ -48,6 +48,7 @@ class NonBonded(Force):
             self._exclusions._rebuild = True
 
     def _build(self):
+        # TODO check performance impact
         self._force_obj = mm.CustomNonbondedForce(
             "step(rcut-r)*(LJ - corr + ES);"
             "LJ = (1 - sc_lambda1) * (C12(type1, type2) / rA^12 - C6(type1, type2) / rA^6) + sc_lambda1 * (C12(type1, type2) / rB^12 - C6(type1, type2) / rB^6);"

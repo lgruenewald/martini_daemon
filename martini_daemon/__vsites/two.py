@@ -1,13 +1,19 @@
 import openmm as mm
-from .vsite import VirtualSite
+from ..__core import VirtualSite
 
 
 class VSiteTwo(VirtualSite):
 
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return params
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "vsite2"
+
     def _make_vsite(self, vid, members, weights):
-        vsite = mm.TwoParticleAverageSite(
+        return mm.TwoParticleAverageSite(
             members[0], members[1], weights[0], weights[1]
         )
-        self._sysstar._system.setVirtualSite(vid, vsite)
 
-    _filters = {"virtual_site", "vsite", "vsite2"}
+    _filters = {"virtual_site", "vsite"}

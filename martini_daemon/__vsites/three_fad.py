@@ -1,20 +1,25 @@
 import openmm as mm
-from .vsite import VirtualSite
+from ..__core import VirtualSite
 from math import cos, sin
 
 
 class VSite3fad(VirtualSite):
 
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return params
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "3fad"
+
     def _make_vsite(self, vid, members, params):
-        i, j, k = members
         theta, d = params
-        vsite = mm.LocalCoordinatesSite(
-            [i, j, k],  # atoms
+        return mm.LocalCoordinatesSite(
+            members,  # atoms
             [1.0, 0.0, 0.0],  # origin weights
             [-0.5, 0.5, 0.0],  # x direction weight
             [0.0, -0.5, 0.5],  # y direction weight
             [d * cos(theta), d * sin(theta), 0.0]  # coordinates
         )
-        self._sysstar._system.setVirtualSite(vid, vsite)
 
-    _filters = {"virtual_site", "vsite", "3fad"}
+    filters = {"virtual_site", "vsite"}
