@@ -1,8 +1,9 @@
 import openmm as mm
-from ..__core import BondedForce
+from ..__core import BondedForce, register_available_force
 from ..__parser import register_angle_type
 
 @register_angle_type(type_=9, args=["float", "float"])
+@register_available_force
 class LinearAngle(BondedForce):
 
     def _add_to_force(self, members: list[int], params: list[float]) -> None:

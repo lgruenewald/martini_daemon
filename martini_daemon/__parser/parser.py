@@ -97,6 +97,10 @@ class Parser:
         self.__done = True
         try:
             self.__parse(self.__path)
+
+            while len(self.__directive_stack) > 0:
+                self.__directive_stack.pop().finish()
+
             for key, directive in self.__directives.items():
                 if directive.is_mandatory() and key not in self.__past_directives_at_root:
                     raise ParseException(
@@ -426,6 +430,4 @@ class Parser:
             raise ParseException(
                 "Unmatched #ifdef or #ifndef. #ifdef/#ifndef crossing file boundaries are not supported."
             )
-        while len(self.__directive_stack) > 0:
-            self.__directive_stack.pop().finish()
         self.__path = old_path

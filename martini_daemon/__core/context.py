@@ -14,7 +14,8 @@ class Context(mm.Context):
     # and then proceed. MAYBE: have a separate reinitialize only for timing purposes
 
 
-    def __init__(self, system: System, integrator, platform=None, params=None):
+    def __init__(self, system: System, integrator, default_box: PeriodicBox, platform=None, params=None):
+        system._set_default_pbc(default_box)
         if platform is None:
             self.__context = mm.Context(system.get_openmm_system(), integrator)
         elif params is None:
@@ -23,7 +24,7 @@ class Context(mm.Context):
             self.__context = mm.Context(system.get_openmm_system(), integrator, platform, params)
         self.system = system
         self.integrator = integrator
-        system.bind_context(self)
+        system._bind_context(self)
         self.N = system.atom_count()
 
         # before doing any steps or exporting a state, if this is True, reinitialize before proceeding
@@ -92,7 +93,7 @@ class Context(mm.Context):
         state = self.__context.getState(energy=True)
         pe = state.getPotentialEnergy().value_in_unit_system(mm.unit.md_unit_system)
         ke = state.getKineticEnergy().value_in_unit_system(mm.unit.md_unit_system)
-        te = state.getTotalEnergy().value_in_unit_system(mm.unit.md_unit_system)
+        te = pe + ke
         return ke, pe, te
 
     def get_forces(self) -> np.ndarray:

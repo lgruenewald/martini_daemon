@@ -1,8 +1,10 @@
 import openmm as mm
-from ..__core import VirtualSite
+from ..__core import VirtualSite, register_available_force
+from ..__parser import register_vsite3_type
 from math import cos, sin
 
-
+@register_vsite3_type(3, ["degree", "float"])
+@register_available_force
 class VSite3fad(VirtualSite):
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:

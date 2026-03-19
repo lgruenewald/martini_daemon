@@ -1,8 +1,9 @@
 import openmm as mm
-from ..__core import BondedForce
+from ..__core import BondedForce, register_available_force
 from ..__parser import register_dihedral_type
 
 @register_dihedral_type(type_=10, args=["degree", "float"])
+@register_available_force
 class RestrictedDihedral(BondedForce):
 
     def _add_to_force(self, members: list[int], params: list[float]) -> None:

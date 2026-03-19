@@ -19,7 +19,7 @@ class ConstraintsDirective(InteractionDirective):
     @classmethod
     def get_type(cls, type_int: int) -> str | None:
         got = cls.__type_data.get(type_int)
-        return got or got[0]
+        return got[0] if got is not None else None
 
     @classmethod
     def get_type_args(cls, type_int: int) -> list[str]:
@@ -42,6 +42,6 @@ class ConstraintsDirective(InteractionDirective):
 def register_constraint_type(type_: int, args: list[str], is_excl: bool):
     def inner(class_):
         name = class_.get_name()
-        ConstraintsDirective.register_type(class_, type_, name, args, is_excl)
+        ConstraintsDirective.register_type(type_, name, args, is_excl)
         return class_
     return inner

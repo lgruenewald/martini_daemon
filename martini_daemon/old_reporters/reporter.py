@@ -140,7 +140,3 @@ class Reporter():
     def interactive_line(self) -> str:
         pass
 
-
-def read_compressed(path):
-    with open(path, "rb") as f:
-        return zlib.decompress(f.read())

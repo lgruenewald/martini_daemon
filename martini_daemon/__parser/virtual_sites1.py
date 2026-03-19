@@ -1,16 +1,17 @@
 from .interaction_directive import InteractionDirective
 from .gromacs_top_file import register_directive
+from ..__parser import TokenList
 
 @register_directive
-class DihedralsDirective(InteractionDirective):
+class VirtualSites1(InteractionDirective):
     @classmethod
     def get_number_members(cls) -> int:
-        return 4
+        return 2
 
     __type_data: dict[int, tuple[str, list[str]]] = {}
 
     @classmethod
-    def register_type(cls, class_, type_: int, name: str, args: list[str]) -> None:
+    def register_type(cls, type_: int, name: str, args: list[str]) -> None:
         assert type_ not in cls.__type_data.keys()
         cls.__type_data[type_] = (name, args)
 
@@ -25,16 +26,24 @@ class DihedralsDirective(InteractionDirective):
 
     @classmethod
     def get_name(cls) -> str:
-        return "dihedrals"
+        return "virtual_sites1"
 
     @classmethod
     def get_number_params(cls, type_: int) -> tuple[int, int]:
         _, args = cls.__type_data[type_]
         return len(args), len(args)
 
-def register_dihedral_type(type_: int, args: list[str]):
+    def line(self, tokens: TokenList) -> None:
+        # we don't want to trigger nrexcl processing with these exclusions
+        super().line(tokens)
+        self.parent.exclusions.add((
+            self.parent.parse_index(tokens, 0),
+            self.parent.parse_index(tokens, 1)
+        ))
+
+def register_vsite1_type(type_: int, args: list[str]):
     def inner(class_):
         name = class_.get_name()
-        DihedralsDirective.register_type(class_, type_, name, args)
+        VirtualSites1.register_type(type_, name, args)
         return class_
     return inner

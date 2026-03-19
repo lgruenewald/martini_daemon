@@ -41,7 +41,7 @@ def collect_bonds_for_whole(system: System):
         # do we include this force
         if not issubclass(type(force), BondedForce) or force.uses_pbc():
             continue
-        for members, _ in force.iterate_bonds():
+        for _, (members, _) in force.iterate_bonds():
             i = members[0]
             for j in members[1:]:
                 if i == j:

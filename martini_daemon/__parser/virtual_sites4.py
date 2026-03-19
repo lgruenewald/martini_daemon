@@ -2,15 +2,15 @@ from .interaction_directive import InteractionDirective
 from .gromacs_top_file import register_directive
 
 @register_directive
-class DihedralsDirective(InteractionDirective):
+class VirtualSites4(InteractionDirective):
     @classmethod
     def get_number_members(cls) -> int:
-        return 4
+        return 5
 
     __type_data: dict[int, tuple[str, list[str]]] = {}
 
     @classmethod
-    def register_type(cls, class_, type_: int, name: str, args: list[str]) -> None:
+    def register_type(cls, type_: int, name: str, args: list[str]) -> None:
         assert type_ not in cls.__type_data.keys()
         cls.__type_data[type_] = (name, args)
 
@@ -25,16 +25,16 @@ class DihedralsDirective(InteractionDirective):
 
     @classmethod
     def get_name(cls) -> str:
-        return "dihedrals"
+        return "virtual_sites4"
 
     @classmethod
     def get_number_params(cls, type_: int) -> tuple[int, int]:
         _, args = cls.__type_data[type_]
         return len(args), len(args)
 
-def register_dihedral_type(type_: int, args: list[str]):
+def register_vsite4_type(type_: int, args: list[str]):
     def inner(class_):
         name = class_.get_name()
-        DihedralsDirective.register_type(class_, type_, name, args)
+        VirtualSites4.register_type(type_, name, args)
         return class_
     return inner

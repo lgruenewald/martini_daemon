@@ -2,13 +2,13 @@ from typing import Any
 
 from .directive import Directive
 from .gromacs_top_file import register_directive
-from .molecule_type_directive import MoleculeType
+from .molecule_type_directive import MoleculeTypeDirective
 from .token_list import TokenList, TokenParseException
 
 
 @register_directive
 class AtomsDirective(Directive):
-    def __init__(self, parent: MoleculeType, path: str, line_num: int) -> None:
+    def __init__(self, parent: MoleculeTypeDirective, path: str, line_num: int) -> None:
         self.parent = parent
         self.path = path
         self.line_num = line_num
@@ -22,7 +22,7 @@ class AtomsDirective(Directive):
         res_num = tokens.unwrap(2, "int")
         res_name = tokens.unwrap(3, "word")
         atom_name = tokens.unwrap(4, "word")
-        charge_group_num = tokens.unwrap(5, "int")
+        _ = tokens.unwrap(5, "int") # charge group number
         charge = tokens.unwrap(6, "float", None)
         mass = tokens.unwrap(7, "float", None)
         if index != len(self.parent.atoms):
@@ -32,7 +32,7 @@ class AtomsDirective(Directive):
                 f" got id {index} but expected {len(self.parent.atoms)}"
             )
         self.parent.atoms.append(
-            (type_, res_num, res_name, atom_name, charge_group_num, charge, mass)
+            (type_, res_num, res_name, atom_name, charge, mass)
         )
 
 
@@ -49,7 +49,7 @@ class AtomsDirective(Directive):
 
     @classmethod
     def is_valid_parent(cls, parent: Any) -> bool:
-        return type(parent) == MoleculeType
+        return type(parent) is MoleculeTypeDirective
 
     @classmethod
     def get_name(cls) -> str:

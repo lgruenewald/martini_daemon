@@ -4,11 +4,12 @@ import zlib
 import sys
 from datetime import datetime
 from importlib.metadata import version
-from typing import Any
+from typing import Any, Type, Callable
 
 from .__formats import *
 from .__parser import GromacsTopFile, InvalidTopologyError
 from .__core import System, Context, wrap_coupling
+from .__forces import NonBonded
 
 
 class Simulation:
@@ -25,7 +26,7 @@ class Simulation:
 
     def __init__(
         self, top_path: str, geom_path: str, md_steps: int,
-        reporters: list[Reporter],
+        reporters,
         dm_frequency: int = 0, traj_frequency: int = 0,
         sim_name: str = "out", continue_sim=False,
         coupling = None,
@@ -36,6 +37,7 @@ class Simulation:
         platform: str | None | mm.Platform = None,
         context_parameters: None | dict[str, str] = None,
         restraint_coord_path=None,
+        nonbonded: Callable[[], NonBonded] | Type[NonBonded] | None = None,
     ):
         """
 
@@ -70,7 +72,8 @@ class Simulation:
             "GMXBIN" in os.environ and
             os.path.join(os.environ["GMXBIN"], "..", "share", "gromacs", "top")
         ) or "/usr/local/gromacs/share/gromacs/top"
-
+        if nonbonded is None:
+            nonbonded = NonBonded
 
         # file handles setup
         # dict of suffix -> (handle, compression_obj | None)
@@ -100,11 +103,16 @@ class Simulation:
         self.info(f"Read {len(start_pos)} atoms from {geom_path}. Box: {box.to_lattice()}. Velocities read? {start_vel is not None}.")
         self.system = System(options=options)
         try:
-            top_parser = GromacsTopFile(self.system, top_path)
+            GromacsTopFile(self.system, top_path)
         except InvalidTopologyError:
             self.error("Fatal error during .top parsing.")
             # I want a silent exit, kinda hacky..
             raise SystemExit
+        nb = nonbonded(self.system)
+        excl = nb.get_exclusion_helper()
+        self.system.add_force(nb)
+        self.system.add_force(excl)
+        self.system.build_initial_molecules()
         self.info("Parsing finished")
 
         self.info("setup integrator", "dt (ns):", self.dt_ns, "type:", type(self.md_integrator).__name__)
@@ -117,7 +125,7 @@ class Simulation:
 
         # build context
         self.info("Building context")
-        self.context = Context(self.system, self.integrator, platform, context_parameters)
+        self.context = Context(self.system, self.integrator, box, platform, context_parameters)
 
         # set pos, vel
         self.context.set_positions(start_pos, box)

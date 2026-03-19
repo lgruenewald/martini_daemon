@@ -25,6 +25,13 @@ class BondedForce(Force, metaclass=ABCMeta):
         raise NotImplementedError
 
     def should_build(self) -> bool:
+        """
+        If True, build() will be called on a global rebuild.
+
+        By default this happens if there are any entries and there is no force.
+
+        To trigger a rebuild, you generally therefore want to call _destroy().
+        """
         return len(self.__entries) > 0 and self.force is None
 
     @abstractmethod
@@ -65,7 +72,7 @@ class BondedForce(Force, metaclass=ABCMeta):
         self.__entries[self.__next_entry_id] = (members, params)
         if self.force is not None:
             self._add_to_force(members, params)
-            self.system.reinitialize()
+            self.system.flag_reinitialize()
         self.__next_entry_id += 1
         return self.__next_entry_id - 1
 

@@ -6,8 +6,10 @@ import numpy as np
 from .force import Force
 from .bonded_force import BondedForce
 from .molecule_type import MoleculeType
+from ..__rust import PeriodicBox
 
 class System:
+    __available_forces: dict[str, Type[BondedForce]] = {}
 
     def __init__(self, options=None):
         self.__names: list[str] = []
@@ -24,7 +26,6 @@ class System:
         self.__context = None
         self.__system: mm.System = mm.System()
         self.__forces: dict[str, Force] = {}
-        self.__available_forces: dict[str, Type[BondedForce]] = {}
 
         self.__interactions_by_atom: list[list[tuple[str, int]]] = []
 
@@ -40,6 +41,15 @@ class System:
     def __assert_no_context(self):
         if self.__context is not None:
             raise ValueError("This operation must be done before Context is initialized.")
+
+    # ==== Initial molecules ====
+
+    def build_initial_molecules(self):
+        for name, n in self.initial_molecules:
+            mol = self.molecule_types[name]
+            for i in range(n):
+                atoms = mol.add_atoms_to_system(self)
+                mol.instantiate(self, atoms)
 
     # ==== ATOM METADATA ====
 
@@ -73,6 +83,7 @@ class System:
             len(self.__names) == len(self.__res_ids) == len(self.__res_names) == len(self.__types)
             == len(self.__charges) == len(self.__masses) == len(self.__softcore)
         )
+        self.flag_atom_add()
         return len(self.__names) - 1
 
     def new_residue(self):
@@ -101,14 +112,14 @@ class System:
 
     def retype(self, atom_id: int, new_type: str) -> None:
         self.__types[atom_id] = new_type
-        self.flag_nonbonded(atom_id)
+        self.flag_atom_change(atom_id)
 
     def get_charge(self, atom_id: int) -> float:
         return self.__charges[atom_id]
 
     def recharge(self, atom_id: int, new_charge: float) -> None:
         self.__charges[atom_id] = new_charge
-        self.flag_nonbonded(atom_id, True)
+        self.flag_atom_change(atom_id, True)
 
     def get_mass(self, atom_id: int) -> float:
         return self.__masses[atom_id]
@@ -123,13 +134,16 @@ class System:
 
     def update_sc(self, atom_id: int, new_sc: tuple[float, float]) -> None:
         self.__softcore[atom_id] = new_sc
-        self.flag_nonbonded(atom_id)
+        self.flag_atom_change(atom_id)
 
     # ==== ATOM TYPE HANDLING ====
 
     def add_atom_type(self, atom_type: str, charge: float, mass: float) -> None:
         self.__assert_no_context()
         self.__atom_types[atom_type] = (charge, mass)
+
+    def iterate_atom_types(self) -> Iterable[tuple[str, tuple[float, float]]]:
+            return self.__atom_types.items()
 
     def get_atom_type(self, atom_type: str) -> None | tuple[float, float]:
         return self.__atom_types.get(atom_type)
@@ -148,6 +162,10 @@ class System:
     def flag_atom_change(self, atom_id: int, change_charge: bool = False) -> None:
         for f in self.__forces.values():
             f.flag_atom_change(atom_id, change_charge)
+
+    def flag_atom_add(self) -> None:
+        for f in self.__forces.values():
+            f.flag_atom_add()
 
     # ==== API old_helpers ====
 
@@ -221,6 +239,11 @@ class System:
             self.__harmonic_constraints = None
             constraints.build(must=True)
 
+    def _set_default_pbc(self, box: PeriodicBox) -> None:
+        self.__system.setDefaultPeriodicBoxVectors(
+            box.a, box.b, box.c
+        )
+
     def _bind_context(self, context):
         """
         Should only be called by context.
@@ -233,16 +256,17 @@ class System:
         Add a wrapped Force to the system.
         """
         self.__forces[force.get_name()] = force
-        force.build()
+        self.flag_reinitialize()
 
-    def provide_force(self, force_class: Type[BondedForce]):
+    @classmethod
+    def provide_force(cls, force_class: Type[BondedForce]):
         """
         Register a class to the list of available forces.
 
         If attempting to add a new interaction, it will get instantiated and added to Forces.
         """
-        assert force_class.get_name() not in self.__available_forces.keys() and force_class.get_name() not in self.__forces.keys()
-        self.__available_forces[force_class.get_name()] = force_class
+        assert force_class.get_name() not in cls.__available_forces.keys()
+        cls.__available_forces[force_class.get_name()] = force_class
 
     def get_forces(self) -> Iterable[Force]:
         """
@@ -270,6 +294,14 @@ class System:
         Main API for getting bonds
         """
         f = self.__forces.get(name)
+        if f is None:
+            if name in self.__available_forces.keys():
+                self.add_force(self.__available_forces[name](self))
+                f = self.__forces[name]
+            else:
+                raise ValueError(
+                    f"Internal error: {name} is not an interaction that is in System."
+                )
         bond_id = f._add_bond(members, params)
         for member in members:
             self.__interactions_by_atom[member].append((name, bond_id))
@@ -319,3 +351,7 @@ class System:
             f.delta_degrees_of_freedom()
             for f in self.__forces.values()
         )
+
+def register_available_force(cls):
+    System.provide_force(cls)
+    return cls

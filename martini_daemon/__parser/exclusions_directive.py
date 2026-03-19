@@ -1,13 +1,13 @@
 from typing import Any
 
 from .directive import Directive
-from .molecule_type_directive import MoleculeType
+from .molecule_type_directive import MoleculeTypeDirective
 from .gromacs_top_file import register_directive
-from .. import TokenList
+from ..__parser import TokenList
 
 
 @register_directive
-class BondsDirective(Directive):
+class ExclusionsDirective(Directive):
 
     def line(self, tokens: TokenList) -> None:
         i = self.parent.parse_index(tokens, 0)
@@ -33,7 +33,7 @@ class BondsDirective(Directive):
 
     @classmethod
     def is_valid_parent(cls, parent: Any) -> bool:
-        return isinstance(type(parent), MoleculeType)
+        return isinstance(parent, MoleculeTypeDirective)
 
     @classmethod
     def get_name(cls) -> str:

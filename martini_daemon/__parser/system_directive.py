@@ -7,7 +7,7 @@ from .token_list import TokenList
 @register_directive
 class SystemDirective(Directive):
     def line(self, tokens: TokenList) -> None:
-        self.parent.set("title", tokens.get_line())
+        self.parent.system.additional_data["title"] = tokens.get_line()
 
     def finish(self):
         pass

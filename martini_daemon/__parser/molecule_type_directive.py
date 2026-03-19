@@ -3,9 +3,10 @@ from typing import Any
 from .parser import ParseException
 from .directive import  Directive
 from .token_list import TokenList, TokenParseException
-from .gromacs_top_file import GromacsTopFile
+from .gromacs_top_file import GromacsTopFile, register_directive
 from ..__core import MoleculeType
 
+@register_directive
 class MoleculeTypeDirective(Directive):
     def __init__(self, parent: GromacsTopFile, path: str, line_num: int) -> None:
         super().__init__(parent, path, line_num)
@@ -14,8 +15,8 @@ class MoleculeTypeDirective(Directive):
         self.nrexcl: int | None = None
         self.system = parent.system
 
-        # type, res num, res name, atomname, charge_gr, charge, mass
-        self.atoms: list[tuple[str, int, str, str, int, float | None, float | None]] = []
+        # type, res num, res name, atomname, charge, mass
+        self.atoms: list[tuple[str, int, str, str, float | None, float | None]] = []
         self.exclusions: set[tuple[int, int]] = set()
         self.interactions: list[tuple[str, list[int], list[float], bool]] = []
 
@@ -27,9 +28,9 @@ class MoleculeTypeDirective(Directive):
         tokens.assert_no_more_than(2)
 
     def finish(self):
-        if self.molecule_name is None or self.nrel_excl is None:
+        if self.molecule_name is None or self.nrexcl is None:
             raise ParseException("Molecule name and nr. excl. expected.")
-        self.process_nrel_excl()
+        self.process_nrexcl()
         self.parent.system.molecule_types[self.molecule_name] = MoleculeType(
             self.molecule_name,
             self.atoms,
@@ -47,16 +48,16 @@ class MoleculeTypeDirective(Directive):
 
     @classmethod
     def is_valid_parent(cls, parent: Any) -> bool:
-        return type(parent) is GromacsTopFile
+        return isinstance(parent, GromacsTopFile)
 
     @classmethod
     def get_name(cls) -> str:
         return "moleculetype"
 
-    def process_nrel_excl(self):
+    def process_nrexcl(self):
         assert self.nrexcl == 1, "Martini uses nrexcl == 1" # TODO temporary
-        # TODO make a nrel excl = 2 test / some AA force field tests for correctness
-        for members, _, is_excl in self.interactions:
+        # TODO make a nrexcl = 2 test / some AA force field tests for correctness
+        for _, members, _, is_excl in self.interactions:
             if is_excl:
                 assert len(members) == 2
                 self.exclusions.add((members[0], members[1]))

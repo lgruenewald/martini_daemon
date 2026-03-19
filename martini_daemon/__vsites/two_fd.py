@@ -1,7 +1,9 @@
 import openmm as mm
-from ..__core import VirtualSite
+from ..__core import VirtualSite, register_available_force
+from ..__parser import register_vsite2_type
 
-
+@register_vsite2_type(2, ["float"])
+@register_available_force
 class VSite2fd(VirtualSite):
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         return params

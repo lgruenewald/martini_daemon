@@ -1,0 +1,9 @@
+TODO
+
+- replay tests, also against written .top references
+- checkpoint tests, against replay
+- modification tests with force test after by dumping a new .top and comparing against GMX
+    - test if exclusions are removed correctly, especially with charged neighbors
+    - test if changing types, charges, etc. works
+- detection tests with 3+ reagents
+- (a minimal set of) all atom tests for test single frame

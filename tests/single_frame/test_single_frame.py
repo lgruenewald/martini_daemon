@@ -7,10 +7,7 @@ import numpy as np
 import math
 import pytest
 
-from martini_daemon.top_parser import DaemonTopFile
-from martini_daemon.old_gro_file import read_gro
-from martini_daemon.__forces import NonBonded
-from martini_daemon.utils import pdist
+from martini_daemon import Simulation, PeriodicBox, read_geometry
 
 # == CONFIG ==
 e_tol = 1e-5  # energy relative tolerance
@@ -50,7 +47,7 @@ cutoff_nm = 1.1
 def rootdir(request):
     return os.path.dirname(request.path)
 
-
+# TODO add a few all atom tests
 tests = [
     "cutoff_LJ", "cmap",
     "pairs", "pairs_VW", "pairs_VWQ", "pairs_type",
@@ -75,57 +72,32 @@ tests = [
 # == TEST CLASS ==
 class TestSingleFrame():
     def apply_constraints(self):
-        # applies constraints and vsites and checks for position change
-        platform = mm.Platform.getPlatformByName("Reference")
-        _, respos, _ = read_gro(self.respos)
-        ok, res = DaemonTopFile(
-            self.top, NonBonded(cutoff_nm=cutoff_nm), respos=respos,
-            experimental=True
+        """
+        applies constraints and vsites and checks for position change
+        """
+        _, reference, _ = read_geometry(self.gro)
+        sim = Simulation(
+            self.top, self.gro, 0, [], restraint_coord_path=self.respos, platform="Reference"
         )
-        assert ok
-        system, top = res
-        box, pos, vel = read_gro(self.gro)
-        system.build_context(
-            mm.VerletIntegrator(20 * femtosecond),
-            box,
-            platform=platform
-        )
-        system.set_positions(pos)
-        system.apply_constraints()
-        newpos = system.get_state().getPositions(asNumpy=True)\
-            .value_in_unit(mm.unit.nanometer)
-        r_diff = np.linalg.norm(newpos - pos, axis=1)
-        largest_index = np.argmax(r_diff)
-        nm = r_diff[largest_index]
-        assert not np.any(r_diff > r_tol), (
-            f"Constraint/VSite position moved by {nm} nm "
-            f"(particle {largest_index})."
-        )
+        sim.context.apply_constraints()
+        new_pos, box = sim.context.get_positions()
+        for i in range(len(reference)):
+            r_diff = box.distance(reference[i], new_pos[i])
+            assert r_diff < r_tol, f"Constraint/VSite position moved by {r_diff} nm (particle {i})."
 
     def compare_daemon_gmx(self):
         platform = mm.Platform.getPlatformByName("Reference")
-        _, respos, _ = read_gro(self.respos)
-        ok, res = DaemonTopFile(
-            self.top, NonBonded(cutoff_nm=1.1), respos=respos,
-            experimental=True
+        sim = Simulation(
+            self.top, self.gro, 0, [], restraint_coord_path=self.respos, platform="Reference"
         )
-        assert ok
-        system, top = res
-        box, pos, vel = read_gro(self.gro)
-        system.build_context(
-            mm.VerletIntegrator(20 * femtosecond),
-            box,
-            platform=platform
-        )
-        system.set_positions(pos)
-        state = system.get_state()
-        energy = state.getPotentialEnergy().value_in_unit(kilojoule_per_mole)
-        forces = state.getForces(asNumpy=True).\
-            value_in_unit(kilojoule / nanometer / mole).flatten()
-        for vsite in system.vsites:
-            forces[vsite * 3] = 0.
-            forces[vsite * 3 + 1] = 0.
-            forces[vsite * 3 + 2] = 0.
+
+        _, energy, _ = sim.context.get_energies()
+        forces = sim.context.get_forces().flatten()
+        for i in range(sim.system.atom_count()):
+            if sim.system.get_mass(i) == 0.:
+                forces[i * 3] = 0.
+                forces[i * 3 + 1] = 0.
+                forces[i * 3 + 2] = 0.
 
         if energy != 0.:
             e_diff = math.fabs(self.gmx_energy / energy - 1)
@@ -133,19 +105,19 @@ class TestSingleFrame():
             assert self.gmx_energy == energy, f"{self.gmx_energy} != {energy}"
             e_diff = 0
         e_percent = e_diff * 100
-        cetol = etol_override.get(self.test_name) or e_tol
-        assert e_diff < cetol, (
+        c_etol = etol_override.get(self.test_name) or e_tol
+        assert e_diff < c_etol, (
             f"Gmx and daemon energy different by {e_percent:.2f} %.\n"
             f"Gromacs energy: {self.gmx_energy:.10e}\n"
             f"Daemon energy: {energy:.10e}\n"
-            f"Relative difference {e_diff:.3e} above tolerance {cetol:.2e}"
+            f"Relative difference {e_diff:.3e} above tolerance {c_etol:.2e}"
         )
 
-        cftol = ftol_override.get(self.test_name)
-        if cftol == 0:
+        c_ftol = ftol_override.get(self.test_name)
+        if c_ftol == 0:
             return
-        elif cftol is None:
-            cftol = f_tol
+        elif c_ftol is None:
+            c_ftol = f_tol
 
         f_diff = np.fabs(self.gmx_forces - forces) / (np.fabs(forces) + f_tol)
         i_max = np.argmax(f_diff)
@@ -157,13 +129,13 @@ class TestSingleFrame():
         atom_index = i_max // 3
         atom_dim = i_max % 3
         # check if there is any exactly cutoffs
-        box = np.array(box)
+        box, pos, _ = read_geometry(self.gro)
         for other_atom in range(len(pos)):
-            dist = pdist(pos[atom_index], pos[other_atom], box)
+            dist = box.distance(pos[atom_index], pos[other_atom])
             if np.isclose(dist, cutoff_nm):
                 print(f"Atoms {atom_index+1} and {other_atom}+1 are exactly cutoff apart!")
                 print("This can cause artifacts in __forces.")
-        assert np.allclose(self.gmx_forces, forces, cftol, 0), (
+        assert np.allclose(self.gmx_forces, forces, c_ftol, 0), (
             f"Gmx and daemon __forces different by {f_percent:.2f} %.\n"
             f"Particle {atom_index+1} (<-- indexes start from 1) "
             f"dimension {atom_dim}\n"
@@ -181,11 +153,11 @@ class TestSingleFrame():
         os.chdir(x)
         os.system("../gmxrun.sh")
         assert os.path.isfile("energy.xvg"), f"./gmxrun.sh failure for {x} (E)"
-        assert os.path.isfile("__forces.xvg"), f"./gmxrun.sh failure for {x} (F)"
+        assert os.path.isfile("forces.xvg"), f"./gmxrun.sh failure for {x} (F)"
         with open("energy.xvg") as f:
             lines = [line for line in f]
             self.gmx_energy = float(lines[-1].split()[-1])
-        with open("__forces.xvg") as f:
+        with open("forces.xvg") as f:
             lines = [line for line in f]
             gmx_force_line = lines[-1].split()
             self.gmx_forces = np.array([float(x) for x in gmx_force_line][1:])
@@ -198,4 +170,4 @@ class TestSingleFrame():
         self.apply_constraints()
         self.compare_daemon_gmx()
         os.remove("energy.xvg")
-        os.remove("__forces.xvg")
+        os.remove("forces.xvg")

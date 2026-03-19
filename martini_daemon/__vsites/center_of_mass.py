@@ -1,6 +1,10 @@
 import openmm as mm
-from ..__core import VirtualSite
+from ..__core import VirtualSite, register_available_force
+from ..__parser import register_vsiten_type
 
+
+@register_vsiten_type(2, [])
+@register_available_force
 class VSiteCenterOfMass(VirtualSite):
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:

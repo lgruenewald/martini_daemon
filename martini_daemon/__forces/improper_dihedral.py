@@ -1,9 +1,10 @@
 import openmm as mm
 import math
-from ..__core import BondedForce
+from ..__core import BondedForce, register_available_force
 from ..__parser import register_dihedral_type
 
 @register_dihedral_type(type_=2, args=["degree", "float"])
+@register_available_force
 class ImproperDihedral(BondedForce):
 
     def _add_to_force(self, members: list[int], params: list[float]) -> None:

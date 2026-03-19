@@ -6,7 +6,8 @@ from .__topstar import *
 from .__rust import PeriodicBox
 from .simulation import Simulation
 # private submodules that mutate global state when imported
-import __forces
+from . import __forces
+from . import __vsites
 
 # public submodules
 from . import old_helpers

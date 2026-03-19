@@ -1,4 +1,4 @@
-from .system import System
+from .system import System, register_available_force
 from .context import Context
 from .force import Force
 from .bonded_force import BondedForce

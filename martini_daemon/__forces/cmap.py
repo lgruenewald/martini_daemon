@@ -1,7 +1,7 @@
 from typing import Any
 import openmm as mm
 
-from ..__core import BondedForce
+from ..__core import BondedForce, register_available_force
 from ..__parser import InteractionDirective, register_directive, Directive, GromacsTopFile, TokenList, TokenParseException
 
 @register_directive
@@ -85,6 +85,10 @@ class CMAPTypeDirective(Directive):
 @register_directive
 class CMAPDirective(InteractionDirective):
     @classmethod
+    def get_number_params(cls, type_: int) -> tuple[int, int]:
+        return 0, 0
+
+    @classmethod
     def get_number_members(cls) -> int:
         return 5
 
@@ -106,7 +110,7 @@ class CMAPDirective(InteractionDirective):
     def is_exclusion(cls, type_: str) -> bool:
         return False
 
-
+@register_available_force
 class Cmap(BondedForce):
 
     def _add_to_force(self, members: list[int], params: list[float]) -> None:

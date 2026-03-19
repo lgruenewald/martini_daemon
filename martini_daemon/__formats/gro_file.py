@@ -2,6 +2,7 @@
 import numpy as np
 from ..__rust import PeriodicBox
 
+# TODO fix float 64 / 32 in the whole project to be the same as OpenMM uses for each internal thing (e.g. pos, box...)
 
 def read_gro(path):
     """

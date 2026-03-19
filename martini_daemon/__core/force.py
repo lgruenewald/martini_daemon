@@ -34,8 +34,9 @@ class Force(metaclass=ABCMeta):
 
         Protected because it should only be called by this class.
         """
-        self.system._remove_mm_force(self.force)
-        self.force = None
+        if self.force is not None:
+            self.system._remove_mm_force(self.force)
+            self.force = None
 
     def _prepare_force_obj(self) -> None:
         self.force.setName(self.get_name())
@@ -86,4 +87,7 @@ class Force(metaclass=ABCMeta):
         return self.force is not None
 
     def flag_atom_change(self, atom_id: int, change_charge: bool = False) -> None:
+        pass
+
+    def flag_atom_add(self):
         pass

@@ -33,6 +33,8 @@ impl PeriodicBox {
         Ok(pbc)
     }
 
+
+    #[pyo3(signature = (ax, by, cz, ay=None, az=None, bx=None, bz=None, cx=None, cy=None))]
     #[staticmethod]
     pub fn from_gro(ax: f64, by: f64, cz: f64, ay: Option<f64>, az: Option<f64>, bx: Option<f64>, bz: Option<f64>, cx: Option<f64>, cy: Option<f64>) -> PyResult<Self> {
         let pbc = Self {

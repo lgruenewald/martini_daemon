@@ -1,7 +1,7 @@
 import openmm as mm
 
 from ..__parser import Directive, register_directive, GromacsTopFile, TokenList, InteractionDirective, TokenParseException
-from ..__core import BondedForce
+from ..__core import BondedForce, register_available_force
 
 @register_directive
 class PairTypes(Directive):
@@ -65,10 +65,14 @@ class PairsDirective(InteractionDirective):
     def get_name(cls) -> str:
         return "pairs"
 
-
+@register_available_force
 class Pairs(BondedForce):
+    def __init__(self, system):
+        super().__init__(system)
+        self.epsilon_r = system.additional_data["epsilon_r"]
+
     def _add_to_force(self, members: list[int], params: list[float]) -> None:
-        self.force.addBond(*members, *params)
+        self.force.addBond(*members, params)
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         # TODO what if charge/type changes during sim
@@ -82,7 +86,7 @@ class Pairs(BondedForce):
                 raise ValueError("No pair types were defined.")
             t1 = self.system.get_type(members[0])
             t2 = self.system.get_type(members[1])
-            params = pair_types.get((t1, t2))
+            params = pair_types.get((t1, t2)) or pair_types.get((t2, t1))
             if params is None:
                 raise ValueError(
                     f"Unknown pair type ({t1}, {t2})."
@@ -113,7 +117,7 @@ class Pairs(BondedForce):
             "LJ + ES;"
             "LJ = (C12 / r^12 - C6 / r^6);"
             "ES = f*qprod/epsilon_r/r;"
-            f"epsilon_r = {self.system.epsilon_r};"
+            f"epsilon_r = {self.epsilon_r};"
             "f = 138.935458;"
         )
         self.force.addPerBondParameter("qprod")

@@ -17,7 +17,7 @@ class AnglesDirective(InteractionDirective):
     @classmethod
     def get_type(cls, type_int: int) -> str | None:
         got = cls.__type_data.get(type_int)
-        return got or got[0]
+        return got[0] if got is not None else None
 
     @classmethod
     def get_type_args(cls, type_int: int) -> list[str]:
@@ -35,6 +35,6 @@ class AnglesDirective(InteractionDirective):
 def register_angle_type(type_: int, args: list[str]):
     def inner(class_):
         name = class_.get_name()
-        AnglesDirective.register_type(class_, type_, name, args)
+        AnglesDirective.register_type(type_, name, args)
         return class_
     return inner

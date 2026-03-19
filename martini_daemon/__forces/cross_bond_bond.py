@@ -1,8 +1,9 @@
 import openmm as mm
-from ..__core import BondedForce
+from ..__core import BondedForce, register_available_force
 from ..__parser import register_angle_type
 
 @register_angle_type(type_=3, args=["float", "float", "float"])
+@register_available_force
 class CrossBondBond(BondedForce):
     def _add_to_force(self, members: list[int], params: list[float]) -> None:
         self.force.addBond(members, params)

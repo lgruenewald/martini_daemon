@@ -3,7 +3,7 @@ from abc import ABCMeta, abstractmethod
 
 from .directive import Directive
 from .token_list import TokenList, TokenParseException
-from .molecule_type_directive import MoleculeType
+from .molecule_type_directive import MoleculeTypeDirective
 
 
 class InteractionDirective(Directive, metaclass=ABCMeta):
@@ -21,19 +21,19 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
 
     @classmethod
     def is_valid_parent(cls, parent: Any) -> bool:
-        return issubclass(type(parent), Directive)
+        return isinstance(parent, MoleculeTypeDirective)
 
     # get_name should be implemented by child classes
 
     # customizable line parsing
     def line(self, tokens: TokenList) -> None:
-        type_ = self.read_type(tokens)
+        type_num, type_name = self.read_type(tokens)
 
         self.parent.interactions.append((
-            type_,
+            type_name,
             self.read_members(tokens),
-            self.read_params(tokens, type_),
-            self.is_exclusion(type_),
+            self.read_params(tokens, type_num),
+            self.is_exclusion(type_name),
         ))
 
     # reasonable defaults that still can be overridden for e.g. virtual_sitesn
@@ -67,7 +67,7 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
 
         return params
 
-    def read_type(self, tokens: TokenList) -> str:
+    def read_type(self, tokens: TokenList) -> tuple[int, str]:
         type_num = tokens.unwrap(
             self.get_number_members(),
             "int",
@@ -79,7 +79,7 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
                 f"Invalid type {type_num} for directive {self.get_name()}"
             )
         else:
-            return type_
+            return type_num, type_
 
 
     # for most child classes, number of members leads to a good default impl of read_type, read_members, read_params
