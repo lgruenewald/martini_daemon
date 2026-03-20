@@ -1,12 +1,15 @@
 [package]
 name = "martini_daemon"
-version = "0.1.0"
+version = "0.1.0+dev"
 edition = "2024"
 
 [lib]
 name = "martini_daemon"
 crate-type = ["cdylib"]
 path = "src/lib.rs"
+
+[build-dependencies]
+chrono = "0.4.44"
 
 [dependencies]
 glam = "0.32.1"

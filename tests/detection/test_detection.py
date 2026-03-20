@@ -39,7 +39,7 @@ class TestDetection():
                 rep
             ]
         )
-        sim.step(0, xtc=False, dm=True)
+        sim.current_step(0, xtc=False, dm=True)
         # force closing of file
         # TODO oof
         rep.__del__()

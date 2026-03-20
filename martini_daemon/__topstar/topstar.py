@@ -1,0 +1,3 @@
+
+class TopStar:
+    pass

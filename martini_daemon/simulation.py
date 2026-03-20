@@ -1,6 +1,7 @@
 import openmm as mm
 import os
 import zlib
+import math
 import sys
 from datetime import datetime
 from importlib.metadata import version
@@ -10,6 +11,8 @@ from .__formats import *
 from .__parser import GromacsTopFile, InvalidTopologyError
 from .__core import System, Context, wrap_coupling
 from .__forces import NonBonded
+from .__rust import build_version
+from .reporters import Reporter
 
 
 class Simulation:
@@ -26,7 +29,7 @@ class Simulation:
 
     def __init__(
         self, top_path: str, geom_path: str, md_steps: int,
-        reporters,
+        reporters: list[Reporter] | None = None,
         dm_frequency: int = 0, traj_frequency: int = 0,
         sim_name: str = "out", continue_sim=False,
         coupling = None,
@@ -42,8 +45,8 @@ class Simulation:
         """
 
         """
-        self.reporters = []
-        self.step = 0
+        self.reporters = reporters or []
+        self.current_step = 0
         self.total_steps = md_steps
         self.__sim_name = sim_name
         self.time_ns = 0.
@@ -80,8 +83,8 @@ class Simulation:
         self.output_files = {}
 
         self.open(".log")
-        self.info("Simulation __init__ called")
-        self.info("Martini Daemon version", version("martini_daemon"))
+        self.info(f"Martini Daemon {version('martini_daemon')} log file")
+        self.info("Build version:", build_version())
         self.info(
             "Parameters:", top_path, geom_path,
             "steps:", self.total_steps, "dm_freq:", self.dm_frequency,
@@ -132,8 +135,8 @@ class Simulation:
         if start_vel is not None:
             self.context.set_velocities(start_vel)
 
-        # TODO reporters
-
+        for r in self.reporters:
+            r.on_simulation_start(self)
 
     # File handles and loggers
     @staticmethod
@@ -194,8 +197,11 @@ class Simulation:
 
     def finish(self):
         """
-        Flushes output files and closes output file handles.
+        1. Runs finish on all reporters.
+        2. Flushes output files and closes output file handles.
         """
+        for r in self.reporters:
+            r.on_simulation_finish(self)
         self.flush()
         for handle, _ in self.output_files.values():
             handle.close()
@@ -258,7 +264,7 @@ class Simulation:
         vel = self.context.get_velocities()
         write_geometry(
             path,
-            f"Simulation {self.__sim_name}, step {self.step}, time {self.time_ns}.",
+            f"Simulation {self.__sim_name}, step {self.current_step}, time {self.time_ns}.",
             self.system.get_atom_names(),
             self.system.get_res_ids(),
             self.system.get_res_names(),
@@ -266,5 +272,32 @@ class Simulation:
         )
 
         # TODO replay
+        # TODO checkpoints
+
+    def simulate(self):
+        remaining = self.total_steps - self.current_step
+        sim_ns = self.total_steps * self.dt_ns
+        print(f"Simulation of {remaining} steps ({sim_ns} ns)")
+        gcd = math.gcd(self.traj_frequency, self.dm_frequency, remaining)
+        print(f"D/M freq {self.dm_frequency} Traj freq {self.traj_frequency} gcd {gcd}")
+        while self.current_step < self.total_steps:
+            self.step(
+                gcd, traj=self.current_step % self.traj_frequency == 0 if self.traj_frequency > 0 else False,
+                dm=self.current_step % self.dm_frequency == 0 if self.dm_frequency > 0 else False
+            )
+        print()
+        self.finish()
+
+    def step(self, n_steps: int, traj=False, dm=False):
+        """
+        Do the following:
+        - steps n_steps
+        - D/M algorithm if dm is true
+        - locally minimize energy and reinitialize system if reactions happened
+        - trigger a trajectory frame on reporters if traj is True
+        - display info to logs and screen, % info given by self.current_step and self.md_steps
+        - update self.current_step
+        """
         # TODO step
-        # TODO simulate - make sure to call finish after
+
+

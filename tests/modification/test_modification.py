@@ -35,7 +35,7 @@ class TestDetection:
                 rep, FragCountReporter(), ReactionReporter()
             ]
         )
-        sim.step(0, xtc=False, dm=True)
+        sim.current_step(0, xtc=False, dm=True)
         # force closing of file
         # TODO oof
         # it is what it is

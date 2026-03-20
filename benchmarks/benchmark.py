@@ -126,7 +126,7 @@ def bench_daemon(top, gro, steps, freq, reactive, force_reinit):
     logger.info(f"Simulation done in {mdrun:.1f} s.")
 
     probe_start = time.time()
-    sim.step(100000, xtc=True, dm=False, neighbor=False)
+    sim.current_step(100000, xtc=True, dm=False, neighbor=False)
     probe_end = time.time()
     probe = probe_end - probe_start
     logger.info(f"Probe 100k steps took {probe:.2f} s.")

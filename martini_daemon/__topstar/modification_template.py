@@ -1,8 +1,8 @@
-from ..__parser import MoleculeType, TokenList, ParseException, TokenParseException, GromacsTopFile
-from ..old_graph import GraphAtomType
+from ..__core import MoleculeType
+from ..__parser import TokenList, ParseException, TokenParseException, GromacsTopFile
 
 
-class ReactionTemplate(MoleculeType):
+class ModificationTemplate(MoleculeType):
     def __init__(self, parent: GromacsTopFile, path: str, line_num: int):
         super().__init__(parent, path, line_num)
         self.topology = parent.result.get("topology")

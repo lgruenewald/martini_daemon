@@ -32,7 +32,7 @@ for inp in inputs:
     )
     start = time.time()
     for i in range(10):
-        sim.step(250, xtc=True, dm=True)
+        sim.current_step(250, xtc=True, dm=True)
     categories = extract("out.log", ignore_first=True)
     for cat, ctime in categories.items():
         print(f"{cat}: {ctime} s")

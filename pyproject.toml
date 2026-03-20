@@ -13,9 +13,7 @@ classifiers = []
 dependencies = [
   "numpy",
   "openmm",
-  "freud-analysis",
-  "tqdm",
-  "molly@git+https://git.sr.ht/~ma3ke/molly#egg=molly&subdirectory=bindings/python"
+  "tqdm"
 ]
 dynamic = ["version"]
 
