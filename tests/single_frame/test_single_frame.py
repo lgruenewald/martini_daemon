@@ -7,7 +7,7 @@ import numpy as np
 import math
 import pytest
 
-from martini_daemon import Simulation, PeriodicBox, read_geometry
+from martini_daemon import Simulation, read_geometry
 
 # == CONFIG ==
 e_tol = 1e-5  # energy relative tolerance
@@ -134,9 +134,9 @@ class TestSingleFrame():
             dist = box.distance(pos[atom_index], pos[other_atom])
             if np.isclose(dist, cutoff_nm):
                 print(f"Atoms {atom_index+1} and {other_atom}+1 are exactly cutoff apart!")
-                print("This can cause artifacts in __forces.")
+                print("This can cause artifacts in forces.")
         assert np.allclose(self.gmx_forces, forces, c_ftol, 0), (
-            f"Gmx and daemon __forces different by {f_percent:.2f} %.\n"
+            f"Gmx and daemon forces different by {f_percent:.2f} %.\n"
             f"Particle {atom_index+1} (<-- indexes start from 1) "
             f"dimension {atom_dim}\n"
             f"Absolute diff: {abs_diff:.3e}    relative diff: {max:.3e}\n"

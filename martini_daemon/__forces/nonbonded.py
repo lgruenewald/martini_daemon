@@ -67,7 +67,7 @@ class NonBonded(Force):
 
     def _set_force_obj(self):
         self.force = mm.CustomNonbondedForce(
-            "step(rcut-r)*(LJ - corr + ES);"
+            "(LJ - corr + ES);"
             "LJ = (1 - sc_lambda1) * (C12 / rA^2 - C6 / rA) + sc_lambda1 * (C12 / rB^2 - C6 / rB);"
             "rA = (sc_alpha1 * sigma(type1, type2)^6 * sc_lambda1 + r^6);"
             "rB = (sc_alpha1 * sigma(type1, type2)^6 * (1 - sc_lambda1) + r^6);"
@@ -152,6 +152,10 @@ class ExclusionHelper(BondedForce):
 
     def delta_degrees_of_freedom(self) -> int:
         return 0
+
+    def should_build(self) -> bool:
+        # should build also when there is no exclusions, so that self corrections work
+        return self.force is None
 
     def _set_force_obj(self) -> None:
         self.force = mm.CustomBondForce(

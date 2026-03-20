@@ -49,7 +49,7 @@ class VirtualSitesN(InteractionDirective):
     def read_params(self, tokens: TokenList, type_: int) -> list[float]:
         n_params = self.get_number_params(type_)[0]
         start = 2
-        end = len(tokens) - n_params - 1
+        end = len(tokens) - n_params
         step = n_params + 1
         params = []
         for i in range(start, end, step):

@@ -39,8 +39,8 @@ information about each system.
 
 ## Tests
 
-- `test_pbc.py` - Test the PBC handling utility functions.
-- `parser` - Tests the .top parser basics. 
+- `cargo test` - Test the rust bits and pieces (you may want to run this outside of a conda environment).
+- `parser` - Tests the .top parser basics.
 - `single_frame` - Single point energy and force calculation tests, that verify that Martini is implemented correctly by comparing it to GROMACS energies.
 - `graph` - Tests for the graph matching algorithm.
 - `detection` - Tests for the detection algorithm.

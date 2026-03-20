@@ -3,7 +3,7 @@ from ..__core import BondedForce, register_available_force
 from ..__parser import InteractionDirective, register_directive, ParseException
 
 @register_directive
-class PositionRestraintDirecctive(InteractionDirective):
+class PositionRestraintDirective(InteractionDirective):
 
     @classmethod
     def get_number_members(cls) -> int:

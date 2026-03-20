@@ -60,7 +60,11 @@ class Context(mm.Context):
         mm.LocalEnergyMinimizer.minimize(self.__context, tolerance, max_steps)
 
     def apply_constraints(self):
+        pos_before = self.__context.getState(positions=True).getPositions(asNumpy=True).value_in_unit(mm.unit.nanometer)
         self.__context.applyConstraints(tol=1e-10)
+        pos_after = self.__context.getState(positions=True).getPositions(asNumpy=True).value_in_unit(mm.unit.nanometer)
+        return pos_before, pos_after
+
 
     def get_positions(self) -> tuple[np.ndarray, PeriodicBox]:
         state = self.__context.getState(positions=True)

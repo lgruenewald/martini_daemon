@@ -11,4 +11,6 @@ path = "src/lib.rs"
 [dependencies]
 glam = "0.32.1"
 numpy = "0.28.0"
-pyo3 = "0.28.2"
+
+[dependencies.pyo3]
+version = "0.28.2"

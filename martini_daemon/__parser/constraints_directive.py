@@ -36,7 +36,8 @@ class ConstraintsDirective(InteractionDirective):
     @classmethod
     def get_number_params(cls, type_: int) -> tuple[int, int]:
         _, args = cls.__type_data[type_]
-        return len(args), len(args)
+        # often with #define FLEXIBLE they put huge force constants after
+        return len(args), len(args)+1
 
 
 def register_constraint_type(type_: int, args: list[str], is_excl: bool):

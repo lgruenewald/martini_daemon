@@ -86,7 +86,6 @@ def make_cluster_frame(n_atoms, frame):
                 res[res == larger] = smaller
     return res
 
-
 def make_whole_frame(n_atoms, pos, box: PeriodicBox, clus):
     """
     Makes a single frame whole, based on cluster info. Cluster 0 is ignored.
@@ -95,6 +94,7 @@ def make_whole_frame(n_atoms, pos, box: PeriodicBox, clus):
     Args:
     pos, box, clus, n_atoms
     """
+    # TODO this actually is incorrect for molecules larger than half a pbc
     root = {}
     for atom_i in range(n_atoms):
         ci = clus[atom_i]

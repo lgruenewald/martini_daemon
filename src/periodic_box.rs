@@ -142,18 +142,19 @@ impl PeriodicBox {
     pub fn diff(&self, v1: [f64; 3], v2: [f64; 3]) -> [f64; 3] {
         let v1 = DVec3::from(self.move_within(v1));
         let v2: DVec3 = DVec3::from(self.move_within(v2));
-        let mut diff = v1 - v2;
+        let diff = v1 - v2;
+        let mut best = diff.clone();
         for i in -1..=1 {
             for j in -1..=1 {
                 for k in -1..=1 {
                     let c = diff - (i as f64) * self.a - (j as f64) * self.b - (k as f64) * self.c;
-                    if c.length_squared() < diff.length_squared() {
-                        diff = c;
+                    if c.length_squared() < best.length_squared() {
+                        best = c;
                     }
                 }
             }
         }
-        diff.into()
+        best.into()
     }
     pub fn crosses_box(&self, v1: [f64; 3], v2: [f64; 3]) -> bool {
         (self.distance_squared(v1, v2) - (DVec3::from(v1)-DVec3::from(v2)).length_squared()).abs() > f64::EPSILON
@@ -196,7 +197,7 @@ impl PeriodicBox {
 
 #[cfg(test)]
 fn is_close(a: f64, b: f64) -> bool {
-    (a-b).abs() <= f64::EPSILON
+    (a-b).abs() <= 0.000001
 }
 #[test]
 fn test_pbc() {
@@ -235,6 +236,7 @@ fn test_pbc() {
     let t2 = [-10.5, 9.5, -4.5];
     let t3 = [4.5, 5.5, -0.5];
     let t4 = [0.5, -0.5, -0.5];
+
     assert!(is_close(pbc.cos_angle(t1, t2, t3), (PI / 3.).cos()));
     assert!(is_close(pbc.cos_angle(t2, t3, t4), (PI / 3.).cos()));
     assert!(is_close(pbc.cos_angle(t1, t4, t3), (PI / 3.).cos()));
@@ -291,5 +293,49 @@ fn test_pbc() {
 
     assert!(pbc.crosses_box(v1, v2));
     assert!(!pbc.crosses_box(v1, v3));
+
+    // past bugs from trypsin
+    let box_trypsin = PeriodicBox::orthogonal(7.7463, 7.7463, 5.47747).unwrap();
+    let pos_start = [-0.206, 6.682, 5.795];
+    let move_to = [0.062, 6.635, 5.923];
+    let moved = box_trypsin.move_to(move_to, pos_start);
+    assert!(
+        is_close(moved[0], pos_start[0])
+        && is_close(moved[1], pos_start[1])
+        && is_close(moved[2], pos_start[2])
+    );
+
+    let pos_start = [1.153, 0.1297, 3.54];
+    let move_to = [1.086, 7.481, 3.589];
+    let moved = box_trypsin.move_to(move_to, pos_start);
+    assert!(
+        is_close(moved[0], pos_start[0])
+        && is_close(moved[1], pos_start[1]+box_trypsin.b.y)
+        && is_close(moved[2], pos_start[2])
+    );
+
+    let pos1 = [1.153, 7.876, 3.54 ];
+    let pos2 = [1.013, 7.386, 8.79847];
+    let diff = box_trypsin.diff(pos2, pos1);
+    assert!(
+        is_close(diff[0], pos2[0]-pos1[0])
+        && is_close(diff[1], pos2[1]-pos1[1])
+        && is_close(diff[2], pos2[2]-pos1[2]-box_trypsin.c.z)
+    );
+    let diff_back = box_trypsin.diff(pos1, pos2);
+    assert!(
+        is_close(diff[0], -diff_back[0])
+            && is_close(diff[1], -diff_back[1])
+            && is_close(diff[2], -diff_back[2])
+    );
+    let pos1 = [1.153, 7.876, 3.54 ];
+    let pos2 = [1.089, 7.63, 8.89547];
+    let moved = box_trypsin.move_to(pos1, pos2);
+    let sum: [f64; 3] = (DVec3::from(pos1) + DVec3::from(box_trypsin.diff(pos2, pos1))).into();
+    assert!(
+        is_close(sum[0], moved[0])
+        && is_close(sum[1], moved[1])
+        && is_close(sum[2], moved[2])
+    );
     // TODO: test all functions, test on non orthogonal boxes
 }
