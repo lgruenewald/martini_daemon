@@ -1,4 +1,8 @@
-# Topology Trajectory format writer
+from typing import Collection
+from dataclasses import dataclass
+import zlib
+import struct
+
 
 class TopTrajWriter:
     """
@@ -17,18 +21,15 @@ class TopTrajWriter:
           the constructing atoms and the virtual particle, no extra bonds added among constructing atoms.
           It also sets a maximum of one bond between each pair of atoms, as the number of bonds as defined in a force
           field topology may not be so relevant for a connectivity graph.
-        - LIST OF FRAGMENTS - list of dynamic atom groupings. a list of fragment name, fragment ID and constructing
-          particles. In Martini Daemon, this stores the fragments found by the graph matching algorithm at each
-          frame.
-    - Store per-frame data as diffs from the previous frame
     - Optimize disk space and sequential access (both reading and writing)
-    - Backward compatibility (it is desirable to be able to analyze data in old files), but no forward compatibility
+    - No forward compatibility, not even across minor version
+        - it is a non-goal for old reader software to be able to read newer files
+        - readers should still be able to read older files thanks to the version string
 
     Assumptions made about the simulation:
         - less than 2^32 frames in total (the MD step can exceed 2^32 though)
         - less than 2^32 atoms
         - less than 2^32 residues
-        - less than 2^32 fragments (by ID)
 
     Description of the binary layout:
 
@@ -37,7 +38,12 @@ class TopTrajWriter:
     - The body contains all the info described above. The header is compressed using ZLIB. ZLIB writes its own tiny
     header at the start of the body which contains the compression details. A compression level of 6 is recommended.
     - integers are all little endian and unsigned.
-    - all strings are UTF-8 encoded and null terminated.
+    - all strings are UTF-8 encoded and encoded as pascal strings
+        - One byte length, followed by the bytes of the string.
+        - Writers may truncate as they wish, even resulting in
+        incomplete UTF-8 codepoints.
+        - Readers should stop parsing UTF-8 at the invalid
+        UTF-8 character, and skip the remainder of the bytes.
     - floats are 32 bit IEEE floats.
     - doubles are 64 bit IEEE floats.
 
@@ -61,13 +67,7 @@ class TopTrajWriter:
         - 8 byte integer - simulation step
         - double - simulation time, in nanoseconds
         - List of atom names
-            - if first frame:
-                - n_atoms strings
-            - all other frames:
-                - 4 byte integer n_changes (relative to previous frame)
-                - for each change:
-                    - 4 byte integer, index of changed atom
-                    - string, new name
+            - n_atoms strings
         - Similar setup for resname, resid, atom type, charges, mass. Payload type:
             - resname - string
             - resid - 4 byte integer
@@ -76,39 +76,287 @@ class TopTrajWriter:
             - mass - float
         - List of bonds:
             - in no particular order, however guaranteed to have at most one bond per i-j combination and no i-i
-            - if first frame:
-                - 8 byte integer n_bonds
-                - for each bond:
-                    - 4 byte integer, index of atom i
-                    - 4 byte integer, index of atom j
-            - all other frames:
-                - 8 byte integer n_deletions (relative to previous frame)
-                    - 4 byte integer, index of atom i
-                    - 4 byte integer, index of atom j
-                - readers should error if a bond is removed that was not there
-                - 8 byte integer n_additions (relative to previous frame)
-                - for each bond addition:
-                    - 4 byte integer, index of atom i
-                    - 4 byte integer, index of atom j
-                - readers should error if a bond is added that was there
-        - List of fragments:
-            - if first frame:
-                - 4 byte integer n_fragments
-                - for each fragment:
-                    - string, fragment name
-                    - 4 byte integer, frag_id
-                    - 4 byte integer, number of atoms
-                        - n_frag_atoms 4 byte integers - containing atoms, if 0xFFFFFFFF it is a missing optional or forbidden atom
-            - all other frames:
-                - 4 byte integer n_deletions (relative to previous frame)
-                    - 4 byte integer for FRAG_IDs of each deletion
-                - 4 byte integer n_additions (relative to previous frame)
-                    - string, fragment name
-                    - 4 byte integer, frag_id
-                    - 4 byte integer, number of atoms
-                        - n_frag_atoms 4 byte integers - containing atoms, if 0xFFFFFFFF it is a missing optional or forbidden atom
+            - 8 byte integer n_bonds
+            - 4 byte integer, index of atom i
+            - 4 byte integer, index of atom j
         - CRC32 checksum of frame data
     """
 
-    # TODO
+    def __init__(
+        self,
+        path: str,
+        title: str,
+        initial_molecules: list[tuple[str, int]]
+    ):
+        # version 1.0
+        header = b"\xc0TOPTR\x01\x00"
+        title_bytes = title.encode("utf-8")
+        title_len = min(255, len(title_bytes))
+        n_initial = len(initial_molecules)
+        body = struct.pack(
+            f"<B{title_len}sI", title_len, title_bytes, n_initial
+        )
+        for name, count in initial_molecules:
+            name_bytes = name.encode("utf-8")
+            name_len = min(255, len(name_bytes))
+            body += struct.pack(
+                f"<B{name_len}sI", name_len, name_bytes, count
+            )
+        checksum = zlib.crc32(header+body)
+        body += struct.pack(
+            "<I", checksum
+        )
+
+        self.handle = open(path, "wb")
+        self.handle.write(header)
+        self.comp = zlib.compressobj()
+        self.handle.write(self.comp.compress(body))
+        self.handle.write(self.comp.flush(zlib.Z_PARTIAL_FLUSH))
+        self.handle.flush()
+        self.last_frame = -1
+        # for now, this keeps a lot of information in memory both here
+        # and in system
+        #
+        # if this extra memory consumption becomes a problem this should be
+        # more closely integrated within System
+        #
+        # currently it's put here during prototyping to keep it modular
+        self.frame = None
+        self.previous_frame = None
+
+    def new_frame(
+        self, frame_num: int, sim_step: int, sim_time: float, n_atoms: int
+    ):
+        """
+        Create a new frame.
+        """
+        assert frame_num - self.last_frame == 1, (
+            "Frames passed to TopTrajWriter must be in a sequence. "
+            f"Got frame num {frame_num}, expected {self.last_frame + 1}."
+        )
+        assert self.frame is None, (
+            "Only call new_frame after write_frame()!"
+        )
+        self.last_frame = frame_num
+        self.frame = {
+            "n_atoms": n_atoms,
+            "header": struct.pack(
+                "<IIQd", frame_num, n_atoms, sim_step, sim_time
+            )
+        }
+
+    def register_frame_atoms(
+        self,
+        names: Collection[str], res_names: Collection[str], res_ids: Collection[int],
+        atom_types: Collection[str], charges: Collection[float],
+        masses: Collection[float]
+    ):
+        """
+        Write current state of atoms to current frame.
+        """
+        assert self.frame.get("atoms") is None, (
+            "Should only call register_frame_atoms once per frame!"
+        )
+
+        assert len(names) == len(res_names) == len(res_ids) == len(atom_types) == len(charges) == len(masses)
+        assert len(names) == self.frame["n_atoms"]
+
+        self.frame["atoms"] = {
+            "names": names,
+            "res_names": res_names,
+            "res_ids": res_ids,
+            "atom_types": atom_types,
+            "charges": charges,
+            "masses": masses
+        }
+
+
+    def register_frame_bonds(
+        self,
+        bonds: Collection[tuple[int, int]]
+    ):
+        assert self.frame.get("bonds") is None, (
+            "Should only call register_frame_bonds once per frame!"
+        )
+        self.frame["bonds"] = bonds
+
+    def write_frame(self):
+        """
+        Write current frame to disk.
+        """
+        raw_bytes = bytearray(self.frame["header"])
+        for name in self.frame["atoms"]["names"]:
+            name_bytes = name.encode("utf-8")
+            raw_bytes += struct.pack(
+                f"<B{len(name_bytes)}s", len(name_bytes), name_bytes
+            )
+
+        for name in self.frame["atoms"]["res_names"]:
+            name_bytes = name.encode("utf-8")
+            raw_bytes += struct.pack(
+                f"<B{len(name_bytes)}s", len(name_bytes), name_bytes
+            )
+
+        for res_id in self.frame["atoms"]["res_ids"]:
+            raw_bytes += struct.pack(
+                "<I", res_id
+            )
+
+        for atom_type in self.frame["atoms"]["atom_types"]:
+            atom_type_bytes = atom_type.encode("utf-8")
+            raw_bytes += struct.pack(
+                f"<B{len(atom_type_bytes)}s", len(atom_type_bytes), atom_type_bytes
+            )
+
+        for charge in self.frame["atoms"]["charges"]:
+            raw_bytes += struct.pack(
+                "<f", charge
+            )
+
+        for mass in self.frame["atoms"]["masses"]:
+            raw_bytes += struct.pack(
+                "<f", mass
+                )
+
+        bonds_len = len(raw_bytes)
+        raw_bytes += struct.pack(
+            "<Q", 0
+        )
+        n_bonds = 0
+        wrote = set()
+        for i, j in self.frame["bonds"]:
+            if i == j:
+                continue
+
+            smaller = min(i, j)
+            larger = max(i, j)
+            if (smaller, larger) in wrote:
+                continue
+            wrote.add((smaller, larger))
+            n_bonds += 1
+            raw_bytes += struct.pack(
+                "<II", smaller, larger
+            )
+        raw_bytes[bonds_len:bonds_len+8] = struct.pack(
+            "<Q", n_bonds
+        )
+        raw_bytes += struct.pack(
+            "<I", zlib.crc32(raw_bytes)
+        )
+        self.handle.write(self.comp.compress(raw_bytes))
+        self.handle.write(self.comp.flush(zlib.Z_PARTIAL_FLUSH))
+        self.handle.flush()
+        self.previous_frame = self.frame
+        self.frame = None
+
+    def finish(self):
+        self.handle.write(self.comp.flush())
+        self.handle.close()
+        self.handle = None
+        self.comp = None
+
+
+@dataclass
+class TopTrajFrame:
+    frame_index: int
+    sim_step: int
+    sim_time: float
+    n_atoms: int
+    names: list[str]
+    res_names: list[str]
+    res_ids: list[int]
+    atom_types: list[str]
+    charges: list[float]
+    masses: list[float]
+    bonds: list[tuple[int, int]]
+
+class TopTrajReader:
+    """
+    For a description of the file format, see TopTrajWriter.
+    """
+
+    def __init__(self, path: str):
+        self.path = path
+        with open(path, "rb") as f:
+            self.header = f.read(8)
+            assert self.header == b"\xc0TOPTR\x01\x00"
+            self.content = zlib.decompress(f.read())
+        title_len = self.content[0]
+        self.title, = struct.unpack(f"<{title_len}s", self.content[1:1+title_len])
+        self.i = 1+title_len
+        n_init, = struct.unpack("<I", self.content[self.i:self.i+4])
+        self.i += 4
+        self.initial_molecules = []
+        for i in range(n_init):
+            name_len = self.content[self.i]
+            self.i += 1
+            name, = struct.unpack(f"<{name_len}s", self.content[self.i:self.i+name_len])
+            self.i += name_len
+            n, = struct.unpack("<I", self.content[self.i:self.i+4])
+            self.i += 4
+            self.initial_molecules.append((name, n))
+
+        chunk1 = self.header + self.content[:self.i]
+        crc, = struct.unpack("<I", self.content[self.i:self.i+4])
+        assert zlib.crc32(chunk1) == crc, (
+            f"File {path} appears to be corrupt. Header CRC32 {crc} doesn't match {zlib.crc32(chunk1)}."
+        )
+        self.i += 4
+        self.frame = 0
+
+    def __read_strings(self, n):
+        res = []
+        for i in range(n):
+            len_ = self.content[self.i]
+            self.i += 1
+            res.append(
+                struct.unpack(f"<{len_}s", self.content[self.i:self.i+len_])[0]
+            )
+            self.i += len_
+        return res
+
+    def __read_any(self, n, byte_format, n_bytes):
+        res = []
+        for i in range(n):
+            res.append(
+                struct.unpack(byte_format, self.content[self.i:self.i+n_bytes])[0]
+            )
+            self.i += n_bytes
+        return res
+
+
+    def read_frame(self) -> TopTrajFrame | None:
+        if self.i >= len(self.content):
+            return None
+
+        frame_start = self.i
+        frame, n_atoms, sim_step, sim_time  = struct.unpack(
+            "<IIQd", self.content[self.i:self.i+24]
+        )
+        self.i += 24
+        names = self.__read_strings(n_atoms)
+        res_names = self.__read_strings(n_atoms)
+        res_ids = self.__read_any(n_atoms, "<I", 4)
+        types = self.__read_strings(n_atoms)
+        charges = self.__read_any(n_atoms, "<f", 4)
+        masses = self.__read_any(n_atoms, "<f", 4)
+        n_bonds, = struct.unpack("<Q", self.content[self.i:self.i+8])
+        bonds = []
+        self.i += 8
+        for i in range(n_bonds):
+            bonds.append(
+                struct.unpack("<II", self.content[self.i:self.i+8])
+            )
+            self.i += 8
+        crc, = struct.unpack("<I", self.content[self.i:self.i+4])
+        self.i += 4
+        assert zlib.crc32(
+            self.content[frame_start:self.i-4]
+        ) == crc, f"Frame {frame} corrupt, CRC32 mismatch."
+
+        return TopTrajFrame(
+            frame, sim_step, sim_time, n_atoms,
+            names, res_names, res_ids, types, charges, masses, bonds
+        )
+
 
