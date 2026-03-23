@@ -1,3 +1,4 @@
 
 class TopStar:
-    pass
+    def __init__(self, n_atoms: int):
+        pass

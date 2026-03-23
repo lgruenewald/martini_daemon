@@ -11,6 +11,10 @@ pub struct PeriodicBox {
     c: DVec3,
 }
 
+/// All constructors of PeriodicBox should call this!
+/// This ensures that the same guarantees about PBCs are upheld as in GROMACS or OpenMM.
+/// This allows them to be more directly used with those software's, as well as some code is
+/// easier/faster to write for ourselves as well!
 fn sanitize(pbc: &PeriodicBox) -> PyResult<()> {
     if pbc.a.y != 0. || pbc.a.z != 0. || pbc.b.z != 0. {
         return Err(PyValueError::new_err("a.y, a.z and b.z of periodic boxes must be 0."));
@@ -24,6 +28,7 @@ fn sanitize(pbc: &PeriodicBox) -> PyResult<()> {
 
     Ok(())
 }
+
 #[pymethods]
 impl PeriodicBox {
     #[new]
@@ -98,7 +103,8 @@ impl PeriodicBox {
             c: [0., 0., z].into()
         })
     }
-
+    /// Move atom within the same copy of the PBC.
+    /// Note: moves it within the box 0,0,0 to a.x,b.y,c.z, not the box a,b,c.
     pub fn move_within(&self, v: [f64; 3]) -> [f64; 3] {
         (
             DVec3::from(v)
@@ -108,10 +114,13 @@ impl PeriodicBox {
         ).into()
     }
 
+    /// Translates v by periodic box vectors so it is the closest possible to reference
+    /// in non-periodic space.
     pub fn move_to(&self, reference: [f64; 3], v: [f64; 3]) -> [f64; 3] {
         (DVec3::from(reference) + DVec3::from(self.diff(v, reference))).into()
     }
 
+    /// Move_within but for 2D numpy arrays of positions of shape (n, 3).
     pub fn move_all_within(&self, mut array: PyReadwriteArray<f64, Ix2>) -> PyResult<()> {
         if let [_, inner] = array.shape() && *inner != 3 {
             return Err(pyo3::exceptions::PyValueError::new_err(format!("Invalid dimensions, expected Nx3, got (N, {inner})")))
@@ -192,6 +201,40 @@ impl PeriodicBox {
         let y = s.dot(w) / s.length();
 
         f64::atan2(y, x)
+    }
+
+    /// Returns whether a position is either:
+    /// - inside the "within" copy of the pbc
+    /// - within a cutoff distance of the pbc
+    /// Non-exactly! It can return true even if it is not within cutoff.
+    /// The only guarantee is that if it returns false, the distance between pos
+    /// and the pbc box is larger than cutoff.
+    pub fn is_almost_inside(&self, pos: [f64; 3], cutoff: f64) -> bool {
+        // assumption that a.y, a.z, b.z are 0, and a.x, b.y, c.z > 0
+        // this assumption is upheld by all constructors calling sanitize
+        let [x, y, z] = pos;
+        // only third component has a z = easy to check
+        if self.c.z + cutoff < z || z < -cutoff {
+            return false;
+        }
+        // two components can have a y
+        // conservative behavior - we add the maximum deviation from orthogonal boxes to cutoff
+        let y_cutoff = cutoff + self.c.y.abs();
+        if self.b.y + y_cutoff < y || y < - y_cutoff {
+            return false;
+        }
+        // three components can have an x
+        let x_cutoff = cutoff + self.c.x.abs() + self.b.x.abs();
+        if self.a.x + x_cutoff < x || x < - x_cutoff {
+            return false;
+        }
+        true
+    }
+
+    /// Translates pos by i, j, k times periodic box vectors. This returns the same point
+    /// in a different copy of the periodic box.
+    pub fn translate_by(&self, pos: [f64; 3], i: i64, j: i64, k: i64) -> [f64; 3] {
+        (DVec3::from(pos) + (i as f64) * self.a + (j as f64) * self.b + (k as f64) * self.c).into()
     }
 }
 

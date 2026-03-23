@@ -14,6 +14,10 @@ chrono = "0.4.44"
 [dependencies]
 glam = "0.32.1"
 numpy = "0.28.0"
+rand = "0.10.0"
+kdtree = "0.8.0"
+ordermap = "1.1.0"
+sortedlist-rs = "0.2.5"
 
 [dependencies.pyo3]
 version = "0.28.2"
