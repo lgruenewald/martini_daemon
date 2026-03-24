@@ -12,7 +12,8 @@ from .__parser import GromacsTopFile, InvalidTopologyError
 from .__core import System, Context, wrap_coupling
 from .__forces import NonBonded
 from .__rust import build_version
-from .reporters import Reporter
+from .__reporters import Reporter
+from .__topstar import TopStar
 
 
 class Simulation:
@@ -25,10 +26,14 @@ class Simulation:
     * be passed around to all reporters to provide the required metadata and file handle access for reporting.
     * is the required glue between all components, also only uses the public interface of different components.
     * provide access to the system, context, topstar instance to all reporters and the user
+
+    geom_path: path to geometry. Note: if None is passed, no context will be initialized. Simulation can then be
+    used as a .top parser, and the resulting topology can then be read out. Of course things needing Context
+    steps will not be available.
     """
 
     def __init__(
-        self, top_path: str, geom_path: str, md_steps: int,
+        self, top_path: str, geom_path: str | None, md_steps: int,
         reporters: list[Reporter] | None = None,
         dm_frequency: int = 0, traj_frequency: int = 0,
         sim_name: str = "out", continue_sim=False,
@@ -98,12 +103,14 @@ class Simulation:
             options["epsilon_r"] = 15.
         if options.get("cutoff") is None:
             options["cutoff"] = 1.1
+        if options.get("respos") is None:
+            if restraint_coord_path is not None:
+                options["respos"] = read_geometry(restraint_coord_path)[1]
+            elif geom_path is not None:
+                options["respos"] = read_geometry(geom_path)[1]
 
         # Parsing
         self.info("Parsing start")
-        box, start_pos, start_vel = read_geometry(geom_path)
-        options["respos"] = read_geometry(restraint_coord_path)[1] if restraint_coord_path is not None else start_pos
-        self.info(f"Read {len(start_pos)} atoms from {geom_path}. Box: {box.to_lattice()}. Velocities read? {start_vel is not None}.")
         self.system = System(options=options)
         try:
             GromacsTopFile(self.system, top_path)
@@ -118,6 +125,10 @@ class Simulation:
         self.system.build_initial_molecules()
         self.info("Parsing finished")
 
+        self.info("TopStar build start")
+        self.top = TopStar(self.system)
+        self.info("TopStar build finished")
+
         self.info("setup integrator", "dt (ns):", self.dt_ns, "type:", type(self.md_integrator).__name__)
         # integrator -> always compound, index 0 always for md
         self.integrator = mm.CompoundIntegrator()
@@ -127,13 +138,17 @@ class Simulation:
             self.system.add_force(wrap_coupling(c)(self.system))
 
         # build context
-        self.info("Building context")
-        self.context = Context(self.system, self.integrator, box, platform, context_parameters)
+        if geom_path is not None:
+            box, start_pos, start_vel = read_geometry(geom_path)
+            self.info(f"Read {len(start_pos)} atoms from {geom_path}. Box: {box.to_lattice()}. Velocities read? {start_vel is not None}.")
 
-        # set pos, vel
-        self.context.set_positions(start_pos, box)
-        if start_vel is not None:
-            self.context.set_velocities(start_vel)
+            self.info("Building context")
+            self.context = Context(self.system, self.integrator, box, platform, context_parameters)
+
+            # set pos, vel
+            self.context.set_positions(start_pos, box)
+            if start_vel is not None:
+                self.context.set_velocities(start_vel)
 
         for r in self.reporters:
             r.on_simulation_start(self)

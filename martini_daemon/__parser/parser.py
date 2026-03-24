@@ -79,6 +79,11 @@ class Parser:
             f"Directive [{name}] was already defined."
         )
         self.__directives[name] = directive
+        for alias in directive.aliases:
+            assert alias not in self.__directives, (
+                f"Directive [{alias}] was already defined."
+            )
+            self.__directives[alias] = directive
 
     def parse(self) -> bool:
         """

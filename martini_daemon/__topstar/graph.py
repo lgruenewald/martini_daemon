@@ -1,9 +1,9 @@
 # helper function for T* graph based fragments
 from __future__ import annotations
 from enum import Enum
-from .__forces.force import Interaction
-from .old_sysstar import SysStar
+from ..__core import System
 from fnmatch import fnmatch
+from ..__parser import ParseException
 
 
 # === MAIN CLASSES ===
@@ -13,10 +13,10 @@ class GraphAtomType(Enum):
     NOT = 2
 
 
-class Graph():
+class Graph:
     """
-        The class constructed from [graph]/[frag] directives that contains all
-        the information the user provided about a graph.
+    The class constructed from [graph]/[frag] directives that contains all
+    the information the user provided about a graph.
     """
 
     def __init__(self, name):
@@ -25,7 +25,7 @@ class Graph():
         self.molecules: list[str] = []
         # list[(graph_atom_name, name_pat, type_pat, type)]
         self.atoms: list[tuple[str, str, str, GraphAtomType]] = []
-        # list[(interaction_type, list[atom_id])]
+        # list[(interaction_type, list[graph_atom_name])]
         self.interactions: list[tuple[str, list[str]]] = []
         self.equivalents: list[set[str]] = []
         # dict[graph_atom_name, graph_atom_index]
@@ -33,35 +33,40 @@ class Graph():
 
     def finish_init(self) -> None:
         """
-            Must be called after parsing the graph and before it's used.
+        Must be called after parsing the graph and before it's used.
 
-            Validates graphs and errors on malformed graphs.
+        Validates graphs and errors on malformed graphs.
+        Raises ParseExceptions.
         """
+        if self.name is None:
+            raise ParseException(
+                "Graph has no name."
+            )
         nodes: dict[str, set[str]] = {}
         if len([x for x in self.atoms if x[3] == GraphAtomType.NORMAL]) == 0:
             raise ValueError("Graph must contain at least one normal atom")
         if self.atoms[0][3] != GraphAtomType.NORMAL:
-            raise ValueError(
+            raise ParseException(
                 "First atom in graph must be a normal atom (not opt or not)."
             )
         for i, (name, _, _, _) in enumerate(self.atoms):
             if nodes.get(name) is not None:
-                raise ValueError(
+                raise ParseException(
                     f"Same graph has multiple atoms of the same name: {name}."
                 )
             nodes[name] = set()
             self.atom_name_to_index[name] = i
         for filter_str, atoms in self.interactions:
             if len(atoms) < 2:
-                raise ValueError(
+                raise ParseException(
                     f"Interaction {filter_str} must have at least "
                     f"two atom members. Only found {atoms}."
                 )
             for atom in atoms:
                 if nodes.get(atom) is None:
-                    raise ValueError(
+                    raise ParseException(
                         f"Interaction {filter_str} for atoms {atoms} "
-                        "references undefined atom name {atom}."
+                        f"references undefined atom name {atom}."
                     )
                 for other_atom in atoms:
                     if atom != other_atom:
@@ -82,25 +87,25 @@ class Graph():
         if len(marked) != len(self.atoms):
             assert len(self.atoms) == len(nodes.keys())
             missing = set(nodes.keys()) - marked
-            raise ValueError(
+            raise ParseException(
                 f"Invalid graph. The graph is not all connected to itself. Add"
                 f" interactions to connect it. Disconnected atom: {missing}."
             )
 
 
 # === MATCH HELPERS ===
-class GraphMatch():
+class GraphMatch:
     """
-        Helper class that represents a (partially) mapped out graph to S*.
+    Helper class that represents a (partially) mapped out graph to S*.
     """
     # mapping of atoms -> atom_id
     graph: Graph
     atoms: dict[str, int]
     # interaction matches, lists of None or Interaction
-    interactions: list[None | Interaction]
+    interactions: list[None | tuple[str, int]]
     # reverse of atoms
     rev_atoms: dict[int, str]
-    matched_inter: set[Interaction]
+    matched_inter: set[tuple[str, int]]
     next_inter: int
 
     def __init__(self, graph: Graph):
@@ -125,7 +130,7 @@ class GraphMatch():
         self.atoms[name] = atom_num
         self.rev_atoms[atom_num] = name
 
-    def add_inter(self, id: int, inter: Interaction) -> None:
+    def add_inter(self, id: int, inter: tuple[str, int]) -> None:
         assert (
             self.interactions[id] is None and inter not in self.matched_inter
         )
@@ -155,8 +160,7 @@ class GraphMatch():
         return True
 
     def is_equal(self, other: GraphMatch) -> bool:
-        # note1:
-        # also see note for is_complete / is_acceptable -> only checks atoms
+        # note1: also see note for is_complete / is_acceptable -> only checks atoms
         # note2: equivalent atoms in graph are exchangeable
         if self.graph != other.graph:
             return False
@@ -177,53 +181,53 @@ class GraphMatch():
         return True
 
 
-class AtomCache():
+class AtomCache:
     """
-        Helper class that groups S* information and provides helper query
-        functions to it.
+    Helper class that groups S* information and provides helper query
+    functions to it.
     """
 
     def __init__(
-            self, sysstar: SysStar, interactions: list[list[Interaction]]
+            self, system: System
     ):
-        self.sysstar = sysstar
-        self.interactions = interactions
+        self.system = system
 
     def neighbors(self, atom: int) -> set[int]:
         res = set()
-        if len(self.interactions[atom]) == 0:
+        inters = self.system.get_interactions_for_atom(atom)
+        if len(inters) == 0:
             return res
-        for inter in self.interactions[atom]:
-            for member in inter.get_members():
+        for inter in inters:
+            for member in self.system.get_members(*inter):
                 res.add(member)
         res.remove(atom)
         return res
 
     def check_atom_interactions(
         self, g_atom: str, atom_id: int, partial: GraphMatch
-    ) -> bool:
+    ) -> tuple[bool, list[tuple[int, tuple[str, int]]]]:
         """
-            Returns True if adding g_atom=atom_id to the graph match is
-            possible (all interaction requirements fulfilled).
-            Returns False if there is an interaction requirement violated
-            (missing interaction that should be there).
+        Returns True if adding g_atom=atom_id to the graph match is
+        possible (all interaction requirements fulfilled).
+        Returns False if there is an interaction requirement violated
+        (missing interaction that should be there).
 
-            Args:
-            g_atom -> graph atom name
-            atom_id -> S* atom ID candidate for g_name
-            partial -> partial graph match that g_atom=atom_id is considered
-            for. Note: assumes g_atom=atom_id is not a part of partial yet.
-            Note2: this function does not mutate partial.
+        Args:
+        g_atom -> graph atom name
+        atom_id -> S* atom ID candidate for g_name
+        partial -> partial graph match that g_atom=atom_id is considered
+        for. Note: assumes g_atom=atom_id is not a part of partial yet.
+        Note2: this function does not mutate partial.
         """
         # g_ prefix -> graph things
         # s_ prefix -> S* things
-        s_inters = self.interactions[atom_id]  # interactions for atom_id in S*
+        s_inters = self.system.get_interactions_for_atom(atom_id)  # interactions for atom_id in S*
         # interactions already considered
-        skip: set[Interaction] = set(
+        skip: set[tuple[str, int]] = set(
             i for i in partial.interactions if i is not None
         )
-        matches: list[tuple[int, Interaction]] = []  # new matches
-        # iterate over all iteraction requirements in graph
+        matches: list[tuple[int, tuple[str, int]]] = []  # new matches
+        # iterate over all interaction requirements in graph
         for i, (g_type, g_atoms) in enumerate(partial.graph.interactions):
             # g_type -> the filter text of this interaction (e.g. "connection")
             # g_atoms -> list of graph atom names in the interaction
@@ -248,7 +252,7 @@ class AtomCache():
 
             # find which interaction in S* corresponds to this to-be-filled
             # by now interaction in the graph
-            # note: unsound code below
+            # Note: unsound code below
             # we eagerly take the first interaction that matches, this might
             # not be what we want (e.g. vsite 1 2 3 and vsite 1 2, we might
             # accept vsite 1 2 3 for a constraint vsite 1 2)
@@ -258,13 +262,15 @@ class AtomCache():
             found = False
             for s_inter in s_inters:
                 # S* interaction does not fulfill graph type filter
-                if not s_inter.is_instance(g_type):
+                # either it doesn't exist as a force
+                # we assume that it's a BondedForce
+                if self.system.get_force(s_inter[0]) is None or not self.system.get_force(s_inter[0]).passes_filter(g_type):
                     continue
                 # s_inter already used
                 if s_inter in skip:
                     continue
                 # S* Interaction members
-                s_members = set(s_inter.get_members())
+                s_members = set(self.system.get_members(*s_inter))
                 if len(g_members - s_members) > 0:
                     # S* can contain extra members, but all Graph ones
                     # should be fulfilled
@@ -281,21 +287,21 @@ class AtomCache():
     def is_name_type(
         self, name_filter: str, type_filter: str, atom_id: int
     ) -> bool:
-        name = self.sysstar.get_atom_name(atom_id)
-        type, _, _, _, _ = self.sysstar.get_atom_details(atom_id)
-        return fnmatch(name, name_filter) and fnmatch(type, type_filter)
+        name = self.system.get_name(atom_id)
+        type_ = self.system.get_type(atom_id)
+        return fnmatch(name, name_filter) and fnmatch(type_, type_filter)
 
 
 # === MAIN MATCHING ALGO ===
 def match_atoms(
     graph: Graph, atoms: set[int],
-    sysstar: SysStar, interactions: list[list[Interaction]]
+    system: System
 ) -> list[GraphMatch]:
     """
     Return all unique graph matches for graph against a given set of atoms.
     """
     # 1. build a atom cache
-    cache = AtomCache(sysstar, interactions)
+    cache = AtomCache(system)
     queue: list[GraphMatch] = []  # partial matches
     results: list[GraphMatch] = []  # complete matches
     # 2. find starting matches of a single atom

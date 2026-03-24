@@ -1,14 +1,14 @@
-use ordermap::{OrderMap, OrderSet};
+use ordermap::OrderMap;
 use std::collections::HashMap;
 use pyo3::prelude::*;
 use pyo3::{pyclass, pymethods};
-
+use pyo3::exceptions::PyException;
 use crate::detection_template::DetectionTemplate;
 #[pyclass]
 pub struct DetectionTemplateList {
     pub reactions: OrderMap<String, Py<DetectionTemplate>>,
     pub reactions_by_reactants: OrderMap<Vec<String>, Vec<String>>,
-    pub first_reactants: OrderSet<String>,
+    pub first_reactants: HashMap<String, (bool, bool)>,
     pub frag_name_to_r_max_atoms: HashMap<String, Vec<usize>>,
     pub largest_r_max: f64
 }
@@ -20,13 +20,18 @@ impl DetectionTemplateList {
         Self {
             reactions: OrderMap::new(),
             reactions_by_reactants: OrderMap::new(),
-            first_reactants: OrderSet::new(),
+            first_reactants: HashMap::new(),
             frag_name_to_r_max_atoms: HashMap::new(),
             largest_r_max: 0.0
         }
     }
     pub fn add_reaction(&mut self, rx: Py<DetectionTemplate>, py: Python) -> PyResult<bool> {
         let rx_ref = rx.borrow(py);
+
+        if rx_ref.reactants.len() > 3 {
+            return Err(PyException::new_err("Only up to 3 reactants per reaction are supported."));
+        }
+
         for (i1, a1, i2, a2, r_max) in rx_ref.distance_max.iter() {
             // largest_r_max
             if (i1 == i2) {
@@ -64,7 +69,15 @@ impl DetectionTemplateList {
 
         // first reactants - list of reactants that start multimolecular reactions
         if rx_ref.reactants.len() > 1 {
-            self.first_reactants.insert(rx_ref.reactants[0].clone());
+            if !self.first_reactants.contains_key(&rx_ref.reactants[0]) {
+                self.first_reactants.insert(rx_ref.reactants[0].clone(), (false, false));
+            }
+            match (rx_ref.reactants.len(), self.first_reactants.get_mut(&rx_ref.reactants[0])) {
+                (2, Some((val, _))) => *val = true,
+                (3, Some((_, val))) => *val = true,
+                _ => { unreachable!() }
+            }
+
         }
         // reactions by reactants
         let reactants = rx_ref.reactants.clone();

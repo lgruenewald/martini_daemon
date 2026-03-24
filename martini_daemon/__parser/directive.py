@@ -88,3 +88,5 @@ class Directive(ABC):
         Should return the name for the directive used in [].
         """
         raise NotImplementedError
+
+    aliases = set()

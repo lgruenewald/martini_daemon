@@ -317,6 +317,25 @@ class System:
             ]
         f._remove_bond(bond_id)
 
+    def get_members(self, force_name: str, bond_id: int) -> list[int]:
+        f = self.__forces[force_name]
+        return f.get_members(bond_id)
+
+    def get_filters(self):
+        filters = set()
+        for f in self.__forces.values():
+            if issubclass(type(f), BondedForce):
+                filters.add(f.get_name())
+                for filter_ in f.filters:
+                    filters.add(filter_)
+        for f in self.__available_forces.values():
+            if issubclass(f, BondedForce):
+                filters.add(f.get_name())
+                for filter_ in f.filters:
+                    filters.add(filter_)
+        return filters
+
+
     def break_group(self, break_group: set[int]) -> None:
         """
         Break all interactions that include all atoms in break_group.

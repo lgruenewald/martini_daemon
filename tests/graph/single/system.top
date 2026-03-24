@@ -13,12 +13,6 @@ XX 1
 name aa
 atom 1 aa TC5
 
-; without a rx fragments never actually get added to the system (optimization)
-[ rx ]
-placeholder
-[ reactants ]
-aa
-
 [ system ]
 Single atom name/type matching test
 
