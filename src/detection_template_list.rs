@@ -25,7 +25,7 @@ impl DetectionTemplateList {
             largest_r_max: 0.0
         }
     }
-    pub fn add_reaction(&mut self, rx: Py<DetectionTemplate>, py: Python) -> PyResult<bool> {
+    pub fn add_detection_template(&mut self, rx: Py<DetectionTemplate>, py: Python) -> PyResult<bool> {
         let rx_ref = rx.borrow(py);
 
         if rx_ref.reactants.len() > 3 {
@@ -95,7 +95,7 @@ impl DetectionTemplateList {
         Ok(true)
     }
 
-    pub fn get_reaction(
+    pub fn get_detection_template(
         &self,
         name: &str,
         py: Python

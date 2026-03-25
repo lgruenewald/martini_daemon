@@ -31,12 +31,18 @@ class MoleculeType:
                 self.exclusions.add((j, i))
         for (i, j) in self.exclusions:
             if i > j:
+                if i < 0 or j < 0:
+                    # during reactions, missing optional atoms can do this
+                    continue
                 system.add_interaction(
                     "exclusion",
                     [atom_indices[i], atom_indices[j]],
                     []
                 )
         for (name, members, params) in self.interactions:
+            if any(x < 0 for x in members):
+                # during reactions, missing optional atoms can do this
+                continue
             system.add_interaction(
                 name,
                 [atom_indices[x] for x in members],

@@ -26,7 +26,7 @@ class Reporter:
 
     def pre_modification(self, simulation):
         """
-        Called before the modification algorithm, but only if there is any reactions happening.
+        Called before the modification algorithm, but only if there may be any reactions happening.
         """
 
     def on_reaction(self, simulation, reactions):

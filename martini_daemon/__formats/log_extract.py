@@ -2,7 +2,7 @@ from datetime import datetime
 
 date_format = "%Y-%m-%d %H:%M:%S,%f"
 
-def extract(path, ignore_first=False):
+def extract_timings_from_log(path, ignore_first=False):
     categories_starts = {}
     categories_sums = {}
     try:

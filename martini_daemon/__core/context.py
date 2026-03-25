@@ -8,13 +8,13 @@ from ..__rust import PeriodicBox
 from .utils import collect_bonds_for_whole, make_whole_frame, make_cluster_frame
 
 
-class Context(mm.Context):
+class Context:
     # automatically read it out from the System and all Force's if there should be a reinitialize!
     # when any state is queried or when there is steps forward, check if reinitializing is needed first, reinitialize
     # and then proceed. MAYBE: have a separate reinitialize only for timing purposes
 
 
-    def __init__(self, system: System, integrator, default_box: PeriodicBox, platform=None, params=None):
+    def __init__(self, system: System, integrator: mm.Integrator, default_box: PeriodicBox, platform=None, params=None):
         system._set_default_pbc(default_box)
         if platform is None:
             self.__context = mm.Context(system.get_openmm_system(), integrator)
@@ -29,6 +29,9 @@ class Context(mm.Context):
 
         # before doing any steps or exporting a state, if this is True, reinitialize before proceeding
         self.reinitialize = False
+
+    def do_steps(self, n):
+        self.integrator.step(n)
 
     def __reinitialize(self):
         """

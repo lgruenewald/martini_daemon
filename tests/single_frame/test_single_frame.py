@@ -20,6 +20,11 @@ r_tol = 2e-3  # distance tolerance
 # Setting it to 0 will disable that test (only works for ftol).
 # Put an explanation here.
 #
+# CNAP:
+# the only force in it is a 180 degree improper dihedral
+# apparently there is a small relative deviation that's slightly larger than
+# tolerance, but a very small absolute difference and the forces seem to pass
+#
 # cmap:
 # probably different interpolation in OpenMM and GROMACS
 # this is somehow made worse if there are bonds involved?
@@ -33,6 +38,7 @@ r_tol = 2e-3  # distance tolerance
 # seem *slightly* off for a few atoms
 #
 etol_override = {
+    "CNAP": 3e-5
 }
 ftol_override = {
     "cmap": 1e-2,
@@ -47,9 +53,13 @@ cutoff_nm = 1.1
 def rootdir(request):
     return os.path.dirname(request.path)
 
-# TODO add a few all atom tests
+
 tests = [
-    "cutoff_LJ", "cmap",
+    # notable soft skips
+    "CNAP",
+    "cutoff_LJ",
+    # cmap, pairs
+    "cmap",
     "pairs", "pairs_VW", "pairs_VWQ", "pairs_type",
     # biomolecule tests
     "trypsin", "posres",

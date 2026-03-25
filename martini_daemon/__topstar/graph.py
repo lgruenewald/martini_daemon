@@ -262,9 +262,8 @@ class AtomCache:
             found = False
             for s_inter in s_inters:
                 # S* interaction does not fulfill graph type filter
-                # either it doesn't exist as a force
                 # we assume that it's a BondedForce
-                if self.system.get_force(s_inter[0]) is None or not self.system.get_force(s_inter[0]).passes_filter(g_type):
+                if not self.system.get_force(s_inter[0]).passes_filter(g_type):
                     continue
                 # s_inter already used
                 if s_inter in skip:

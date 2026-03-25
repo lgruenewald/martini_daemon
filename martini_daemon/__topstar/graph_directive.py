@@ -67,8 +67,8 @@ class GraphDirective(Directive):
                         f"Keyword {keyword} not recognized." +
                         (
                             f" Perhaps you meant one of: {', '.join(close_matches)}"
-                            if len(close_matches) > 0 else f"Valid keywords are: {', '.join(possibilities)}."
-                        )
+                            if len(close_matches) > 0 else ""
+                        ) + f" Valid keywords are: {', '.join(possibilities)}."
                     )
 
 

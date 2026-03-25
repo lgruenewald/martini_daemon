@@ -20,17 +20,6 @@ coh_nco_bond
 coh_end nco_end
 [ conditions ]
 r_max 1:1 2:1 0.5
-angle_between 2:2 2:1 1:1 110 170
-angle_between 1:2 1:1 2:1 90 150
-
-[ retype ]
-1:1 TN3
-2:1 SP4
-
-[ bonds ]
-  1:1 2:1   1   0.300  15000
-
-[ angles ]
-  2:2 2:1 1:1   2    140   100
-  1:2 1:1 2:1   2    120   80
+angle 2:2 2:1 1:1 110 to 170
+angle 1:2 1:1 2:1 90 to 150
 

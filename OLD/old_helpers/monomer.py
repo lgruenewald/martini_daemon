@@ -225,6 +225,3 @@ def find_double_bonds(n_monomers, monomer_frames):
                 if order == 2:
                     doubles[frame_index].add((li, ri) if li > ri else (ri, li))
     return doubles
-
-# TODO chain analysis - find different types of linear chains
-# TODO find n_mers

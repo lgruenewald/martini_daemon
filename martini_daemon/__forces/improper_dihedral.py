@@ -30,7 +30,7 @@ class ImproperDihedral(BondedForce):
             "thetap = step(-plus)*2*pi+theta+step(minus)*(-2*pi);"
             "plus=theta+pi-theta0;"
             "minus=theta-pi-theta0;"
-            f"pi = {math.pi:.14f}"
+            f"pi = {math.pi}"
         )
         self.force.addPerTorsionParameter("theta0")
         self.force.addPerTorsionParameter("k")

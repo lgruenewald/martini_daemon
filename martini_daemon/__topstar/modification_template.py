@@ -1,13 +1,11 @@
 from ..__core import MoleculeType
 from ..__parser import TokenList, ParseException, TokenParseException, GromacsTopFile
-
+from .graph import GraphAtomType
 
 class ModificationTemplate(MoleculeType):
-    def __init__(self, parent: GromacsTopFile, path: str, line_num: int):
-        super().__init__(parent, path, line_num)
-        self.topology = parent.result.get("topology")
-        self.__reactants = []
+    def __init__(self):
         # TODO ...
+        pass
 
     def add_reactant(self):
         # TODO verify that reactant exists before adding it to reactants[]

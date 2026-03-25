@@ -1,15 +1,25 @@
-from ..__rust import Fragment, FragList, DetectionTemplate, DetectionTemplateList
+import numpy as np
+from ..__rust import Fragment, FragList, DetectionTemplate, DetectionTemplateList, detection, PeriodicBox
 from .modification_template import ModificationTemplate
 from .graph import Graph, GraphMatch, match_atoms
 from ..__core import System
 
 class TopStar:
+    """
+    The glue between the following components:
+    - graph matching algorithm
+    - detection algorithm
+    - modification algorithm
+    """
     def __init__(self, system: System):
         self.system = system
         self.n_atoms = system.atom_count()
         self.frag_list = FragList(self.n_atoms)
         self.detection_templates = DetectionTemplateList()
+        for d in system.additional_data.get("detection_templates", []):
+            self.detection_templates.add_detection_template(d)
         self.graphs: dict[str, Graph] = system.additional_data.get("graphs") or {}
+        self.absolute_rate = None
 
         # run the graph matching algorithm on all molecules separately
         i = 0
@@ -54,3 +64,12 @@ class TopStar:
             self.frag_list.add_fragment(
                 m.graph.name, frag_atoms
             )
+
+    def detection(self, pbc: PeriodicBox, pos) -> list[tuple[str, list[int]]]:
+        return detection(
+            self.frag_list,
+            self.detection_templates,
+            self.absolute_rate,
+            pbc,
+            pos
+        )

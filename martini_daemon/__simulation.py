@@ -4,6 +4,7 @@ import zlib
 import math
 import sys
 from datetime import datetime
+from time import time
 from importlib.metadata import version
 from typing import Any, Type, Callable
 
@@ -12,7 +13,7 @@ from .__parser import GromacsTopFile, InvalidTopologyError
 from .__core import System, Context, wrap_coupling
 from .__forces import NonBonded
 from .__rust import build_version
-from .__reporters import Reporter
+from .__reporter import Reporter
 from .__topstar import TopStar
 
 
@@ -152,6 +153,10 @@ class Simulation:
 
         for r in self.reporters:
             r.on_simulation_start(self)
+
+        # for the estimated time left display
+        self.last_step_time = 0.
+        self.first_step_time = 0.
 
     # File handles and loggers
     @staticmethod
@@ -303,7 +308,23 @@ class Simulation:
         print()
         self.finish()
 
-    def step(self, n_steps: int, traj=False, dm=False):
+    @staticmethod
+    def __format_time(total):
+        c = int(total)
+        seconds = c % 60
+        c //= 60
+        minutes = c % 60
+        c //= 60
+        hours = c % 24
+        c //= 24
+        days = c
+
+        res = f"{hours:02}:{minutes:02}:{seconds:02}"
+        if days > 0:
+            res = f"{days}d " + res
+        return res
+
+    def step(self, n_steps: int, traj=False, dm=False, silent=False):
         """
         Do the following:
         - steps n_steps
@@ -313,6 +334,63 @@ class Simulation:
         - display info to logs and screen, % info given by self.current_step and self.md_steps
         - update self.current_step
         """
-        # TODO step
-
-
+        start_time = time()
+        self.info(f"doing md steps to go from {self.current_step} to")
+        self.current_step += n_steps
+        percent = self.current_step / self.total_steps * 100. if self.total_steps > 0 else 100.
+        self.info(f"step {self.current_step}")
+        if n_steps > 0:
+            self.info(f"md_steps {n_steps}")
+            self.info("MD start")
+            try:
+                self.context.do_steps(n_steps)
+            except mm.OpenMMException as e:
+                self.error(f"!!! OpenMM Exception !!!\n{e}")
+            self.info("MD finished")
+        if self.total_steps > 0 and n_steps > 0 and not silent:
+            ns_so_far = self.dt_ns * self.current_step
+            time_left = self.__format_time(self.last_step_time * (self.total_steps - self.current_step))
+            reporter_data = " ".join(filter(None, [r.interactive_line(self) for r in self.reporters]))
+            sys.stdout.write(
+                f"\033[2K\rstep {self.i}"
+                f"({ns_so_far:.2f} ns, "
+                f"{percent:.1f}%) "
+                f"{time_left} {reporter_data}"
+            )
+        if dm:
+            self.info("Detection start")
+            pos, box = self.context.get_positions()
+            reactions = self.top.detection(box, pos)
+            self.info(f"After detection there were {len(reactions)} reactions")
+            self.info("Detection finished")
+            if len(reactions) > 0:
+                for r in self.reporters:
+                    r.pre_modification(self)
+            # TODO modification here, modification should return a filtered set of reactions
+            # reactions = self.top.modification(reactions)
+                for r in self.reporters:
+                    r.on_reaction(self, reactions)
+                # TODO minimization, reinitialize
+        if traj:
+            self.info("Trajectory frame start")
+            for r in self.reporters:
+                r.on_trajectory_frame(self)
+            self.info("Trajectory frame finished")
+        end_time = time()
+        if n_steps > 0:
+            step_time = (end_time - start_time) / n_steps
+            if self.last_step_time > 0.:
+                self.last_step_time = step_time * 0.01 + self.last_step_time * 0.99
+            elif not traj or not dm:
+                # step 0 tends to have both xtc and dm as True, and is
+                # usually unrepresentatively slow
+                scale = self.dm_frequency / self.traj_frequency
+                if scale > 1.:
+                    scale = 1. / scale
+                if self.first_step_time == 0.:
+                    # continuations might not start with an expensive step
+                    scale = 0.
+                self.last_step_time = step_time * (1 - scale) + scale * self.first_step_time
+            else:
+                # step 0 probably
+                self.first_step_time = step_time
