@@ -104,6 +104,15 @@ class System:
     def get_res_names(self) -> list[str]:
         return self.__res_names
 
+    def get_types(self) -> list[str]:
+        return self.__types
+
+    def get_charges(self) -> list[float]:
+        return self.__charges
+
+    def get_masses(self) -> list[float]:
+        return self.__masses
+
     def rename(self, atom_id: int, new_name: str) -> None:
         self.__names[atom_id] = new_name
 

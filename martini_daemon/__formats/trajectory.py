@@ -18,9 +18,10 @@ class TrajectoryWriter:
             self.backend = self.default_backends.get(ext)
             if self.backend is None:
                 raise ValueError(f"Unknown trajectory file format {ext} for {path}.")
-        if backend not in self.backends:
-            raise ValueError(f"Unknown trajectory backend {backend}. Available Trajectory Writer backends: {', '.join(self.backends)}.")
-        self.backend = backend
+        else:
+            self.backend = backend
+        if self.backend not in self.backends:
+            raise ValueError(f"Unknown trajectory backend {self.backend}. Available Trajectory Writer backends: {', '.join(self.backends)}.")
         match self.backend:
             case "xtc_openmm_internal":
                 pass
@@ -47,7 +48,8 @@ class TrajectoryWriter:
                 xtc_write_frame(
                     self.path.encode("utf-8"), # title as byte string
                     pos, # positions as float[:, :]
-                    time_ns,
+                    box, # box as float[:, :]
+                    time_ns * 1000., # time in ps
                     sim_step
                 )
             case _:
@@ -90,6 +92,9 @@ class TrajectoryReader:
 
 
     def read_frame(self) -> None | tuple[int, float, PeriodicBox, np.ndarray, np.ndarray | None]:
+        """
+        Returns a tuple of sim step, time (in ns), pbc, pos and vel if the format supports it
+        """
         match self.backend:
             case "xtc_openmm_internal":
                 if self.c_frame >= self.n_frames:
@@ -97,7 +102,7 @@ class TrajectoryReader:
                 self.c_frame += 1
                 return (
                     self.step[self.c_frame - 1],
-                    self.time[self.c_frame - 1],
+                    self.time[self.c_frame - 1] / 1000.,
                     PeriodicBox(self.box[self.c_frame - 1]),
                     self.pos[self.c_frame - 1],
                     None

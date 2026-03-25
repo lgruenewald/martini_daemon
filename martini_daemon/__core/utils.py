@@ -3,6 +3,7 @@ from .bonded_force import BondedForce
 import numpy as np
 from ..__rust import PeriodicBox
 
+# == Bond list utilities ==
 def collect_bonds(system: System, filters: list[str]):
     n = system.atom_count()
     bonds = []
@@ -18,7 +19,7 @@ def collect_bonds(system: System, filters: list[str]):
                 if force.passes_filter(filt):
                     do_force = True
                     break
-        for members, _ in force.iterate_bonds():
+        for _, (members, _) in force.iterate_bonds():
             if force.passes_filter("vsite"):
                 # hardcoded special case, modeled as vsite bonded to all constructing particles
                 i = members[0]

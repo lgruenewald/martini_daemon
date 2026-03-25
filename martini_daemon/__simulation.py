@@ -157,6 +157,7 @@ class Simulation:
         # for the estimated time left display
         self.last_step_time = 0.
         self.first_step_time = 0.
+        self.trajectory_frame = 0
 
     # File handles and loggers
     @staticmethod
@@ -305,6 +306,7 @@ class Simulation:
                 gcd, traj=self.current_step % self.traj_frequency == 0 if self.traj_frequency > 0 else False,
                 dm=self.current_step % self.dm_frequency == 0 if self.dm_frequency > 0 else False
             )
+        self.do_traj_frame()
         print()
         self.finish()
 
@@ -324,6 +326,13 @@ class Simulation:
             res = f"{days}d " + res
         return res
 
+    def do_traj_frame(self):
+        for r in self.reporters:
+            self.info(f"Trajectory {r.__class__.__name__} start")
+            r.on_trajectory_frame(self)
+            self.info(f"Trajectory {r.__class__.__name__} finished")
+        self.trajectory_frame += 1
+
     def step(self, n_steps: int, traj=False, dm=False, silent=False):
         """
         Do the following:
@@ -335,6 +344,9 @@ class Simulation:
         - update self.current_step
         """
         start_time = time()
+        if traj:
+            self.do_traj_frame()
+
         self.info(f"doing md steps to go from {self.current_step} to")
         self.current_step += n_steps
         percent = self.current_step / self.total_steps * 100. if self.total_steps > 0 else 100.
@@ -348,12 +360,12 @@ class Simulation:
                 self.error(f"!!! OpenMM Exception !!!\n{e}")
             self.info("MD finished")
         if self.total_steps > 0 and n_steps > 0 and not silent:
-            ns_so_far = self.dt_ns * self.current_step
+            self.time_ns = self.dt_ns * self.current_step
             time_left = self.__format_time(self.last_step_time * (self.total_steps - self.current_step))
             reporter_data = " ".join(filter(None, [r.interactive_line(self) for r in self.reporters]))
             sys.stdout.write(
-                f"\033[2K\rstep {self.i}"
-                f"({ns_so_far:.2f} ns, "
+                f"\033[2K\rstep {self.current_step}"
+                f"({self.time_ns:.2f} ns, "
                 f"{percent:.1f}%) "
                 f"{time_left} {reporter_data}"
             )
@@ -371,11 +383,6 @@ class Simulation:
                 for r in self.reporters:
                     r.on_reaction(self, reactions)
                 # TODO minimization, reinitialize
-        if traj:
-            self.info("Trajectory frame start")
-            for r in self.reporters:
-                r.on_trajectory_frame(self)
-            self.info("Trajectory frame finished")
         end_time = time()
         if n_steps > 0:
             step_time = (end_time - start_time) / n_steps
