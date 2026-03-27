@@ -13,7 +13,7 @@ class ExclusionsDirective(Directive):
         i = self.parent.parse_index(tokens, 0)
         # j is mandatory -> separate
         j = self.parent.parse_index(tokens, 1)
-        self.parent.exclusions.add((i, j))
+        self.parent.molecule_type.exclusions.add((i, j))
         for k in range(2, len(tokens)):
             self.parent.exclusions.add((
                 i, self.parent.parse_index(tokens, k)

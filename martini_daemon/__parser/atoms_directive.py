@@ -8,14 +8,6 @@ from .token_list import TokenList, TokenParseException
 
 @register_directive
 class AtomsDirective(Directive):
-    def __init__(self, parent: MoleculeTypeDirective, path: str, line_num: int) -> None:
-        self.parent = parent
-        self.path = path
-        self.line_num = line_num
-
-    def where(self) -> tuple[str, int]:
-        return self.path, self.line_num
-
     def line(self, tokens: TokenList) -> None:
         index = tokens.unwrap(0, "index")
         type_ = tokens.unwrap(1, "word")
@@ -25,13 +17,13 @@ class AtomsDirective(Directive):
         _ = tokens.unwrap(5, "int") # charge group number
         charge = tokens.unwrap(6, "float", None)
         mass = tokens.unwrap(7, "float", None)
-        if index != len(self.parent.atoms):
+        if index != len(self.parent.molecule_type.atoms):
             raise TokenParseException(
                 tokens[0],
                 "Bad atom ID, are they out of order?"
-                f" got id {index} but expected {len(self.parent.atoms)}"
+                f" got id {index} but expected {len(self.parent.molecule_type.atoms)}"
             )
-        self.parent.atoms.append(
+        self.parent.molecule_type.atoms.append(
             (type_, res_num, res_name, atom_name, charge, mass)
         )
 

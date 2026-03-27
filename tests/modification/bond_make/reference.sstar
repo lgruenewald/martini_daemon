@@ -11,12 +11,12 @@ Atoms
 ('X1', 2, 'X', 'W', 0.0, 72.0, 1, 0.5)
 
 Forces
-Force:HarmonicBond
+Force:harmonic_bond
 (0, 1, 0.5, 1000.0)
 (2, 3, 0.5, 1000.0)
-Force:ExclusionHelper
-(0, 1)
-(2, 3)
+Force:exclusion
+(1, 0)
+(3, 2)
 End Frame
 
 ==== Frame 0 ====
@@ -28,18 +28,18 @@ Atoms
 ('X1', 2, 'X', 'W', 0.0, 72.0, 1, 0.5)
 
 Forces
-Force:HarmonicBond
+Force:harmonic_bond
 (0, 1, 0.5, 1000.0)
 (2, 3, 0.5, 1000.0)
 (1, 2, 0.5, 1200.0)
-Force:HarmonicAngle
+Force:harmonic_angle
 (0, 1, 2, 1.0471975511965976, 120.0)
 (1, 2, 3, 1.0471975511965976, 120.0)
-Force:ProperDihedral
-(0, 1, 2, 3, 1.0471975511965976, 20.0, 1)
-Force:ExclusionHelper
-(0, 1)
-(2, 3)
-(1, 2)
+Force:proper_dihedral
+(0, 1, 2, 3, 1.0, 1.0471975511965976, 20.0)
+Force:exclusion
+(1, 0)
+(3, 2)
+(2, 1)
 End Frame
 

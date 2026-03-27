@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
-from martini_daemon import Simulation, XTCReporter, ToptrajReporter, ReactionReporter
+from martini_daemon import Simulation, XTCReporter, ToptrajReporter, ReactionReporter, FragCountReporter
 
 sim = Simulation(
     "system.top", "system.gro",
     md_steps=1000000, reporters=[
         ToptrajReporter(),
         XTCReporter(),
-        ReactionReporter()
+        ReactionReporter(),
+        FragCountReporter()
     ],
     dm_frequency=100,
     traj_frequency=1000,

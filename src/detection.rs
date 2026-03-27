@@ -18,10 +18,9 @@ use crate::frag_list::FragList;
 pub fn detection<'py>(
     frag_list: &mut FragList,
     detection_template_list: &mut DetectionTemplateList,
-    absolute_rate: Option<f64>,
     pbc: &PeriodicBox,
     pos: Bound<'py, PyArray<f64, Ix2>>,
-) -> PyResult<Vec<(Vec<usize>, String)>> {
+) -> PyResult<Vec<(String, Vec<usize>)>> {
     let py = pos.py();
     let pos = pos.as_borrowed();
 
@@ -34,7 +33,10 @@ pub fn detection<'py>(
         let name = &frag.name;
         let frag_id = frag.frag_id;
         // for each within-frag index
-        for frag_atom_index in detection_template_list.frag_name_to_r_max_atoms[name].iter() {
+        let Some(name_to_rmax) = detection_template_list.frag_name_to_r_max_atoms.get(name) else {
+            continue;
+        };
+        for frag_atom_index in name_to_rmax.iter() {
             // index globally
             let index = frag.atoms[*frag_atom_index];
             if index < 0 {
@@ -71,7 +73,7 @@ pub fn detection<'py>(
     // for many systems skip is going to be quite empty or low in # of members
     let mut skip: HashSet<usize> = HashSet::new();
     // result
-    let mut reactions: Vec<(Vec<usize>, String)> = Vec::new();
+    let mut reactions: Vec<(String, Vec<usize>)> = Vec::new();
 
     for (i, frag_i) in frag_list.iter() {
         if skip.contains(i) {
@@ -85,9 +87,9 @@ pub fn detection<'py>(
             for uni_rx in uni_rxs {
                 let rx = detection_template_list.reactions.get(uni_rx).unwrap().borrow_mut(py);;
                 let frags = vec![frag_i];
-                if detection_one(rx, frags, pbc, pos, absolute_rate, &mut rng) {
+                if detection_one(rx, frags, pbc, pos, &mut rng) {
                     skip.insert(*i);
-                    reactions.push((vec![*i], uni_rx.clone()));
+                    reactions.push((uni_rx.clone(), vec![*i]));
                     break; // uni_rx in uni_rxs
                 }
             }
@@ -150,10 +152,10 @@ pub fn detection<'py>(
                             .borrow_mut(py);
                         let frags = vec![frag_i, frag_j];
 
-                        if detection_one(rx, frags, pbc, pos, absolute_rate, &mut rng) {
+                        if detection_one(rx, frags, pbc, pos, &mut rng) {
                             skip.insert(*i);
                             skip.insert(*j);
-                            reactions.push((vec![*i, *j], bi_rx.clone()));
+                            reactions.push((bi_rx.clone(), vec![*i, *j]));
                             break; // bi_rx in bi_rxs
                         }
                     }
@@ -226,11 +228,11 @@ pub fn detection<'py>(
                                 .borrow_mut(py);
                             let frags = vec![frag_i, frag_j_or_k, frag_k_or_j];
 
-                            if detection_one(rx, frags, pbc, pos, absolute_rate, &mut rng) {
+                            if detection_one(rx, frags, pbc, pos, &mut rng) {
                                 skip.insert(*i);
                                 skip.insert(*j_or_k);
                                 skip.insert(*k_or_j);
-                                reactions.push((vec![*i, *j_or_k, *k_or_j], tri_rx.clone()));
+                                reactions.push((tri_rx.clone(), vec![*i, *j_or_k, *k_or_j]));
                                 break; // tri_rx in tri_rxs
                             }
                         }
@@ -250,11 +252,11 @@ pub fn detection<'py>(
                                 .borrow_mut(py);
                             let frags = vec![frag_i, frag_k_or_j, frag_j_or_k];
 
-                            if detection_one(rx, frags, pbc, pos, absolute_rate, &mut rng) {
+                            if detection_one(rx, frags, pbc, pos, &mut rng) {
                                 skip.insert(*i);
                                 skip.insert(*j_or_k);
                                 skip.insert(*k_or_j);
-                                reactions.push((vec![*i, *k_or_j, *j_or_k], tri_rx.clone()));
+                                reactions.push((tri_rx.clone(), vec![*i, *k_or_j, *j_or_k]));
                                 break; // tri_rx in tri_rxs
                             }
                         }

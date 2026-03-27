@@ -2,21 +2,20 @@ from typing import Any
 import difflib
 from math import pi, cos
 
-from ..__parser import Directive, register_directive, GromacsTopFile, TokenList, ParseException, TokenParseException
+from ..__parser import Directive, register_directive, GromacsTopFile, TokenList, ParseException, TokenParseException, MoleculeTypeDirective
 from ..__rust import DetectionTemplate
 from .modification_template import ModificationTemplate
 from .graph import GraphAtomType
 
 
-# TODO make this actually a child class of MoleculeTypeDirective or a shared abstract class
 @register_directive
-class ReactionDirective(Directive):
+class ReactionDirective(MoleculeTypeDirective):
+
     def __init__(self, parent, path, line_num):
         super().__init__(parent, path, line_num)
         self.d_template = DetectionTemplate()
-        #self.m_template = ModificationTemplate() <-- probably should inherit MoleculeType and should have the same mechanism as MoleculeTypeDirective for adding it to system
-        # TODO modification templates should go among molecule types
-        # TODO nrexcl on reaction templates?
+        self.molecule_type: ModificationTemplate = ModificationTemplate()
+        self.molecule_type.nrexcl = 1
         if parent.system.additional_data.get("detection_templates") is None:
             parent.system.additional_data["detection_templates"] = []
         parent.system.additional_data["detection_templates"].append(self.d_template)
@@ -26,6 +25,8 @@ class ReactionDirective(Directive):
     def line(self, tokens: TokenList) -> None:
         name = tokens.unwrap(0, "word")
         self.d_template.name = name
+        self.molecule_type.name = name
+        tokens.assert_no_more_than(1)
         if self.system.molecule_types.get(name) is not None:
             raise TokenParseException(
                 tokens[0],
@@ -34,8 +35,9 @@ class ReactionDirective(Directive):
 
 
     def finish(self):
-        # called during parsing
+        super().finish()
         try:
+            # called during parsing
             self.d_template.complete()
         except Exception as e:
             raise ParseException(str(e))
@@ -96,6 +98,11 @@ class ReactionDirective(Directive):
 @register_directive
 class ReactantsDirective(Directive):
     def line(self, tokens: TokenList) -> None:
+        if len(self.parent.d_template.reactants) > 0:
+            raise TokenParseException(
+                tokens[0],
+                "Only one line containing all reactants per reaction."
+            )
         reactants = [
             tokens.unwrap(i, "word") for i in range(len(tokens))
         ]
@@ -108,11 +115,7 @@ class ReactantsDirective(Directive):
                     tokens[i],
                     f"Undefined reactant graph name {r}. Please put the required [graph] directive first."
                 )
-        if len(self.parent.d_template.reactants) > 0:
-            raise TokenParseException(
-                tokens[0],
-                "Only one line containing all reactants per reaction."
-            )
+        self.parent.molecule_type.reactants = reactants
         self.parent.d_template.reactants = reactants
 
     def finish(self):
@@ -320,4 +323,141 @@ class ConditionsDirective(Directive):
     def get_name(cls) -> str:
         return "conditions"
 
-# TODO break, update, redefine, softcore
+@register_directive
+class BreakDirective(Directive):
+    def line(self, tokens: TokenList) -> None:
+        self.parent.molecule_type.break_groups.append([
+            self.parent.parse_index(tokens, i) for i in range(len(tokens))
+        ])
+
+    def finish(self):
+        pass
+
+    @classmethod
+    def is_mandatory(cls):
+        return False
+
+    @classmethod
+    def is_unique(cls):
+        return False
+
+    @classmethod
+    def is_valid_parent(cls, parent: Any) -> bool:
+        return isinstance(parent, ReactionDirective)
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "break"
+
+
+@register_directive
+class UpdateDirective(Directive):
+    def line(self, tokens: TokenList) -> None:
+        self.parent.molecule_type.update_groups.append([
+            self.parent.parse_index(tokens, i) for i in range(len(tokens))
+        ])
+
+    def finish(self):
+        pass
+
+    @classmethod
+    def is_mandatory(cls):
+        return False
+
+    @classmethod
+    def is_unique(cls):
+        return False
+
+    @classmethod
+    def is_valid_parent(cls, parent: Any) -> bool:
+        return isinstance(parent, ReactionDirective)
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "update"
+
+
+@register_directive
+class RedefineDirective(Directive):
+
+    def line(self, tokens: TokenList) -> None:
+        reactant_index, atom_index = self.parent.parse_index(tokens, 0, "pair")
+        changes = set()
+        i = 1
+        while i < len(tokens):
+            word = tokens.unwrap(i, "word")
+            if word in changes:
+                raise TokenParseException(
+                    tokens[i],
+                    f"Duplicate entry {word}."
+                )
+            changes.add(word)
+            match word:
+                case "name":
+                    self.parent.molecule_type.renames.append((
+                        reactant_index, atom_index, tokens.unwrap(i+1, "word")
+                    ))
+                case "type":
+                    self.parent.molecule_type.retypes.append((
+                        reactant_index, atom_index, tokens.unwrap(i+1, "word")
+                    ))
+                case "charge":
+                    self.parent.molecule_type.recharges.append((
+                        reactant_index, atom_index, tokens.unwrap(i+1, "float")
+                    ))
+                case "mass":
+                    self.parent.molecule_type.remasses.append((
+                        reactant_index, atom_index, tokens.unwrap(i+1, "float")
+                    ))
+                case _:
+                    raise TokenParseException(
+                        tokens[1 + i * 2],
+                        f"Unknown atom property {word}."
+                    )
+
+    def finish(self):
+        pass
+
+    @classmethod
+    def is_mandatory(cls):
+        return False
+
+    @classmethod
+    def is_unique(cls):
+        return False
+
+    @classmethod
+    def is_valid_parent(cls, parent: Any) -> bool:
+        return isinstance(parent, ReactionDirective)
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "redefine"
+
+@register_directive
+class SoftCoreDirective(Directive):
+
+    def line(self, tokens: TokenList) -> None:
+        reactant_index, atom_index = self.parent.parse_index(tokens, 0, "pair")
+        sc_lam = tokens.unwrap(1, "float")
+        sc_alpha = tokens.unwrap(2, "float")
+        self.parent.molecule_type.soft_core.append((reactant_index, atom_index, sc_lam, sc_alpha))
+
+    def finish(self):
+        pass
+
+    @classmethod
+    def is_mandatory(cls):
+        return False
+
+    @classmethod
+    def is_unique(cls):
+        return False
+
+    @classmethod
+    def is_valid_parent(cls, parent: Any) -> bool:
+        return isinstance(parent, ReactionDirective)
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "softcore"

@@ -1,5 +1,5 @@
 import openmm as mm
-from typing import Iterable, Type, Any
+from typing import Iterable, Type, Any, Collection
 from collections import OrderedDict
 import numpy as np
 
@@ -18,6 +18,7 @@ class System:
         self.__types: list[str] = []
         self.__charges: list[float] = []
         self.__masses: list[float] = []
+        # sc_lambda, sc_alpha
         self.__softcore: list[tuple[float, float]] = []
 
         # default charge, mass
@@ -98,26 +99,26 @@ class System:
     def get_atom_names(self) -> list[str]:
         return self.__names
 
+    def get_res_id(self, atom_id: int) -> int:
+        return self.__res_ids[atom_id]
+
     def get_res_ids(self) -> list[int]:
         return self.__res_ids
 
     def get_res_names(self) -> list[str]:
         return self.__res_names
 
-    def get_types(self) -> list[str]:
-        return self.__types
-
-    def get_charges(self) -> list[float]:
-        return self.__charges
-
-    def get_masses(self) -> list[float]:
-        return self.__masses
+    def get_res_name(self, atom_id: int) -> str:
+        return self.__res_names[atom_id]
 
     def rename(self, atom_id: int, new_name: str) -> None:
         self.__names[atom_id] = new_name
 
     def get_type(self, atom_id: int) -> str:
         return self.__types[atom_id]
+
+    def get_types(self) -> list[str]:
+        return self.__types
 
     def retype(self, atom_id: int, new_type: str) -> None:
         self.__types[atom_id] = new_type
@@ -126,12 +127,18 @@ class System:
     def get_charge(self, atom_id: int) -> float:
         return self.__charges[atom_id]
 
+    def get_charges(self) -> list[float]:
+        return self.__charges
+
     def recharge(self, atom_id: int, new_charge: float) -> None:
         self.__charges[atom_id] = new_charge
         self.flag_atom_change(atom_id, True)
 
     def get_mass(self, atom_id: int) -> float:
         return self.__masses[atom_id]
+
+    def get_masses(self) -> list[float]:
+        return self.__masses
 
     def remass(self, atom_id: int, new_mass: float) -> None:
         self.__masses[atom_id] = new_mass
@@ -140,6 +147,12 @@ class System:
 
     def get_sc(self, atom_id: int) -> tuple[float, float]:
         return self.__softcore[atom_id]
+
+    def get_sc_lam(self, atom_id) -> float:
+        return self.get_sc(atom_id)[0]
+
+    def get_sc_alpha(self, atom_id) -> float:
+        return self.get_sc(atom_id)[1]
 
     def update_sc(self, atom_id: int, new_sc: tuple[float, float]) -> None:
         self.__softcore[atom_id] = new_sc
@@ -155,6 +168,9 @@ class System:
             return self.__atom_types.items()
 
     def get_atom_type(self, atom_type: str) -> None | tuple[float, float]:
+        """
+        Get default charge and mass for atom type.
+        """
         return self.__atom_types.get(atom_type)
 
     # ==== STATE SYNCHRONIZATION ====
@@ -185,7 +201,8 @@ class System:
 
         Should only be called by Force/BondedForce. Should be only called if Force is in __forces.
         """
-        self.__system.addForce(force)
+        i = self.__system.addForce(force)
+        assert self.__system.getNumForces() - 1 == i
         self.flag_reinitialize()
 
     def _rebuild(self) -> None:
@@ -208,6 +225,7 @@ class System:
         for i in range(self.__system.getNumForces()):
             if name == self.__system.getForce(i).getName():
                 self.__system.removeForce(i)
+                break
         self.flag_reinitialize()
 
     def _add_constraint(self, i, j, length) -> None:
@@ -379,6 +397,87 @@ class System:
             f.delta_degrees_of_freedom()
             for f in self.__forces.values()
         )
+
+    def collect_bonds(self, filters: list[str]) -> list[tuple[int, int]]:
+        """
+        Returns a list of bonds that matches any of the filters.
+
+        Virtual sites will be added as each constructing particle being bonded to the virtual site.
+
+        Multi-members interactions otherwise will be added as each member being bonded to the next.
+        """
+        n = self.atom_count()
+        bonds = []
+        for force in self.get_forces():
+            if not issubclass(type(force), BondedForce):
+                continue
+            # do we include this force
+            do_force = False
+            if filters is None:
+                do_force = True
+            else:
+                for filt in filters:
+                    if force.passes_filter(filt):
+                        do_force = True
+                        break
+            for _, (members, _) in force.iterate_bonds():
+                if force.passes_filter("vsite"):
+                    # hardcoded special case, modeled as vsite bonded to all constructing particles
+                    i = members[0]
+                    for j in members[1:]:
+                        if i == j:
+                            continue
+                        bonds.append((i, j))
+                else:
+                    # modeled as each particle bonded to the next one
+                    for i, j in zip(members[:-1], members[1:]):
+                        if i == j:
+                            continue
+                        bonds.append((i, j))
+        return bonds
+
+    def collect_bonds_for_whole(self) -> list[tuple[int, int]]:
+        """
+        Returns a list of bonds that need to be made whole across the PBC before simulation
+        can start. This usually includes constraints and virtual sites.
+        Uses the `uses_pbc()` function of BondedForce to determine which one it is.
+        """
+        n = self.atom_count()
+        bonds = []
+        for force in self.get_forces():
+            # do we include this force
+            if not issubclass(type(force), BondedForce) or force.uses_pbc():
+                continue
+            for _, (members, _) in force.iterate_bonds():
+                i = members[0]
+                for j in members[1:]:
+                    if i == j:
+                        continue
+                    bonds.append((i, j))
+        return bonds
+
+
+    def populate_neighbors(self, atoms: Collection[int], recursive=False) -> set[int]:
+        """
+        For a set of atoms, return a set that also contains their neighbors.
+
+        Neighbor = shared interaction (e.g. bond, angle, exclusion...).
+
+        If recursive, will traverse interactions recursively to get the whole molecule.
+        """
+        res = set(atoms)
+        stack = list(atoms)
+        while len(stack) > 0:
+            atom = stack[-1]
+            for force, bond_id in self.__interactions_by_atom[atom]:
+                for m in self.get_force(force).get_members(bond_id):
+                    res.add(m)
+                    if recursive:
+                        stack.append(m)
+            del stack[-1]
+        return res
+
+
 
 def register_available_force(cls):
     System.provide_force(cls)

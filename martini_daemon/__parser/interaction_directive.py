@@ -29,7 +29,7 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
     def line(self, tokens: TokenList) -> None:
         type_num, type_name = self.read_type(tokens)
 
-        self.parent.interactions.append((
+        self.parent.molecule_type.interactions.append((
             type_name,
             self.read_members(tokens),
             self.read_params(tokens, type_num),

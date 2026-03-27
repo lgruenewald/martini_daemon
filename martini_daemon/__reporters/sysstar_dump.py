@@ -1,57 +1,78 @@
-from .reporter import Reporter
+from ..__core import BondedForce
+from ..__reporter import Reporter
+from ..__simulation import Simulation
+from typing import Any
 import re
+
+
+def write_frame(sim: Simulation):
+    sim.print(".sstar", f"==== Frame {sim.current_step} ====")
+
+    sys = sim.system
+    sim.print(".sstar","Atoms")
+    sim.print(".sstar", "# (name, resid, resname, type, charge, mass, sc_lam, sc_alpha)")
+
+    for atom in range(sys.atom_count()):
+        sim.print(
+            ".sstar",
+            f"('{sys.get_name(atom)}', {sys.get_res_id(atom)}, '{sys.get_res_name(atom)}', "
+            f"'{sys.get_type(atom)}', {sys.get_charge(atom)}, {sys.get_mass(atom)}, "
+            f"{sys.get_sc_lam(atom)}, {sys.get_sc_alpha(atom)})"
+        )
+
+    sim.print(".sstar", "")
+    sim.print(".sstar", "Forces")
+    for force in sys.get_forces():
+        if not issubclass(type(force), BondedForce):
+            continue
+        if len([force.iterate_bonds()]) == 0:
+            continue
+        sim.print(".sstar", f"Force:{force.get_name()}")
+        for (_, (members, params)) in force.iterate_bonds():
+            sim.print(".sstar", "(" + ", ".join(str(x) for x in members + params) + ")")
+
+    sim.print(".sstar","End Frame")
+    sim.print(".sstar","")
+
 
 class SysStarDump(Reporter):
     """
-        Dumps all info from S* -- all atom details and all interactions
-        in a human-readable plaintext file. Dumps it at the start and
-        when there is any change.
+    Dumps all info from S* -- all atom details and all interactions
+    in a human-readable plaintext file. Dumps it at the start and
+    when there is any change.
     """
 
     def __init__(self):
         pass
 
-    def on_set_xtc_path(self, xtc_name):
-        self._open(xtc_name + ".sstar")
-        n = self._sysstar.len_atoms()
+
+    def on_simulation_start(self, simulation):
+        simulation.open(".sstar")
+        n = simulation.system.atom_count()
         assert n > 0
-        self._print("Format: SStar Dump")
-        self._print("Version: 0")
-        self._print(f"N: {n}")
-        self._print("# Written by Martini Daemon SysStarDump")
-        self._write_frame(0)
+        simulation.print(".sstar", "Format: SStar Dump")
+        simulation.print(".sstar", "Version: 0")
+        simulation.print(".sstar", f"N: {n}")
+        simulation.print(".sstar", "# Written by Martini Daemon SysStarDump")
+        write_frame(simulation)
 
-    def post_modification(self, i, name, reactions):
-        self._write_frame(i)
-
-    def _write_frame(self, i):
-        self._print(f"==== Frame {i} ====")
-
-        sys = self._sysstar
-        self._print("Atoms")
-        self._print("# (name, resid, resname, type, charge, mass, sc_lam, sc_alpha)")
-        for deets in sys._atom_list:
-            self._print(f"{deets}")
-
-        self._print("")
-        self._print("Forces")
-        for force in sys.modular_forces:
-            if force._list is None or len(force._list) == 0:
-                continue
-            else:
-                self._print(f"Force:{type(force).__name__}")
-                for deets in force._list:
-                    self._print(f"{deets}")
-
-        self._print("End Frame")
-        self._print("")
+    def on_reaction(self, simulation, _):
+        write_frame(simulation)
 
     @staticmethod
-    def read_dump(path: str):
+    def read_dump(path: str) -> list[tuple[int, list[tuple[str, int, str, str, float, float, float, float]], list[tuple[str, list[Any]]]]]:
         """
         .sstar dump reader
-        TODO the format writer and reader should go together in the same place
+
+        Returns a list of frames read.
+
+        - Each frame is a tuple of sim step, atoms and forces.
+        - atoms is a list of name, resid, resname, atom type, charge, mass and two additional float parameters for soft core
+        - forces is a list of force name and interaction list
+        - interaction is a list of members and params in a tuple
         """
+        # TODO verify if this is true
+
         frames = []
         with open(path, "r") as f:
             lines = f.read().splitlines()

@@ -37,6 +37,6 @@ class Reporter:
 
     def post_reaction(self, simulation):
         """
-        Called after minimization (if done) and reinitialize.
+        Called after minimization (if there was one) and reinitialize.
         """
         pass

@@ -5,7 +5,7 @@ import openmm as mm
 import numpy as np
 from .system import System
 from ..__rust import PeriodicBox
-from .utils import collect_bonds_for_whole, make_whole_frame, make_cluster_frame
+from .bond_list import make_whole_frame, make_cluster_frame
 
 
 class Context:
@@ -46,7 +46,7 @@ class Context:
         if positions.shape != (self.N, 3):
             raise ValueError(f"Positions must have shape ({self.N}, 3), got {positions.shape}.")
         positions = positions.copy()
-        bonds = collect_bonds_for_whole(self.system)
+        bonds = self.system.collect_bonds_for_whole()
         clus = make_cluster_frame(self.N, bonds)
         make_whole_frame(self.N, positions, box, clus)
         self.__context.setPositions(positions)

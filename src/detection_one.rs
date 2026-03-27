@@ -14,7 +14,6 @@ pub fn detection_one<'py>(
     frags: Vec<&Fragment>,
     pbc: &PeriodicBox,
     pos: Borrowed<PyArray<f64, Ix2>>,
-    absolute_rate: Option<f64>,
     rng: &mut ThreadRng,
 ) -> bool {
 
@@ -153,36 +152,26 @@ pub fn detection_one<'py>(
     }
 
     // simple probability based rate control
-    assert!(rx.probability <= 1.);
     if rx.probability < 1. {
-        assert!(rx.probability >= 0.);
         let rand: f64 = rng.random();
-        assert!(rand >= 0.);
-        assert!(rand <= 1.);
         if rand > rx.probability {
             return false;
         }
     }
 
-    // is reaction rate controlled
-    if let Some(_) = rx.relative_rate {
-        rx.reaction_counter += 1;
-        let Some(abs_rate) = absolute_rate else {
-            // rate controlled reaction but no global rate control established yet
-            return false;
-        };
+    // is reaction rate controlled using a rate constant
+    if let Some(rate) = rx.rate {
         let Some(obs_rate) = rx.observed_rate else {
             // warmup for this reaction
             return false;
         };
-        let prob = abs_rate / obs_rate;
-        assert!(prob >= 0.);
-        assert!(prob <= 1.);
-        let rand: f64 = rng.random();
-        assert!(rand >= 0.);
-        assert!(rand <= 1.);
-        if prob < rand {
-            // random between 0 and 1
+        if rx.total_reaction_count < 3 {
+            // arbitrary small number to get at least an order of magnitude estimate for
+            // the frequency of reactions
+            return false;
+        }
+        if obs_rate > rate {
+            // too fast! slow down a bit until the smoothing estimates the rate to be below
             return false;
         }
     }

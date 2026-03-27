@@ -5,6 +5,7 @@ import struct
 
 # TODO improve docs
 # TODO initial molecules should contain number of atoms per molecule as well
+# TODO reaction information
 # TODO fragment information per frame?
 
 class TopTrajWriter:

@@ -1,13 +1,14 @@
-from dataclasses import dataclass
-
-@dataclass
 class MoleculeType:
-    molecule_name: str
 
-    # type, res num, res name, atomname, charge, mass
-    atoms: list[tuple[str, int, str, str, float | None, float | None]]
-    exclusions: set[tuple[int, int]]
-    interactions: list[tuple[str, list[int], list[float]]]
+    def __init__(self):
+        self.name: str | None = None
+        self.nrexcl: int | None = None
+
+        # type, res num, res name, atomname, charge, mass
+        self.atoms: list[tuple[str, int, str, str, float | None, float | None]] = []
+        self.exclusions: set[tuple[int, int]] = set()
+        # name, members, params, generates_excl?
+        self.interactions: list[tuple[str, list[int], list[float], bool]] = []
 
     # methods called by [molecules] and reactions
     def add_atoms_to_system(self, system) -> list[int]:
@@ -21,6 +22,13 @@ class MoleculeType:
                 atom_name, res_name, type_, charge, mass
             ))
         return res
+
+
+    def process_nrexcl(self):
+        for _, members, _, is_excl in self.interactions:
+            if is_excl:
+                assert len(members) == 2
+                self.exclusions.add((members[0], members[1]))
 
 
     def instantiate(self, system, atom_indices: list[int]):
@@ -39,7 +47,7 @@ class MoleculeType:
                     [atom_indices[i], atom_indices[j]],
                     []
                 )
-        for (name, members, params) in self.interactions:
+        for (name, members, params, _) in self.interactions:
             if any(x < 0 for x in members):
                 # during reactions, missing optional atoms can do this
                 continue

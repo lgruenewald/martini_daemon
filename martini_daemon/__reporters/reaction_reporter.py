@@ -2,6 +2,7 @@ import re
 
 from ..__reporter import Reporter
 from ..__simulation import Simulation
+from ..__rust import Fragment
 
 class ReactionReporter(Reporter):
     """A reporter that reports all reactions to <name>.reactions"""
@@ -42,12 +43,8 @@ class ReactionReporter(Reporter):
         return "(res:" + ",".join(res) + ")"
 
     # need to be post, as the modification algorithm can reject some reactions
-    def on_reaction(self, simulation: Simulation, reactions):
-        for (frag_ids, rx) in reactions:
-            frags = [
-                simulation.top.frag_list.get_fragment(frag_id)
-                for frag_id in frag_ids
-            ]
+    def on_reaction(self, simulation: Simulation, reactions: list[tuple[str, list[Fragment]]]):
+        for (rx, frags) in reactions:
             simulation.print(
                 ".reactions",
                 f"{simulation.current_step},{rx};"
@@ -68,9 +65,11 @@ class ReactionReporter(Reporter):
 
 
     @staticmethod
-    def read_reactions(path) -> list[tuple[str, str, list[list[int]]]]:
+    def read_reactions(path) -> list[tuple[int, str, list[list[int]]]]:
         """
         .reactions format reader suited for test_detection.py
+
+        Returns a list of simulation steps, reaction names and list of reactant atom lists
         """
         reactions = []
         with open(path, "r") as f:

@@ -10,7 +10,9 @@ pub struct FragList {
     n_atoms: usize,
     defrag_list: Vec<Vec<usize>>,
     frag_list: OrderMap<usize, Fragment>,
+    #[pyo3(get)]
     next_frag_id: usize,
+    #[pyo3(get)]
     frag_counts: HashMap<String, usize>,
 }
 
@@ -20,7 +22,6 @@ impl FragList {
     {
         self.frag_list.values()
     }
-
 
     pub fn iter(&self) -> impl Iterator<Item = (&usize, &Fragment)> {
         self.frag_list.iter()
@@ -50,7 +51,7 @@ impl FragList {
         &mut self,
         name: String,
         atoms: Vec<isize>,
-    ) -> PyResult<usize> {
+    ) -> usize {
         // frag counts
         if let Some(count) = self.frag_counts.get_mut(&name) {
             *count += 1;
@@ -76,20 +77,20 @@ impl FragList {
             atoms,
         };
         self.frag_list.insert(id, frag);
-        Ok(id)
+        id
     }
 
-    pub fn get_fragment(&mut self, index: usize) -> PyResult<Option<Fragment>> {
+    pub fn get_fragment(&mut self, index: usize) -> Option<Fragment> {
         let frag = self.frag_list.get(&index);
         match frag {
             // returns a read only copy
             // usually there isn't that many atoms per fragment, so this isn't so bad
-            Some(frag) => Ok(Some(frag.clone())),
-            None => Ok(None),
+            Some(frag) => Some(frag.clone()),
+            None => None,
         }
     }
 
-    pub fn delete_fragment(&mut self, index: usize) -> PyResult<bool> {
+    pub fn delete_fragment(&mut self, index: usize) -> bool {
         // frag list
         match self.frag_list.remove(&index) {
             Some(frag) => {
@@ -107,9 +108,17 @@ impl FragList {
                     .frag_counts
                     .get_mut(&frag.name)
                     .expect("delete_fragment but frag_counts did not contain key.") -= 1;
-                Ok(true)
+                true
             }
-            None => Ok(false),
+            None => false,
+        }
+    }
+
+    pub fn delete_fragments_for_atoms(&mut self, atoms: Vec<usize>) {
+        for atom in atoms {
+            for frag_id in self.defrag_list[atom].clone() {
+                self.delete_fragment(frag_id);
+            }
         }
     }
 

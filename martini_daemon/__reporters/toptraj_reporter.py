@@ -1,7 +1,6 @@
 from ..__reporter import Reporter
 from ..__simulation import Simulation
 from ..__formats import TopTrajWriter
-from ..__core import collect_bonds
 
 class ToptrajReporter(Reporter):
     def __init__(self):
@@ -30,7 +29,7 @@ class ToptrajReporter(Reporter):
             simulation.system.get_masses()
         )
         self.writer.register_frame_bonds(
-            collect_bonds(simulation.system, ["vsite", "bond"]),
+            simulation.system.collect_bonds(["vsite", "bond"]),
         )
         self.writer.write_frame()
 

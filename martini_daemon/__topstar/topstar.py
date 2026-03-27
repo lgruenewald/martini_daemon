@@ -19,7 +19,6 @@ class TopStar:
         for d in system.additional_data.get("detection_templates", []):
             self.detection_templates.add_detection_template(d)
         self.graphs: dict[str, Graph] = system.additional_data.get("graphs") or {}
-        self.absolute_rate = None
 
         # run the graph matching algorithm on all molecules separately
         i = 0
@@ -65,11 +64,63 @@ class TopStar:
                 m.graph.name, frag_atoms
             )
 
+    def update_rates(self, reactions: list[tuple[str, list[int]]], counts: dict[str, int], volume: float) -> None:
+        """
+        Updates "observed rate" in detection templates based on the reactions happening and current
+        reactant concentrations (specified using counts and volume).
+        """
+        pass
+
     def detection(self, pbc: PeriodicBox, pos) -> list[tuple[str, list[int]]]:
+        """
+        Runs the detection algorithm, given a periodic box and atom positions and current state in TopStar.
+        Returns the list of reactions.
+        """
         return detection(
             self.frag_list,
             self.detection_templates,
-            self.absolute_rate,
             pbc,
             pos
         )
+
+    def modification(self, reactions: list[tuple[str, list[int]]]) -> list[tuple[str, list[Fragment]]]:
+        """
+        Runs the modification algorithm.
+
+        Modifies TopStar and System according to the reaction templates.
+
+        Returns the list of reactions that were successfully applied to the system.
+        """
+        completed = []
+
+        for (rx, frag_ids) in reactions:
+            frags = [
+                self.frag_list.get_fragment(frag_id)
+                for frag_id in frag_ids
+            ]
+            if any(frag is None for frag in frags):
+                # pass reactions if a previous reactions' modification algorithm destroyed the reactant fragment
+                # of another reaction
+                continue
+
+            flattened_atoms = []
+            for f in frags:
+                flattened_atoms.extend(f.atoms)
+
+            # execute modification tempate
+            m_template = self.system.molecule_types[rx]
+            assert isinstance(m_template, ModificationTemplate)
+            m_template.instantiate(self.system, flattened_atoms)
+
+            # remove old graphs
+            recalc = self.system.populate_neighbors(flattened_atoms)
+            self.frag_list.delete_fragments_for_atoms(list(recalc))
+
+            # add new graphs
+            self.try_match_graphs(recalc)
+
+            # mark reaction as completed
+            # return frags, since frag_id's now refer to non existent frags
+            completed.append((rx, frags))
+
+        return completed

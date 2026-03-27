@@ -12,7 +12,7 @@ from .__formats import *
 from .__parser import GromacsTopFile, InvalidTopologyError
 from .__core import System, Context, wrap_coupling
 from .__forces import NonBonded
-from .__rust import build_version
+from .__rust import build_version, Fragment
 from .__reporter import Reporter
 from .__topstar import TopStar
 
@@ -372,17 +372,17 @@ class Simulation:
         if dm:
             self.info("Detection start")
             pos, box = self.context.get_positions()
-            reactions = self.top.detection(box, pos)
+            reactions: list[tuple[str, list[int]]] = self.top.detection(box, pos)
             self.info(f"After detection there were {len(reactions)} reactions")
             self.info("Detection finished")
             if len(reactions) > 0:
                 for r in self.reporters:
                     r.pre_modification(self)
-            # TODO modification here, modification should return a filtered set of reactions
-            # reactions = self.top.modification(reactions)
+                # we now need copies of fragments, since they possibly got consumed in the reaction
+                reactions: list[tuple[str, list[Fragment]]] = self.top.modification(reactions)
                 for r in self.reporters:
                     r.on_reaction(self, reactions)
-                # TODO minimization, reinitialize
+                # TODO minimization
         end_time = time()
         if n_steps > 0:
             step_time = (end_time - start_time) / n_steps
