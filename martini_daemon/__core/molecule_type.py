@@ -1,4 +1,10 @@
 class MoleculeType:
+    """
+    A class that contains all the information that is in a moleculetype.
+    Along with helpers to mutate system to add the required atoms for it
+    to system, and then to instantiate the bonded interactions on top
+    of the new atoms added.
+    """
 
     def __init__(self):
         self.name: str | None = None
@@ -12,6 +18,10 @@ class MoleculeType:
 
     # methods called by [molecules] and reactions
     def add_atoms_to_system(self, system) -> list[int]:
+        """
+        Adds the atoms in molecule type to system and returns
+        the atom_id of them.
+        """
         res = []
         last_res = -1
         for type_, res_num, res_name, atom_name, charge, mass in self.atoms:
@@ -25,6 +35,11 @@ class MoleculeType:
 
 
     def process_nrexcl(self):
+        """
+        Called after parsing. It parses self.interactions
+        to see which bonds generate exclusions, and then
+        it adds the generated exclusions to it.
+        """
         for _, members, _, is_excl in self.interactions:
             if is_excl:
                 assert len(members) == 2
@@ -32,6 +47,11 @@ class MoleculeType:
 
 
     def instantiate(self, system, atom_indices: list[int]):
+        """
+        Adds the bonded interactions and exclusions
+        stored in this MoleculeType to the selected atom
+        indices (should call add_atoms_to_system to get those first).
+        """
         # lookup force by name in system
         # call add interaction
         for (i, j) in self.exclusions.copy():

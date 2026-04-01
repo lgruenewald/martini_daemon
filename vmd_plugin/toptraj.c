@@ -296,15 +296,126 @@ static char *read_ss(CompressedReader *reader, const size_t n) {
     res[len] = 0;
     return res;
 }
+
+typedef struct bond {
+    uint32_t bi;
+    uint32_t bj;
+} Bond;
+
+static bool sorted_list_insert(Bond *sorted_bonds, size_t *sorted_len, Bond b) {
+    // find where to insert
+    // highest index that is for sure valid
+    size_t most = *sorted_len;
+    // lowest index that is for sure valid
+    size_t least = 0;
+
+    while (most > least) {
+        // rounding down intentional
+        size_t guess_idx = (most + least) / 2;
+        Bond guess = sorted_bonds[guess_idx];
+
+        if (b.bi > guess.bi || (b.bi == guess.bi && b.bj > guess.bj)) {
+            // bond is larger than guess
+            // move least up
+            least = guess_idx + 1;
+        } else if (b.bi < guess.bi || (b.bi == guess.bi && b.bj < guess.bj)) {
+            // bond is smaller than guess
+            // move most down
+            most = guess_idx;
+            
+        } else {
+            // duplicate bond entry
+            // forbidden by the file format, but we silently ignore it
+            return false;
+        }
+        
+    }
+
+    // insert into the sorted list
+    assert(most == least);
+    if (least < *sorted_len) {
+        memmove(&sorted_bonds[least+1], &sorted_bonds[least], *sorted_len - least);
+    }
+    sorted_bonds[least] = b;
+    return true;
+    
+}
+
 static char *read_bonds(CompressedReader *reader) {
     const size_t n_bonds = read_Q(reader);
+
+    // sorted list of bonds
+    size_t sorted_len = 0;
+    Bond *sorted_bonds = calloc(sizeof(struct bond), 2 * n_bonds);
+    
     for (size_t i = 0; i < n_bonds; i++)
     {
-        // TODO
-        read_I(reader);
-        read_I(reader);
+        Bond b = { read_I(reader), read_I(reader) };
+        if (b.bi == b.bj) {
+            // self bonding
+            // forbidden by the file format, but we silently ignore it
+            continue;
+        }
+        // FIXME: good candidate for optimization, if it becomes a bottleneck
+        sorted_list_insert(sorted_bonds, &sorted_len, b);
+        Bond b2 = { b.bj, b.bi };
+        sorted_list_insert(sorted_bonds, &sorted_len, b2);
     }
-    return "";
+
+    assert(sorted_len == 2 * n_bonds);
+    
+    size_t cap = 10000;
+    size_t len = 0;
+    char *res = malloc(cap);
+
+    size_t prev_bi = -1;
+    for (size_t i = 0; i < sorted_len; i++) {
+        Bond b = sorted_bonds[i];
+        // how many chars do we write?
+        int extra = snprintf(NULL, 0, " %u", b.bj);
+        if (b.bi > prev_bi && prev_bi >= 0) {
+            // "} {%u" vs " %u" is two extra characters
+            extra += 2;
+        }
+        // realloc if cap not enough
+        if (len+extra > cap) {
+            cap *= 2;
+            res = realloc(res, cap);
+            assert(res != NULL);
+        }
+        // write
+        if (prev_bi == -1) {
+            res[len] = '{';
+            len++;
+            extra--;
+        } else if (b.bi > prev_bi) {
+            res[len] = '}';
+            res[len+1] = ' ';
+            res[len+2] = '{';
+            len += 3;
+            extra -= 3;
+        } else {
+            res[len] = ' ';
+            len++;
+            extra--;
+        }
+        assert(extra == snprintf(&res[len], extra, "%u", b.bj));
+        len += extra;
+        prev_bi = b.bi;
+    }
+
+    if (len+1 > cap) {
+        cap *= 2;
+        res = realloc(res, cap);
+        assert(res != NULL);
+    }
+    res[len] = '}';
+    len++;
+
+    res = realloc(res, len+1);
+    assert(res != NULL);
+    res[len] = 0;
+    return res;
 }
 static bool read_crc(CompressedReader *reader) {
     const uint32_t reference = reader->crc;

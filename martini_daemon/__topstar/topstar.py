@@ -69,6 +69,7 @@ class TopStar:
         Updates "observed rate" in detection templates based on the reactions happening and current
         reactant concentrations (specified using counts and volume).
         """
+        # TODO
         pass
 
     def detection(self, pbc: PeriodicBox, pos) -> list[tuple[str, list[int]]]:
@@ -113,7 +114,9 @@ class TopStar:
             m_template.instantiate(self.system, flattened_atoms)
 
             # remove old graphs
-            recalc = self.system.populate_neighbors(flattened_atoms)
+            recalc = self.system.populate_neighbors(
+                x for x in flattened_atoms if x >= 0
+            )
             self.frag_list.delete_fragments_for_atoms(list(recalc))
 
             # add new graphs

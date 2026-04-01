@@ -3,15 +3,12 @@ from .bonded_force import BondedForce
 import numpy as np
 from ..__rust import PeriodicBox
 
-def make_cluster_frame(n_atoms, frame):
+def make_cluster_frame(n_atoms, frame: list[tuple[int, int]]):
     """
     Given a list of bonds (frame), it creates an (n_atoms,) shape uint32
     numpy array of clusters. Cluster 0 = unbonded. All other numbers =
     contiguous bonded graph within that numbered cluster. Cluster numbers
     are arbitrary and non-contiguous.
-
-    See make_clusters for doing it for the whole trajectory, in parallel
-    and with tqdm.
     """
     res = np.zeros((n_atoms,), dtype=np.uint32)
     last_cluster = 0
@@ -46,7 +43,7 @@ def make_whole_frame(n_atoms, pos, box: PeriodicBox, clus):
     Modifies pos in place.
 
     Args:
-    pos, box, clus, n_atoms
+    n_atoms pos, box, clus
     """
     # TODO this actually is incorrect for molecules larger than half a pbc
     root = {}

@@ -4,6 +4,24 @@ from typing import Iterable
 from .force import Force
 
 class BondedForce(Force, metaclass=ABCMeta):
+    """
+    Parent class of all bonded forces.
+
+    Manages the list of bonds (as a dict of bond_id -> members, params).
+    Provides an API to add/remove bonds, while it appropriately keeps
+    the OpenMM state up to date, hidden from the user. An appropriate API
+    is exposed through System for this too.
+
+    New BondedForces should implement the following:
+    - _add_to_force(self, members, params)
+    - _parse(self, members, params) -> params
+    - get_name()
+    - uses_pbc()
+    
+    Optionally, the following field should be set:
+    - filters (set)
+    
+    """
 
     def __init__(self, system):
         super().__init__(system)
@@ -20,6 +38,9 @@ class BondedForce(Force, metaclass=ABCMeta):
     @abstractmethod
     def _add_to_force(self, members: list[int], params: list[float]) -> None:
         """
+        The force defined by members and params should add the entry
+        to self.force.
+        
         Protected because only this class should call this.
         """
         raise NotImplementedError
@@ -37,10 +58,10 @@ class BondedForce(Force, metaclass=ABCMeta):
     @abstractmethod
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         """
-        Protected because only this class should call this.
-
         Given a list of members and parameters (as unwrapped = minimal pre-parsing), parse the params to how they
         should be stored in entries and passed to _add_to_force.
+        
+        Protected because only this class should call this.
         """
         raise NotImplementedError
 
@@ -96,6 +117,9 @@ class BondedForce(Force, metaclass=ABCMeta):
         return len(self.__entries)
 
     def get_members(self, bond_id: int) -> list[int]:
+        """
+        Given a bond_id, return which atoms are part of it.
+        """
         members, _ = self.__entries[bond_id]
         return members
 

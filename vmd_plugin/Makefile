@@ -10,6 +10,7 @@ HEADERS := $(wildcard *.h)
 .PHONY: all
 all: lib
 
+.PHONY: lib
 lib: $(SRC) $(HEADERS)
 	$(CC) $(CFLAGS) $(SRC) -o $(LIB) $(LDFLAGS)
 

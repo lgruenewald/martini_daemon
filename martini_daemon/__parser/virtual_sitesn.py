@@ -79,7 +79,7 @@ class VirtualSitesN(InteractionDirective):
         # we don't want to trigger nrexcl processing with these exclusions
         super().line(tokens)
         if len((members := self.read_members(tokens))) == 2:
-            self.parent.exclusions.add((
+            self.parent.molecule_type.exclusions.add((
                 members[0], members[1],
             ))
 

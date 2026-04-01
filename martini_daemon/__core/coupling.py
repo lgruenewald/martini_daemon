@@ -6,6 +6,10 @@ from typing import Type
 import openmm as mm
 
 def wrap_coupling(mm_force: mm.Force) -> Type[Force]:
+    """
+    Given an OpenMM force that should act as a coupling for a simulation,
+    it creates a Martini Daemon Force from it.
+    """
     used = False
     class Coupling(Force):
 

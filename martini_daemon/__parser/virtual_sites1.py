@@ -36,7 +36,7 @@ class VirtualSites1(InteractionDirective):
     def line(self, tokens: TokenList) -> None:
         # we don't want to trigger nrexcl processing with these exclusions
         super().line(tokens)
-        self.parent.exclusions.add((
+        self.parent.molecule_type.exclusions.add((
             self.parent.parse_index(tokens, 0),
             self.parent.parse_index(tokens, 1)
         ))

@@ -14,21 +14,30 @@ class GraphAtomType(Enum):
 
 
 class Graph:
-    """
-    The class constructed from [graph]/[frag] directives that contains all
-    the information the user provided about a graph.
-    """
-
     def __init__(self, name):
+        """
+        The class constructed from [graph]/[frag] directives that contains all
+        the information the user provided about a graph.
+
+        Note: Graphs contain atoms that each have a name (which is what's used
+        in input files) and an index (used only internally, may show up in some outputs).
+        The index is used for canonical ordering in fragments, and name->index
+        is also resolved during parsing in modification template's
+        parse_pair and parse_index.
+
+        :param name: Name of the graph.
+
+        Attributes:
+        - name - graph name
+        - atoms - list of (graph_atom_name, name_pattern, type_patter, graph_atom_type)
+        - interactions - list of (interaction_type, list of graph_atom_name)
+        - equivalents - list of sets of str
+        - atom_name_to_index - dict of str and int
+        """
         self.name: str = name
-        # if set, only add this graph at the start and for these mol names
-        self.molecules: list[str] = []
-        # list[(graph_atom_name, name_pat, type_pat, type)]
         self.atoms: list[tuple[str, str, str, GraphAtomType]] = []
-        # list[(interaction_type, list[graph_atom_name])]
         self.interactions: list[tuple[str, list[str]]] = []
         self.equivalents: list[set[str]] = []
-        # dict[graph_atom_name, graph_atom_index]
         self.atom_name_to_index: dict[str, int] = {}
 
     def finish_init(self) -> None:
@@ -97,6 +106,16 @@ class Graph:
 class GraphMatch:
     """
     Helper class that represents a (partially) mapped out graph to S*.
+
+    Attributes:
+    - graph - reference to a Graph instance that was (partially) matched
+    - atoms - dict of atoms that were matched, dict of atom name to atom_id
+    - interactions - interaction matches for each interaction in graph. All are None or an Interaction
+        (a tuple of force name and bond_id).
+    - rev_atoms - atom_id to atom name mapping
+    - matched_inter - same as interactions, but as a set and excluding None's
+    - next_inter - internal state for the graph matching algorithm, it should point to the next
+        interaction index in the graph that was not attempted to be filled yet.
     """
     # mapping of atoms -> atom_id
     graph: Graph
@@ -126,6 +145,9 @@ class GraphMatch:
         return res
 
     def add_atom(self, name: str, atom_num: int) -> None:
+        """
+        Add an graph atom name <=> atom_id mapping to the partial match.
+        """
         assert self.atoms.get(name) is None and atom_num not in self.rev_atoms
         self.atoms[name] = atom_num
         self.rev_atoms[atom_num] = name
