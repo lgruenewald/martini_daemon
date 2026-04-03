@@ -5,11 +5,17 @@
 TODO:
 - selections other than all atoms
 - deleting frames
+- everything here is prototype quality, fix that
+    - use the Obj interface instead of string for tcl
+    - non orthogonal pbc
+    - some stuff really needs to be refactored into sub-functions instead of copy pasted around
+    - improve error handling
 */
 
 #define PKG_NAME "toptraj"
 #define VERSION "0.1"
 
+#include <math.h>
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -295,6 +301,12 @@ typedef struct bond {
     uint32_t bj;
 } Bond;
 
+typedef struct vec3 {
+    float x;
+    float y;
+    float z;
+} Vec3;
+
 static bool sorted_list_insert(Bond *sorted_bonds, size_t *sorted_len, Bond b) {
     // find where to insert
     // highest index that is for sure valid
@@ -335,7 +347,7 @@ static bool sorted_list_insert(Bond *sorted_bonds, size_t *sorted_len, Bond b) {
     
 }
 
-static char *read_bonds(CompressedReader *reader, size_t n_atoms) {
+static char *read_bonds(CompressedReader *reader, size_t n_atoms, int pbc, Vec3 box, Vec3 *coords) {
     const size_t n_bonds = read_Q(reader);
 
     // sorted list of bonds
@@ -349,6 +361,18 @@ static char *read_bonds(CompressedReader *reader, size_t n_atoms) {
             // self bonding
             // forbidden by the file format, but we silently ignore it
             continue;
+        }
+        if (pbc) {
+            // skip if bond is longer than 1/2 along any pbc directions
+            if (box.x / 2. < fabs(coords[b.bi].x - coords[b.bj].x)) {
+                continue;
+            }
+            if (box.y / 2. < fabs(coords[b.bi].y - coords[b.bj].y)) {
+                continue;
+            }
+            if (box.z / 2. < fabs(coords[b.bi].z - coords[b.bj].z)) {
+                continue;
+            }
         }
         // FIXME: good candidate for optimization, if it becomes a bottleneck
         sorted_list_insert(sorted_bonds, &sorted_len, b);
@@ -477,7 +501,13 @@ static void free_toptraj(TopTrajData *data) {
     free(data);
 }
 
-static TopTrajData *load_toptraj(const char *path, int molid, int pbc) {
+static char *clone_str(const char *src) {
+    char *res = malloc(strlen(src) + 1);
+    strcpy(res, src);
+    return res;
+}
+
+static TopTrajData *load_toptraj(Tcl_Interp *interp, const char *path, int molid, int pbc) {
     /// Reads .toptraj file at path and loads it into a dynamically allocated
     /// object, which it returns.
     /// While doing so, prints a progress bar on STDOUT.
@@ -528,6 +558,17 @@ if (reader->is_err) { \
         res->frames = calloc(sizeof(TopTrajFrame), res->cap_frames);
         res->n_frames = 0;
 
+        char *atomselect = NULL;
+        if (pbc) {
+            char molid[64];
+            snprintf(molid, 64, "%i", res->molid);
+            int res = Tcl_VarEval(interp, "atomselect ", molid, " all", NULL);
+            if (res != TCL_OK) {
+                printf("TOPTRAJ FATAL: failed at atomselect: %s\n", Tcl_GetStringResult(interp));
+            }
+            atomselect = clone_str(Tcl_GetStringResult(interp));
+        }
+
         size_t frame_index = 0;
         printf("\n");
         while (!reader->stream_over) {
@@ -550,7 +591,73 @@ if (reader->is_err) { \
             frame->types = read_ss(reader, frame->n_atoms);
             frame->charges = read_fs(reader, frame->n_atoms);
             frame->masses = read_fs(reader, frame->n_atoms);
-            frame->bonds = read_bonds(reader, frame->n_atoms);
+
+            Vec3 *coords = NULL;
+            Vec3 box = {0., 0., 0.};
+            // if ignoring bonds that cross pbc, read out the coords
+            if (pbc) {
+                char frame_str[64];
+                snprintf(frame_str, 64, "%lu", frame_index);
+                char molid[64];
+                snprintf(molid, 64, "%i", res->molid);
+                int res = Tcl_VarEval(interp, atomselect, " frame ", frame_str, NULL);
+                if (res != TCL_OK) {
+                    printf("TOPTRAJ FATAL: failed at frame: %s\n", Tcl_GetStringResult(interp));
+                }
+                res = Tcl_VarEval(interp, atomselect, " num", NULL);
+                if (res != TCL_OK) {
+                    printf("TOPTRAJ FATAL: failed at num: %s\n", Tcl_GetStringResult(interp));
+                }
+                long n_atoms = atol(Tcl_GetStringResult(interp));
+                if (n_atoms != frame->n_atoms) {
+                    printf("TOPTRAJ FATAL: n_atoms mismatch. Selection has %li, while .toptraj has %u\n", n_atoms, frame->n_atoms);
+                }
+                res = Tcl_VarEval(interp, atomselect, " get x", NULL);
+                if (res != TCL_OK) {
+                    printf("TOPTRAJ FATAL: failed at get x: %s\n", Tcl_GetStringResult(interp));
+                }
+                char *xs = clone_str(Tcl_GetStringResult(interp));
+                res = Tcl_VarEval(interp, atomselect, " get y", NULL);
+                if (res != TCL_OK) {
+                    printf("TOPTRAJ FATAL: failed at get y: %s\n", Tcl_GetStringResult(interp));
+                }
+                char *ys = clone_str(Tcl_GetStringResult(interp));
+                res = Tcl_VarEval(interp, atomselect, " get z", NULL);
+                if (res != TCL_OK) {
+                    printf("TOPTRAJ FATAL: failed at get z: %s\n", Tcl_GetStringResult(interp));
+                }
+                char *zs = clone_str(Tcl_GetStringResult(interp));
+
+                coords = calloc(sizeof(Vec3), frame->n_atoms);
+                char *xp = xs;
+                char *yp = ys;
+                char *zp = zs;
+                for (size_t j = 0; j < frame->n_atoms; j++) {
+                    // strtof autoskips whitespace
+                    Vec3 v = {
+                        strtof(xp, &xp),
+                        strtof(yp, &yp),
+                        strtof(zp, &zp)
+                    };
+                    coords[j] = v;
+                }
+
+                res = Tcl_VarEval(interp, "molinfo ", molid, " get {a b c}", NULL);
+                if (res != TCL_OK) {
+                    printf("TOPTRAJ FATAL: failed at get pbc: %s\n", Tcl_GetStringResult(interp));
+                }
+                char *bs = clone_str(Tcl_GetStringResult(interp));
+                char *bp = bs;
+                box.x = strtof(bp, &bp);
+                box.y = strtof(bp, &bp);
+                box.z = strtof(bp, &bp);
+                free(bs);
+                free(xs);
+                free(ys);
+                free(zs);
+            }
+            
+            frame->bonds = read_bonds(reader, frame->n_atoms, pbc, box, coords);
             if (!read_crc(reader)) {
                 free_frame(frame);
                 printf("Frame %lu CRC mismatch, stopping.", frame_index + 1);
@@ -596,11 +703,14 @@ static char *on_frame_change(
     char molid[64];
     snprintf(molid, 64, "%i", toptraj->molid);
 
-    int res = Tcl_VarEval(interp, "molinfo ", molid, " get frame", NULL);
-    if (res != TCL_OK) {
-        printf("TOPTRAJ FATAL: Trace failed at molinfo get frame: %s\n", Tcl_GetStringResult(interp));
-        return NULL;
+#define CHECK_RES(x) \
+    if (res != TCL_OK) {\
+        printf("TOPTRAJ FATAL: Trace failed at " x ": %s\n", Tcl_GetStringResult(interp)); \
+        return NULL; \
     }
+
+    int res = Tcl_VarEval(interp, "molinfo ", molid, " get frame", NULL);
+    CHECK_RES("molinfo get frame")
     int64_t c_frame = atol(Tcl_GetStringResult(interp));
     if (c_frame < 0 || c_frame > toptraj->n_frames) {
         printf("TOPTRAJ FATAL: Frame %li is out of range for the loaded .toptraj.\n", c_frame);
@@ -612,36 +722,40 @@ static char *on_frame_change(
 
     // ATOMSELECT
     res = Tcl_VarEval(interp, "atomselect ", molid, " all frame ", frame, NULL);
-    if (res != TCL_OK) {
-        printf("TOPTRAJ FATAL: Trace failed at atomselect: %s\n", Tcl_GetStringResult(interp));
-        return NULL;
-    }
+    CHECK_RES("atomselect")
+
     const char *sel = Tcl_GetStringResult(interp);
 
     // N_ATOMS
     res = Tcl_VarEval(interp, sel, " num", NULL);
-    if (res != TCL_OK) {
-        printf("TOPTRAJ FATAL: Trace failed at n_atoms: %s\n", Tcl_GetStringResult(interp));
-        return NULL;
-    }
+    CHECK_RES("n_atoms")
     int64_t n_atoms = atol(Tcl_GetStringResult(interp));
     if (n_atoms != toptraj->frames[c_frame]->n_atoms) {
         printf("TOPTRAJ FATAL: number of atoms does not match .toptraj.\n");
         return NULL;
     }
 
+    // SET ATOM PROPERTIES
+
+    res = Tcl_VarEval(interp, sel, " set name {", toptraj->frames[c_frame]->names, "}", NULL);
+    CHECK_RES("set name")
+    res = Tcl_VarEval(interp, sel, " set resname {", toptraj->frames[c_frame]->resnames, "}", NULL);
+    CHECK_RES("set resname")
+    res = Tcl_VarEval(interp, sel, " set resid {", toptraj->frames[c_frame]->resids, "}", NULL);
+    CHECK_RES("set resid")
+    res = Tcl_VarEval(interp, sel, " set type {", toptraj->frames[c_frame]->types, "}", NULL);
+    CHECK_RES("set type")
+    res = Tcl_VarEval(interp, sel, " set charge {", toptraj->frames[c_frame]->charges, "}", NULL);
+    CHECK_RES("set charge")
+    res = Tcl_VarEval(interp, sel, " set mass {", toptraj->frames[c_frame]->masses, "}", NULL);
+    CHECK_RES("set mass")
+
     // SETBONDS
     res = Tcl_VarEval(interp, sel, " setbonds ", toptraj->frames[c_frame]->bonds, NULL);
-    if (res != TCL_OK) {
-        printf("TOPTRAJ FATAL: Trace failed at setbonds: %s\n", Tcl_GetStringResult(interp));
-        return NULL;
-    }
+    CHECK_RES("setbonds")
 
     res = Tcl_VarEval(interp, sel, " delete", NULL);
-    if (res != TCL_OK) {
-        printf("TOPTRAJ FATAL: Trace failed at delete: %s\n", Tcl_GetStringResult(interp));
-        return NULL;
-    }
+    CHECK_RES("delete")
 
     return NULL;
 }
@@ -678,7 +792,7 @@ static int load_toptraj_cmd(
     if (argc >= 4) {
         pbc = atoi(argv[3]);
     }
-    TopTrajData *data = load_toptraj(argv[1], molid, pbc);
+    TopTrajData *data = load_toptraj(interp, argv[1], molid, pbc);
     if (data->is_err) {
         Tcl_SetResult(
             interp,
