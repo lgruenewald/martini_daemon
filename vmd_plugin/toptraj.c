@@ -1,6 +1,12 @@
 // VMD Plugin implemented as a Tcl dynamic library
 // allows for loading of per-frame trajectory information from .toptraj files
 
+/*
+TODO:
+- selections other than all atoms
+- deleting frames
+*/
+
 #define PKG_NAME "toptraj"
 #define VERSION "0.1"
 
@@ -10,8 +16,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <tcl8.6/tcl.h>
-#include <tcl8.6/tclDecls.h>
+#include <tcl.h>
+#include <tclDecls.h>
 #include <zconf.h>
 #include <zlib.h>
 
@@ -45,9 +51,7 @@ typedef struct
 /// if stream.avail_in > 0, copies the leftovers first
 /// sets stream.next_in and stream.avail_in
 static void read_file_into_chunk(CompressedReader *reader) {
-    // printf("READ FILE INTO CHUNK\n");
     if (reader->stream.avail_in > 0) {
-        // printf("AVAIL IN STILL PRESENT %u. moving.\n", reader->stream.avail_in);
         memmove(
             reader->chunk_in,
             reader->stream.next_in,
@@ -55,10 +59,7 @@ static void read_file_into_chunk(CompressedReader *reader) {
         );
     }
     const size_t read_from_file = reader->chunk_size - reader->stream.avail_in;
-    // printf("READ FROM FILE SIZE %lu\n chunk size %lu\n", read_from_file, reader->chunk_size);
-    // printf("READING TO %p\n", &reader->chunk_in[reader->stream.avail_in]);
     const size_t read = fread(&reader->chunk_in[reader->stream.avail_in], 1, read_from_file, reader->file);
-    // printf("READ %lu from file.\n", read);
     if (read == 0) {
         reader->stream_over = true;
     }
@@ -69,7 +70,6 @@ static void read_file_into_chunk(CompressedReader *reader) {
 /// consumes as much of avail_in as possible, writing it to chunk_out
 /// must only be called once all of chunk_out has been fully read (read_out must be == size-stream.avail_out).
 static void decompress_into_chunk(CompressedReader *reader) {
-    // printf("DECOMPRESS INTO CHUNK CALLED");
     assert(
         reader->read_out == reader->chunk_size - reader->stream.avail_out
     );
@@ -96,18 +96,13 @@ static void decompress_into_chunk(CompressedReader *reader) {
 
 /// will read n compressed bytes, and error if it is unable to do so.
 static char *read_bytes(CompressedReader *reader, const size_t n) {
-    // printf("READ BYTES CALLED WITH N %lu\n", n);
-    // printf("READ OUT: %lu, AVAIL OUT: %u, CHUNK SIZE: %lu\n", reader->read_out, reader->stream.avail_out, reader->chunk_size);
     char *res = malloc(n+1);
     res[n] = 0;
     for (size_t i = 0; i < n; i++) {
-        // printf("I IS %lu\n", i);
         if (reader->read_out == reader->chunk_size - reader->stream.avail_out) {
             // we ran out of chunk_out
-            // printf("RAN OUT\n");
             if (reader->stream_over)
             {
-                // printf("STREAM OVER\n");
                 reader->is_err = true;
                 reader->error_msg = "Stream ended prematurely.";
                 return res;
@@ -117,7 +112,6 @@ static char *read_bytes(CompressedReader *reader, const size_t n) {
         }
 
         res[i] = (char)reader->chunk_out[reader->read_out];
-        // printf("Read byte %lu content %c\n", reader->read_out, res[i]);
         reader->read_out++;
     }
     if (reader->stream_over)
@@ -155,7 +149,6 @@ static CompressedReader *new_compressed_reader(const char *path) {
     res->chunk_size = 1 << 20; // 1 MB
     res->chunk_in = (Bytef *)malloc(res->chunk_size);
     res->chunk_out = (Bytef *)malloc(res->chunk_size);
-    // printf("chunks: %p %p\n", res->chunk_in, res->chunk_out);
 
     res->stream.zalloc = Z_NULL;
     res->stream.zfree = Z_NULL;
@@ -334,14 +327,15 @@ static bool sorted_list_insert(Bond *sorted_bonds, size_t *sorted_len, Bond b) {
     // insert into the sorted list
     assert(most == least);
     if (least < *sorted_len) {
-        memmove(&sorted_bonds[least+1], &sorted_bonds[least], *sorted_len - least);
+        memmove(&sorted_bonds[least+1], &sorted_bonds[least], (*sorted_len - least) * sizeof(Bond));
     }
     sorted_bonds[least] = b;
+    (*sorted_len)++;
     return true;
     
 }
 
-static char *read_bonds(CompressedReader *reader) {
+static char *read_bonds(CompressedReader *reader, size_t n_atoms) {
     const size_t n_bonds = read_Q(reader);
 
     // sorted list of bonds
@@ -362,53 +356,50 @@ static char *read_bonds(CompressedReader *reader) {
         sorted_list_insert(sorted_bonds, &sorted_len, b2);
     }
 
-    assert(sorted_len == 2 * n_bonds);
-    
     size_t cap = 10000;
     size_t len = 0;
     char *res = malloc(cap);
+    res[len] = '{';
+    len++;
 
-    size_t prev_bi = -1;
-    for (size_t i = 0; i < sorted_len; i++) {
-        Bond b = sorted_bonds[i];
-        // how many chars do we write?
-        int extra = snprintf(NULL, 0, " %u", b.bj);
-        if (b.bi > prev_bi && prev_bi >= 0) {
-            // "} {%u" vs " %u" is two extra characters
-            extra += 2;
-        }
-        // realloc if cap not enough
-        if (len+extra > cap) {
-            cap *= 2;
-            res = realloc(res, cap);
-            assert(res != NULL);
-        }
-        // write
-        if (prev_bi == -1) {
-            res[len] = '{';
-            len++;
-            extra--;
-        } else if (b.bi > prev_bi) {
-            res[len] = '}';
-            res[len+1] = ' ';
-            res[len+2] = '{';
-            len += 3;
-            extra -= 3;
-        } else {
-            res[len] = ' ';
-            len++;
-            extra--;
-        }
-        assert(extra == snprintf(&res[len], extra, "%u", b.bj));
-        len += extra;
-        prev_bi = b.bi;
+#define ACCOMODATE(x) \
+    while (len+(x) > cap) { \
+        cap *= 2; \
+        res = realloc(res, cap); \
+        assert(res != NULL); \
     }
 
-    if (len+1 > cap) {
-        cap *= 2;
-        res = realloc(res, cap);
-        assert(res != NULL);
+    size_t bond_idx = 0;
+    for (size_t i = 0; i < n_atoms; i++) {
+        ACCOMODATE(1)
+        res[len] = '{';
+        len++;
+
+        bool first_iter = true;
+        while (bond_idx < sorted_len && sorted_bonds[bond_idx].bi == i) {
+            if (!first_iter) {
+                ACCOMODATE(1)
+                res[len] = ' ';
+                len++;
+            }
+            first_iter = false;
+
+            Bond b = sorted_bonds[bond_idx];
+            int extra = snprintf(NULL, 0, "%u", b.bj);
+            ACCOMODATE(extra+1);
+            snprintf(&res[len], extra+1, "%u", b.bj);
+            len += extra;
+            bond_idx++;
+        }
+        
+        ACCOMODATE(2);
+        res[len] = '}';
+        len++;
+        res[len] = ' ';
+        len++;
     }
+
+    ACCOMODATE(1);
     res[len] = '}';
     len++;
 
@@ -417,6 +408,7 @@ static char *read_bonds(CompressedReader *reader) {
     res[len] = 0;
     return res;
 }
+
 static bool read_crc(CompressedReader *reader) {
     const uint32_t reference = reader->crc;
     const uint32_t crc = read_I(reader);
@@ -461,6 +453,30 @@ typedef struct {
     TopTrajFrame **frames;
 } TopTrajData;
 
+static void free_frame(TopTrajFrame *frame) {
+    free(frame->names);
+    free(frame->resnames);
+    free(frame->resids);
+    free(frame->types);
+    free(frame->charges);
+    free(frame->masses);
+    free(frame->bonds);
+    free(frame);
+}
+
+static void free_toptraj(TopTrajData *data) {
+    for (size_t i = 0; i < data->n_frames; i++) {
+        free_frame(data->frames[i]);
+    }
+    if (data->frames != NULL) {
+        free(data->frames);
+    }
+    if (data->path != NULL) {
+        free(data->path);
+    }
+    free(data);
+}
+
 static TopTrajData *load_toptraj(const char *path, int molid, int pbc) {
     /// Reads .toptraj file at path and loads it into a dynamically allocated
     /// object, which it returns.
@@ -504,7 +520,7 @@ if (reader->is_err) { \
         if (!read_crc(reader)) {
             free_compressed_reader(reader);
             res->is_err = true;
-            res->error_msg = "CRC mismatch! .toptraj file is likely corrupt.";
+            res->error_msg = "CRC mismatch in header! .toptraj file is likely corrupt.";
             return res;
         }
 
@@ -513,10 +529,17 @@ if (reader->is_err) { \
         res->n_frames = 0;
 
         size_t frame_index = 0;
+        printf("\n");
         while (!reader->stream_over) {
             TopTrajFrame *frame = calloc(sizeof(TopTrajFrame), 1);
             frame->frame_number = read_I(reader);
-            assert(frame->frame_number == frame_index);
+            if (frame->frame_number != frame_index) {
+                // probably junk at the end of the file from a sim that
+                // was cancelled
+                printf("\nFrame %lu wrong frame index, stopping.", frame_index + 1);
+                free(frame);
+                break;
+            }
             frame->n_atoms = read_I(reader);
             frame->sim_step = read_Q(reader);
             frame->sim_time_ns = read_d(reader);
@@ -527,12 +550,13 @@ if (reader->is_err) { \
             frame->types = read_ss(reader, frame->n_atoms);
             frame->charges = read_fs(reader, frame->n_atoms);
             frame->masses = read_fs(reader, frame->n_atoms);
-            frame->bonds = read_bonds(reader);
+            frame->bonds = read_bonds(reader, frame->n_atoms);
             if (!read_crc(reader)) {
-                free_compressed_reader(reader);
-                res->is_err = true;
-                res->error_msg = "CRC mismatch! .toptraj file is likely corrupt.";
+                free_frame(frame);
+                printf("Frame %lu CRC mismatch, stopping.", frame_index + 1);
+                break;
             }
+            printf("\rFrame read successfully: %lu", frame_index + 1);
             frame_index++;
             res->frames[res->n_frames] = frame;
             res->n_frames++;
@@ -544,7 +568,7 @@ if (reader->is_err) { \
             }
 
         }
-        printf("Read %lu frames.\n", frame_index+1);
+        printf("\nRead %lu frames.\n", frame_index);
 
         free_compressed_reader(reader);
         return res;
@@ -558,38 +582,67 @@ if (reader->is_err) { \
 }
 
 
-static void free_frame(TopTrajFrame *frame) {
-    free(frame->names);
-    free(frame->resnames);
-    free(frame->resids);
-    free(frame->types);
-    free(frame->charges);
-    free(frame->masses);
-    free(frame->bonds);
-    free(frame);
-}
-
-static void free_toptraj(TopTrajData *data) {
-    for (size_t i = 0; i < data->n_frames; i++) {
-        free_frame(data->frames[i]);
-    }
-    if (data->frames != NULL) {
-        free(data->frames);
-    }
-    if (data->path != NULL) {
-        free(data->path);
-    }
-    free(data);
-}
 
 static char *on_frame_change(
     ClientData data, // TopTrajData *
     Tcl_Interp *interp,
     const char *name1, // "vmd_frame"
-    const char *name2, // current frame as string
+    const char *name2,
     int flags
 ) {
-    // TODO
+    TopTrajData *toptraj = (TopTrajData *)data;
+
+    // GET CURRENT FRAME
+    char molid[64];
+    snprintf(molid, 64, "%i", toptraj->molid);
+
+    int res = Tcl_VarEval(interp, "molinfo ", molid, " get frame", NULL);
+    if (res != TCL_OK) {
+        printf("TOPTRAJ FATAL: Trace failed at molinfo get frame: %s\n", Tcl_GetStringResult(interp));
+        return NULL;
+    }
+    int64_t c_frame = atol(Tcl_GetStringResult(interp));
+    if (c_frame < 0 || c_frame > toptraj->n_frames) {
+        printf("TOPTRAJ FATAL: Frame %li is out of range for the loaded .toptraj.\n", c_frame);
+        return NULL;
+    }
+
+    char frame[64];
+    snprintf(frame, 64, "%li", c_frame);
+
+    // ATOMSELECT
+    res = Tcl_VarEval(interp, "atomselect ", molid, " all frame ", frame, NULL);
+    if (res != TCL_OK) {
+        printf("TOPTRAJ FATAL: Trace failed at atomselect: %s\n", Tcl_GetStringResult(interp));
+        return NULL;
+    }
+    const char *sel = Tcl_GetStringResult(interp);
+
+    // N_ATOMS
+    res = Tcl_VarEval(interp, sel, " num", NULL);
+    if (res != TCL_OK) {
+        printf("TOPTRAJ FATAL: Trace failed at n_atoms: %s\n", Tcl_GetStringResult(interp));
+        return NULL;
+    }
+    int64_t n_atoms = atol(Tcl_GetStringResult(interp));
+    if (n_atoms != toptraj->frames[c_frame]->n_atoms) {
+        printf("TOPTRAJ FATAL: number of atoms does not match .toptraj.\n");
+        return NULL;
+    }
+
+    // SETBONDS
+    res = Tcl_VarEval(interp, sel, " setbonds ", toptraj->frames[c_frame]->bonds, NULL);
+    if (res != TCL_OK) {
+        printf("TOPTRAJ FATAL: Trace failed at setbonds: %s\n", Tcl_GetStringResult(interp));
+        return NULL;
+    }
+
+    res = Tcl_VarEval(interp, sel, " delete", NULL);
+    if (res != TCL_OK) {
+        printf("TOPTRAJ FATAL: Trace failed at delete: %s\n", Tcl_GetStringResult(interp));
+        return NULL;
+    }
+
     return NULL;
 }
 

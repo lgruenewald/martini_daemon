@@ -104,6 +104,7 @@ class TopTrajWriter:
             name_bytes = name.encode("utf-8")
             name_len = min(255, len(name_bytes))
             body += struct.pack(
+                # TODO test with 255< bytes
                 f"<B{name_len}sI", name_len, name_bytes, count
             )
         checksum = zlib.crc32(header+body)
