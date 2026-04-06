@@ -43,7 +43,8 @@ class Context:
 
     def do_steps(self, n):
         self.__reinitialize()
-        self.integrator.step(n)
+        if n > 0:
+            self.integrator.step(n)
 
     def __reinitialize(self):
         """

@@ -353,8 +353,11 @@ class Simulation:
         self.info(f"step {self.current_step}")
         if n_steps > 0:
             self.info(f"md_steps {n_steps}")
-            self.info("MD start")
             try:
+                self.info("Reinitialize start")
+                self.context.do_steps(0)
+                self.info("Reinitialize finished")
+                self.info("MD start")
                 self.context.do_steps(n_steps)
             except mm.OpenMMException as e:
                 self.error(f"!!! OpenMM Exception !!!\n{e}")
@@ -379,7 +382,9 @@ class Simulation:
                 for r in self.reporters:
                     r.pre_modification(self)
                 # we now need copies of fragments, since they possibly got consumed in the reaction
+                self.info("Modification start")
                 reactions: list[tuple[str, list[Fragment]]] = self.top.modification(reactions)
+                self.info("Modification finished")
                 for r in self.reporters:
                     r.on_reaction(self, reactions)
                 # TODO minimization
