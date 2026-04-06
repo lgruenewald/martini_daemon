@@ -229,7 +229,8 @@ class TopTrajWriter:
         )
         n_bonds = 0
         wrote = set()
-        for i, j in self.frame["bonds"]:
+        for i, j in self.frame["bonds"].to_list():
+            # TODO optimize
             if i == j:
                 continue
 

@@ -85,9 +85,9 @@ pub fn detection<'py>(
             .get(&vec![frag_i.name.to_string()])
         {
             for uni_rx in uni_rxs {
-                let rx = detection_template_list.reactions.get(uni_rx).unwrap().borrow_mut(py);;
+                let rx = detection_template_list.reactions.get(uni_rx).unwrap().borrow(py);
                 let frags = vec![frag_i];
-                if detection_one(rx, frags, pbc, pos, &mut rng) {
+                if detection_one(&rx, frags, pbc, pos, &mut rng) {
                     skip.insert(*i);
                     reactions.push((uni_rx.clone(), vec![*i]));
                     break; // uni_rx in uni_rxs
@@ -149,10 +149,10 @@ pub fn detection<'py>(
                             .reactions
                             .get(bi_rx)
                             .unwrap()
-                            .borrow_mut(py);
+                            .borrow(py);
                         let frags = vec![frag_i, frag_j];
 
-                        if detection_one(rx, frags, pbc, pos, &mut rng) {
+                        if detection_one(&rx, frags, pbc, pos, &mut rng) {
                             skip.insert(*i);
                             skip.insert(*j);
                             reactions.push((bi_rx.clone(), vec![*i, *j]));
@@ -225,10 +225,10 @@ pub fn detection<'py>(
                                 .reactions
                                 .get(tri_rx)
                                 .unwrap()
-                                .borrow_mut(py);
+                                .borrow(py);
                             let frags = vec![frag_i, frag_j_or_k, frag_k_or_j];
 
-                            if detection_one(rx, frags, pbc, pos, &mut rng) {
+                            if detection_one(&rx, frags, pbc, pos, &mut rng) {
                                 skip.insert(*i);
                                 skip.insert(*j_or_k);
                                 skip.insert(*k_or_j);
@@ -249,10 +249,10 @@ pub fn detection<'py>(
                                 .reactions
                                 .get(tri_rx)
                                 .unwrap()
-                                .borrow_mut(py);
+                                .borrow(py);
                             let frags = vec![frag_i, frag_k_or_j, frag_j_or_k];
 
-                            if detection_one(rx, frags, pbc, pos, &mut rng) {
+                            if detection_one(&rx, frags, pbc, pos, &mut rng) {
                                 skip.insert(*i);
                                 skip.insert(*j_or_k);
                                 skip.insert(*k_or_j);

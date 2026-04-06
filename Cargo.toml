@@ -18,6 +18,7 @@ rand = "0.10.0"
 kdtree = "0.8.0"
 ordermap = "1.1.0"
 sortedlist-rs = "0.2.5"
+petgraph = "0.8.3"
 
 [dependencies.pyo3]
 version = "0.28.2"

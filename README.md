@@ -9,20 +9,18 @@ This is achieved by combining multiple components in one repo / one python packa
 - a graph matching system to find reactants (`__topstar`)
 - a detection/modification algorithm to execute reaction templates (`__topstar`)
 
-### Installation
+### Installation (from source)
 
-Pre-requisites:
-- Make and activate a Python virtual environment or conda environment. Python 3.13 is recommended.
-- It's recommended to explicitly install the right version of OpenMM with support for your GPU.
-   - e.g. `pip install openmm[cuda12]`
 - Install `git-lfs` (`sudo apt install git-lfs` on Ubuntu).
 - Install Cargo and Rust. Installation via [rustup](https://rustup.rs/) is recommended.
-
-Installation process:
-
-- Download the source code. Clone the repository and switch to the desired branch, tag or commit.
-- Install with `pip install .` in the root directory of this repo, where `pyproject.toml` is located.
-- (optional) Install with `pip install .[all]` if you want to run tests, benchmarks or build documentation yourself.
+- Clone the repository and switch to the desired branch, tag or commit. Enter the directory.
+- Make and activate a Python virtual environment. Python 3.13 is recommended.
+- It's recommended to explicitly [install the right version of OpenMM](https://docs.openmm.org/latest/userguide/application/01_getting_started.html#installing-openmm) with support for your GPU.
+   - e.g. `pip install openmm[cuda12]` or `pip install openmm[hip7]`
+   - (optional) after installing, verify which platforms are available with `python -m openmm.testInstallation`
+- (Within the virtual environment) install maturin (`pip install maturin` or `uv tool install maturin`).
+- Install to the virtual environment using `maturin develop -r`.
+- (optional) Also install optional dependencies with `pip install .[all]` if you want to run tests, benchmarks or build documentation yourself.
 
 ## Docs
 

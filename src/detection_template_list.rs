@@ -34,7 +34,7 @@ impl DetectionTemplateList {
 
         for (i1, a1, i2, a2, r_max) in rx_ref.distance_max.iter() {
             // largest_r_max
-            if (i1 == i2) {
+            if i1 == i2 {
                 // this is for constructing additional data required for intermolecular
                 // reactions and detection algorithm.
                 continue;

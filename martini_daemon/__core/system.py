@@ -1,12 +1,13 @@
-import openmm as mm
-from typing import Iterable, Type, Any, Collection
 from collections import OrderedDict
-import numpy as np
+from typing import Any, Collection, Iterable, Type
 
-from .force import Force
+import openmm as mm
+
+from ..__rust import BondGraph, PeriodicBox
 from .bonded_force import BondedForce
+from .force import Force
 from .molecule_type import MoleculeType
-from ..__rust import PeriodicBox
+
 
 class System:
     __available_forces: dict[str, Type[BondedForce]] = {}
@@ -41,7 +42,9 @@ class System:
 
     def __assert_no_context(self):
         if self.__context is not None:
-            raise ValueError("This operation must be done before Context is initialized.")
+            raise ValueError(
+                "This operation must be done before Context is initialized."
+            )
 
     # ==== Initial molecules ====
 
@@ -55,8 +58,13 @@ class System:
     # ==== ATOM METADATA ====
 
     def add_atom(
-        self, name: str, res_name: str, atom_type: str,
-        charge: float | None, mass: float | None, sc: tuple[float, float] = (1., 0.5)
+        self,
+        name: str,
+        res_name: str,
+        atom_type: str,
+        charge: float | None,
+        mass: float | None,
+        sc: tuple[float, float] = (1.0, 0.5),
     ) -> int:
         """
         Add an atom to the system.
@@ -81,8 +89,13 @@ class System:
         self.__softcore.append(sc)
         self.__interactions_by_atom.append([])
         assert (
-            len(self.__names) == len(self.__res_ids) == len(self.__res_names) == len(self.__types)
-            == len(self.__charges) == len(self.__masses) == len(self.__softcore)
+            len(self.__names)
+            == len(self.__res_ids)
+            == len(self.__res_names)
+            == len(self.__types)
+            == len(self.__charges)
+            == len(self.__masses)
+            == len(self.__softcore)
         )
         self.flag_atom_add()
         return len(self.__names) - 1
@@ -165,7 +178,7 @@ class System:
         self.__atom_types[atom_type] = (charge, mass)
 
     def iterate_atom_types(self) -> Iterable[tuple[str, tuple[float, float]]]:
-            return self.__atom_types.items()
+        return self.__atom_types.items()
 
     def get_atom_type(self, atom_type: str) -> None | tuple[float, float]:
         """
@@ -267,9 +280,7 @@ class System:
             constraints.build(must=True)
 
     def _set_default_pbc(self, box: PeriodicBox) -> None:
-        self.__system.setDefaultPeriodicBoxVectors(
-            box.a, box.b, box.c
-        )
+        self.__system.setDefaultPeriodicBoxVectors(box.a, box.b, box.c)
 
     def _bind_context(self, context):
         """
@@ -316,7 +327,9 @@ class System:
         self._rebuild()
         return self.__system
 
-    def add_interaction(self, name: str, members: list[int], params: list[float]) -> None:
+    def add_interaction(
+        self, name: str, members: list[int], params: list[float]
+    ) -> None:
         """
         Main API for getting bonds
         """
@@ -362,7 +375,6 @@ class System:
                     filters.add(filter_)
         return filters
 
-
     def break_group(self, break_group: set[int]) -> None:
         """
         Break all interactions that include all atoms in break_group.
@@ -394,11 +406,10 @@ class System:
 
     def get_number_of_degrees_of_freedom(self) -> int:
         return self.atom_count() - sum(
-            f.delta_degrees_of_freedom()
-            for f in self.__forces.values()
+            f.delta_degrees_of_freedom() for f in self.__forces.values()
         )
 
-    def collect_bonds(self, filters: list[str]) -> list[tuple[int, int]]:
+    def collect_bonds(self, filters: list[str]) -> BondGraph:
         """
         Returns a list of bonds that matches any of the filters.
 
@@ -407,7 +418,7 @@ class System:
         Multi-members interactions otherwise will be added as each member being bonded to the next.
         """
         n = self.atom_count()
-        bonds = []
+        bonds = BondGraph(n)
         for force in self.get_forces():
             if not issubclass(type(force), BondedForce):
                 continue
@@ -427,23 +438,23 @@ class System:
                     for j in members[1:]:
                         if i == j:
                             continue
-                        bonds.append((i, j))
+                        bonds.add_bond(i, j)
                 else:
                     # modeled as each particle bonded to the next one
                     for i, j in zip(members[:-1], members[1:]):
                         if i == j:
                             continue
-                        bonds.append((i, j))
+                        bonds.add_bond(i, j)
         return bonds
 
-    def collect_bonds_for_whole(self) -> list[tuple[int, int]]:
+    def collect_bonds_for_whole(self) -> BondGraph:
         """
-        Returns a list of bonds that need to be made whole across the PBC before simulation
+        Returns a bond graph that need to be made whole across the PBC before simulation
         can start. This usually includes constraints and virtual sites.
         Uses the `uses_pbc()` function of BondedForce to determine which one it is.
         """
         n = self.atom_count()
-        bonds = []
+        bonds = BondGraph(n)
         for force in self.get_forces():
             # do we include this force
             if not issubclass(type(force), BondedForce) or force.uses_pbc():
@@ -453,9 +464,8 @@ class System:
                 for j in members[1:]:
                     if i == j:
                         continue
-                    bonds.append((i, j))
+                    bonds.add_bond(i, j)
         return bonds
-
 
     def populate_neighbors(self, atoms: Collection[int], recursive=False) -> set[int]:
         """
@@ -476,7 +486,6 @@ class System:
                         stack.append(m)
             del stack[-1]
         return res
-
 
 
 def register_available_force(cls):

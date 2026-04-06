@@ -20,7 +20,7 @@ def read_geometry(path):
 
 
 
-def write_geometry(path, title, atom_names, res_ids, res_names, box, pos, vel=None):
+def write_geometry(path, title, atom_names, res_names, res_ids, box, pos, vel=None):
     """
     File format implied from extension.
 
@@ -36,7 +36,7 @@ def write_geometry(path, title, atom_names, res_ids, res_names, box, pos, vel=No
     prefix, ext = splitext(path)
     match ext:
         case ".gro":
-            return write_gro(path, title, atom_names, res_ids, res_names, box, pos, vel)
+            return write_gro(path, title, atom_names, res_names, res_ids, box, pos, vel)
         case ".xyz":
             return write_xyz(path, atom_names, box, pos, vel)
         case _:

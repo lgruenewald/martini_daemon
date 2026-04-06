@@ -1,11 +1,12 @@
 """
 Context inheriting openmm context
 """
-import openmm as mm
+
 import numpy as np
-from .system import System
+import openmm as mm
+
 from ..__rust import PeriodicBox
-from .bond_list import make_whole_frame, make_cluster_frame
+from .system import System
 
 
 class Context:
@@ -13,15 +14,25 @@ class Context:
     # when any state is queried or when there is steps forward, check if reinitializing is needed first, reinitialize
     # and then proceed. MAYBE: have a separate reinitialize only for timing purposes
 
-
-    def __init__(self, system: System, integrator: mm.Integrator, default_box: PeriodicBox, platform=None, params=None):
+    def __init__(
+        self,
+        system: System,
+        integrator: mm.Integrator,
+        default_box: PeriodicBox,
+        platform=None,
+        params=None,
+    ):
         system._set_default_pbc(default_box)
         if platform is None:
             self.__context = mm.Context(system.get_openmm_system(), integrator)
         elif params is None:
-            self.__context = mm.Context(system.get_openmm_system(), integrator, platform)
+            self.__context = mm.Context(
+                system.get_openmm_system(), integrator, platform
+            )
         else:
-            self.__context = mm.Context(system.get_openmm_system(), integrator, platform, params)
+            self.__context = mm.Context(
+                system.get_openmm_system(), integrator, platform, params
+            )
         self.system = system
         self.integrator = integrator
         system._bind_context(self)
@@ -42,19 +53,22 @@ class Context:
             return
         self.system._rebuild()
         self.__context.reinitialize(preserveState=True)
+        self.reinitialize = False
 
     def set_positions(self, positions: np.ndarray, box: PeriodicBox) -> None:
         if positions.shape != (self.N, 3):
-            raise ValueError(f"Positions must have shape ({self.N}, 3), got {positions.shape}.")
-        positions = positions.copy()
+            raise ValueError(
+                f"Positions must have shape ({self.N}, 3), got {positions.shape}."
+            )
         bonds = self.system.collect_bonds_for_whole()
-        clus = make_cluster_frame(self.N, bonds)
-        make_whole_frame(self.N, positions, box, clus)
+        bonds.make_whole(box, positions)
         self.__context.setPositions(positions)
 
     def set_velocities(self, velocities: np.ndarray) -> None:
         if velocities.shape != (self.N, 3):
-            raise ValueError(f"Velocities must have shape ({self.N}, 3), got {velocities.shape}.")
+            raise ValueError(
+                f"Velocities must have shape ({self.N}, 3), got {velocities.shape}."
+            )
         self.__context.setVelocities(velocities)
 
     def generate_velocities(self, temp: float) -> None:
@@ -64,9 +78,17 @@ class Context:
         mm.LocalEnergyMinimizer.minimize(self.__context, tolerance, max_steps)
 
     def apply_constraints(self):
-        pos_before = self.__context.getState(positions=True).getPositions(asNumpy=True).value_in_unit(mm.unit.nanometer)
+        pos_before = (
+            self.__context.getState(positions=True)
+            .getPositions(asNumpy=True)
+            .value_in_unit(mm.unit.nanometer)
+        )
         self.__context.applyConstraints(tol=1e-10)
-        pos_after = self.__context.getState(positions=True).getPositions(asNumpy=True).value_in_unit(mm.unit.nanometer)
+        pos_after = (
+            self.__context.getState(positions=True)
+            .getPositions(asNumpy=True)
+            .value_in_unit(mm.unit.nanometer)
+        )
         return pos_before, pos_after
 
     def get_positions(self) -> tuple[np.ndarray, PeriodicBox]:
@@ -81,7 +103,7 @@ class Context:
         if np.any(np.abs(pos) > 2147483.0):
             # would be too large to store without remaindering, so likely
             # the system blew up
-            raise ValueError (
+            raise ValueError(
                 "Coordinates too large, your system likely blew up. "
                 f"Largest coordinate (abs value) is {np.max(np.abs(pos))}."
             )
@@ -90,7 +112,9 @@ class Context:
 
     def get_velocities(self) -> np.ndarray:
         state = self.__context.getState(velocities=True)
-        return state.getVelocities(asNumpy=True).value_in_unit_system(mm.unit.md_unit_system)  # nm / ps
+        return state.getVelocities(asNumpy=True).value_in_unit_system(
+            mm.unit.md_unit_system
+        )  # nm / ps
 
     def get_energies(self) -> tuple[float, float, float]:
         """
@@ -105,5 +129,8 @@ class Context:
 
     def get_forces(self) -> np.ndarray:
         self.__reinitialize()
-        return self.__context.getState(forces=True).getForces(asNumpy=True).value_in_unit_system(mm.unit.md_unit_system)
-
+        return (
+            self.__context.getState(forces=True)
+            .getForces(asNumpy=True)
+            .value_in_unit_system(mm.unit.md_unit_system)
+        )

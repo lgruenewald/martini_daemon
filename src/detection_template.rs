@@ -112,7 +112,7 @@ impl DetectionTemplate {
         // 2. must be connected through r_max
         let mut connections: Vec<HashSet<usize>> =
             self.reactants.iter().map(|_| HashSet::new()).collect();
-        for (m1, i1, m2, i2, dist) in self.distance_max.iter() {
+        for (m1, _i1, m2, _i2, _dist) in self.distance_max.iter() {
             // parse_pair() in the parsing code should already handle out of bounds
             connections[*m1].insert(*m2);
             connections[*m2].insert(*m1);

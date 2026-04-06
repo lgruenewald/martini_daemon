@@ -7,7 +7,6 @@ use crate::fragment::Fragment;
 
 #[pyclass]
 pub struct FragList {
-    n_atoms: usize,
     defrag_list: Vec<Vec<usize>>,
     frag_list: OrderMap<usize, Fragment>,
     #[pyo3(get)]
@@ -39,7 +38,6 @@ impl FragList {
     pub fn new(n_atoms: usize) -> Self {
         let defrag_list = (0..n_atoms).map(|_| Vec::new()).collect();
         Self {
-            n_atoms,
             defrag_list,
             frag_list: OrderMap::new(),
             next_frag_id: 0,

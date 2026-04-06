@@ -2,8 +2,8 @@ use std::fmt::Display;
 
 use pyo3::prelude::*;
 
-#[pyclass(str)]
-#[derive(Clone, Debug)]
+#[pyclass(str, skip_from_py_object)]
+#[derive(Clone)]
 pub struct Fragment {
     // must be same as graph name
     #[pyo3(get)]

@@ -10,7 +10,7 @@ use crate::{
 };
 
 pub fn detection_one<'py>(
-    mut rx: PyRefMut<'py, DetectionTemplate>,
+    rx: &DetectionTemplate,
     frags: Vec<&Fragment>,
     pbc: &PeriodicBox,
     pos: Borrowed<PyArray<f64, Ix2>>,

@@ -287,8 +287,8 @@ class Simulation:
             path,
             f"Simulation {self.__sim_name}, step {self.current_step}, time {self.time_ns}.",
             self.system.get_atom_names(),
-            self.system.get_res_ids(),
             self.system.get_res_names(),
+            self.system.get_res_ids(),
             box, pos, vel
         )
 
