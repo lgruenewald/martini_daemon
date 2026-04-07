@@ -2,6 +2,7 @@ from typing import Collection
 from dataclasses import dataclass
 import zlib
 import struct
+from ..__rust import BondGraph
 
 # TODO improve docs
 # TODO initial molecules should contain number of atoms per molecule as well
@@ -178,7 +179,7 @@ class TopTrajWriter:
 
     def register_frame_bonds(
         self,
-        bonds: Collection[tuple[int, int]]
+        bonds: BondGraph
     ):
         assert self.frame.get("bonds") is None, (
             "Should only call register_frame_bonds once per frame!"

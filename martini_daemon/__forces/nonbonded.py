@@ -46,6 +46,8 @@ class NonBonded(Force):
         return self.__exclusions
 
     def flag_atom_change(self, atom_id: int, change_charge: bool = False) -> None:
+        if self.force is None:
+            return
         type_ = self.__atom_types[self.system.get_type(atom_id)]
         charge = self.system.get_charge(atom_id)
         sc_lam, sc_alpha = self.system.get_sc(atom_id)

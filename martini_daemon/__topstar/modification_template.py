@@ -53,7 +53,7 @@ class ModificationTemplate(MoleculeType):
             if atom_indices[i] >= 0:
                 system.remass(atom_indices[i], mass)
 
-    def toggle_sc(self, system, atom_indices: list[int], on: bool):
+    def toggle_softcore(self, system, atom_indices: list[int], on: bool):
         """
         Toggles soft core on/off for minimization based on the reacting atom_indices.
         """

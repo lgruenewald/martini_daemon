@@ -126,4 +126,7 @@ class Pairs(BondedForce):
 
     def flag_atom_change(self, atom_id, change_charge) -> None:
         # TODO
+        # 1. update entries
+        # 2. if force is not None, update force
         raise NotImplementedError
+

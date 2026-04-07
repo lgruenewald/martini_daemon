@@ -149,3 +149,5 @@ class Cmap(BondedForce):
         for index, (size, cmap) in enumerate(self.system.additional_data["cmap_maps"]):
             i = self.force.addMap(size, cmap)
             assert i == index
+
+    # TODO flag atom type change, same as in pairs

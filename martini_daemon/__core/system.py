@@ -167,8 +167,8 @@ class System:
     def get_sc_alpha(self, atom_id) -> float:
         return self.get_sc(atom_id)[1]
 
-    def update_sc(self, atom_id: int, new_sc: tuple[float, float]) -> None:
-        self.__softcore[atom_id] = new_sc
+    def update_sc(self, atom_id: int, sc_lam: float, sc_alpha: float) -> None:
+        self.__softcore[atom_id] = (sc_lam, sc_alpha)
         self.flag_atom_change(atom_id)
 
     # ==== ATOM TYPE HANDLING ====
@@ -234,11 +234,14 @@ class System:
         Should only be called by Force/BondedForce.
         """
         name = force.getName()
-        assert name is not None and name in self.__forces.keys()
+        assert name is not None
+        removed = False
         for i in range(self.__system.getNumForces()):
             if name == self.__system.getForce(i).getName():
                 self.__system.removeForce(i)
+                removed = True
                 break
+        assert removed
         self.flag_reinitialize()
 
     def _add_constraint(self, i, j, length) -> None:
@@ -257,18 +260,18 @@ class System:
         """
         Used for constraints <=> harmonic bond replace.
         """
-        for i in range(self.__system.getNumConstraints(), 0, -1):
+        for i in range(self.__system.getNumConstraints()-1, -1, -1):
             self.__system.removeConstraint(i)
         assert self.__system.getNumConstraints() == 0
 
-    def _toggle_constraints_as_harmonic_bonds(self, harmonic: bool) -> None:
+    def toggle_constraints_as_harmonic_bonds(self, harmonic: bool) -> None:
         constraints = self.get_force("constraint")
         if harmonic:
             self.__harmonic_constraints = mm.HarmonicBondForce()
             self.__harmonic_constraints.setName("harmonic_replacement_for_constraints")
             self.__del_all_constraints()
             for _, (members, params) in constraints.iterate_bonds():
-                self.__harmonic_constraints.addBond(*members, *params, 10000)
+                self.__harmonic_constraints.addBond(*members, *params, 10000.)
             # this sets reinitialize to True
             self._add_mm_force(self.__harmonic_constraints)
         else:
@@ -475,16 +478,20 @@ class System:
 
         If recursive, will traverse interactions recursively to get the whole molecule.
         """
-        res = set(atoms)
+        res = set()
         stack = list(atoms)
         while len(stack) > 0:
             atom = stack[-1]
+            del stack[-1]
+            if recursive and atom in res:
+                continue
+            res.add(atom)
             for force, bond_id in self.__interactions_by_atom[atom]:
                 for m in self.get_force(force).get_members(bond_id):
-                    res.add(m)
                     if recursive:
                         stack.append(m)
-            del stack[-1]
+                    else:
+                        res.add(m)
         return res
 
 

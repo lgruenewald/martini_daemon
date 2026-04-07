@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
-from martini_daemon import TopTrajWriter, TopTrajReader
+from martini_daemon import TopTrajWriter, TopTrajReader, BondGraph
 import numpy as np
 import string
-from tqdm import tqdm
 from math import isclose
 
 def get_random_name():
@@ -31,7 +30,7 @@ def test_toptraj_writer():
         {} for _ in range(n_frames)
     ]
 
-    for frame_num, frame in tqdm(enumerate(frames), total=len(frames)):
+    for frame_num, frame in enumerate(frames):
         n_atoms = np.random.randint(2000, 3000)
         frame["n_atoms"] = n_atoms
         frame["names"] = [
@@ -47,22 +46,17 @@ def test_toptraj_writer():
         frame["charges"] = np.random.rand(n_atoms) * 2. - 1.
         frame["masses"] = np.random.rand(n_atoms) * 50.
         n_bonds  = np.random.randint(1000, 5000)
-        bonds = set()
+        bonds = BondGraph(n_atoms)
         for _ in range(n_bonds):
             i = np.random.randint(0, n_atoms)
             j = np.random.randint(0, n_atoms)
-            if i == j:
-                continue
-            # it'd only write it once if there are duplicates
-            # + we want this to be the same format as it'll be read back
-            smaller = min(i,j)
-            larger = max(i,j)
-            bonds.add((smaller, larger))
+            # BondGraph ignores it if i==j
+            bonds.add_bond(i, j)
         frame["bonds"] = bonds
         # and write it to file
 
     print("writing it to file")
-    for frame_num, frame in tqdm(enumerate(frames), total=len(frames)):
+    for frame_num, frame in enumerate(frames):
         w.new_frame(
             frame_num,
             frame_num * 5000,
@@ -91,7 +85,7 @@ def test_toptraj_writer():
     assert r.initial_molecules[1] == (b"b", 2)
     assert r.initial_molecules[2] == (b"c", 3)
 
-    for i, frame in tqdm(enumerate(frames), total=len(frames)):
+    for i, frame in enumerate(frames):
         f = r.read_frame()
         assert f.sim_step == i * 5000
         assert f.frame_index == i
@@ -104,9 +98,11 @@ def test_toptraj_writer():
             assert isclose(f.charges[j], frame["charges"][j], rel_tol=1e-5)
             assert isclose(f.masses[j], frame["masses"][j], rel_tol=1e-5)
             assert f.res_ids[j] == frame["res_ids"][j]
-        assert len(f.bonds) == len(frame["bonds"])
-        assert len(set(f.bonds) - frame["bonds"]) == 0
-        assert len(frame["bonds"] - set(f.bonds)) == 0
+        assert len(f.bonds) == len(frame["bonds"].to_list())
+        # Note: if this fails in the future, consider if the order (i, j) and (j, i) is not inverted
+        # currently there is a fixed order in to_list, which the writer also calls, so a simple equality is fine
+        assert len(set(f.bonds) - set(frame["bonds"].to_list())) == 0
+        assert len(set(frame["bonds"].to_list()) - set(f.bonds)) == 0
 
     assert r.read_frame() is None
 

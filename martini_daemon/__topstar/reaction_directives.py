@@ -381,7 +381,7 @@ class UpdateDirective(Directive):
 class RedefineDirective(Directive):
 
     def line(self, tokens: TokenList) -> None:
-        reactant_index, atom_index = self.parent.parse_index(tokens, 0, "pair")
+        atom_index = self.parent.parse_index(tokens, 0)
         changes = set()
         i = 1
         while i < len(tokens):
@@ -395,25 +395,26 @@ class RedefineDirective(Directive):
             match word:
                 case "name":
                     self.parent.molecule_type.renames.append((
-                        reactant_index, atom_index, tokens.unwrap(i+1, "word")
+                        atom_index, tokens.unwrap(i+1, "word")
                     ))
                 case "type":
                     self.parent.molecule_type.retypes.append((
-                        reactant_index, atom_index, tokens.unwrap(i+1, "word")
+                        atom_index, tokens.unwrap(i+1, "word")
                     ))
                 case "charge":
                     self.parent.molecule_type.recharges.append((
-                        reactant_index, atom_index, tokens.unwrap(i+1, "float")
+                        atom_index, tokens.unwrap(i+1, "float")
                     ))
                 case "mass":
                     self.parent.molecule_type.remasses.append((
-                        reactant_index, atom_index, tokens.unwrap(i+1, "float")
+                        atom_index, tokens.unwrap(i+1, "float")
                     ))
                 case _:
                     raise TokenParseException(
                         tokens[1 + i * 2],
                         f"Unknown atom property {word}."
                     )
+            i += 2
 
     def finish(self):
         pass
@@ -438,10 +439,10 @@ class RedefineDirective(Directive):
 class SoftCoreDirective(Directive):
 
     def line(self, tokens: TokenList) -> None:
-        reactant_index, atom_index = self.parent.parse_index(tokens, 0, "pair")
+        atom_index = self.parent.parse_index(tokens, 0)
         sc_lam = tokens.unwrap(1, "float")
         sc_alpha = tokens.unwrap(2, "float")
-        self.parent.molecule_type.soft_core.append((reactant_index, atom_index, sc_lam, sc_alpha))
+        self.parent.molecule_type.soft_core.append((atom_index, sc_lam, sc_alpha))
 
     def finish(self):
         pass
@@ -460,4 +461,4 @@ class SoftCoreDirective(Directive):
 
     @classmethod
     def get_name(cls) -> str:
-        return "softcore"
+        return "soft_core"

@@ -9,7 +9,7 @@ This is achieved by combining multiple components in one repo / one python packa
 - a graph matching system to find reactants (`__topstar`)
 - a detection/modification algorithm to execute reaction templates (`__topstar`)
 
-### Installation (from source)
+## Installation (from source)
 
 - Install `git-lfs` (`sudo apt install git-lfs` on Ubuntu).
 - Install Cargo and Rust. Installation via [rustup](https://rustup.rs/) is recommended.
@@ -24,27 +24,46 @@ This is achieved by combining multiple components in one repo / one python packa
 
 ## Docs
 
-Docs can be built using sphinx. Run `make html` in the `docs/` folder in the
+Docs can be built using sphinx. Install optional dependencies with `pip install .[all]` first.
+
+Run `make html` in the `docs/` folder in the
 repo. The generated docs can then be found under `docs/build/html`.
 
 If any questions remain, feel free to open an Issue, so that we can help and also extend the documentation where necessary.
 
-## Examples
-
-Example systems built with martini_daemon can be found here.
-The README in every example directory should provide further
-information about each system.
-
 ## Tests
 
-- `cargo test` - Test the rust bits and pieces (you may want to run this outside of a conda environment).
+To run the test suite:
+
+```
+# Gromacs in double precision is required, this should be installed first
+source /usr/local/gromacs-2026.1-double/bin/GMXRC
+# (in the root of the repo)
+# make sure optional dependencies are installed
+pip install .[all]
+# make sure everything is recompiled
+maturin develop
+# run the python tests
+pytest .
+# run the rust tests (for this command, deactivate conda environments if using conda/mamba)
+cargo test
+```
+
+The python tests can be found in the `tests` folder in the repo, containing the following types of tests:
 - `parser` - Tests the .top parser basics.
 - `single_frame` - Single point energy and force calculation tests, that verify that Martini is implemented correctly by comparing it to GROMACS energies.
 - `graph` - Tests for the graph matching algorithm.
 - `detection` - Tests for the detection algorithm.
 - `modification` - Tests for the modification algorithm.
+- `integration` - Runs a short reactive simulation with various reporters. Does not automatically verify output at the moment, doing that is the job of the other tests.
+
+The rust tests can be found in `src` at the end of a few of the submodules. Other submodules are tested as part of the python tests.
+
+Currently, there are no skipped or stochastic tests, all tests should pass.
+
+Some single_frame tests have looser tolerances, this is documented at the top of `tests/single_frame/test_single_frame.py`.
 
 # License
 
 Martini Daemon is licensed under the Apache 2.0 license.
-See LICENSE.txt for details.
+See `LICENSE.txt` for details.

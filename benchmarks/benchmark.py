@@ -132,7 +132,7 @@ def bench_daemon(top, gro, steps, freq, reactive, force_reinit):
     logger.info(f"Probe 100k steps took {probe:.2f} s.")
 
     for h in sim.logger.handlers:
-        h.flush()
+        h.flush_all()
         h.close()
 
     return (sim_name + ".log", grompp, mdrun, probe)

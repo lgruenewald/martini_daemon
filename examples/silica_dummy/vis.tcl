@@ -1,7 +1,10 @@
-load ../../tcl/bond_loader.so
-source ../../tcl/daemon.tcl
-daemon_open out.gro whole.xtc
-daemon_bonds whole.z
+load ../../vmd_plugin/toptraj.so
+
+mol new system.gro
+mol addfile out.xtc waitfor all
+animate delete beg 0 end 0 skip 0 0
+
+load_toptraj out.toptraj 0 1
 
 mol modstyle 0 0 VDW 0.8 12.0
 mol modselect 0 0 name SI1
@@ -15,6 +18,3 @@ mol modselect 2 0 name W
 mol modmaterial 2 0 Ghost
 mol modstyle 2 0 QuickSurf 1.6 0.5 1.0 1.0
 animate goto 0
-display depthcue off
-display projection Orthographic
-display rendermode GLSL

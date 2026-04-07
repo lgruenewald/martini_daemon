@@ -1,5 +1,7 @@
+use std::collections::HashSet;
 use pyo3::prelude::*;
-use numpy::{PyReadwriteArray, Ix2, PyUntypedArrayMethods};
+use numpy::{PyReadwriteArray, Ix2, PyUntypedArrayMethods, PyReadonlyArray2};
+use kdtree::{KdTree, distance::squared_euclidean, ErrorKind};
 
 use glam::DVec3;
 use pyo3::exceptions::PyValueError;
@@ -123,7 +125,7 @@ impl PeriodicBox {
     /// Move_within but for 2D numpy arrays of positions of shape (n, 3).
     pub fn move_all_within(&self, mut array: PyReadwriteArray<f64, Ix2>) -> PyResult<()> {
         if let [_, inner] = array.shape() && *inner != 3 {
-            return Err(pyo3::exceptions::PyValueError::new_err(format!("Invalid dimensions, expected Nx3, got (N, {inner})")))
+            return Err(PyValueError::new_err(format!("Invalid dimensions, expected Nx3, got (N, {inner})")))
         }
 
         for v in array.as_slice_mut()?.chunks_mut(3) {
@@ -133,18 +135,60 @@ impl PeriodicBox {
         Ok(())
     }
 
+    pub fn which_atoms_within_distance(&self, positions: PyReadonlyArray2<f64>, reference: HashSet<usize>, r: f64) -> PyResult<HashSet<usize>> {
+        let mut res: HashSet<usize> = HashSet::new();
+        let r2 = r * r;
+        if let [_, inner] = positions.shape() && *inner != 3 {
+            return Err(PyValueError::new_err(format!("Invalid dimensions, expected Nx3, got (N, {inner})")))
+        }
+        let mut tree = KdTree::new(3);
+        for atom in reference {
+            let pos = self.move_within(positions.get_item(atom)?.extract::<[f64; 3]>()?);
+            for dx in -1..=1 {
+                for dy in -1..=1 {
+                    for dz in -1..=1 {
+                        // Note: dx=0, dy=0, dz=0 is handled here too
+                        let new_pos = self.translate_by(pos, dx, dy, dz);
+                        if self.is_almost_inside(new_pos, r + 0.01) {
+                            tree.add(new_pos, atom).unwrap();
+                        }
+                    }
+                }
+            }
+        }
+        for i in 0..positions.shape()[0] {
+            match tree.nearest(&positions.get_item(i)?.extract::<[f64; 3]>()?, 1, &squared_euclidean) {
+                Ok(v) => {
+                    for (dist, _) in v {
+                        if dist < r2 {
+                            res.insert(i);
+                        }
+                    }
+                }
+                Err(e) => {
+                    return match e {
+                        ErrorKind::WrongDimension => Err(PyValueError::new_err("Internal error: wrong dimension.")),
+                        ErrorKind::NonFiniteCoordinate => Err(PyValueError::new_err("Supplied positions contain a non-finite value.")),
+                        ErrorKind::ZeroCapacity => Err(PyValueError::new_err("Internal error: zero capacity."))
+                    }
+                }
+            }
+        }
+        Ok(res)
+    }
+
     #[getter]
-    fn a(&self) -> [f64; 3] {
+    pub fn a(&self) -> [f64; 3] {
         self.a.into()
     }
 
     #[getter]
-    fn b(&self) -> [f64; 3] {
+    pub fn b(&self) -> [f64; 3] {
         self.b.into()
     }
 
     #[getter]
-    fn c(&self) -> [f64; 3] {
+    pub fn c(&self) -> [f64; 3] {
         self.c.into()
     }
 

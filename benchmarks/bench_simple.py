@@ -35,7 +35,11 @@ for inp in inputs:
     start = time.time()
     for i in range(10):
         sim.step(250, traj=True, dm=True)
+    break
     categories = extract_timings_from_log("out.log", ignore_first=True)
+    if not categories:
+        print("log for ", inp, " can't be extracted!")
+        continue
     for cat, ctime in categories.items():
         print(f"{cat}: {ctime} s")
     print("")

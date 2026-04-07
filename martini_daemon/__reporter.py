@@ -1,7 +1,15 @@
 class Reporter:
+    def pre_simulation_start(self, simulation):
+        """
+        Called just before the context is initialized.
+
+        Use on_simulation_start unless you really need to mutate simulation in a way that needs to happen
+        before context initialization.
+        """
+
     def on_simulation_start(self, simulation):
         """
-        Called once when Simulation is constructed.
+        Called once when Simulation is constructed. After the context is initialized.
         """
         pass
 
@@ -37,6 +45,6 @@ class Reporter:
 
     def post_reaction(self, simulation):
         """
-        Called after minimization (if there was one) and reinitialize.
+        Called after all on_reaction reporters were resolved (some might apply minimization).
         """
         pass

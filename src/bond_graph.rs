@@ -1,69 +1,64 @@
-use numpy::{PyArray2, PyArrayMethods, PyUntypedArrayMethods};
-use petgraph::data::FromElements;
+use numpy::{PyReadwriteArray2, PyUntypedArrayMethods};
+use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
-use pyo3::{prelude::*};
-use petgraph::prelude::*;
-use petgraph::algo::min_spanning_tree;
+use std::collections::{HashSet};
 
 use crate::periodic_box::PeriodicBox;
 
 #[pyclass]
 pub struct BondGraph {
     n_atoms: usize,
-    bonds: UnGraph<(), ()>
+    bonds: Vec<HashSet<usize>>
 }
 
 #[pymethods]
 impl BondGraph {
     #[new]
     pub fn new(n_atoms: usize) -> Self {
-        let mut bonds = UnGraph::new_undirected();
-        for _ in 0..n_atoms {
-            bonds.add_node(());
-        }
         BondGraph {
             n_atoms,
-            bonds
+            bonds: (0..n_atoms).map(|_| HashSet::new()).collect()
         }
     }
 
-    pub fn add_bond(&mut self, i: u32, j: u32) {
-        self.bonds.extend_with_edges(&[(i, j)]);
+    pub fn add_bond(&mut self, i: usize, j: usize) {
+        if i != j {
+            self.bonds[i].insert(j);
+            self.bonds[j].insert(i);
+        }
     }
 
-    pub fn make_whole<'py>(&self, pbc: &PeriodicBox, pos: Bound<'py, PyArray2<f64>>) -> PyResult<()> {
+    pub fn make_whole<'py>(&self, pbc: &PeriodicBox, mut pos: PyReadwriteArray2<f64>) -> PyResult<()> {
         if pos.shape()[0] != self.n_atoms {
             return Err(PyValueError::new_err("Supplied positions have wrong dimension. Is the number of atoms correct?"));
         }
         if pos.shape()[1] != 3 {
             return Err(PyValueError::new_err("Supplied positions second dimension is not 3."))
         }
+        let pos = pos.as_slice_mut()?;
 
-        // 1. build a minimum spanning tree from the bond graph
-        let mut arr = unsafe { pos.as_array_mut() };
-        let mst = UnGraph::from_elements(min_spanning_tree(&self.bonds));
-
-        // 2. use move_to to make all trees whole across PBC
         let mut visited: Vec<bool> = (0..self.n_atoms).map(|_| false).collect();
         for i in 0..self.n_atoms {
             if visited[i] {
                 continue;
             }
-            visited[i] = true;
-            let reference: [f64; 3] = [arr[[i, 0]], arr[[i, 1]], arr[[i, 2]]];
-            let mut dfs = Dfs::new(&mst, NodeIndex::<u32>::new(i));
-            while let Some(j) = dfs.next(&mst) {
-                let j = j.index();
-                if i == j {
+
+            let mut stack: Vec<(usize, [f64; 3])> = Vec::new();
+            stack.push((i, [pos[i*3 + 0], pos[i*3 + 1], pos[i*3 + 2]]));
+
+            while stack.len() > 0 {
+                let (c, reference) = stack.pop().unwrap();
+                if visited[c] {
                     continue;
                 }
-                assert!(!visited[j]);
-                let before = [arr[[j, 0]], arr[[j, 1]], arr[[j, 2]]];
-                let after = pbc.move_to(reference, before);
-                arr[[j, 0]] = after[0];
-                arr[[j, 1]] = after[1];
-                arr[[j, 2]] = after[2];
-                visited[j] = true;
+                let cpos: [f64; 3] = pos[c*3..(c+1)*3].try_into()?;
+                pos[c*3..(c+1)*3].copy_from_slice(&pbc.move_to(reference, cpos));
+
+                visited[c] = true;
+
+                for j in self.bonds[c].iter() {
+                    stack.push((*j, pos[c*3..(c+1)*3].try_into()?));
+                }
             }
         }
         for v in visited {
@@ -75,13 +70,30 @@ impl BondGraph {
 
     pub fn to_list(&self) -> Vec<(usize, usize)> {
         let mut res: Vec<(usize, usize)> = Vec::new();
-
-        for edge in self.bonds.raw_edges() {
-            let i = edge.source().index();
-            let j = edge.target().index();
-            res.push((i, j));
+        for i in 0..self.n_atoms {
+            for j in self.bonds[i].iter() {
+                if i < *j {
+                    res.push((i, *j));
+                }
+            }
         }
 
+        res
+    }
+
+    pub fn reachable_from(&self, atoms: HashSet<usize>) -> HashSet<usize> {
+        let mut res: HashSet<usize> = HashSet::new();
+        let mut stack: Vec<usize> = atoms.into_iter().collect();
+        while stack.len() > 0 {
+            let atom = stack.pop().unwrap();
+            if res.contains(&atom) {
+                continue;
+            }
+            res.insert(atom);
+            for j in self.bonds[atom].iter() {
+                stack.push(*j);
+            }
+        }
         res
     }
 }

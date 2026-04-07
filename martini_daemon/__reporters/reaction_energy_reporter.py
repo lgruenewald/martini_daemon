@@ -22,7 +22,8 @@ class ReactionEnergyReporter(Reporter):
         if self.write_coords:
             sim.save_geometry(sim.request_path(f"_{title}{sim.current_step}{self.ext}"))
 
-    def on_reaction(self, simulation: Simulation, _):
+    def pre_modification(self, simulation: Simulation):
+        # minimizations happen in "on_reaction", this is guaranteed to be before it
         write_energies("pre-reaction", ".rxener", simulation)
         self.__write_pos("premin", simulation)
 

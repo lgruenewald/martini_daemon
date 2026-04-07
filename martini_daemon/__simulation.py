@@ -138,6 +138,9 @@ class Simulation:
         for c in coupling:
             self.system.add_force(wrap_coupling(c)(self.system))
 
+        for r in self.reporters:
+            r.pre_simulation_start(self)
+
         # build context
         if geom_path is not None:
             box, start_pos, start_vel = read_geometry(geom_path)
@@ -158,6 +161,9 @@ class Simulation:
         self.last_step_time = 0.
         self.first_step_time = 0.
         self.trajectory_frame = 0
+
+        # to avoid double finish
+        self.finished = False
 
     # File handles and loggers
     @staticmethod
@@ -206,24 +212,38 @@ class Simulation:
                 self.write(suffix, sep)
             self.write(suffix, f"{arg}")
         self.write(suffix, end)
+        self.flush(suffix)
 
-    def flush(self):
+    def flush(self, suffix: str):
+        """
+        Flushes a single output file handle.
+        """
+        handle, comp = self.output_files[suffix]
+        if comp is not None:
+            handle.write(comp.flush_all())
+        handle.flush()
+
+    def flush_all(self):
         """
         Flushes all output files. Also called at trajectory frames automatically.
         """
-        for handle, comp in self.output_files.values():
-            if comp is not None:
-                handle.write(comp.flush())
-            handle.flush()
+        for suffix in self.output_files.keys():
+            self.flush(suffix)
+
 
     def finish(self):
         """
         1. Runs finish on all reporters.
         2. Flushes output files and closes output file handles.
+
+        Called by simulate(), or should be called by the user manually otherwise.
         """
+        if self.finished:
+            return
+        self.finished = True
         for r in self.reporters:
             r.on_simulation_finish(self)
-        self.flush()
+        self.flush_all()
         for handle, _ in self.output_files.values():
             handle.close()
         self.output_files = {}
@@ -338,10 +358,13 @@ class Simulation:
         Do the following:
         - steps n_steps
         - D/M algorithm if dm is true
-        - locally minimize energy and reinitialize system if reactions happened
         - trigger a trajectory frame on reporters if traj is True
         - display info to logs and screen, % info given by self.current_step and self.md_steps
         - update self.current_step
+
+        Note: reinitializing is now handled automatically by context.
+
+        Note: if calling step manually, must call finish() after!
         """
         start_time = time()
         if traj:
@@ -386,8 +409,13 @@ class Simulation:
                 reactions: list[tuple[str, list[Fragment]]] = self.top.modification(reactions)
                 self.info("Modification finished")
                 for r in self.reporters:
+                    self.info(f"OnReaction {r.__class__.__name__} start")
                     r.on_reaction(self, reactions)
-                # TODO minimization
+                    self.info(f"OnReaction {r.__class__.__name__} finished")
+                for r in self.reporters:
+                    r.post_reaction(self)
+
+
         end_time = time()
         if n_steps > 0:
             step_time = (end_time - start_time) / n_steps

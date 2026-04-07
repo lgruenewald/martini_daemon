@@ -70,6 +70,7 @@ class TopStar:
         reactant concentrations (specified using counts and volume).
         """
         # TODO
+        # note we only have post-rate adjusted rates
         pass
 
     def detection(self, pbc: PeriodicBox, pos) -> list[tuple[str, list[int]]]:
@@ -127,3 +128,13 @@ class TopStar:
             completed.append((rx, frags))
 
         return completed
+
+    def toggle_softcore(self, reactions: list[tuple[str, list[Fragment]]], on: bool):
+        for (rx, frags) in reactions:
+            m_template = self.system.molecule_types[rx]
+            flattened_atoms = []
+            for f in frags:
+                flattened_atoms.extend(f.atoms)
+
+            m_template.toggle_softcore(self.system, flattened_atoms, on)
+
