@@ -266,6 +266,8 @@ class System:
 
     def toggle_constraints_as_harmonic_bonds(self, harmonic: bool) -> None:
         constraints = self.get_force("constraint")
+        if constraints is None:
+            return
         if harmonic:
             self.__harmonic_constraints = mm.HarmonicBondForce()
             self.__harmonic_constraints.setName("harmonic_replacement_for_constraints")
@@ -347,6 +349,7 @@ class System:
                 )
         bond_id = f._add_bond(members, params)
         for member in members:
+            assert member >= 0, f"Internal error: {member} is negative in {name}, {members}, {params}."
             self.__interactions_by_atom[member].append((name, bond_id))
 
     def remove_interaction(self, force_name: str, bond_id: int) -> None:
@@ -488,6 +491,7 @@ class System:
             res.add(atom)
             for force, bond_id in self.__interactions_by_atom[atom]:
                 for m in self.get_force(force).get_members(bond_id):
+                    assert m >= 0, f"Internal error: m is {m}, for force {force}, bond_id {bond_id}."
                     if recursive:
                         stack.append(m)
                     else:

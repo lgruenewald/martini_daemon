@@ -35,7 +35,6 @@ SIAC 1
 3 4 5
 4 5
 
-#ifdef REACT
 [frag]
 name Si
 atom 1 SV* *
@@ -74,4 +73,3 @@ bond
 r_min 1:1 1:2 0.26
 [break]
 1:1 1:2
-#endif

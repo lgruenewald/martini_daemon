@@ -34,7 +34,7 @@ class Context:
                 system.get_openmm_system(), integrator, platform, params
             )
         self.system = system
-        self.integrator = integrator
+        self.__integrator = integrator
         system._bind_context(self)
         self.N = system.atom_count()
 
@@ -44,7 +44,7 @@ class Context:
     def do_steps(self, n):
         self.__reinitialize()
         if n > 0:
-            self.integrator.step(n)
+            self.__integrator.step(n)
 
     def __reinitialize(self):
         """
@@ -55,6 +55,21 @@ class Context:
         self.system._rebuild()
         self.__context.reinitialize(preserveState=True)
         self.reinitialize = False
+
+    def get_current_integrator(self) -> int:
+        """
+        If supplied integrator was an OpenMM compound integrator, get the current index.
+
+        Note: Simulation always sets up compound integrators, so generally it will be a compound integrator if using
+        the Simulation API.
+        """
+        return self.__integrator.getCurrentIntegrator()
+
+    def set_current_integrator(self, idx: int) -> None:
+        """
+        If supplied integrator was an OpenMM compound integrator, set the current index.
+        """
+        self.__integrator.setCurrentIntegrator(idx)
 
     def set_positions(self, positions: np.ndarray, box: PeriodicBox) -> None:
         if positions.shape != (self.N, 3):

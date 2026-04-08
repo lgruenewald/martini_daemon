@@ -29,7 +29,7 @@ class TrajectoryWriter:
                 assert False
 
 
-    def write_frame(self, sim_step: int, time_ns: float, box: PeriodicBox, pos: np.ndarray, vel: np.ndarray = None) -> None:
+    def write_frame(self, sim_step: int, time_ps: float, box: PeriodicBox, pos: np.ndarray, vel: np.ndarray = None) -> None:
         match self.backend:
             case "xtc_openmm_internal":
                 from openmm.app.internal.xtc_utils import xtc_write_frame
@@ -49,7 +49,7 @@ class TrajectoryWriter:
                     self.path.encode("utf-8"), # title as byte string
                     pos, # positions as float[:, :]
                     box, # box as float[:, :]
-                    time_ns * 1000., # time in ps
+                    time_ps, # time in ps
                     sim_step
                 )
             case _:
@@ -93,7 +93,7 @@ class TrajectoryReader:
 
     def read_frame(self) -> None | tuple[int, float, PeriodicBox, np.ndarray, np.ndarray | None]:
         """
-        Returns a tuple of sim step, time (in ns), pbc, pos and vel if the format supports it
+        Returns a tuple of sim step, time (in ps), pbc, pos and vel if the format supports it
         """
         match self.backend:
             case "xtc_openmm_internal":
@@ -102,7 +102,7 @@ class TrajectoryReader:
                 self.c_frame += 1
                 return (
                     self.step[self.c_frame - 1],
-                    self.time[self.c_frame - 1] / 1000.,
+                    self.time[self.c_frame - 1],
                     PeriodicBox(self.box[self.c_frame - 1]),
                     self.pos[self.c_frame - 1],
                     None

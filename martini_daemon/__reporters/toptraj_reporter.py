@@ -17,7 +17,7 @@ class ToptrajReporter(Reporter):
         self.writer.new_frame(
             simulation.trajectory_frame,
             simulation.current_step,
-            simulation.time_ns,
+            simulation.time_ps,
             simulation.system.atom_count()
         )
         self.writer.register_frame_atoms(

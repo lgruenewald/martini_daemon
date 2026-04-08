@@ -13,7 +13,7 @@ class XTCReporter(Reporter):
 
     def on_trajectory_frame(self, simulation):
         pos, box = simulation.context.get_positions()
-        self.writer.write_frame(simulation.current_step, simulation.time_ns, box, pos)
+        self.writer.write_frame(simulation.current_step, simulation.time_ps, box, pos)
 
     def on_simulation_finish(self, simulation):
         self.writer.finish()

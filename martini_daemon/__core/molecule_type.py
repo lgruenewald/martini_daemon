@@ -68,7 +68,7 @@ class MoleculeType:
                     []
                 )
         for (name, members, params, _) in self.interactions:
-            if any(x < 0 for x in members):
+            if any(atom_indices[x] < 0 for x in members):
                 # during reactions, missing optional atoms can do this
                 continue
             system.add_interaction(

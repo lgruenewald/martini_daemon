@@ -86,8 +86,9 @@ class TestSingleFrame():
         applies constraints and vsites and checks for position change
         """
         _, reference, _ = read_geometry(self.gro)
+        _, respos, _ = read_geometry(self.respos)
         sim = Simulation(
-            self.top, self.gro, 0, [], restraint_coord_path=self.respos, platform="Reference"
+            self.top, self.gro, 0, [], options={"respos": respos}, platform="Reference"
         )
         sim.context.apply_constraints()
         new_pos, box = sim.context.get_positions()
@@ -96,9 +97,10 @@ class TestSingleFrame():
             assert r_diff < r_tol, f"Constraint/VSite position moved by {r_diff} nm (particle {i})."
 
     def compare_daemon_gmx(self):
+        _, respos, _ = read_geometry(self.respos)
         platform = mm.Platform.getPlatformByName("Reference")
         sim = Simulation(
-            self.top, self.gro, 0, [], restraint_coord_path=self.respos, platform="Reference"
+            self.top, self.gro, 0, [], options={"respos": respos}, platform="Reference"
         )
 
         _, energy, _ = sim.context.get_energies()

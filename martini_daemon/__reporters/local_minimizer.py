@@ -48,8 +48,8 @@ class LocalMinimizer(Reporter):
 
         vel = simulation.context.get_velocities()
         pos, box = simulation.context.get_positions()
-        old_integrator = simulation.integrator.getCurrentIntegrator()
-        simulation.integrator.setCurrentIntegrator(self.integrator_index)
+        old_integrator = simulation.context.get_current_integrator()
+        simulation.context.set_current_integrator(self.integrator_index)
         simulation.top.toggle_softcore(reactions, True)
         if self.harmonic_constraints:
             simulation.system.toggle_constraints_as_harmonic_bonds(True)
@@ -94,8 +94,7 @@ class LocalMinimizer(Reporter):
         if self.harmonic_constraints:
             simulation.system.toggle_constraints_as_harmonic_bonds(False)
         simulation.top.toggle_softcore(reactions, False)
-        simulation.integrator.setCurrentIntegrator(old_integrator)
-
+        simulation.context.set_current_integrator(old_integrator)
 
 class LocalGradientDescent:
 

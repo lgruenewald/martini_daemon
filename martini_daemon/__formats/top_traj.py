@@ -70,7 +70,7 @@ class TopTrajWriter:
         - 4 byte integer - frame number, must be one greater than previous frame, must be 0 for the first frame
         - 4 byte integer - number of atoms (n_atoms)
         - 8 byte integer - simulation step
-        - double - simulation time, in nanoseconds
+        - double - simulation time, in picoseconds
         - List of atom names
             - n_atoms strings
         - Similar setup for resname, resid, atom type, charges, mass. Payload type:
@@ -131,7 +131,7 @@ class TopTrajWriter:
         self.previous_frame = None
 
     def new_frame(
-        self, frame_num: int, sim_step: int, sim_time: float, n_atoms: int
+        self, frame_num: int, sim_step: int, time_ps: float, n_atoms: int
     ):
         """
         Create a new frame.
@@ -147,7 +147,7 @@ class TopTrajWriter:
         self.frame = {
             "n_atoms": n_atoms,
             "header": struct.pack(
-                "<IIQd", frame_num, n_atoms, sim_step, sim_time
+                "<IIQd", frame_num, n_atoms, sim_step, time_ps
             )
         }
 
