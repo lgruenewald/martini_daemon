@@ -89,7 +89,6 @@ class LocalMinimizer(Reporter):
             if self.minimizer.is_converged():
                 break
 
-        #print("CLEANING UP")
         simulation.context.set_velocities(vel)
         if self.harmonic_constraints:
             simulation.system.toggle_constraints_as_harmonic_bonds(False)
@@ -97,8 +96,6 @@ class LocalMinimizer(Reporter):
         simulation.context.set_current_integrator(old_integrator)
 
 class LocalGradientDescent:
-
-
     def __init__(self, initial_step_size_nm=0.1, etol=0., smoothing_factor=0.1):
         """
         Construct a (smoothed) gradient descent minimization integrator.

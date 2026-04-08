@@ -191,7 +191,7 @@ def parse_old_reactions(path, interval, frame_count):
 
 def parse_frag_counts(path, interval, frame_count):
     """
-    Parses the 0.1 .frags format,
+    Parses the old (pre 0.2) .frags format,
     returns a dict of frag name -> frag count per D/M frame
     (np.ndarray of shape (frame_count//interval,) and type np.int64)
 

@@ -48,7 +48,9 @@ class Context:
 
     def __reinitialize(self):
         """
-        Call this before stepping, reading energies or forces.
+        Automatically called before stepping, reading energies or forces.
+
+        If self.reinitialize was "flagged" to True, rebuilds system and then reinitializes the context.
         """
         if not self.reinitialize:
             return

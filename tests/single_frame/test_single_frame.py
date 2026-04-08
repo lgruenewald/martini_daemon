@@ -2,6 +2,7 @@
 
 import os
 import openmm as mm
+import openmm.app as mmapp
 from openmm.unit import femtosecond, kilojoule_per_mole, kilojoule, mole, nanometer
 import numpy as np
 import math
@@ -124,6 +125,23 @@ class TestSingleFrame():
             f"Daemon energy: {energy:.10e}\n"
             f"Relative difference {e_diff:.3e} above tolerance {c_etol:.2e}"
         )
+
+        # Secondary comparison with raw openmm but martini daemon as parser
+        # main purpose of this part is to just run the code in the public interface for exporting
+        sys = sim.system.get_openmm_system()
+        top = sim.get_openmm_topology()
+
+        sim = mmapp.Simulation(
+            top, sys, mm.VerletIntegrator(0.1), mm.Platform.getPlatformByName("Reference")
+        )
+        _, pos, _ = read_geometry(self.gro)
+        # note: there might be deviations here because martini_daemon's set_positions also makes vsites and constraints
+        # whole across the pbc. currently no such tests exist, but in the future it may cause problems if such a test
+        # is introduced.
+        sim.context.setPositions(pos)
+        raw_openmm_energy = sim.context.getState(energy=True).getPotentialEnergy().value_in_unit_system(mm.unit.md_unit_system)
+        assert np.isclose(raw_openmm_energy, energy), "Raw OpenMM energy mismatch"
+
 
         c_ftol = ftol_override.get(self.test_name)
         if c_ftol == 0:

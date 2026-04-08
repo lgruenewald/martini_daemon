@@ -1,4 +1,5 @@
 import openmm as mm
+import openmm.app as mmapp
 import os
 import zlib
 import math
@@ -387,6 +388,70 @@ class Simulation:
             r.on_trajectory_frame(self)
             self.info(f"Trajectory {r.__class__.__name__} finished")
         self.trajectory_frame += 1
+
+    def get_openmm_topology(self) -> mmapp.Topology:
+        """
+        Helper that generates an OpenMM Topology object required for creating an OpenMMApp Simulation object.
+
+        Chains will be set to initial molecules, residues will be set to initial residues.
+        The periodic box, bonds, atom names and charges reflect the current state of the system.
+        It's recommended to use other methods to query those though, as the purpose of this function is to
+        facilitate using Martini Daemon as a .top file parser and then continue simulating in vanilla OpenMM.
+        """
+        top = mmapp.Topology()
+
+        if self.context is not None:
+            _, box = self.context.get_positions()
+
+            top.setPeriodicBoxVectors([
+                box.a,
+                box.b,
+                box.c
+            ])
+
+        init_molecules = [
+            (name, count, len(self.system.molecule_types[name].atoms))
+            for name, count in self.system.initial_molecules
+        ]
+
+        # iteration over initial molecules
+        # chains correspond to initial molecules
+        # residues correspond to residues
+        c_mol_type = 0
+        c_mol_idx = 0
+        c_index_in_mol = 0
+        c_chain = top.addChain()
+        last_residue = -1
+        c_res = None
+        must_be_new_residue = True
+        for i in range(self.system.atom_count()):
+            resid = self.system.get_res_id(i)
+            if last_residue < resid:
+                last_residue = resid
+                res_name = self.system.get_res_name(i)
+                c_res = top.addResidue(res_name, c_chain)
+                must_be_new_residue = False
+            else:
+                assert not must_be_new_residue
+            top.addAtom(
+                self.system.get_name(i), None, c_res,
+                formalCharge=self.system.get_charge(i)
+            )
+            c_index_in_mol += 1
+            if c_index_in_mol >= init_molecules[c_mol_type][2]:
+                c_mol_idx += 1
+                c_index_in_mol = 0
+                c_chain = top.addChain()
+                must_be_new_residue = True
+            if c_mol_idx >= init_molecules[c_mol_type][1]:
+                c_mol_idx = 0
+                c_mol_type += 1
+
+        for (i, j) in self.system.collect_bonds(["bond", "constraint", "vsite"]).to_list():
+            top.addBond(i, j)
+
+        return top
+
 
     def step(self, n_steps: int, traj=False, dm=False, silent=False):
         """
