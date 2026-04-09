@@ -25,9 +25,9 @@ def read_gro(path):
             if len(line) < 44:
                 raise ValueError(f"Error parsing gro file, line for atom index {i} (zero indexed) is shorter than 44 characters.")
             try:
-                pos[i][0] = float(line[21:28].strip())
-                pos[i][1] = float(line[29:36].strip())
-                pos[i][2] = float(line[37:44].strip())
+                pos[i][0] = float(line[20:28].strip())
+                pos[i][1] = float(line[28:36].strip())
+                pos[i][2] = float(line[36:44].strip())
             except ValueError:
                 raise ValueError(f"Error parsing gro file, invalid coordinate / floating point number for atom index {i} (zero indexed).")
             if len(line) < 68:
@@ -35,9 +35,9 @@ def read_gro(path):
             if vel is None:
                 continue
             try:
-                vel[i][0] = float(line[45:52].strip())
-                vel[i][1] = float(line[53:60].strip())
-                vel[i][2] = float(line[61:68].strip())
+                vel[i][0] = float(line[44:52].strip())
+                vel[i][1] = float(line[52:60].strip())
+                vel[i][2] = float(line[60:68].strip())
             except ValueError:
                 raise ValueError(f"Error parsing gro file, invalid velocity / floating point number for atom index {i} (zero indexed).")
         last_line = file.readline().strip().split()

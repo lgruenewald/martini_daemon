@@ -43,7 +43,6 @@ class Simulation:
         * Is the required glue between all components, also only uses the public interface of different components.
         * Provides access to the system, context, topstar instance to all reporters and the user
 
-        :param geom_path: path to geometry. Note:
         :param top_path: Path to the Martini .top file.
         :param geom_path: Path to the geometry file (.gro, .xyz).
         :param md_steps: Number of MD steps.
@@ -70,7 +69,8 @@ class Simulation:
             when called with system as its argument. By default, the Martini compatible shifted Lennard-Jones
             and reaction-field electrostatics are used.
 
-        More important simulation functionality is exposed through the following attributes:
+        Note: You may want to take a look at the following attributes, which also contain methods for common simulation
+        tasks:
 
         :attribute context: See :doc:`/autoapi/martini_daemon/Context`. Note: if geom_path is None, no context will be initialized.
             Simulation can then be solely used as a .top parser, the resulting topology and OpenMM system can still be read out.
@@ -154,7 +154,7 @@ class Simulation:
         self.top: TopStar = TopStar(self.system)
         self.info("TopStar build finished")
 
-        self.info("setup integrator", "dt (ps):", self.dt_ps, "type:", type(self.md_integrator).__name__)
+        self.info("setup integrator", "dt (ps):", self.dt_ps, "type:", type(md_integrator).__name__)
         self.integrator: mm.CompoundIntegrator | None = mm.CompoundIntegrator() #: Compound Integrator with integrator index 0 as the user specified integrator. Only exposed before the context is built.
         self.integrator.addIntegrator(md_integrator)
         # couplings

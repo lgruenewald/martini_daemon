@@ -240,7 +240,7 @@ Reporters are Python class instances that inherit the ``Reporter`` base class,
 and their methods get called by ``Simulation`` at specified events during
 simulations.
 
-Reporters can be broadly divided into two categories:
+Reporters can be broadly divided into distinct categories:
 
 * Some perform reporting at a pre-defined trajectory frequency:
     * This frequency is the ``traj_frequency`` argument to the constructor of ``Simulation``.
@@ -255,6 +255,9 @@ Reporters can be broadly divided into two categories:
     * :doc:`/autoapi/martini_daemon/LocalMinimizer` is not a traditional reporter. It locally minimizes the energy after reactions.
     * :doc:`/autoapi/martini_daemon/ReactionReporter` logs all reactions and reactants to a file as they happen.
     * :doc:`/autoapi/martini_daemon/ReactionEnergyReporter` reports thermodynamic variables before and after reactions. Optionally, it can write coordinates too, which can be helpful to debug local minimizations.
+
+* Some of the reporters are there to help debug reaction templates:
+    * :doc:`/autoapi/martini_daemon/SystemDump` prints all atom properties and a list of bonded forces in the system at the simulation start and after each frame with reactions. It is advised to use this on small systems only.
 
 Of course, technically a reporter can do something at both, it is up to the implementation to choose which
 callbacks to hook on. User-defined reporters are supported, they can use the public API of simulation

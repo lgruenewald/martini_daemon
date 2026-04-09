@@ -24,7 +24,8 @@ python-source = "."
 [project.optional-dependencies]
 
 test = [
-  "pytest"
+  "pytest",
+  "mdtraj"
 ]
 
 docs = [

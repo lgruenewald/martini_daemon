@@ -15,14 +15,12 @@ tests = [
     "polyurethane",
     "bdt",
     # dummy systems
+    "three_reagent",
     "distance",
     "angle",
-    "dihedral"
-# TODO
-#    "multi_reagent",
-#    "mono_distance",
-#    "optional",
-#    "overlap"
+    "dihedral",
+    "optional",
+    "overlap"
 ]
 
 
@@ -40,7 +38,6 @@ def get_sim(top: str, gro: str) -> list[tuple[str, str, list[list[int]]]]:
 
 def compare(reactions, expected):
     dump = f"\nGot: {reactions}, expected: {expected}."
-    assert len(reactions) == len(expected), f"first len check {dump}"
     for (_, r1, frags1), (_, r2, frags2) in zip(reactions, expected):
         # while order in theory can be different, it is simpler
         # to for now make systems where we just form the expected
@@ -52,6 +49,7 @@ def compare(reactions, expected):
             assert len(atoms1) == len(atoms2), "third len check" + dump
             for atom1, atom2 in zip(atoms1, atoms2):
                 assert atom1 == atom2, f"Atom differs. {dump}"
+    assert len(reactions) == len(expected), f"first len check {dump}"
 
 @pytest.mark.parametrize("x", tests)
 def test_detection(x, rootdir):

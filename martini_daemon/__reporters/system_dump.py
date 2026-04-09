@@ -35,14 +35,23 @@ def write_frame(sim: Simulation):
     sim.print(".sstar","")
 
 
-class SysStarDump(Reporter):
-    """
-    Dumps all info from S* -- all atom details and all interactions
-    in a human-readable plaintext file. Dumps it at the start and
-    when there is any change.
-    """
+class SystemDump(Reporter):
 
     def __init__(self):
+        """
+        Dumps all info from System, including all atom details and all interactions
+        in a human-readable plaintext file. Dumps it at the start of a simulation and
+        when there is any reactions.
+
+        The purpose of this reporter is twofold:
+
+        * to facilitate debugging reactions,
+        * it is also used in the modification algorithm unit tests.
+
+        Uses the file extension ``.sstar``.
+        Due to the debug-oriented nature of this format,
+        no commitments are made to keep this format forward or backward compatible.
+        """
         pass
 
 
@@ -51,9 +60,7 @@ class SysStarDump(Reporter):
         n = simulation.system.atom_count()
         assert n > 0
         simulation.print(".sstar", "Format: SStar Dump")
-        simulation.print(".sstar", "Version: 0")
-        simulation.print(".sstar", f"N: {n}")
-        simulation.print(".sstar", "# Written by Martini Daemon SysStarDump")
+        simulation.print(".sstar", "# Written by Martini Daemon SystemDump")
         write_frame(simulation)
 
     def on_reaction(self, simulation, _):
@@ -66,12 +73,20 @@ class SysStarDump(Reporter):
 
         Returns a list of frames read.
 
-        - Each frame is a tuple of sim step, atoms and forces.
-        - atoms is a list of name, resid, resname, atom type, charge, mass and two additional float parameters for soft core
-        - forces is a list of force name and interaction list
-        - interaction is a list of members and params in a tuple
+        * Each frame is a tuple of sim step, atoms and forces.
+        * atoms is a list of tuples of:
+            * name
+            * resid
+            * resname
+            * atom type
+            * charge
+            * mass
+            * two additional float parameters for soft core
+        * forces is a list of tuples of:
+            * force name
+            * interaction list, which is a list of tuples.
+                * these tuples contain members (int) and parameters (floats).
         """
-        # TODO verify if this is true
 
         frames = []
         with open(path, "r") as f:
@@ -95,9 +110,6 @@ class SysStarDump(Reporter):
             assert prev_i is not None
             i = prev_i
             prev_i = None
-
-
-        # TODO header parsing
 
         def parse_atoms(atoms):
             while line := advance():

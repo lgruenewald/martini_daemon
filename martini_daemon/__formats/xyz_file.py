@@ -28,13 +28,17 @@ def read_xyz(path, pos_conversion=0.1, vel_conversion=0.1):
         try:
             title_line = file.readline().strip()
             match = re.match('Lattice="[^"]*"', title_line)
-            lattice = title_line[match.start():match.end()]
-            box_floats = list(map(lambda x: float(x), lattice.split()))
+            lattice = title_line[match.start()+9:match.end()-1]
+            box_floats = [float(x) for x in lattice.split()]
             assert len(box_floats) == 9
             # 0: x1 1: y1 2: z1 3: x2 4: y2 5: z2 6: x3 7: y3 8: z3
+            # we need to remove the useless ones - z2, z1, y1
+            del box_floats[5]
+            del box_floats[2]
+            del box_floats[1]
             box = PeriodicBox.triclinic(*box_floats)
-        except:
-            raise ValueError(f"Error parsing xyz file, the title line contains no or invalid Lattice description?")
+        except Exception as e:
+            raise ValueError(f"Error parsing xyz file, the title line contains no or invalid Lattice description? {e}")
 
         pos = np.zeros((n_atoms, 3), dtype=np.float64)
         vel = np.zeros((n_atoms, 3), dtype=np.float64)
@@ -82,7 +86,7 @@ def write_xyz(path, atoms, box, pos, vel=None) -> None:
         assert len(pos) == len(vel)
     with open(path, "w") as file:
         file.write(f"{len(atoms)}\n")
-        file.write(f'Lattice="{box.to_lattice()}\n')
+        file.write(f'Lattice="{box.to_lattice()}"\n')
         for i in range(n_atoms):
             cpos = pos[i] * 10.
             name = atoms[i]

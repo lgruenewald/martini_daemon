@@ -1,7 +1,7 @@
 import os
 import glob
 import pytest
-from martini_daemon import Simulation, SysStarDump, FragCountReporter, ReactionReporter
+from martini_daemon import Simulation, SystemDump, FragCountReporter, ReactionReporter
 from math import isclose
 
 
@@ -26,7 +26,7 @@ def get_sim(top: str, gro: str) -> str:
     sim = Simulation(
         top, gro, 0,
         reporters=[
-            SysStarDump(), FragCountReporter(), ReactionReporter()
+            SystemDump(), FragCountReporter(), ReactionReporter()
         ]
     )
     sim.step(0, traj=True, dm=True)
@@ -35,8 +35,8 @@ def get_sim(top: str, gro: str) -> str:
 
 
 def compare(dump_new: str, dump_reference: str) -> None:
-    reference = SysStarDump.read_dump(dump_reference)
-    new = SysStarDump.read_dump(dump_new)
+    reference = SystemDump.read_dump(dump_reference)
+    new = SystemDump.read_dump(dump_new)
     assert len(new) == len(reference)
     # structural equality with lists
     for i in range(len(new)):
