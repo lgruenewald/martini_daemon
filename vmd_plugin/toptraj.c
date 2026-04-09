@@ -46,6 +46,8 @@ typedef struct
     // within chunk_out, where are we at
     size_t read_out;
 
+    // whether there is any compressed file or avail_in left.
+    // NOT WHETHER THERE IS ANY DECOMPRESSED OUTPUT LEFT.
     bool stream_over;
 
     // current value of crc
@@ -66,11 +68,13 @@ static void read_file_into_chunk(CompressedReader *reader) {
     }
     const size_t read_from_file = reader->chunk_size - reader->stream.avail_in;
     const size_t read = fread(&reader->chunk_in[reader->stream.avail_in], 1, read_from_file, reader->file);
-    if (read == 0) {
-        reader->stream_over = true;
-    }
     reader->stream.next_in = reader->chunk_in;
     reader->stream.avail_in += read;
+
+    
+    if (reader->stream.avail_in == 0) {
+        reader->stream_over = true;
+    }
 }
 
 /// consumes as much of avail_in as possible, writing it to chunk_out
@@ -126,6 +130,13 @@ static char *read_bytes(CompressedReader *reader, const size_t n) {
     }
     reader->crc = crc32(reader->crc, (Bytef *)res, n);
     return res;
+}
+
+// is there any more decompressed output
+static bool is_over(CompressedReader *reader) {
+    // all is still "available" to decompress -> nothing was decompressed
+    read_file_into_chunk(reader);
+    return reader->stream_over && (reader->read_out == reader->chunk_size - reader->stream.avail_out);
 }
 
 
@@ -571,7 +582,7 @@ if (reader->is_err) { \
 
         size_t frame_index = 0;
         printf("\n");
-        while (!reader->stream_over) {
+        while (!is_over(reader)) {
             TopTrajFrame *frame = calloc(sizeof(TopTrajFrame), 1);
             frame->frame_number = read_I(reader);
             if (frame->frame_number != frame_index) {
