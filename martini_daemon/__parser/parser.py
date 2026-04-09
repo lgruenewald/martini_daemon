@@ -10,10 +10,21 @@ from .directive import Directive
 
 
 class ParseException(Exception):
-    """
-    Generic exception raised during parsing.
-    """
     def __init__(self, message: str):
+        """
+        Generic exception raised during parsing.
+        """
+        self.message = message
+
+class DirectiveException(Exception):
+    def __init__(self, message: str, path, start_line, end_line):
+        """
+        Exception raised during the finish() method of directives.
+        ParseExceptions get re-raised as this type automatically.
+        """
+        self.path = path
+        self.end_line = end_line
+        self.start_line = start_line
         self.message = message
 
 
@@ -25,31 +36,29 @@ class IfStackElem(Enum):
 
 
 class Parser:
-    """
-    Gromacs-style .ini format parser (used for .top/.itp files).
-
-    .. note::
-        Documentation below this line is kept as a reference for development.
-        Most users do not need to interact with this API.
-
-    A parser for gromacs topology file-like config files with limited C
-    style preprocessing, that should be sufficient for most input files.
-    You can add your own levels (Directive types). Your Directive types
-    get instantiated when a level starts, with the parent directive instance
-    as the constructor argument (often representing the System, or the currently
-    edited Molecule). The line is method called on every line with TokenList as
-    an argument (you can call TokenList.unwrap() to get individual tokens
-    in your desired type). The finish() method is called when the directive ends.
-    See :doc:`Directive</autoapi/martini_daemon/Directive>` class for details.
-
-    All exceptions inside callbacks will be caught and re-raised,
-    so that the specific line and file they occurred on can be printed to
-    stdout, and the traceback suppressed to reduce clutter.
-    """
-
     def __init__(self, root: Directive, path: str, include_dirs: list[str] | None = None, defines: dict[str, str] | None = None):
         """
-        :param root: gets passed as the parent argument for directives with no parent directive. Can be useful to put the main root object being constructed here. Should be a directive instance.
+        Generic Gromacs-style .ini format parser.
+
+        See :doc:`/autoapi/martini_daemon/GromacsTopFile` for the parser specifically for GROMACS ``.top`` files,
+        which inherits this class. For extending Martini Daemon with custom directives, also see :doc:`/extending`.
+
+        A parser for gromacs topology file-like config files with limited C
+        style preprocessing, that should be sufficient for most input files.
+        You can add your own levels (Directive types). Your Directive types
+        get instantiated when a level starts, with the parent directive instance
+        as the constructor argument (often representing the System, or the currently
+        edited Molecule). The line is method called on every line with TokenList as
+        an argument (you can call TokenList.unwrap() to get individual tokens
+        in your desired type). The finish() method is called when the directive ends.
+        See :doc:`Directive</autoapi/martini_daemon/Directive>` class for details.
+
+        All exceptions inside callbacks will be caught and re-raised,
+        so that the specific line and file they occurred on can be printed to
+        stdout, and the traceback suppressed to reduce clutter.
+
+        :param root: gets passed as the parent argument for directives with no parent directive.
+            Can be useful to put the main root object being constructed here. Should be a directive instance.
         :param path: the path to the file to be parsed.
         :param include_dirs: list of directories to be searched if #include fails to find a file in the current dir.
         :param defines: dict[str, str] of keys and values for token replacements by the limited C preprocessor impl.
@@ -122,33 +131,81 @@ class Parser:
         except ParseException as pe:
             self.__error_message_location(
                 pe.message,
-                self.__path, self.__line_num
+                self.__path, self.__line_num,
+                None
+            )
+        except DirectiveException as de:
+            self.__error_directive(
+                de.message,
+                de.path,
+                de.start_line,
+                de.end_line,
             )
         except Exception:
             # yes it's broad, but we want to print where it happened
             traceback.print_exc()
             self.__error_message_location(
                 "Exception occurred while parsing.",
-                self.__path, self.__line_num
+                self.__path, self.__line_num,
+                None
             )
         return False
 
     @staticmethod
-    def __error_message_location(message: str, path: str, line_num: int, line=None, start=None, end=None) -> None:
-        print("Parsing error:", file=stderr)
-        print(message, file=stderr)
+    def __error_message_location(
+        message: str, path: str, line_num: int, line: str | None, start=None, end=None
+    ) -> None:
+        """
+        Prints an error message. Three modes available:
+
+        - ``line``, ``start``, ``end`` are all None - will print the line based on the file on disk
+        - only ``line`` is not None - will print ``line`` as line content
+        - ``line``, ``start``, ``end`` are all not None - will print ``line``, with the range ``start``:``end`` yellow
+        """
+        print(f"\033[1;33m{message}\033[0m", file=stderr)
         print(f"In file {path} at line {line_num + 1}.", file=stderr)
 
-        if line is not None:
-            if start is None or end is None:
-                print(line, file=stderr)
-            else:
-                print(
-                    f"{line[0:start]}"
-                    f"\033[1;33m{line[start:end]}\033[0m"
-                    f"{line[end:]}",
-                    file=stderr
+        if start is None or end is None:
+            if line is None:
+                with open(path, "r") as file:
+                    lines = file.read().splitlines()
+                    if len(lines) <= line_num:
+                        return
+                    line = lines[line_num]
+
+            print(f"{line_num+1}: \033[1;33m{line}\033[0m", file=stderr)
+        else:
+            assert line is not None
+            print(
+                f"{line_num+1}: {line[0:start]}"
+                f"\033[1;33m{line[start:end]}\033[0m"
+                f"{line[end:]}",
+                file=stderr
             )
+
+    @staticmethod
+    def __error_directive(
+        message: str, path: str, start: int, end: int | None
+    ) -> None:
+        """
+        Prints an error message. If end is not None, it will read the file and highlight the whole directive's
+        text in yellow, with line numbers.
+        """
+
+        assert end is None or end > start
+
+        print(f"\033[1;33m{message}\033[0m", file=stderr)
+        print(f"In file {path} at line {start + 1}.", file=stderr)
+
+        if end is not None:
+            with open(path, "r") as file:
+                lines = file.read().splitlines()
+                if len(lines) <= end:
+                    return
+                print("\n".join(f"{i+1}: \033[1;33m{line}\033[0m" for i, line in zip(range(start, end), lines[start:end])), file=stderr)
+
+
+
 
     # A token is either:
     # '['
@@ -194,17 +251,23 @@ class Parser:
                 break
             else:
                 # directive ends previous directive -- call finishers
-                # we need good error messages from finish hooks,
-                # so temporarily edit path and line num to where the directive started
-                old_ln = self.__line_num
-                old_path = self.__path
                 old_dir = self.__directive_stack.pop()
-                self.__path, self.__line_num = old_dir.where()
+
+                # info for potential exceptions
+                directive_end = self.__line_num
+                current_path = self.__path
+                directive_path, directive_start = old_dir.where()
                 # finisher
-                old_dir.finish()
-                # since there's only one exception displayed at a time, if we get here
-                # .finish() did not raise any exceptions
-                self.__path, self.__line_num = old_path, old_ln
+                try:
+                    old_dir.finish()
+                except ParseException as pe:
+                    # we need good error messages from finish hooks, so let's re-raise ParseExceptions
+                    raise DirectiveException(
+                        pe.message,
+                        directive_path,
+                        directive_start,
+                        directive_end if current_path == directive_path else None
+                    )
         parent = self.__directive_stack[-1]
         if not directive_type.is_valid_parent(parent):
             raise ParseException(
