@@ -19,21 +19,6 @@ from .__topstar import TopStar
 
 
 class Simulation:
-    """
-    Simulation class.
-
-    * provide a friendly interface for reporters requesting output files. contains default values for Martini simulations.
-    * hold simulation metadata, such as current step, simulation name.
-    * own all open file handles, reporters and loggers.
-    * be passed around to all reporters to provide the required metadata and file handle access for reporting.
-    * is the required glue between all components, also only uses the public interface of different components.
-    * provide access to the system, context, topstar instance to all reporters and the user
-
-    geom_path: path to geometry. Note: if None is passed, no context will be initialized. Simulation can then be
-    used as a .top parser, and the resulting topology can then be read out. Of course things needing Context
-    steps will not be available.
-    """
-
     def __init__(
         self, top_path: str, geom_path: str | None, md_steps: int,
         reporters: list[Reporter] | None = None,
@@ -49,6 +34,16 @@ class Simulation:
         nonbonded: Callable[[System], NonBonded] | Type[NonBonded] | None = None,
     ):
         """
+        Simulation class.
+
+        * Provides a friendly interface for reporters requesting output files. Contains default values for Martini simulations.
+        * Holds simulation metadata, such as current step, simulation name.
+        * Owns all open file handles, reporters and loggers.
+        * Is passed around to all reporters to provide the required metadata and file handle access for reporting.
+        * Is the required glue between all components, also only uses the public interface of different components.
+        * Provides access to the system, context, topstar instance to all reporters and the user
+
+        :param geom_path: path to geometry. Note:
         :param top_path: Path to the Martini .top file.
         :param geom_path: Path to the geometry file (.gro, .xyz).
         :param md_steps: Number of MD steps.
@@ -58,29 +53,35 @@ class Simulation:
         :param sim_name: Short name of the simulation. All output files will be prefixed by this name.
         :param continue_sim: Attempt to continue previous simulation with the same name?
         :param coupling: List of OpenMM coupling forces to use. If None, pressure coupling at 1 bar and 300 kelvin,
-        and center of mass motion removal will be employed.
+            and center of mass motion removal will be employed.
         :param integrator: Base integrator to use during the simulation. Note: a compound integrator will be set up
-        based on it. Depending on the reporters, local minimization or other integrators can be configured alongside.
-        If None, LangevinMiddleIntegrator will be used, at 300 kelvin, 1 ps-1 collision frequency and 0.02 ps dt.
+            based on it. Depending on the reporters, local minimization or other integrators can be configured alongside.
+            If None, LangevinMiddleIntegrator will be used, at 300 kelvin, 1 ps-1 collision frequency and 0.02 ps dt.
         :param options: Additional data to pass to the system. Example keys available are "epsilon_r" (default 15),
-        "cutoff" (default 1.1, in nanometers) to control the nonbonded force, as well as "respos",
-        which can be set as a f64 (n_atoms, 3) shaped numpy array for position restraint reference coordinates
-        (default same as geom_path coordinates).
+            "cutoff" (default 1.1, in nanometers) to control the nonbonded force, as well as "respos",
+            which can be set as a f64 (n_atoms, 3) shaped numpy array for position restraint reference coordinates
+            (default same as geom_path coordinates).
         :param include_dirs: Additional include directories for #include directives in .top files. By default it tries
-        to detect the gromacs installation and add an entry to the "top" subfolder inside it.
+            to detect the gromacs installation and add an entry to the "top" subfolder inside it.
         :param defines: Additional defines to pass to the .top parser.
         :param platform: Which OpenMM platform to use.
         :param context_parameters: Additional options to pass to the platform.
         :param nonbonded: Nonbonded force to use, passed as a type or a function that returns the martini daemon Force
-        when called with system as its argument. By default, the Martini compatible shifted Lennard-Jones
-        and reaction-field electrostatics are used.
+            when called with system as its argument. By default, the Martini compatible shifted Lennard-Jones
+            and reaction-field electrostatics are used.
+
+        More important simulation functionality is exposed through the following attributes:
+
+        :attribute context: See :doc:`/autoapi/martini_daemon/Context`. Note: if geom_path is None, no context will be initialized.
+            Simulation can then be solely used as a .top parser, the resulting topology and OpenMM system can still be read out.
+        :attribute system: See :doc:`/autoapi/martini_daemon/System`.
         """
-        self.reporters = reporters or []
-        self.current_step = 0
-        self.total_steps = md_steps
+        self.__reporters = reporters or []
+        self.current_step: int = 0
+        self.total_steps: int = md_steps
         self.__sim_name = sim_name
-        self.time_ps = 0.
-        self.md_integrator = integrator or mm.LangevinMiddleIntegrator(
+        self.time_ps: float = 0.
+        md_integrator = integrator or mm.LangevinMiddleIntegrator(
             300 * mm.unit.kelvin, 1. / mm.unit.picosecond, 0.02 * mm.unit.picosecond
         )
         if coupling is None:
@@ -92,10 +93,10 @@ class Simulation:
                 mm.CMMotionRemover()
             ]
         self.dt_ps: float = (
-            self.md_integrator.getStepSize().value_in_unit(mm.unit.picosecond)
+            md_integrator.getStepSize().value_in_unit(mm.unit.picosecond)
         )
-        self.dm_frequency = dm_frequency
-        self.traj_frequency = traj_frequency
+        self.dm_frequency: int = dm_frequency
+        self.traj_frequency: int = traj_frequency
         if type(platform) is str:
             platform = mm.Platform.getPlatformByName(platform)
         if include_dirs is None:
@@ -111,7 +112,7 @@ class Simulation:
 
         # file handles setup
         # dict of suffix -> (handle, compression_obj | None)
-        self.output_files = {}
+        self.__output_files = {}
 
         self.open(".log")
         self.info(f"Martini Daemon {version('martini_daemon')} log file")
@@ -135,7 +136,7 @@ class Simulation:
 
         # Parsing
         self.info("Parsing start")
-        self.system = System(options=options)
+        self.system: System = System(options=options)
         try:
             GromacsTopFile(self.system, top_path, include_dirs=[include_dirs], defines=defines)
         except InvalidTopologyError:
@@ -150,21 +151,21 @@ class Simulation:
         self.info("Parsing finished")
 
         self.info("TopStar build start")
-        self.top = TopStar(self.system)
+        self.top: TopStar = TopStar(self.system)
         self.info("TopStar build finished")
 
         self.info("setup integrator", "dt (ps):", self.dt_ps, "type:", type(self.md_integrator).__name__)
-        # integrator -> always compound, index 0 always for md
-        self.integrator = mm.CompoundIntegrator()
-        self.integrator.addIntegrator(self.md_integrator)
+        self.integrator: mm.CompoundIntegrator | None = mm.CompoundIntegrator() #: Compound Integrator with integrator index 0 as the user specified integrator. Only exposed before the context is built.
+        self.integrator.addIntegrator(md_integrator)
         # couplings
         for c in coupling:
             self.system.add_force(wrap_coupling(c)(self.system))
 
         # reporters can add integrators only here
-        for r in self.reporters:
+        for r in self.__reporters:
             r.pre_simulation_start(self)
 
+        self.context: Context | None = None
         # build context
         if geom_path is not None:
             box, start_pos, start_vel = read_geometry(geom_path)
@@ -181,16 +182,16 @@ class Simulation:
         # it's owned by context now
         self.integrator = None
 
-        for r in self.reporters:
+        for r in self.__reporters:
             r.on_simulation_start(self)
 
         # for the estimated time left display
-        self.last_step_time = 0.
-        self.first_step_time = 0.
-        self.trajectory_frame = 0
+        self.__last_step_time = 0.
+        self.__first_step_time = 0.
+        self.trajectory_frame: int = 0
 
         # to avoid double finish
-        self.finished = False
+        self.__finished = False
 
     # File handles and loggers
     @staticmethod
@@ -205,32 +206,32 @@ class Simulation:
             os.rename(path, bkup_path)
             print(f"Backed up {path} to {bkup_path}")
 
-    def request_path(self, suffix):
+    def request_path(self, suffix) -> str:
         """
-        Convert suffix to path.
+        Convert suffix to path based on simulation name. Will try to back up existing file if it exists.
         """
         path = self.__sim_name + suffix
         self.__backup_try(path)
         return path
 
-    def open(self, suffix, compress=False):
+    def open(self, suffix, compress=False) -> None:
         """
         Opens a new file handle for writing.
         """
         path = self.request_path(suffix)
-        self.output_files[suffix] = (open(path, "wb"), zlib.compressobj(6) if compress else None)
+        self.__output_files[suffix] = (open(path, "wb"), zlib.compressobj(6) if compress else None)
 
-    def write(self, suffix, bytes_or_text):
+    def write(self, suffix, bytes_or_text) -> None:
         """
         Writes to open handle.
         """
         if type(bytes_or_text) is str:
             bytes_or_text = bytes_or_text.encode("utf-8")
-        if self.output_files[suffix][1] is not None:
-            bytes_or_text = self.output_files[suffix][1].compress(bytes_or_text)
-        self.output_files[suffix][0].write(bytes_or_text)
+        if self.__output_files[suffix][1] is not None:
+            bytes_or_text = self.__output_files[suffix][1].compress(bytes_or_text)
+        self.__output_files[suffix][0].write(bytes_or_text)
 
-    def print(self, suffix, *args, sep=" ", end="\n"):
+    def print(self, suffix, *args, sep=" ", end="\n") -> None:
         """
         Writes all args to output file, separated by separator (space). Writes a newline after.
         """
@@ -241,55 +242,64 @@ class Simulation:
         self.write(suffix, end)
         self.flush(suffix)
 
-    def flush(self, suffix: str):
+    def flush(self, suffix: str) -> None:
         """
         Flushes a single output file handle.
         """
-        handle, comp = self.output_files[suffix]
+        handle, comp = self.__output_files[suffix]
         if comp is not None:
             handle.write(comp.flush_all())
         handle.flush()
 
-    def flush_all(self):
+    def flush_all(self) -> None:
         """
         Flushes all output files. Also called at trajectory frames automatically.
         """
-        for suffix in self.output_files.keys():
+        for suffix in self.__output_files.keys():
             self.flush(suffix)
 
 
-    def finish(self):
+    def finish(self) -> None:
         """
         1. Runs finish on all reporters.
         2. Flushes output files and closes output file handles.
 
         Called by simulate(), or should be called by the user manually otherwise.
         """
-        if self.finished:
+        if self.__finished:
             return
-        self.finished = True
-        for r in self.reporters:
+        self.__finished = True
+        for r in self.__reporters:
             r.on_simulation_finish(self)
         self.flush_all()
-        for handle, _ in self.output_files.values():
+        for handle, _ in self.__output_files.values():
             handle.close()
-        self.output_files = {}
+        self.__output_files = {}
 
-    def info(self, *args):
+    def info(self, *args) -> None:
+        """
+        Writes a message to log.
+        """
         self.print(
             ".log",
             datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S,%f")[:-3],
             *args
         )
 
-    def warn(self, message):
+    def warn(self, message) -> None:
+        """
+        Writes a warning to the log file and to stderr.
+        """
         self.info(
             "[WARNING] " + message
         )
         print("[WARNING]", message, file=sys.stderr)
 
 
-    def error(self, message):
+    def error(self, message) -> None:
+        """
+        Writes an error to the log file and stderr.
+        """
         self.info(
             "[ERROR] " + message
         )
@@ -298,14 +308,12 @@ class Simulation:
 
     # Friendly interface for setting up and running simulations
     @staticmethod
-    def set_process_title(newname=b"daemon"):
+    def set_process_title(newname=b"daemon") -> None:
         """
-        Set process title to something else than "python".
-        Nothing critical, just a nice thing to have for top/htop/btop/mu ;)
-        Only works on (some versions of) linux.
-        May fail silently with no exceptions thrown.
+        Set process title to something else than "python". Nothing critical, purely aesthetic.
+        Only works on (some versions of) linux. May fail silently with no exceptions thrown.
 
-        based on: https://stackoverflow.com/questions/564695/is-there-a-way-to-change-effective-process-name-in-python
+        Based on: https://stackoverflow.com/questions/564695/is-there-a-way-to-change-effective-process-name-in-python
 
         :param newname: new process name, as a byte string.
         """
@@ -325,6 +333,8 @@ class Simulation:
 
         This may include atom names, residue id, residue names, timestep, current time,
         simulation name, positions, velocities and the pbc box, depending on the file format used.
+
+        Supported file types include .gro and .xtc, this is determined based on the extension of the specified path.
 
         :param path: path to save geometry to.
         """
@@ -361,7 +371,7 @@ class Simulation:
                     gcd, traj=self.current_step % self.traj_frequency == 0 if self.traj_frequency > 0 else False,
                     dm=self.current_step % self.dm_frequency == 0 if self.dm_frequency > 0 else False
                 )
-            self.do_traj_frame()
+            self.__do_traj_frame()
             print()
         except Exception as e:
             self.error(f"!!! Unexpected Exception!!!\n{e}")
@@ -393,8 +403,8 @@ class Simulation:
         else:
             return f"{ps/1000000:.2f} μs"
 
-    def do_traj_frame(self):
-        for r in self.reporters:
+    def __do_traj_frame(self):
+        for r in self.__reporters:
             self.info(f"Trajectory {r.__class__.__name__} start")
             r.on_trajectory_frame(self)
             self.info(f"Trajectory {r.__class__.__name__} finished")
@@ -480,7 +490,7 @@ class Simulation:
         """
         start_time = time()
         if traj:
-            self.do_traj_frame()
+            self.__do_traj_frame()
 
         self.info(f"doing md steps to go from {self.current_step} to")
         self.current_step += n_steps
@@ -496,8 +506,8 @@ class Simulation:
             self.info("MD finished")
         if self.total_steps > 0 and n_steps > 0 and not silent:
             self.time_ps += self.dt_ps * n_steps
-            time_left = self.__format_time(self.last_step_time * (self.total_steps - self.current_step))
-            reporter_data = " ".join(filter(None, [r.interactive_line(self) for r in self.reporters]))
+            time_left = self.__format_time(self.__last_step_time * (self.total_steps - self.current_step))
+            reporter_data = " ".join(filter(None, [r.interactive_line(self) for r in self.__reporters]))
             sys.stdout.write(
                 f"\033[2K\rstep {self.current_step}"
                 f"({self.__format_sim_time(self.time_ps)}, "
@@ -511,7 +521,7 @@ class Simulation:
             self.info(f"After detection there were {len(reactions)} reactions")
             self.info("Detection finished")
             if len(reactions) > 0:
-                for r in self.reporters:
+                for r in self.__reporters:
                     r.pre_modification(self)
                 # we now need copies of fragments, since they possibly got consumed in the reaction
                 self.info("Modification start")
@@ -519,12 +529,12 @@ class Simulation:
                 self.info(f"After modification there were {len(reactions)} reactions")
                 self.info("Modification finished")
                 if len(reactions) > 0:
-                    for r in self.reporters:
+                    for r in self.__reporters:
                         self.info(f"OnReaction {r.__class__.__name__} start")
                         # local minimization happens here for example
                         r.on_reaction(self, reactions)
                         self.info(f"OnReaction {r.__class__.__name__} finished")
-                    for r in self.reporters:
+                    for r in self.__reporters:
                         self.info(f"PostReaction {r.__class__.__name__} start")
                         r.post_reaction(self)
                         self.info(f"PostReaction {r.__class__.__name__} finished")
@@ -532,18 +542,18 @@ class Simulation:
         end_time = time()
         if n_steps > 0:
             step_time = (end_time - start_time) / n_steps
-            if self.last_step_time > 0.:
-                self.last_step_time = step_time * 0.01 + self.last_step_time * 0.99
+            if self.__last_step_time > 0.:
+                self.__last_step_time = step_time * 0.01 + self.__last_step_time * 0.99
             elif not traj or not dm:
                 # step 0 tends to have both xtc and dm as True, and is
                 # usually unrepresentatively slow
                 scale = self.dm_frequency / self.traj_frequency
                 if scale > 1.:
                     scale = 1. / scale
-                if self.first_step_time == 0.:
+                if self.__first_step_time == 0.:
                     # continuations might not start with an expensive step
                     scale = 0.
-                self.last_step_time = step_time * (1 - scale) + scale * self.first_step_time
+                self.__last_step_time = step_time * (1 - scale) + scale * self.__first_step_time
             else:
                 # step 0 probably
-                self.first_step_time = step_time
+                self.__first_step_time = step_time
