@@ -19,12 +19,22 @@ dynamic = ["version"]
 [tool.maturin]
 module-name = "martini_daemon.__rust"
 features = ["pyo3/extension-module"]
+python-source = "."
 
 [project.optional-dependencies]
-all = [
-# Testing
-  "pytest",
-  # Docs
+
+test = [
+  "pytest"
+]
+
+docs = [
   "sphinx",
-  "sphinx-autoapi"
+  "sphinx-autoapi",
+  "sphinx-rtd-theme"
+]
+
+dev = [
+  "python-lsp-server",
+  "ruff",
+  "ty"
 ]

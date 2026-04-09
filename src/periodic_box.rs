@@ -2,10 +2,12 @@ use std::collections::HashSet;
 use pyo3::prelude::*;
 use numpy::{PyReadwriteArray, Ix2, PyUntypedArrayMethods, PyReadonlyArray2};
 use kdtree::{KdTree, distance::squared_euclidean, ErrorKind};
+use pyo3_stub_gen::{derive::gen_stub_pyclass, derive::gen_stub_pymethods};
 
 use glam::DVec3;
 use pyo3::exceptions::PyValueError;
 
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct PeriodicBox {
     a: DVec3,
@@ -31,6 +33,7 @@ fn sanitize(pbc: &PeriodicBox) -> PyResult<()> {
     Ok(())
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl PeriodicBox {
     #[new]

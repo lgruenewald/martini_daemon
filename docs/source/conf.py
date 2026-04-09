@@ -15,29 +15,30 @@ author = ''
 
 extensions = [
     "sphinx.ext.autodoc",
-    "autoapi.extension"
+    "autoapi.extension",
+    "sphinx_rtd_theme"
 ]
+
+html_theme = "sphinx_rtd_theme"
 
 templates_path = ['_templates']
 exclude_patterns = []
 autoapi_dirs = ["../../martini_daemon/"]
 # concat class and __init__ documentation
-autoapi_python_class_content = "both"
+autoapi_python_class_content = "init"
 # every class should have its own page
 autoapi_own_page_level = "class"
 # what to document? default but private members removed
 autoapi_options = [
     "members",
-    "inherited-members",
     "undoc-members",
     "special-members",
     "show-module-summary",
     "imported-members"
 ]
 
-
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'alabaster'
+#html_theme = 'alabaster'
 html_static_path = ['_static']

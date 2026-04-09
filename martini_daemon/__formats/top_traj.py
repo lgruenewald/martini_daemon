@@ -256,8 +256,12 @@ class TopTrajWriter:
         self.previous_frame = self.frame
         self.frame = None
 
-    def finish(self):
+    def flush(self):
         self.handle.write(self.comp.flush())
+        self.handle.flush()
+
+    def finish(self):
+        self.flush()
         self.handle.close()
         self.handle = None
         self.comp = None

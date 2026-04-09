@@ -7,6 +7,12 @@ from .molecule_type_directive import MoleculeTypeDirective
 
 
 class InteractionDirective(Directive, metaclass=ABCMeta):
+    def __init__(self, parent, path, line_num) -> None:
+        """
+        Base class for custom .top file directives that add interactions to [moleculetype].
+        """
+        super().__init__(parent, path, line_num)
+
     # default Directive boilerplate
     def finish(self):
         pass

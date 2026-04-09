@@ -1,5 +1,10 @@
+Reference - TODO rewrite
+=========
+
+This document describes the file formats and algorithms implemented in Martini Daemon.
+
 API
-===
+---
 
 The main API entry point of Martini Daemon is the submodule
 ``simulation``. It should be imported as
@@ -121,7 +126,7 @@ means, that only the Martini Daemon API should be used. If adding
 further forces, Martini Daemon will not be aware of them.
 
 Graphs
-======
+------
 
 The ``graph`` directive contains the following possible lines, each
 starting with a specific keyword:
@@ -238,7 +243,7 @@ Interaction filters
 - ``cmap`` - only matched cmap
 
 Reaction conditions
-===================
+-------------------
 
 The possible reaction conditions are:
 
@@ -274,13 +279,12 @@ are in degrees and get converted to be within the same period first, so
 both -180 to 180 or 0 to 360 are valid ways to specify them.
 
 Rate control prototype
-======================
+----------------------
 
 Note: the experimental flag has to be set to True currently to enable
 this.
 
-Simulation parameters
----------------------
+Simulation parameters:
 
 - per simulation:
 
@@ -298,8 +302,7 @@ Simulation parameters
     bimolecular or larger order reactions: concentration units of
     molecules per simulation box
 
-State kept
-----------
+State kept:
 
 - per simulation:
 
@@ -311,8 +314,7 @@ State kept
   - ``observed_rate`` - connected to the frequency of passing geometry
     conditions of a reaction
 
-Goals and limitations
----------------------
+Goals and limitations:
 
 - Non-goal: realistic absolute rates
 - Goal: correct instantaneous relative rates between the reactions in
@@ -350,8 +352,7 @@ Goals and limitations
   and B have a specific relative rate to eachother, independent from
   reactions C and D), this could be lifted later, maybe?
 
-Algorithm
----------
+Algorithm:
 
 - T\* contains a value ``absolute_rate``, which gives the dimension of
   rate constants (to get a real ``k`` for every reaction)
@@ -387,7 +388,7 @@ Algorithm
     of geometry conditions becoming true between the two reactions
 
 Martini Daemon and Martini
-==========================
+--------------------------
 
 Currently, Martini Daemon implements a subset of what is possible in
 Gromacs topology input files. It is the hope, that most of the things
@@ -419,7 +420,7 @@ Martini Daemon handles the periodic boundary condition:
   themselves if required (using e.g. mdvwhole).
 
 Limitations
-===========
+-----------
 
 - The number of particles cannot be changed during reactions.
 - Constraints and virtual sites cannot be created or removed during
@@ -445,9 +446,6 @@ Limitations
 - Center of Mass virtual sites will not change parameters if the
   constructing particle mass changes during a reaction.
 - Only periodic boxes with 90 degree angles are supported.
-
-Programmer’s guide
-==================
 
 Code overview
 -------------

@@ -343,19 +343,30 @@ class Simulation:
         # TODO checkpoints
 
     def simulate(self):
+        """
+        Performs the remaining steps (self.total_steps - self.current_step), and then calls self.finish().
+
+        Will perform Detection/Modification and Trajectory writing according to their frequencies specified in
+        the constructor for Simulation. Catches uncaught exceptions and logs them,
+        and finishes the simulation prematurely if one occurs.
+        """
         remaining = self.total_steps - self.current_step
         sim_ps = self.total_steps * self.dt_ps
         print(f"Simulation of {remaining} steps ({self.__format_sim_time(sim_ps)})")
         gcd = math.gcd(self.traj_frequency, self.dm_frequency, remaining)
         print(f"D/M freq {self.dm_frequency} Traj freq {self.traj_frequency} gcd {gcd}")
-        while self.current_step < self.total_steps:
-            self.step(
-                gcd, traj=self.current_step % self.traj_frequency == 0 if self.traj_frequency > 0 else False,
-                dm=self.current_step % self.dm_frequency == 0 if self.dm_frequency > 0 else False
-            )
-        self.do_traj_frame()
-        print()
-        self.finish()
+        try:
+            while self.current_step < self.total_steps:
+                self.step(
+                    gcd, traj=self.current_step % self.traj_frequency == 0 if self.traj_frequency > 0 else False,
+                    dm=self.current_step % self.dm_frequency == 0 if self.dm_frequency > 0 else False
+                )
+            self.do_traj_frame()
+            print()
+        except Exception as e:
+            self.error(f"!!! Unexpected Exception!!!\n{e}")
+        finally:
+            self.finish()
 
     @staticmethod
     def __format_time(total):
@@ -424,6 +435,7 @@ class Simulation:
         last_residue = -1
         c_res = None
         must_be_new_residue = True
+        atoms = []
         for i in range(self.system.atom_count()):
             resid = self.system.get_res_id(i)
             if last_residue < resid:
@@ -433,10 +445,10 @@ class Simulation:
                 must_be_new_residue = False
             else:
                 assert not must_be_new_residue
-            top.addAtom(
+            atoms.append(top.addAtom(
                 self.system.get_name(i), None, c_res,
                 formalCharge=self.system.get_charge(i)
-            )
+            ))
             c_index_in_mol += 1
             if c_index_in_mol >= init_molecules[c_mol_type][2]:
                 c_mol_idx += 1
@@ -448,14 +460,14 @@ class Simulation:
                 c_mol_type += 1
 
         for (i, j) in self.system.collect_bonds(["bond", "constraint", "vsite"]).to_list():
-            top.addBond(i, j)
+            top.addBond(atoms[i], atoms[j])
 
         return top
 
 
     def step(self, n_steps: int, traj=False, dm=False, silent=False):
         """
-        Do the following:
+        Does the following:
         - steps n_steps
         - D/M algorithm if dm is true
         - trigger a trajectory frame on reporters if traj is True
@@ -464,7 +476,7 @@ class Simulation:
 
         Note: reinitializing is now handled automatically by context.
 
-        Note: if calling step manually, must call finish() after!
+        Note: if calling step() manually, must manually call finish() after to properly flush output files!
         """
         start_time = time()
         if traj:
@@ -476,14 +488,11 @@ class Simulation:
         self.info(f"step {self.current_step}")
         if n_steps > 0:
             self.info(f"md_steps {n_steps}")
-            try:
-                self.info("Reinitialize start")
-                self.context.do_steps(0)
-                self.info("Reinitialize finished")
-                self.info("MD start")
-                self.context.do_steps(n_steps)
-            except mm.OpenMMException as e:
-                self.error(f"!!! OpenMM Exception !!!\n{e}")
+            self.info("Reinitialize start")
+            self.context.do_steps(0)
+            self.info("Reinitialize finished")
+            self.info("MD start")
+            self.context.do_steps(n_steps)
             self.info("MD finished")
         if self.total_steps > 0 and n_steps > 0 and not silent:
             self.time_ps += self.dt_ps * n_steps
@@ -512,18 +521,13 @@ class Simulation:
                 if len(reactions) > 0:
                     for r in self.reporters:
                         self.info(f"OnReaction {r.__class__.__name__} start")
-                        try:
-                            # local minimization happens here for example
-                            r.on_reaction(self, reactions)
-                        except mm.OpenMMException as e:
-                            self.error(f"!!! OpenMM Exception !!!\n{e}")
+                        # local minimization happens here for example
+                        r.on_reaction(self, reactions)
                         self.info(f"OnReaction {r.__class__.__name__} finished")
                     for r in self.reporters:
                         self.info(f"PostReaction {r.__class__.__name__} start")
                         r.post_reaction(self)
                         self.info(f"PostReaction {r.__class__.__name__} finished")
-
-
 
         end_time = time()
         if n_steps > 0:

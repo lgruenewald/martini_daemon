@@ -4,7 +4,9 @@ use std::iter::Iterator;
 use std::ops::IndexMut;
 use pyo3::prelude::*;
 use crate::fragment::Fragment;
+use pyo3_stub_gen::{derive::gen_stub_pyclass, derive::gen_stub_pymethods};
 
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct FragList {
     defrag_list: Vec<Vec<usize>>,
@@ -32,6 +34,7 @@ impl FragList {
 }
 
 // Python+rust API
+#[gen_stub_pymethods]
 #[pymethods]
 impl FragList {
     #[new]

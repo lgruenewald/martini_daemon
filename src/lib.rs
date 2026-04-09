@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 use std::env;
+use pyo3_stub_gen::{derive::gen_stub_pyfunction, define_stub_info_gatherer};
 
 mod periodic_box;
 mod fragment;
@@ -10,7 +11,9 @@ mod frag_list;
 mod detection_template_list;
 mod bond_graph;
 
+#[gen_stub_pyfunction]
 #[pyfunction]
+/// Returns the current version and git commit.
 fn build_version() -> String {
     env!("BUILD_VERSION").to_string()
 }
@@ -28,3 +31,5 @@ fn rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(build_version, m)?)?;
     Ok(())
 }
+
+define_stub_info_gatherer!(stub_info);

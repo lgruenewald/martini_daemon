@@ -2,15 +2,19 @@ use numpy::{PyReadwriteArray2, PyUntypedArrayMethods};
 use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
 use std::collections::{HashSet};
+use pyo3_stub_gen::{derive::gen_stub_pyclass, derive::gen_stub_pymethods};
+
 
 use crate::periodic_box::PeriodicBox;
 
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct BondGraph {
     n_atoms: usize,
     bonds: Vec<HashSet<usize>>
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl BondGraph {
     #[new]

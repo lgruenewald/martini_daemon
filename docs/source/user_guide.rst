@@ -1,28 +1,29 @@
-Installation
-============
+User Guide
+==========
 
+This page of the documentation gives a quick primer on various topics.
 
-Running a simulation
-====================
+Introduction to run scripts
+---------------------------
 
 Simulations in Martini Daemon are ran using python run scripts. These
 contain calls to Martini Daemon’s API, specifying simulation parameters
-and input files. A simple energy minimization run script is provided
+and input files. A simple equilibration run script is provided
 below, which should be adjustable to meet various needs.
 
 ::
 
    #!/usr/bin/env python3
 
-   from martini_daemon.simulation import Simulation
-   from martini_daemon.reporters.variables_reporter import VariablesReporter
+   from martini_daemon import Simulation, VariablesReporter, XTCReporter
    import openmm as mm
 
-   # equilibration
    eq = Simulation(
-     # input files
-     top_path="system.top", geom_path="system.gro",
-     # output files will be named after this
+     # path to Gromacs Topology
+     top_path="system.top",
+     # path to Starting geometry
+     geom_path="system.gro",
+     # output filenames will be prefixed with this name
      sim_name="eq",
      # total MD steps to take
      md_steps=400000,
@@ -32,9 +33,9 @@ below, which should be adjustable to meet various needs.
      dm_frequency=0,
      # report thermodynamic variables, other reporters go here too...
      reporters=[
-       # each reporter typically writes its own file with its own
-       # specific extension
-       VariablesReporter()
+       # each reporter typically writes its own file with its own specific extension
+       VariablesReporter(),
+       XTCReporter(),
      ],
      # integrator+temperature coupling in one
      integrator=mm.LangevinMiddleIntegrator(
@@ -52,12 +53,12 @@ below, which should be adjustable to meet various needs.
          1.0 * mm.unit.bar,
          # reference temperature
          298 * mm.unit.kelvin
-       )
+       ),
+       mm.CMMotionRemover()
      ],
-     # use CUDA with nvidia GPUs
+     # It's recommended to use CUDA with nvidia GPUs for optimal performance
+     # see the available platforms by running python3 -m openmm.testInstallation
      platform="CUDA"
-     # Run on GPU 1 only
-     context_parameters={"DeviceIndex": "1"}
    )
    # minimize energy first, saving the minimized coordinates to min.gro
    eq.minimize_energy(out="min.gro")
@@ -66,22 +67,10 @@ below, which should be adjustable to meet various needs.
    # run equilibration
    eq.simulate()
 
-Selecting GPUs for the simulation can be done using context parameters,
-as seen in the example above. Selecting CPU cores for the simulation can
-be done with the ``taskset`` command. For example,
-``taskset -c 0-31 ./run.py`` will limit run.py to cores 0 to 31.
+See :doc:`/autoapi/martini_daemon/Simulation` for the whole list of available arguments, attributes and methods.
 
-
-Extracting the OpenMM system
-============================
-
-In case you want to use Martini Daemon as a Gromacs .top file parser to
-run your (martini) simulations in OpenMM, you might want to just obtain
-an OpenMM system, rather than use the abstraction layer provided on top
-of it here. TODO -- write up
-
-Including reactions
-===================
+Including reactions - TODO rewrite
+-------------------
 
 A rough workflow for adding a reaction consists of several steps. First,
 the desired reactions should be broken down to a mechanism, that can be
@@ -243,167 +232,45 @@ Then, it has to be constructed and added to the list of reporters within
 the simulation. This reporter also adds a cumulative reaction counter to
 the CLI during the simulation.
 
-Specific simulation requirements
-================================
+Reporters
+---------
 
-It is possible to temporarily reduce the timestep of the simulation
-after reactions, if required using “reaction sensitive” integrators. See
-example for below.
+To produce output from simulations, reporters have to be added to simulations.
+Reporters are Python class instances that inherit the ``Reporter`` base class,
+and their methods get called by ``Simulation`` at specified events during
+simulations.
 
-::
+Reporters can be broadly divided into two categories:
 
-   #!/usr/bin/env python3
+* Some perform reporting at a pre-defined trajectory frequency:
+    * This frequency is the ``traj_frequency`` argument to the constructor of ``Simulation``.
+    * This frequency is the same per-simulation to make analysis easier -- frame indices are synchronized across reporters.
+    * For a successful simulation, there is a frame written at the start, when the current MD step modulo frequency is 0, and at the very end of the simulation.
+    * :doc:`/autoapi/martini_daemon/VariablesReporter` reports thermodynamic variables for each trajectory frame.
+    * :doc:`/autoapi/martini_daemon/XTCReporter` reports atom positions and the periodic box for each trajectory frame.
+    * :doc:`/autoapi/martini_daemon/ToptrajReporter` creates a "topology trajectory", reporting atom properties and bonds for each trajectory frame.
+    * :doc:`/autoapi/martini_daemon/FragCountReporter` reports the number of fragments at each trajectory frame. It also adds the current total number of fragments to the interactive line on stdout.
 
-   from martini_daemon import simulation
-   from martini_daemon.reporters.bond_reporter import BondReporter
-   from martini_daemon.reporters.topstar import ReactionReporter
-   from martini_daemon.components.reaction_sensitive_integrator import ReactionSensitiveLangevinIntegrator
+* Some perform reporting related to reactions happening in the system:
+    * :doc:`/autoapi/martini_daemon/LocalMinimizer` is not a traditional reporter. It locally minimizes the energy after reactions.
+    * :doc:`/autoapi/martini_daemon/ReactionReporter` logs all reactions and reactants to a file as they happen.
+    * :doc:`/autoapi/martini_daemon/ReactionEnergyReporter` reports thermodynamic variables before and after reactions. Optionally, it can write coordinates too, which can be helpful to debug local minimizations.
 
-   sim = simulation.Simulation(
-       top_path="system.top", gro_path="system.gro",
-       sim_name="out",
-       reporters=[
-           BondReporter(),
-           ReactionReporter(molid=True),
-       ],
-       md_steps=100000000, dm_frequency=100,
-       xtc_frequency=5000,
-       # 0.02 ps timestep, 298 K, 1 ps^-1 friction
-       # subdivision of 4, for 5 timesteps
-       integrator=ReactionSensitiveLangevinIntegrator(0.02, 298, 1., 4, 5),
-   )
-   sim.minimize_energy()
-   sim.generate_velocities(300)
-   sim.simulate()
+Of course, technically a reporter can do something at both, it is up to the implementation to choose which
+callbacks to hook on. User-defined reporters are supported, they can use the public API of simulation
+and all its public attributes to perform tasks during callbacks. Callbacks are called in the order
+they are passed to Simulation. See :doc:`/extending` for more detail.
 
-The subdivision has to be a positive integer. During the short
-equilibration, each timestep is divided into this many sub-time steps.
-In this example, this means 5 fs timesteps. The number of steps in this
-example is 5, which get divided into 20 fs timesteps. It is ensured,
-that XTC frames remain evenly spaced, regradless whether there are
-reactions happening.
+Analysis - TODO
+--------
 
-Using this may have a performance impact, so it is recommended to try to
-specify reaction conditions that do not require this short post-reaction
-equilibration.
-
-Reporting
-=========
-
-There are various other reporters which can be useful worth mentioning
-briefly in this guide.
-
-Variables Reporter
-------------------
-
-Reports thermodynamic variables, such as kinetic, potential and total
-energies, temperature and box size. A new entry is written every time
-the XTC trajectory file is written, for easy analysis.
-
-.. code:: py
-
-   from martini_daemon.reporters.variables_reporter import VariablesReporter
-
-Checkpoint Reporter
--------------------
-
-The checkpoint reporter is constructed with a specific interval, at
-which it will write simulation checkpoints. A simulation can be
-continued from these checkpoints, when using the exact same martini
-daemon version.
-
-.. code:: py
-
-   from martini_daemon.reporters.checkpoint_reporter import CheckpointReporter
-
-Checkpoints can be loaded by specifying the chk_path argument of
-Simulation instead of specifying the geom_path and top_path arguments.
-
-Atom Reporter
+Visualization
 -------------
 
-The atom reporter writes atom information (name, type, charge, mass) for
-each XTC frame.
+The ``.toptraj`` files generated by Martini Daemon's :doc:`/autoapi/martini_daemon/ToptrajReporter` can be
+used to dynamically visualize the topology as it changes during a trajectory.
 
-.. code:: py
-
-   from martini_daemon.reporters.atom_reporter import AtomReporter, read_atoms
-
-   ...
-
-   n_frames, natoms, names, types, charges, masses = read_atoms("out.atoms")
-
-Bond Reporter
--------------
-
-The bond reporter writes a list of bonds in the system for each XTC
-frame. All entries in the ``[bonds]`` directive, constraints are
-considered bonds. Virtual sites are considered bonds too, between the
-virtual particle and all constructing particles respectively.
-
-.. code:: py
-
-   from martini_daemon.reporters.bond_reporter import BondReporter, read_bonds
-
-   ...
-
-   n_frames, n_atoms, bond_frames = read_bonds("out.bonds")
-
-Helpers
-=======
-
-The helpers folder contains helpers that facilitate analysis or
-visualization.
-
-VMD
----
-
-The VMD helper, together with the VMD script located in the ``tcl``
-directory of this repository facilitate the visualization of bonds
-during trajectories with bond formation and breakage. The workflow is as
-follows:
-
-1. Have a ``.bonds`` BondReporter output and an XTC file, which is
-   desired to be visualized. If molecules are made whole across the PBC,
-   or similar transformations, those should be done first.
-2. Generate the file that is read by the VMD script from the ``.bonds``
-   and ``.xtc`` files.
-
-.. code:: py
-
-   from martini_daemon.helpers.vmd import generate_vmd_readable_bonds
-   from martini_daemon.bond_reporter import read_bonds
-
-   n_frames, n_atoms, bond_frames = read_bonds("out.bonds")
-   generate_vmd_readable_bonds(
-     bond_frames,
-     "out.xtc",  # XTC path
-     "out.z"  # output path
-   )
-
-3. (Optional, for large trajectories) look at the README in the ``tcl``
-   directory of this repo for instructions to compile the shared library
-   helper.
-4. Make a visualization script that loads the tcl script and load the
-   bond trajectory.
-
-.. code:: tcl
-
-   # (optional) if step 3 was completed:
-   load /path/to/martini_daemon/tcl/bond_loader.so
-   # always mandatory:
-   source /path/to/martini_daemon/tcl/daemon.tcl
-
-   # loads the .gro and .xtc file, deleting the extra frame from the .gro
-   daemon_open out.gro out.xtc
-   # loads the bond list generated in generate_vmd_readable_bonds
-   daemon_bonds out.z
-
-   # ... other commands to set visualization state
-
-This script can then be loaded using the ``-e`` flag of VMD. If the
-script is saved as ``vis.tcl``, it can be opened as:
-
-::
-
-   vmd -e vis.tcl
+Currently, there is a plugin for `VMD`_, which can be found in the ``/vmd_plugin`` folder of the Martini Daemon
+git repository. This plugin is written in C, so it needs to be compiled first.
+Instructions on how to build and use this plugin are in the README in said folder, as it can be viewed as a separate
+component.

@@ -4,6 +4,9 @@ use pyo3::prelude::*;
 use pyo3::{pyclass, pymethods};
 use pyo3::exceptions::PyException;
 use crate::detection_template::DetectionTemplate;
+use pyo3_stub_gen::{derive::gen_stub_pyclass, derive::gen_stub_pymethods};
+
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct DetectionTemplateList {
     pub reactions: OrderMap<String, Py<DetectionTemplate>>,
@@ -13,6 +16,7 @@ pub struct DetectionTemplateList {
     pub largest_r_max: f64
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl DetectionTemplateList {
     #[new]

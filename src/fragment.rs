@@ -1,7 +1,10 @@
 use std::fmt::Display;
 
 use pyo3::prelude::*;
+use pyo3_stub_gen::{derive::gen_stub_pyclass};
 
+
+#[gen_stub_pyclass]
 #[pyclass(str, skip_from_py_object)]
 #[derive(Clone)]
 pub struct Fragment {

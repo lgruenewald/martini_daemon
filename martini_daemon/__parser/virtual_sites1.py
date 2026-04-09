@@ -1,6 +1,6 @@
 from .interaction_directive import InteractionDirective
 from .gromacs_top_file import register_directive
-from ..__parser import TokenList
+from .token_list import TokenList
 
 @register_directive
 class VirtualSites1(InteractionDirective):

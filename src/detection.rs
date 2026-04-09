@@ -3,6 +3,7 @@ use numpy::{Ix2, PyArray};
 use pyo3::prelude::*;
 use kdtree::{KdTree, distance::squared_euclidean};
 use sortedlist_rs::SortedList;
+use pyo3_stub_gen::{derive::gen_stub_pyfunction};
 
 use crate::detection_template_list::DetectionTemplateList;
 use crate::detection_one::detection_one;
@@ -14,9 +15,12 @@ use crate::frag_list::FragList;
 /// - builds a current frame neighbor list.
 /// - runs the detection algorithm on all possible reaction-reactant combinations.
 /// - returns a list of reactions, each as a list of frag_ids and reaction names.
+#[gen_stub_pyfunction]
 #[pyfunction]
 pub fn detection<'py>(
+    #[gen_stub(override_type(type_repr="FragList"))]
     frag_list: &mut FragList,
+    #[gen_stub(override_type(type_repr="DetectionTemplateList"))]
     detection_template_list: &mut DetectionTemplateList,
     pbc: &PeriodicBox,
     pos: Bound<'py, PyArray<f64, Ix2>>,

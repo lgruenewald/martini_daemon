@@ -20,11 +20,10 @@ This is achieved by combining multiple components in one repo / one python packa
    - (optional) after installing, verify which platforms are available with `python -m openmm.testInstallation`
 - (Within the virtual environment) install maturin (`pip install maturin` or `uv tool install maturin`).
 - Install to the virtual environment using `maturin develop -r`.
-- (optional) Also install optional dependencies with `pip install .[all]` if you want to run tests, benchmarks or build documentation yourself.
 
 ## Docs
 
-Docs can be built using sphinx. Install optional dependencies with `pip install .[all]` first.
+Docs can be built using sphinx. Install additional dependencies with `pip install .[docs]` first.
 
 Run `make html` in the `docs/` folder in the
 repo. The generated docs can then be found under `docs/build/html`.
@@ -39,8 +38,8 @@ To run the test suite:
 # Gromacs in double precision is required, this should be installed first
 source /usr/local/gromacs-2026.1-double/bin/GMXRC
 # (in the root of the repo)
-# make sure optional dependencies are installed
-pip install .[all]
+# make sure additional test dependencies are installed
+pip install .[test]
 # make sure everything is recompiled
 maturin develop
 # run the python tests
@@ -62,6 +61,14 @@ The rust tests can be found in `src` at the end of a few of the submodules. Othe
 Currently, there are no skipped or stochastic tests, all tests should pass.
 
 Some single_frame tests have looser tolerances, this is documented at the top of `tests/single_frame/test_single_frame.py`.
+
+## Development
+
+It's recommended to install pylsp and use an editor supporting autocomplete,
+as it makes navigating the API easier. If using the editor helix, `pip install .[dev]` should install it, then
+it should work out of the box.
+
+To re-generate the type stubs for the rust parts, run `cargo run --bin stub_gen`.
 
 # License
 

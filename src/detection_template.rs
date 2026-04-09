@@ -1,7 +1,9 @@
 use pyo3::{prelude::*};
 use std::{collections::HashSet};
 use pyo3::exceptions::PyException;
+use pyo3_stub_gen::{derive::gen_stub_pyclass, derive::gen_stub_pymethods};
 
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct DetectionTemplate {
     #[pyo3(get, set)]
@@ -12,9 +14,7 @@ pub struct DetectionTemplate {
     pub distance_max: Vec<(usize, usize, usize, usize, f64)>,
     #[pyo3(get)]
     pub distance_min: Vec<(usize, usize, usize, usize, f64)>,
-    #[pyo3(get)]
     pub angle_limits: Vec<(usize, usize, usize, usize, usize, usize, f64, f64)>,
-    #[pyo3(get)]
     pub dihedral_limits: Vec<(
         usize,
         usize,
@@ -39,6 +39,7 @@ pub struct DetectionTemplate {
     pub total_reaction_count: usize
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl DetectionTemplate {
     #[new]
@@ -77,9 +78,9 @@ impl DetectionTemplate {
     ) {
         self.angle_limits.push(entry);
     }
-
     pub fn add_dihedral_limit<'py>(
         &mut self,
+        #[gen_stub(override_type(type_repr="tuple[int, int, int, int, int, int, int, int, float, float]"))]
         entry: (
             usize,
             usize,
@@ -94,6 +95,29 @@ impl DetectionTemplate {
         ),
     ) {
         self.dihedral_limits.push(entry);
+    }
+
+    #[getter]
+    #[gen_stub(override_return_type(type_repr="list[tuple[int, int, int, int, int, int, float, float]]"))]
+    pub fn angle_limits(&self) -> Vec<(usize, usize, usize, usize, usize, usize, f64, f64)> {
+        self.angle_limits.clone()
+    }
+
+    #[getter]
+    #[gen_stub(override_return_type(type_repr="list[tuple[int, int, int, int, int, int, int, int, float, float]]"))]
+    pub fn dihedral_limits(&self) -> Vec<(
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        f64,
+        f64,
+    )> {
+        self.dihedral_limits.clone()
     }
 
     /// Raises an exception if reaction is not valid.
