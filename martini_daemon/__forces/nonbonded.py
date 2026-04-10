@@ -51,9 +51,7 @@ class NonBonded(Force):
         type_ = self.__atom_types[self.system.get_type(atom_id)]
         charge = self.system.get_charge(atom_id)
         sc_lam, sc_alpha = self.system.get_sc(atom_id)
-        self.force.setParticleParameters(atom_id, [
-            type_, charge, sc_lam, sc_alpha
-        ])
+        self.force.setParticleParameters(atom_id, [type_, charge, sc_lam, sc_alpha])
         self.system.flag_reinitialize()
 
     def flag_atom_add(self):
@@ -87,15 +85,15 @@ class NonBonded(Force):
         self.force.addPerParticleParameter("q")
         self.force.addPerParticleParameter("sc_lambda")
         self.force.addPerParticleParameter("sc_alpha")
-        self.force.setNonbondedMethod(
-            mm.CustomNonbondedForce.CutoffPeriodic
-        )
+        self.force.setNonbondedMethod(mm.CustomNonbondedForce.CutoffPeriodic)
         self.force.setCutoffDistance(self.cutoff_nm)
 
         for i, (type_name, _) in enumerate(self.system.iterate_atom_types()):
             if self.__atom_types.get(type_name) is not None:
                 # this shouldn't happen
-                assert i == self.__atom_types[type_name], "Internal error: atom types changed"
+                assert (
+                    i == self.__atom_types[type_name]
+                ), "Internal error: atom types changed"
             self.__atom_types[type_name] = i
 
         for atom_id in range(self.system.atom_count()):
@@ -104,7 +102,7 @@ class NonBonded(Force):
             sc_lam, sc_alpha = self.system.get_sc(atom_id)
             self.force.addParticle([type_, charge, sc_lam, sc_alpha])
 
-        for (_, (members, _)) in self.__exclusions.iterate_bonds():
+        for _, (members, _) in self.__exclusions.iterate_bonds():
             self.force.addExclusion(*members)
 
         # add LJ parameters to the system
@@ -112,19 +110,17 @@ class NonBonded(Force):
         epsilons = []
         # i,j => type index; t1,t2 => type names
         n = len(self.__atom_types)
-        nb_types: dict[tuple[str, str], tuple[float, float]] = self.system.additional_data.get("nb_types")
+        nb_types: dict[tuple[str, str], tuple[float, float]] = (
+            self.system.additional_data.get("nb_types")
+        )
         for t1, i in self.__atom_types.items():
             for t2, j in self.__atom_types.items():
                 sigma, epsilon = (
-                    nb_types.get((t1, t2))
-                    or nb_types.get((t2, t1))
-                    or (0., 0.)
+                    nb_types.get((t1, t2)) or nb_types.get((t2, t1)) or (0.0, 0.0)
                 )
                 sigmas.append(sigma)
                 epsilons.append(epsilon)
-        self.force.addTabulatedFunction(
-            "sigma", mm.Discrete2DFunction(n, n, sigmas)
-        )
+        self.force.addTabulatedFunction("sigma", mm.Discrete2DFunction(n, n, sigmas))
         self.force.addTabulatedFunction(
             "epsilon", mm.Discrete2DFunction(n, n, epsilons)
         )
@@ -195,9 +191,7 @@ class ExclusionHelper(BondedForce):
         if i == j:
             q_prod *= 0.5
         if q_prod != 0:
-            self.force.addBond(
-                i, j, [q_prod]
-            )
+            self.force.addBond(i, j, [q_prod])
 
     def _add_bond(self, members: list[int], params: list[float]) -> int:
         res = super()._add_bond(members, params)

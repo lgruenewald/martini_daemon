@@ -9,6 +9,7 @@ from ..__rust import BondGraph
 # TODO reaction information
 # TODO fragment information per frame?
 
+
 class TopTrajWriter:
     """
     The Topology-Trajectory File Format .toptraj is described here.
@@ -87,31 +88,25 @@ class TopTrajWriter:
         - CRC32 checksum of frame data
     """
 
-    def __init__(
-        self,
-        path: str,
-        title: str,
-        initial_molecules: list[tuple[str, int]]
-    ):
+    def __init__(self, path: str, title: str, initial_molecules: list[tuple[str, int]]):
         # version 1.0
         header = b"\xc0TOPTR\x01\x00"
         title_bytes = title.encode("utf-8")
         title_len = min(255, len(title_bytes))
         n_initial = len(initial_molecules)
-        body = struct.pack(
-            f"<B{title_len}sI", title_len, title_bytes, n_initial
-        )
+        body = struct.pack(f"<B{title_len}sI", title_len, title_bytes, n_initial)
         for name, count in initial_molecules:
             name_bytes = name.encode("utf-8")
             name_len = min(255, len(name_bytes))
             body += struct.pack(
                 # TODO test with 255< bytes
-                f"<B{name_len}sI", name_len, name_bytes, count
+                f"<B{name_len}sI",
+                name_len,
+                name_bytes,
+                count,
             )
-        checksum = zlib.crc32(header+body)
-        body += struct.pack(
-            "<I", checksum
-        )
+        checksum = zlib.crc32(header + body)
+        body += struct.pack("<I", checksum)
 
         self.handle = open(path, "wb")
         self.handle.write(header)
@@ -130,9 +125,7 @@ class TopTrajWriter:
         self.frame = None
         self.previous_frame = None
 
-    def new_frame(
-        self, frame_num: int, sim_step: int, time_ps: float, n_atoms: int
-    ):
+    def new_frame(self, frame_num: int, sim_step: int, time_ps: float, n_atoms: int):
         """
         Create a new frame.
         """
@@ -140,31 +133,37 @@ class TopTrajWriter:
             "Frames passed to TopTrajWriter must be in a sequence. "
             f"Got frame num {frame_num}, expected {self.last_frame + 1}."
         )
-        assert self.frame is None, (
-            "Only call new_frame after write_frame()!"
-        )
+        assert self.frame is None, "Only call new_frame after write_frame()!"
         self.last_frame = frame_num
         self.frame = {
             "n_atoms": n_atoms,
-            "header": struct.pack(
-                "<IIQd", frame_num, n_atoms, sim_step, time_ps
-            )
+            "header": struct.pack("<IIQd", frame_num, n_atoms, sim_step, time_ps),
         }
 
     def register_frame_atoms(
         self,
-        names: Collection[str], res_names: Collection[str], res_ids: Collection[int],
-        atom_types: Collection[str], charges: Collection[float],
-        masses: Collection[float]
+        names: Collection[str],
+        res_names: Collection[str],
+        res_ids: Collection[int],
+        atom_types: Collection[str],
+        charges: Collection[float],
+        masses: Collection[float],
     ):
         """
         Write current state of atoms to current frame.
         """
-        assert self.frame.get("atoms") is None, (
-            "Should only call register_frame_atoms once per frame!"
-        )
+        assert (
+            self.frame.get("atoms") is None
+        ), "Should only call register_frame_atoms once per frame!"
 
-        assert len(names) == len(res_names) == len(res_ids) == len(atom_types) == len(charges) == len(masses)
+        assert (
+            len(names)
+            == len(res_names)
+            == len(res_ids)
+            == len(atom_types)
+            == len(charges)
+            == len(masses)
+        )
         assert len(names) == self.frame["n_atoms"]
 
         self.frame["atoms"] = {
@@ -173,17 +172,13 @@ class TopTrajWriter:
             "res_ids": res_ids,
             "atom_types": atom_types,
             "charges": charges,
-            "masses": masses
+            "masses": masses,
         }
 
-
-    def register_frame_bonds(
-        self,
-        bonds: BondGraph
-    ):
-        assert self.frame.get("bonds") is None, (
-            "Should only call register_frame_bonds once per frame!"
-        )
+    def register_frame_bonds(self, bonds: BondGraph):
+        assert (
+            self.frame.get("bonds") is None
+        ), "Should only call register_frame_bonds once per frame!"
         self.frame["bonds"] = bonds
 
     def write_frame(self):
@@ -204,9 +199,7 @@ class TopTrajWriter:
             )
 
         for res_id in self.frame["atoms"]["res_ids"]:
-            raw_bytes += struct.pack(
-                "<I", res_id
-            )
+            raw_bytes += struct.pack("<I", res_id)
 
         for atom_type in self.frame["atoms"]["atom_types"]:
             atom_type_bytes = atom_type.encode("utf-8")
@@ -215,19 +208,13 @@ class TopTrajWriter:
             )
 
         for charge in self.frame["atoms"]["charges"]:
-            raw_bytes += struct.pack(
-                "<f", charge
-            )
+            raw_bytes += struct.pack("<f", charge)
 
         for mass in self.frame["atoms"]["masses"]:
-            raw_bytes += struct.pack(
-                "<f", mass
-                )
+            raw_bytes += struct.pack("<f", mass)
 
         bonds_len = len(raw_bytes)
-        raw_bytes += struct.pack(
-            "<Q", 0
-        )
+        raw_bytes += struct.pack("<Q", 0)
         n_bonds = 0
         wrote = set()
         for i, j in self.frame["bonds"].to_list():
@@ -241,15 +228,9 @@ class TopTrajWriter:
                 continue
             wrote.add((smaller, larger))
             n_bonds += 1
-            raw_bytes += struct.pack(
-                "<II", smaller, larger
-            )
-        raw_bytes[bonds_len:bonds_len+8] = struct.pack(
-            "<Q", n_bonds
-        )
-        raw_bytes += struct.pack(
-            "<I", zlib.crc32(raw_bytes)
-        )
+            raw_bytes += struct.pack("<II", smaller, larger)
+        raw_bytes[bonds_len : bonds_len + 8] = struct.pack("<Q", n_bonds)
+        raw_bytes += struct.pack("<I", zlib.crc32(raw_bytes))
         self.handle.write(self.comp.compress(raw_bytes))
         self.handle.write(self.comp.flush(zlib.Z_PARTIAL_FLUSH))
         self.handle.flush()
@@ -281,6 +262,7 @@ class TopTrajFrame:
     masses: list[float]
     bonds: list[tuple[int, int]]
 
+
 class TopTrajReader:
     """
     For a description of the file format, see TopTrajWriter.
@@ -293,25 +275,27 @@ class TopTrajReader:
             assert self.header == b"\xc0TOPTR\x01\x00"
             self.content = zlib.decompress(f.read())
         title_len = self.content[0]
-        self.title, = struct.unpack(f"<{title_len}s", self.content[1:1+title_len])
-        self.i = 1+title_len
-        n_init, = struct.unpack("<I", self.content[self.i:self.i+4])
+        (self.title,) = struct.unpack(f"<{title_len}s", self.content[1 : 1 + title_len])
+        self.i = 1 + title_len
+        (n_init,) = struct.unpack("<I", self.content[self.i : self.i + 4])
         self.i += 4
         self.initial_molecules = []
         for i in range(n_init):
             name_len = self.content[self.i]
             self.i += 1
-            name, = struct.unpack(f"<{name_len}s", self.content[self.i:self.i+name_len])
+            (name,) = struct.unpack(
+                f"<{name_len}s", self.content[self.i : self.i + name_len]
+            )
             self.i += name_len
-            n, = struct.unpack("<I", self.content[self.i:self.i+4])
+            (n,) = struct.unpack("<I", self.content[self.i : self.i + 4])
             self.i += 4
             self.initial_molecules.append((name, n))
 
-        chunk1 = self.header + self.content[:self.i]
-        crc, = struct.unpack("<I", self.content[self.i:self.i+4])
-        assert zlib.crc32(chunk1) == crc, (
-            f"File {path} appears to be corrupt. Header CRC32 {crc} doesn't match {zlib.crc32(chunk1)}."
-        )
+        chunk1 = self.header + self.content[: self.i]
+        (crc,) = struct.unpack("<I", self.content[self.i : self.i + 4])
+        assert (
+            zlib.crc32(chunk1) == crc
+        ), f"File {path} appears to be corrupt. Header CRC32 {crc} doesn't match {zlib.crc32(chunk1)}."
         self.i += 4
         self.frame = 0
 
@@ -321,7 +305,7 @@ class TopTrajReader:
             len_ = self.content[self.i]
             self.i += 1
             res.append(
-                struct.unpack(f"<{len_}s", self.content[self.i:self.i+len_])[0]
+                struct.unpack(f"<{len_}s", self.content[self.i : self.i + len_])[0]
             )
             self.i += len_
         return res
@@ -330,19 +314,18 @@ class TopTrajReader:
         res = []
         for i in range(n):
             res.append(
-                struct.unpack(byte_format, self.content[self.i:self.i+n_bytes])[0]
+                struct.unpack(byte_format, self.content[self.i : self.i + n_bytes])[0]
             )
             self.i += n_bytes
         return res
-
 
     def read_frame(self) -> TopTrajFrame | None:
         if self.i >= len(self.content):
             return None
 
         frame_start = self.i
-        frame, n_atoms, sim_step, sim_time  = struct.unpack(
-            "<IIQd", self.content[self.i:self.i+24]
+        frame, n_atoms, sim_step, sim_time = struct.unpack(
+            "<IIQd", self.content[self.i : self.i + 24]
         )
         self.i += 24
         names = self.__read_strings(n_atoms)
@@ -351,23 +334,28 @@ class TopTrajReader:
         types = self.__read_strings(n_atoms)
         charges = self.__read_any(n_atoms, "<f", 4)
         masses = self.__read_any(n_atoms, "<f", 4)
-        n_bonds, = struct.unpack("<Q", self.content[self.i:self.i+8])
+        (n_bonds,) = struct.unpack("<Q", self.content[self.i : self.i + 8])
         bonds = []
         self.i += 8
         for i in range(n_bonds):
-            bonds.append(
-                struct.unpack("<II", self.content[self.i:self.i+8])
-            )
+            bonds.append(struct.unpack("<II", self.content[self.i : self.i + 8]))
             self.i += 8
-        crc, = struct.unpack("<I", self.content[self.i:self.i+4])
+        (crc,) = struct.unpack("<I", self.content[self.i : self.i + 4])
         self.i += 4
-        assert zlib.crc32(
-            self.content[frame_start:self.i-4]
-        ) == crc, f"Frame {frame} corrupt, CRC32 mismatch."
+        assert (
+            zlib.crc32(self.content[frame_start : self.i - 4]) == crc
+        ), f"Frame {frame} corrupt, CRC32 mismatch."
 
         return TopTrajFrame(
-            frame, sim_step, sim_time, n_atoms,
-            names, res_names, res_ids, types, charges, masses, bonds
+            frame,
+            sim_step,
+            sim_time,
+            n_atoms,
+            names,
+            res_names,
+            res_ids,
+            types,
+            charges,
+            masses,
+            bonds,
         )
-
-

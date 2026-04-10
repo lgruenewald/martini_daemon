@@ -10,10 +10,9 @@ from .gromacs_top_file import GromacsTopFile
 class MoleculesDirective(Directive):
 
     def line(self, tokens: TokenList) -> None:
-        self.parent.system.initial_molecules.append((
-            tokens.unwrap(0, "word"),
-            tokens.unwrap(1, "int")
-        ))
+        self.parent.system.initial_molecules.append(
+            (tokens.unwrap(0, "word"), tokens.unwrap(1, "int"))
+        )
 
     def finish(self):
         pass

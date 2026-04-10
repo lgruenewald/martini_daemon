@@ -24,7 +24,7 @@ for i in range(n_molecules):
     # NOTE: if it starts not passing after re-generating, check whether there is an exact equality to r_max/r_min
     d1 = 0.5
     d2 = 0.5
-    angle = np.random.random() * np.pi + (np.pi / 2.)
+    angle = np.random.random() * np.pi + (np.pi / 2.0)
 
     index1 = i * 3
     index2 = i * 3 + 1
@@ -43,10 +43,10 @@ for i in range(n_molecules):
     pos[index3, 1] = np.sin(angle) * d2
 
     # z for all 3 same
-    pos[i*3:i*3+3, 2] = i
+    pos[i * 3 : i * 3 + 3, 2] = i
 
     # would this react?
-    if  i < n_molecules // 2:
+    if i < n_molecules // 2:
         # first half, regular overlap (xy) and (yz) can never react
         # so no reaction adding
         pass
@@ -63,9 +63,9 @@ for i in range(n_molecules):
     res_names.append(r1)
     res_names.append(r2)
     res_names.append(r3)
-    res_ids.append(i+1)
-    res_ids.append(i+1)
-    res_ids.append(i+1)
+    res_ids.append(i + 1)
+    res_ids.append(i + 1)
+    res_ids.append(i + 1)
 
 
 with open("expected.reactions", "w") as f:
@@ -76,7 +76,9 @@ with open("expected.reactions", "w") as f:
 write_geometry(
     "system.gro",
     "example reaction with optional atoms",
-    atom_names, res_names, res_ids,
-    PeriodicBox.cubic(n_molecules + 5.),
-    pos
+    atom_names,
+    res_names,
+    res_ids,
+    PeriodicBox.cubic(n_molecules + 5.0),
+    pos,
 )

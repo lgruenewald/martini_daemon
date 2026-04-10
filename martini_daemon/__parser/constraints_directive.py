@@ -1,6 +1,7 @@
 from .interaction_directive import InteractionDirective
 from .gromacs_top_file import register_directive
 
+
 @register_directive
 class ConstraintsDirective(InteractionDirective):
     @classmethod
@@ -11,7 +12,9 @@ class ConstraintsDirective(InteractionDirective):
     __is_exclusion: dict[str, bool] = {}
 
     @classmethod
-    def register_type(cls, type_: int, name: str, args: list[str], is_excl: bool) -> None:
+    def register_type(
+        cls, type_: int, name: str, args: list[str], is_excl: bool
+    ) -> None:
         assert type_ not in cls.__type_data.keys()
         cls.__type_data[type_] = (name, args)
         cls.__is_exclusion[name] = is_excl
@@ -37,7 +40,7 @@ class ConstraintsDirective(InteractionDirective):
     def get_number_params(cls, type_: int) -> tuple[int, int]:
         _, args = cls.__type_data[type_]
         # often with #define FLEXIBLE they put huge force constants after
-        return len(args), len(args)+1
+        return len(args), len(args) + 1
 
 
 def register_constraint_type(type_: int, args: list[str], is_excl: bool):
@@ -45,4 +48,5 @@ def register_constraint_type(type_: int, args: list[str], is_excl: bool):
         name = class_.get_name()
         ConstraintsDirective.register_type(type_, name, args, is_excl)
         return class_
+
     return inner

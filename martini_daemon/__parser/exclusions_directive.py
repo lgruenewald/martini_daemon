@@ -15,9 +15,9 @@ class ExclusionsDirective(Directive):
         j = self.parent.parse_index(tokens, 1)
         self.parent.molecule_type.exclusions.add((i, j))
         for k in range(2, len(tokens)):
-            self.parent.molecule_type.exclusions.add((
-                i, self.parent.parse_index(tokens, k)
-            ))
+            self.parent.molecule_type.exclusions.add(
+                (i, self.parent.parse_index(tokens, k))
+            )
 
     def finish(self):
         pass

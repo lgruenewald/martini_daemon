@@ -28,11 +28,8 @@ class MoleculeType:
             if res_num != last_res:
                 last_res = res_num
                 system.new_residue()
-            res.append(system.add_atom(
-                atom_name, res_name, type_, charge, mass
-            ))
+            res.append(system.add_atom(atom_name, res_name, type_, charge, mass))
         return res
-
 
     def process_nrexcl(self):
         """
@@ -45,7 +42,6 @@ class MoleculeType:
                 assert len(members) == 2
                 self.exclusions.add((members[0], members[1]))
 
-
     def instantiate(self, system, atom_indices: list[int]):
         """
         Adds the bonded interactions and exclusions
@@ -54,25 +50,19 @@ class MoleculeType:
         """
         # lookup force by name in system
         # call add interaction
-        for (i, j) in self.exclusions.copy():
+        for i, j in self.exclusions.copy():
             if j > i:
                 self.exclusions.add((j, i))
-        for (i, j) in self.exclusions:
+        for i, j in self.exclusions:
             if i > j:
                 if i < 0 or j < 0:
                     # during reactions, missing optional atoms can do this
                     continue
                 system.add_interaction(
-                    "exclusion",
-                    [atom_indices[i], atom_indices[j]],
-                    []
+                    "exclusion", [atom_indices[i], atom_indices[j]], []
                 )
-        for (name, members, params, _) in self.interactions:
+        for name, members, params, _ in self.interactions:
             if any(atom_indices[x] < 0 for x in members):
                 # during reactions, missing optional atoms can do this
                 continue
-            system.add_interaction(
-                name,
-                [atom_indices[x] for x in members],
-                params
-            )
+            system.add_interaction(name, [atom_indices[x] for x in members], params)

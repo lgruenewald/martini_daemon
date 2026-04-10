@@ -37,14 +37,8 @@ r_tol = 2e-3  # distance tolerance
 # only slightly raised the tolerance because forces still
 # seem *slightly* off for a few atoms
 #
-etol_override = {
-    "CNAP": 3e-5
-}
-ftol_override = {
-    "cmap": 1e-2,
-    "cutoff_LJ": 0,
-    "pairs": 5e-5
-}
+etol_override = {"CNAP": 3e-5}
+ftol_override = {"cmap": 1e-2, "cutoff_LJ": 0, "pairs": 5e-5}
 
 cutoff_nm = 1.1
 
@@ -60,23 +54,54 @@ tests = [
     "cutoff_LJ",
     # cmap, pairs
     "cmap",
-    "pairs", "pairs_VW", "pairs_VWQ", "pairs_type",
+    "pairs",
+    "pairs_VW",
+    "pairs_VWQ",
+    "pairs_type",
     # biomolecule tests
-    "trypsin", "posres",
+    "trypsin",
+    "posres",
     # polymer tests
     "polyurethane",
     # small molecule tests
-    "NMC", "CHOL_in_W", "AEA", "NAPH", "nacl+waterbox", "solvent_mixture",
-    "waterbox", "DPPC_DIPC_in_W", "CAFF", "BDT", "BZTF_CLPR", "benzbox",
+    "NMC",
+    "CHOL_in_W",
+    "AEA",
+    "NAPH",
+    "nacl+waterbox",
+    "solvent_mixture",
+    "waterbox",
+    "DPPC_DIPC_in_W",
+    "CAFF",
+    "BDT",
+    "BZTF_CLPR",
+    "benzbox",
     # specific interaction tests
     "vsite1",
-    "morse", "vsite4fdn", "quartic_angle", "proper_dihedral",
-    "cross_bond_bond", "vsiten2", "urey_bradley", "fourier_dihedral",
-    "linear_angle", "fene", "cubic", "distance_restraint",
-    "connection", "rbtorsion", "vsiten3", "vsite2fd",
-    "cross_bond_angle", "vsite3fd", "g96_bond",
-    "restricted_dihedral", "restricted_angle", "combined_bending_torsion",
+    "morse",
+    "vsite4fdn",
+    "quartic_angle",
+    "proper_dihedral",
+    "cross_bond_bond",
+    "vsiten2",
+    "urey_bradley",
+    "fourier_dihedral",
+    "linear_angle",
+    "fene",
+    "cubic",
+    "distance_restraint",
+    "connection",
+    "rbtorsion",
+    "vsiten3",
+    "vsite2fd",
+    "cross_bond_angle",
+    "vsite3fd",
+    "g96_bond",
+    "restricted_dihedral",
+    "restricted_angle",
+    "combined_bending_torsion",
 ]
+
 
 # == TEST CLASS ==
 class TestSingleFrame:
@@ -93,7 +118,9 @@ class TestSingleFrame:
         new_pos, box = sim.context.get_positions()
         for i in range(len(reference)):
             r_diff = box.distance(reference[i], new_pos[i])
-            assert r_diff < r_tol, f"Constraint/VSite position moved by {r_diff} nm (particle {i})."
+            assert (
+                r_diff < r_tol
+            ), f"Constraint/VSite position moved by {r_diff} nm (particle {i})."
 
     def compare_daemon_gmx(self):
         _, respos, _ = read_geometry(self.respos)
@@ -104,12 +131,12 @@ class TestSingleFrame:
         _, energy, _ = sim.context.get_energies()
         forces = sim.context.get_forces().flatten()
         for i in range(sim.system.atom_count()):
-            if sim.system.get_mass(i) == 0.:
-                forces[i * 3] = 0.
-                forces[i * 3 + 1] = 0.
-                forces[i * 3 + 2] = 0.
+            if sim.system.get_mass(i) == 0.0:
+                forces[i * 3] = 0.0
+                forces[i * 3 + 1] = 0.0
+                forces[i * 3 + 2] = 0.0
 
-        if energy != 0.:
+        if energy != 0.0:
             e_diff = math.fabs(self.gmx_energy / energy - 1)
         else:
             assert self.gmx_energy == energy, f"{self.gmx_energy} != {energy}"
@@ -129,16 +156,22 @@ class TestSingleFrame:
         top = sim.get_openmm_topology()
 
         sim = mmapp.Simulation(
-            top, sys, mm.VerletIntegrator(0.1), mm.Platform.getPlatformByName("Reference")
+            top,
+            sys,
+            mm.VerletIntegrator(0.1),
+            mm.Platform.getPlatformByName("Reference"),
         )
         _, pos, _ = read_geometry(self.gro)
         # note: there might be deviations here because martini_daemon's set_positions also makes vsites and constraints
         # whole across the pbc. currently no such tests exist, but in the future it may cause problems if such a test
         # is introduced.
         sim.context.setPositions(pos)
-        raw_openmm_energy = sim.context.getState(energy=True).getPotentialEnergy().value_in_unit_system(mm.unit.md_unit_system)
+        raw_openmm_energy = (
+            sim.context.getState(energy=True)
+            .getPotentialEnergy()
+            .value_in_unit_system(mm.unit.md_unit_system)
+        )
         assert np.isclose(raw_openmm_energy, energy), "Raw OpenMM energy mismatch"
-
 
         c_ftol = ftol_override.get(self.test_name)
         if c_ftol == 0:
@@ -160,7 +193,9 @@ class TestSingleFrame:
         for other_atom in range(len(pos)):
             dist = box.distance(pos[atom_index], pos[other_atom])
             if np.isclose(dist, cutoff_nm):
-                print(f"Atoms {atom_index+1} and {other_atom}+1 are exactly cutoff apart!")
+                print(
+                    f"Atoms {atom_index+1} and {other_atom}+1 are exactly cutoff apart!"
+                )
                 print("This can cause artifacts in forces.")
         assert np.allclose(self.gmx_forces, forces, c_ftol, 0), (
             f"Gmx and daemon forces different by {f_percent:.2f} %.\n"

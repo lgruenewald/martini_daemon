@@ -3,6 +3,7 @@ import math
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_dihedral_type
 
+
 @register_dihedral_type(type_=2, args=["degree", "float"])
 @register_available_force
 class ImproperDihedral(BondedForce):
@@ -34,6 +35,5 @@ class ImproperDihedral(BondedForce):
         )
         self.force.addPerTorsionParameter("theta0")
         self.force.addPerTorsionParameter("k")
-
 
     _filters = {"dihedral"}

@@ -3,6 +3,7 @@ import numpy as np
 import re
 from ..__rust import PeriodicBox
 
+
 def read_xyz(path, pos_conversion=0.1, vel_conversion=0.1):
     """
     Reads an extended .xyz file at path, returns box, pos, vel.
@@ -23,12 +24,14 @@ def read_xyz(path, pos_conversion=0.1, vel_conversion=0.1):
         try:
             n_atoms = int(file.readline().strip())
         except ValueError:
-            raise ValueError("Error parsing xyz file: first line should be the number of atoms.")
+            raise ValueError(
+                "Error parsing xyz file: first line should be the number of atoms."
+            )
 
         try:
             title_line = file.readline().strip()
             match = re.match('Lattice="[^"]*"', title_line)
-            lattice = title_line[match.start()+9:match.end()-1]
+            lattice = title_line[match.start() + 9 : match.end() - 1]
             box_floats = [float(x) for x in lattice.split()]
             assert len(box_floats) == 9
             # 0: x1 1: y1 2: z1 3: x2 4: y2 5: z2 6: x3 7: y3 8: z3
@@ -38,7 +41,9 @@ def read_xyz(path, pos_conversion=0.1, vel_conversion=0.1):
             del box_floats[1]
             box = PeriodicBox.triclinic(*box_floats)
         except Exception as e:
-            raise ValueError(f"Error parsing xyz file, the title line contains no or invalid Lattice description? {e}")
+            raise ValueError(
+                f"Error parsing xyz file, the title line contains no or invalid Lattice description? {e}"
+            )
 
         pos = np.zeros((n_atoms, 3), dtype=np.float64)
         vel = np.zeros((n_atoms, 3), dtype=np.float64)
@@ -51,7 +56,9 @@ def read_xyz(path, pos_conversion=0.1, vel_conversion=0.1):
                 pos[i, 1] = float(tokens[2]) * pos_conversion
                 pos[i, 2] = float(tokens[3]) * pos_conversion
             except ValueError:
-                raise ValueError(f"Error parsing xyz file, invalid coordinate / floating point number for atom index {i} (zero indexed).")
+                raise ValueError(
+                    f"Error parsing xyz file, invalid coordinate / floating point number for atom index {i} (zero indexed)."
+                )
 
             if len(tokens) < 7:
                 vel = None
@@ -61,7 +68,9 @@ def read_xyz(path, pos_conversion=0.1, vel_conversion=0.1):
                     vel[i, 1] = float(tokens[5]) * vel_conversion
                     vel[i, 2] = float(tokens[6]) * vel_conversion
                 except ValueError:
-                    raise ValueError(f"Error parsing xyz file, invalid velocity / floating point number for atom index {i} (zero indexed).")
+                    raise ValueError(
+                        f"Error parsing xyz file, invalid velocity / floating point number for atom index {i} (zero indexed)."
+                    )
         return box, pos, vel
 
 
@@ -88,10 +97,10 @@ def write_xyz(path, atoms, box, pos, vel=None) -> None:
         file.write(f"{len(atoms)}\n")
         file.write(f'Lattice="{box.to_lattice()}"\n')
         for i in range(n_atoms):
-            cpos = pos[i] * 10.
+            cpos = pos[i] * 10.0
             name = atoms[i]
             file.write(f"{name} {cpos[0]} {cpos[1]} {cpos[2]}")
             if vel is not None:
-                cvel = vel[i] * 10.
+                cvel = vel[i] * 10.0
                 file.write(f" {cvel[0]} {cvel[1]} {cvel[2]}")
             file.write("\n")

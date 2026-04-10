@@ -2,6 +2,7 @@
 import numpy as np
 from ..__rust import PeriodicBox
 
+
 def read_gro(path):
     """
     Reads .gro file at path, returns box, pos, vel.
@@ -17,19 +18,25 @@ def read_gro(path):
         try:
             n_atoms = int(file.readline().strip())
         except ValueError:
-            raise ValueError("Error parsing gro file: second line should be the number of atoms.")
+            raise ValueError(
+                "Error parsing gro file: second line should be the number of atoms."
+            )
         pos = np.zeros((n_atoms, 3), dtype=np.float64)
         vel = np.zeros((n_atoms, 3), dtype=np.float64)
         for i in range(n_atoms):
             line = file.readline()
             if len(line) < 44:
-                raise ValueError(f"Error parsing gro file, line for atom index {i} (zero indexed) is shorter than 44 characters.")
+                raise ValueError(
+                    f"Error parsing gro file, line for atom index {i} (zero indexed) is shorter than 44 characters."
+                )
             try:
                 pos[i][0] = float(line[20:28].strip())
                 pos[i][1] = float(line[28:36].strip())
                 pos[i][2] = float(line[36:44].strip())
             except ValueError:
-                raise ValueError(f"Error parsing gro file, invalid coordinate / floating point number for atom index {i} (zero indexed).")
+                raise ValueError(
+                    f"Error parsing gro file, invalid coordinate / floating point number for atom index {i} (zero indexed)."
+                )
             if len(line) < 68:
                 vel = None
             if vel is None:
@@ -39,18 +46,24 @@ def read_gro(path):
                 vel[i][1] = float(line[52:60].strip())
                 vel[i][2] = float(line[60:68].strip())
             except ValueError:
-                raise ValueError(f"Error parsing gro file, invalid velocity / floating point number for atom index {i} (zero indexed).")
+                raise ValueError(
+                    f"Error parsing gro file, invalid velocity / floating point number for atom index {i} (zero indexed)."
+                )
         last_line = file.readline().strip().split()
         try:
             box_floats = list(map(lambda x: float(x), last_line))
         except ValueError:
-            raise ValueError("Error parsing gro file, the coordinates line contains non numbers. Is the number of atoms correct?")
+            raise ValueError(
+                "Error parsing gro file, the coordinates line contains non numbers. Is the number of atoms correct?"
+            )
         assert len(box_floats) >= 3
         box = PeriodicBox.from_gro(*box_floats)
         return box, pos, vel
 
 
-def write_gro(path, title, atom_names, res_names, res_ids, box: PeriodicBox, pos, vel=None) -> None:
+def write_gro(
+    path, title, atom_names, res_names, res_ids, box: PeriodicBox, pos, vel=None
+) -> None:
     """
     Write .gro file at path.
 

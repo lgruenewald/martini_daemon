@@ -4,6 +4,7 @@ from ..__reporter import Reporter
 from ..__simulation import Simulation
 from ..__rust import Fragment
 
+
 class ReactionReporter(Reporter):
     """A reporter that reports all reactions to <name>.reactions"""
 
@@ -31,7 +32,7 @@ class ReactionReporter(Reporter):
             ".reactions",
             "# frame,reaction_name;"
             "reactant1_name,reactant1_id(res:resid1,...residn),atoms...;..."
-            "reactantn_name,reactantn_id(res:resid1,...residn),atoms...;"
+            "reactantn_name,reactantn_id(res:resid1,...residn),atoms...;",
         )
 
     @staticmethod
@@ -43,26 +44,26 @@ class ReactionReporter(Reporter):
         return "(res:" + ",".join(res) + ")"
 
     # need to be post, as the modification algorithm can reject some reactions
-    def on_reaction(self, simulation: Simulation, reactions: list[tuple[str, list[Fragment]]]):
-        for (rx, frags) in reactions:
+    def on_reaction(
+        self, simulation: Simulation, reactions: list[tuple[str, list[Fragment]]]
+    ):
+        for rx, frags in reactions:
             simulation.print(
                 ".reactions",
                 f"{simulation.current_step},{rx};"
-                + ";".join([
-                    f"{frag.name},{frag.frag_id}"
-                    f"{self.__get_resids(simulation, frag.atoms)},"
-                    + ",".join([
-                        f"{atom}"
-                        for atom in frag.atoms
-                    ])
-                    for frag in frags
-                ])
+                + ";".join(
+                    [
+                        f"{frag.name},{frag.frag_id}"
+                        f"{self.__get_resids(simulation, frag.atoms)},"
+                        + ",".join([f"{atom}" for atom in frag.atoms])
+                        for frag in frags
+                    ]
+                ),
             )
         self.reactions += len(reactions)
 
     def interactive_line(self, simulation) -> str:
         return f"reactions: {self.reactions}"
-
 
     @staticmethod
     def read_reactions(path) -> list[tuple[int, str, list[list[int]]]]:
@@ -83,12 +84,7 @@ class ReactionReporter(Reporter):
                 frame, rx = elems[0].split(",")
                 # list of atoms
                 frags = [
-                    [
-                        int(atom)
-                        for atom in elem.split(",")[2:]
-                    ] for elem in elems[1:]
+                    [int(atom) for atom in elem.split(",")[2:]] for elem in elems[1:]
                 ]
-                reactions.append(
-                    (int(frame), rx, frags)
-                )
+                reactions.append((int(frame), rx, frags))
         return reactions

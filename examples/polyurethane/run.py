@@ -1,18 +1,28 @@
 #!/usr/bin/env python3
-from martini_daemon import Simulation, ReactionReporter, FragCountReporter, XTCReporter, VariablesReporter, ToptrajReporter
+from martini_daemon import (
+    Simulation,
+    ReactionReporter,
+    FragCountReporter,
+    XTCReporter,
+    VariablesReporter,
+    ToptrajReporter,
+)
+
 sim = Simulation(
-    "system.top", "system.gro",
+    "system.top",
+    "system.gro",
     reporters=[
         ReactionReporter(),
         FragCountReporter(),
         XTCReporter(),
         VariablesReporter(),
-        ToptrajReporter()
+        ToptrajReporter(),
     ],
-    md_steps=100000000, dm_frequency=250,
+    md_steps=100000000,
+    dm_frequency=250,
     traj_frequency=50000,
     platform="CUDA",
-    context_parameters={"DeviceIndex": "0"}
+    context_parameters={"DeviceIndex": "0"},
 )
 sim.context.minimize_energy()
 sim.context.generate_velocities(300)

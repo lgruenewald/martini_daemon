@@ -20,11 +20,16 @@ from .__topstar import TopStar
 
 class Simulation:
     def __init__(
-        self, top_path: str, geom_path: str | None, md_steps: int,
+        self,
+        top_path: str,
+        geom_path: str | None,
+        md_steps: int,
         reporters: list[Reporter] | None = None,
-        dm_frequency: int = 0, traj_frequency: int = 0,
-        sim_name: str = "out", continue_sim=False,
-        coupling = None,
+        dm_frequency: int = 0,
+        traj_frequency: int = 0,
+        sim_name: str = "out",
+        continue_sim=False,
+        coupling=None,
         integrator: mm.Integrator | None = None,
         options: dict[str, Any] | None = None,
         include_dirs: list[str] = None,
@@ -80,20 +85,17 @@ class Simulation:
         self.current_step: int = 0
         self.total_steps: int = md_steps
         self.__sim_name = sim_name
-        self.time_ps: float = 0.
+        self.time_ps: float = 0.0
         md_integrator = integrator or mm.LangevinMiddleIntegrator(
-            300 * mm.unit.kelvin, 1. / mm.unit.picosecond, 0.02 * mm.unit.picosecond
+            300 * mm.unit.kelvin, 1.0 / mm.unit.picosecond, 0.02 * mm.unit.picosecond
         )
         if coupling is None:
             coupling = [
-                mm.MonteCarloBarostat(
-                    1.0 * mm.unit.bar,
-                    300 * mm.unit.kelvin
-                ),
-                mm.CMMotionRemover()
+                mm.MonteCarloBarostat(1.0 * mm.unit.bar, 300 * mm.unit.kelvin),
+                mm.CMMotionRemover(),
             ]
-        self.dt_ps: float = (
-            md_integrator.getStepSize().value_in_unit(mm.unit.picosecond)
+        self.dt_ps: float = md_integrator.getStepSize().value_in_unit(
+            mm.unit.picosecond
         )
         self.dm_frequency: int = dm_frequency
         self.traj_frequency: int = traj_frequency
@@ -101,12 +103,20 @@ class Simulation:
             platform = mm.Platform.getPlatformByName(platform)
         if include_dirs is None:
             include_dirs = (
-                "GMXDATA" in os.environ
-                and [os.path.join(os.environ["GMXDATA"], "top")]
-            ) or (
-                "GMXBIN" in os.environ
-                and [os.path.join(os.environ["GMXBIN"], "..", "share", "gromacs", "top")]
-            ) or ["/usr/local/gromacs/share/gromacs/top"]
+                (
+                    "GMXDATA" in os.environ
+                    and [os.path.join(os.environ["GMXDATA"], "top")]
+                )
+                or (
+                    "GMXBIN" in os.environ
+                    and [
+                        os.path.join(
+                            os.environ["GMXBIN"], "..", "share", "gromacs", "top"
+                        )
+                    ]
+                )
+                or ["/usr/local/gromacs/share/gromacs/top"]
+            )
         if nonbonded is None:
             nonbonded = NonBonded
 
@@ -118,16 +128,30 @@ class Simulation:
         self.info(f"Martini Daemon {version('martini_daemon')} log file")
         self.info("Build version:", build_version())
         self.info(
-            "Parameters:", top_path, geom_path,
-            "steps:", self.total_steps, "dm_freq:", self.dm_frequency,
-            "traj_freq:", self.traj_frequency, "sim_name:", self.__sim_name,
-            "platform:", platform, "context_parameters:", context_parameters,
-            "defines:", defines, "include_dirs:", include_dirs,
+            "Parameters:",
+            top_path,
+            geom_path,
+            "steps:",
+            self.total_steps,
+            "dm_freq:",
+            self.dm_frequency,
+            "traj_freq:",
+            self.traj_frequency,
+            "sim_name:",
+            self.__sim_name,
+            "platform:",
+            platform,
+            "context_parameters:",
+            context_parameters,
+            "defines:",
+            defines,
+            "include_dirs:",
+            include_dirs,
         )
         if options is None:
             options = {}
         if options.get("epsilon_r") is None:
-            options["epsilon_r"] = 15.
+            options["epsilon_r"] = 15.0
         if options.get("cutoff") is None:
             options["cutoff"] = 1.1
         if options.get("respos") is None:
@@ -138,7 +162,9 @@ class Simulation:
         self.info("Parsing start")
         self.system: System = System(options=options)
         try:
-            GromacsTopFile(self.system, top_path, include_dirs=[include_dirs], defines=defines)
+            GromacsTopFile(
+                self.system, top_path, include_dirs=[include_dirs], defines=defines
+            )
         except InvalidTopologyError:
             self.error("Fatal error during .top parsing.")
             # I want a silent exit, kinda hacky..
@@ -154,8 +180,16 @@ class Simulation:
         self.top: TopStar = TopStar(self.system)
         self.info("TopStar build finished")
 
-        self.info("setup integrator", "dt (ps):", self.dt_ps, "type:", type(md_integrator).__name__)
-        self.integrator: mm.CompoundIntegrator | None = mm.CompoundIntegrator() #: Compound Integrator with integrator index 0 as the user specified integrator. Only exposed before the context is built.
+        self.info(
+            "setup integrator",
+            "dt (ps):",
+            self.dt_ps,
+            "type:",
+            type(md_integrator).__name__,
+        )
+        self.integrator: mm.CompoundIntegrator | None = (
+            mm.CompoundIntegrator()
+        )  #: Compound Integrator with integrator index 0 as the user specified integrator. Only exposed before the context is built.
         self.integrator.addIntegrator(md_integrator)
         # couplings
         for c in coupling:
@@ -169,10 +203,14 @@ class Simulation:
         # build context
         if geom_path is not None:
             box, start_pos, start_vel = read_geometry(geom_path)
-            self.info(f"Read {len(start_pos)} atoms from {geom_path}. Box: {box.to_lattice()}. Velocities read? {start_vel is not None}.")
+            self.info(
+                f"Read {len(start_pos)} atoms from {geom_path}. Box: {box.to_lattice()}. Velocities read? {start_vel is not None}."
+            )
 
             self.info("Building context")
-            self.context = Context(self.system, self.integrator, box, platform, context_parameters)
+            self.context = Context(
+                self.system, self.integrator, box, platform, context_parameters
+            )
 
             # set pos, vel
             self.context.set_positions(start_pos, box)
@@ -186,8 +224,8 @@ class Simulation:
             r.on_simulation_start(self)
 
         # for the estimated time left display
-        self.__last_step_time = 0.
-        self.__first_step_time = 0.
+        self.__last_step_time = 0.0
+        self.__first_step_time = 0.0
         self.trajectory_frame: int = 0
 
         # to avoid double finish
@@ -221,7 +259,10 @@ class Simulation:
         if suffix in self.__output_files:
             raise ValueError(f"{suffix} is already open.")
         path = self.request_path(suffix)
-        self.__output_files[suffix] = (open(path, "wb"), zlib.compressobj(6) if compress else None)
+        self.__output_files[suffix] = (
+            open(path, "wb"),
+            zlib.compressobj(6) if compress else None,
+        )
 
     def write(self, suffix, bytes_or_text) -> None:
         """
@@ -293,28 +334,22 @@ class Simulation:
         self.print(
             ".log",
             datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S,%f")[:-3],
-            *args
+            *args,
         )
 
     def warn(self, message) -> None:
         """
         Writes a warning to the log file and to stderr.
         """
-        self.info(
-            "[WARNING] " + message
-        )
+        self.info("[WARNING] " + message)
         print("[WARNING]", message, file=sys.stderr)
-
 
     def error(self, message) -> None:
         """
         Writes an error to the log file and stderr.
         """
-        self.info(
-            "[ERROR] " + message
-        )
+        self.info("[ERROR] " + message)
         print("[ERROR]", message, file=sys.stderr)
-
 
     # Friendly interface for setting up and running simulations
     @staticmethod
@@ -330,8 +365,9 @@ class Simulation:
 
         try:
             from ctypes import cdll, byref, create_string_buffer
-            libc = cdll.LoadLibrary('libc.so.6')
-            buff = create_string_buffer(len(newname)+1)
+
+            libc = cdll.LoadLibrary("libc.so.6")
+            buff = create_string_buffer(len(newname) + 1)
             buff.value = newname
             libc.prctl(15, byref(buff), 0, 0, 0)
         finally:
@@ -356,7 +392,9 @@ class Simulation:
             self.system.get_atom_names(),
             self.system.get_res_names(),
             self.system.get_res_ids(),
-            box, pos, vel
+            box,
+            pos,
+            vel,
         )
 
         # TODO replay
@@ -378,8 +416,17 @@ class Simulation:
         try:
             while self.current_step < self.total_steps:
                 self.step(
-                    gcd, traj=self.current_step % self.traj_frequency == 0 if self.traj_frequency > 0 else False,
-                    dm=self.current_step % self.dm_frequency == 0 if self.dm_frequency > 0 else False
+                    gcd,
+                    traj=(
+                        self.current_step % self.traj_frequency == 0
+                        if self.traj_frequency > 0
+                        else False
+                    ),
+                    dm=(
+                        self.current_step % self.dm_frequency == 0
+                        if self.dm_frequency > 0
+                        else False
+                    ),
                 )
             self.__do_traj_frame()
             print()
@@ -406,9 +453,9 @@ class Simulation:
 
     @staticmethod
     def __format_sim_time(ps):
-        if ps < 1000.:
+        if ps < 1000.0:
             return f"{ps:.2f} ps"
-        elif ps < 1000000.:
+        elif ps < 1000000.0:
             return f"{ps/1000.:.2f} ns"
         else:
             return f"{ps/1000000:.2f} μs"
@@ -434,11 +481,7 @@ class Simulation:
         if self.context is not None:
             _, box = self.context.get_positions()
 
-            top.setPeriodicBoxVectors([
-                box.a,
-                box.b,
-                box.c
-            ])
+            top.setPeriodicBoxVectors([box.a, box.b, box.c])
 
         init_molecules = [
             (name, count, len(self.system.molecule_types[name].atoms))
@@ -465,10 +508,14 @@ class Simulation:
                 must_be_new_residue = False
             else:
                 assert not must_be_new_residue
-            atoms.append(top.addAtom(
-                self.system.get_name(i), None, c_res,
-                formalCharge=self.system.get_charge(i)
-            ))
+            atoms.append(
+                top.addAtom(
+                    self.system.get_name(i),
+                    None,
+                    c_res,
+                    formalCharge=self.system.get_charge(i),
+                )
+            )
             c_index_in_mol += 1
             if c_index_in_mol >= init_molecules[c_mol_type][2]:
                 c_mol_idx += 1
@@ -479,11 +526,12 @@ class Simulation:
                 c_mol_idx = 0
                 c_mol_type += 1
 
-        for (i, j) in self.system.collect_bonds(["bond", "constraint", "vsite"]).to_list():
+        for i, j in self.system.collect_bonds(
+            ["bond", "constraint", "vsite"]
+        ).to_list():
             top.addBond(atoms[i], atoms[j])
 
         return top
-
 
     def step(self, n_steps: int, traj=False, dm=False, silent=False):
         """
@@ -504,7 +552,11 @@ class Simulation:
 
         self.info(f"doing md steps to go from {self.current_step} to")
         self.current_step += n_steps
-        percent = self.current_step / self.total_steps * 100. if self.total_steps > 0 else 100.
+        percent = (
+            self.current_step / self.total_steps * 100.0
+            if self.total_steps > 0
+            else 100.0
+        )
         self.info(f"step {self.current_step}")
         if n_steps > 0:
             self.info(f"md_steps {n_steps}")
@@ -516,8 +568,12 @@ class Simulation:
             self.info("MD finished")
         if self.total_steps > 0 and n_steps > 0 and not silent:
             self.time_ps += self.dt_ps * n_steps
-            time_left = self.__format_time(self.__last_step_time * (self.total_steps - self.current_step))
-            reporter_data = " ".join(filter(None, [r.interactive_line(self) for r in self.__reporters]))
+            time_left = self.__format_time(
+                self.__last_step_time * (self.total_steps - self.current_step)
+            )
+            reporter_data = " ".join(
+                filter(None, [r.interactive_line(self) for r in self.__reporters])
+            )
             sys.stdout.write(
                 f"\033[2K\rstep {self.current_step}"
                 f"({self.__format_sim_time(self.time_ps)}, "
@@ -535,7 +591,9 @@ class Simulation:
                     r.pre_modification(self)
                 # we now need copies of fragments, since they possibly got consumed in the reaction
                 self.info("Modification start")
-                reactions: list[tuple[str, list[Fragment]]] = self.top.modification(reactions)
+                reactions: list[tuple[str, list[Fragment]]] = self.top.modification(
+                    reactions
+                )
                 self.info(f"After modification there were {len(reactions)} reactions")
                 self.info("Modification finished")
                 if len(reactions) > 0:
@@ -552,18 +610,20 @@ class Simulation:
         end_time = time()
         if n_steps > 0:
             step_time = (end_time - start_time) / n_steps
-            if self.__last_step_time > 0.:
+            if self.__last_step_time > 0.0:
                 self.__last_step_time = step_time * 0.01 + self.__last_step_time * 0.99
             elif not traj or not dm:
                 # step 0 tends to have both xtc and dm as True, and is
                 # usually unrepresentatively slow
                 scale = self.dm_frequency / self.traj_frequency
-                if scale > 1.:
-                    scale = 1. / scale
-                if self.__first_step_time == 0.:
+                if scale > 1.0:
+                    scale = 1.0 / scale
+                if self.__first_step_time == 0.0:
                     # continuations might not start with an expensive step
-                    scale = 0.
-                self.__last_step_time = step_time * (1 - scale) + scale * self.__first_step_time
+                    scale = 0.0
+                self.__last_step_time = (
+                    step_time * (1 - scale) + scale * self.__first_step_time
+                )
             else:
                 # step 0 probably
                 self.__first_step_time = step_time

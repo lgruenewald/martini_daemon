@@ -5,6 +5,7 @@ import numpy as np
 import string
 from math import isclose
 
+
 def get_random_name():
     return "".join(
         np.random.choice(list(string.ascii_uppercase))
@@ -13,39 +14,23 @@ def get_random_name():
 
 
 def test_toptraj_writer():
-    w = TopTrajWriter(
-        "out.toptraj",
-        "example title",
-        [
-            ("a", 1),
-            ("b", 2),
-            ("c", 3)
-        ]
-    )
+    w = TopTrajWriter("out.toptraj", "example title", [("a", 1), ("b", 2), ("c", 3)])
 
     print("generating data")
     # generate data
     n_frames = 100
-    frames = [
-        {} for _ in range(n_frames)
-    ]
+    frames = [{} for _ in range(n_frames)]
 
     for frame_num, frame in enumerate(frames):
         n_atoms = np.random.randint(2000, 3000)
         frame["n_atoms"] = n_atoms
-        frame["names"] = [
-            get_random_name() for _ in range(n_atoms)
-        ]
-        frame["types"] = [
-            get_random_name() for _ in range(n_atoms)
-        ]
-        frame["res_names"] = [
-            get_random_name() for _ in range(n_atoms)
-        ]
+        frame["names"] = [get_random_name() for _ in range(n_atoms)]
+        frame["types"] = [get_random_name() for _ in range(n_atoms)]
+        frame["res_names"] = [get_random_name() for _ in range(n_atoms)]
         frame["res_ids"] = np.random.randint(1, high=n_atoms, size=n_atoms)
-        frame["charges"] = np.random.rand(n_atoms) * 2. - 1.
-        frame["masses"] = np.random.rand(n_atoms) * 50.
-        n_bonds  = np.random.randint(1000, 5000)
+        frame["charges"] = np.random.rand(n_atoms) * 2.0 - 1.0
+        frame["masses"] = np.random.rand(n_atoms) * 50.0
+        n_bonds = np.random.randint(1000, 5000)
         bonds = BondGraph(n_atoms)
         for _ in range(n_bonds):
             i = np.random.randint(0, n_atoms)
@@ -69,14 +54,11 @@ def test_toptraj_writer():
             frame["res_ids"],
             frame["types"],
             frame["charges"],
-            frame["masses"]
+            frame["masses"],
         )
-        w.register_frame_bonds(
-            frame["bonds"]
-        )
+        w.register_frame_bonds(frame["bonds"])
         w.write_frame()
     w.finish()
-
 
     print("reading from file and verifying")
     r = TopTrajReader("out.toptraj")

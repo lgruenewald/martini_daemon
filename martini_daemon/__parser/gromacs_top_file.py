@@ -4,8 +4,10 @@ from .parser import Parser
 from .token_list import TokenList, TokenParseException
 from ..__core import System
 
+
 class InvalidTopologyError(Exception):
     pass
+
 
 class GromacsTopFile(Directive):
     """
@@ -13,6 +15,7 @@ class GromacsTopFile(Directive):
     * Metadata about the .top format, allowing for the construction of parsers and generators of said format.
     * A class you can instantiate given a .top file, which will perform the parsing into itself that you can then read out.
     """
+
     # static fields
     __top_directives: list[Type[Directive]] = []
 
@@ -42,10 +45,7 @@ class GromacsTopFile(Directive):
         defines["DAEMON"] = ""
         # Parser's init should be called
         self.__parser = Parser(
-            root=self,
-            path=path,
-            include_dirs=include_dirs,
-            defines=defines
+            root=self, path=path, include_dirs=include_dirs, defines=defines
         )
         # Directive's __init__ is raise NotImplementedError
         for directive_ in self.__top_directives:
@@ -62,17 +62,13 @@ class GromacsTopFile(Directive):
     def unwrap_atom_type(self, tokens: TokenList, index: int) -> str:
         type_ = tokens.unwrap(index, "word")
         if self.system.get_atom_type(type_) is None:
-            raise TokenParseException(
-                tokens[index],
-                f"Unknown atom type {type_}."
-            )
+            raise TokenParseException(tokens[index], f"Unknown atom type {type_}.")
         return type_
 
     # === implementing Directive ===
     def line(self, tokens: TokenList) -> None:
         raise TokenParseException(
-            tokens[0],
-            "Data line encountered outside of any directive."
+            tokens[0], "Data line encountered outside of any directive."
         )
 
     def finish(self):
@@ -97,6 +93,7 @@ class GromacsTopFile(Directive):
 
     def where(self) -> tuple[str, int]:
         raise NotImplementedError()
+
 
 def register_directive(class_: Type[Directive]) -> Type[Directive]:
     GromacsTopFile.add_top_directive(class_)

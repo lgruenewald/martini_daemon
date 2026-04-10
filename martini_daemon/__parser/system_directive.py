@@ -4,6 +4,7 @@ from .directive import Directive
 from .gromacs_top_file import GromacsTopFile, register_directive
 from .token_list import TokenList
 
+
 @register_directive
 class SystemDirective(Directive):
     def line(self, tokens: TokenList) -> None:

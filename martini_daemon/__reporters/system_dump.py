@@ -9,15 +9,17 @@ def write_frame(sim: Simulation):
     sim.print(".sstar", f"==== Frame {sim.current_step} ====")
 
     sys = sim.system
-    sim.print(".sstar","Atoms")
-    sim.print(".sstar", "# (name, resid, resname, type, charge, mass, sc_lam, sc_alpha)")
+    sim.print(".sstar", "Atoms")
+    sim.print(
+        ".sstar", "# (name, resid, resname, type, charge, mass, sc_lam, sc_alpha)"
+    )
 
     for atom in range(sys.atom_count()):
         sim.print(
             ".sstar",
             f"('{sys.get_name(atom)}', {sys.get_res_id(atom)}, '{sys.get_res_name(atom)}', "
             f"'{sys.get_type(atom)}', {sys.get_charge(atom)}, {sys.get_mass(atom)}, "
-            f"{sys.get_sc_lam(atom)}, {sys.get_sc_alpha(atom)})"
+            f"{sys.get_sc_lam(atom)}, {sys.get_sc_alpha(atom)})",
         )
 
     sim.print(".sstar", "")
@@ -28,11 +30,11 @@ def write_frame(sim: Simulation):
         if len([force.iterate_bonds()]) == 0:
             continue
         sim.print(".sstar", f"Force:{force.get_name()}")
-        for (_, (members, params)) in force.iterate_bonds():
+        for _, (members, params) in force.iterate_bonds():
             sim.print(".sstar", "(" + ", ".join(str(x) for x in members + params) + ")")
 
-    sim.print(".sstar","End Frame")
-    sim.print(".sstar","")
+    sim.print(".sstar", "End Frame")
+    sim.print(".sstar", "")
 
 
 class SystemDump(Reporter):
@@ -54,7 +56,6 @@ class SystemDump(Reporter):
         """
         pass
 
-
     def on_simulation_start(self, simulation):
         simulation.open(".sstar")
         n = simulation.system.atom_count()
@@ -67,7 +68,15 @@ class SystemDump(Reporter):
         write_frame(simulation)
 
     @staticmethod
-    def read_dump(path: str) -> list[tuple[int, list[tuple[str, int, str, str, float, float, float, float]], list[tuple[str, list[Any]]]]]:
+    def read_dump(
+        path: str,
+    ) -> list[
+        tuple[
+            int,
+            list[tuple[str, int, str, str, float, float, float, float]],
+            list[tuple[str, list[Any]]],
+        ]
+    ]:
         """
         .sstar dump reader
 
@@ -101,8 +110,8 @@ class SystemDump(Reporter):
             prev_i = i
             while i < len(lines):
                 i += 1
-                if len(lines[i-1]) > 0 and lines[i-1][0] != "#":
-                    return lines[i-1]
+                if len(lines[i - 1]) > 0 and lines[i - 1][0] != "#":
+                    return lines[i - 1]
             return None
 
         def backtrack():
@@ -116,9 +125,19 @@ class SystemDump(Reporter):
                 if line[0] != "(":
                     backtrack()
                     break
-                name, res_id, res_name, atom_type, charge, mass, *other = line.strip("()").replace(" ", "").split(",")
+                name, res_id, res_name, atom_type, charge, mass, *other = (
+                    line.strip("()").replace(" ", "").split(",")
+                )
                 atoms.append(
-                    (name, int(res_id), res_name, atom_type, float(charge), float(mass), *other)
+                    (
+                        name,
+                        int(res_id),
+                        res_name,
+                        atom_type,
+                        float(charge),
+                        float(mass),
+                        *other,
+                    )
                 )
 
         def parse_force(force):
@@ -128,9 +147,7 @@ class SystemDump(Reporter):
                 if line[0] != "(":
                     backtrack()
                     break
-                elems = [
-                    float(x) for x in line.strip("()").replace(" ", "").split(",")
-                ]
+                elems = [float(x) for x in line.strip("()").replace(" ", "").split(",")]
                 force.append(elems)
 
         def parse_forces(forces):
@@ -148,7 +165,7 @@ class SystemDump(Reporter):
             num = pat.search(line)
             atoms = []
             forces = []
-            frame = (int(line[num.start():num.end()]), atoms, forces)
+            frame = (int(line[num.start() : num.end()]), atoms, forces)
             frames.append(frame)
 
             while line := advance():

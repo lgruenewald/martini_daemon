@@ -35,12 +35,14 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
     def line(self, tokens: TokenList) -> None:
         type_num, type_name = self.read_type(tokens)
 
-        self.parent.molecule_type.interactions.append((
-            type_name,
-            self.read_members(tokens),
-            self.read_params(tokens, type_num),
-            self.is_exclusion(type_name),
-        ))
+        self.parent.molecule_type.interactions.append(
+            (
+                type_name,
+                self.read_members(tokens),
+                self.read_params(tokens, type_num),
+                self.is_exclusion(type_name),
+            )
+        )
 
     # reasonable defaults that still can be overridden for e.g. virtual_sitesn
     def read_members(self, tokens: TokenList) -> list[int]:
@@ -52,12 +54,8 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
 
     def read_params(self, tokens: TokenList, type_: int) -> list[float]:
         min_params, max_params = self.get_number_params(type_)
-        tokens.assert_no_more_than(
-            self.get_number_members() + 1 + max_params
-        )
-        tokens.assert_at_least(
-            self.get_number_members() + 1 + min_params
-        )
+        tokens.assert_no_more_than(self.get_number_members() + 1 + max_params)
+        tokens.assert_at_least(self.get_number_members() + 1 + min_params)
         params_start = self.get_number_members() + 1
         params = []
         for j, filter_ in enumerate(self.get_type_args(type_)):
@@ -82,11 +80,10 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
         if type_ is None:
             raise TokenParseException(
                 tokens[self.get_number_members()],
-                f"Invalid type {type_num} for directive {self.get_name()}"
+                f"Invalid type {type_num} for directive {self.get_name()}",
             )
         else:
             return type_num, type_
-
 
     # for most child classes, number of members leads to a good default impl of read_type, read_members, read_params
     @classmethod
@@ -117,6 +114,3 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
     @abstractmethod
     def get_type_args(cls, type_int: int) -> list[str]:
         raise NotImplementedError
-
-
-

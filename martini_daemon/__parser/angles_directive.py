@@ -1,6 +1,7 @@
 from .interaction_directive import InteractionDirective
 from .gromacs_top_file import register_directive
 
+
 @register_directive
 class AnglesDirective(InteractionDirective):
     @classmethod
@@ -32,9 +33,11 @@ class AnglesDirective(InteractionDirective):
         _, args = cls.__type_data[type_]
         return len(args), len(args)
 
+
 def register_angle_type(type_: int, args: list[str]):
     def inner(class_):
         name = class_.get_name()
         AnglesDirective.register_type(type_, name, args)
         return class_
+
     return inner

@@ -16,6 +16,7 @@ class ParseException(Exception):
         """
         self.message = message
 
+
 class DirectiveException(Exception):
     def __init__(self, message: str, path, start_line, end_line):
         """
@@ -36,7 +37,13 @@ class IfStackElem(Enum):
 
 
 class Parser:
-    def __init__(self, root: Directive, path: str, include_dirs: list[str] | None = None, defines: dict[str, str] | None = None):
+    def __init__(
+        self,
+        root: Directive,
+        path: str,
+        include_dirs: list[str] | None = None,
+        defines: dict[str, str] | None = None,
+    ):
         """
         Generic Gromacs-style .ini format parser.
 
@@ -84,14 +91,12 @@ class Parser:
         :param directive: the directive to add.
         """
         name = directive.get_name()
-        assert name not in self.__directives, (
-            f"Directive [{name}] was already defined."
-        )
+        assert name not in self.__directives, f"Directive [{name}] was already defined."
         self.__directives[name] = directive
         for alias in directive.aliases:
-            assert alias not in self.__directives, (
-                f"Directive [{alias}] was already defined."
-            )
+            assert (
+                alias not in self.__directives
+            ), f"Directive [{alias}] was already defined."
             self.__directives[alias] = directive
 
     def parse(self) -> bool:
@@ -103,10 +108,7 @@ class Parser:
         Note: can only be called once per Parser instance.
         """
         if self.__done:
-            print(
-                "Parser.parse() must be called only once.",
-                file=stderr
-            )
+            print("Parser.parse() must be called only once.", file=stderr)
             return False
         self.__done = True
         try:
@@ -116,23 +118,24 @@ class Parser:
                 self.__directive_stack.pop().finish()
 
             for key, directive in self.__directives.items():
-                if directive.is_mandatory() and key not in self.__past_directives_at_root:
-                    raise ParseException(
-                        f"Mandatory directive [{key}] not found."
-                    )
+                if (
+                    directive.is_mandatory()
+                    and key not in self.__past_directives_at_root
+                ):
+                    raise ParseException(f"Mandatory directive [{key}] not found.")
             return True
         except TokenParseException as pe:
             self.__error_message_location(
                 pe.message,
-                pe.token.path, pe.token.line_num,
+                pe.token.path,
+                pe.token.line_num,
                 pe.token.line,
-                pe.token.start, pe.token.end
+                pe.token.start,
+                pe.token.end,
             )
         except ParseException as pe:
             self.__error_message_location(
-                pe.message,
-                self.__path, self.__line_num,
-                None
+                pe.message, self.__path, self.__line_num, None
             )
         except DirectiveException as de:
             self.__error_directive(
@@ -145,9 +148,7 @@ class Parser:
             # yes it's broad, but we want to print where it happened
             traceback.print_exc()
             self.__error_message_location(
-                "Exception occurred while parsing.",
-                self.__path, self.__line_num,
-                None
+                "Exception occurred while parsing.", self.__path, self.__line_num, None
             )
         return False
 
@@ -180,13 +181,11 @@ class Parser:
                 f"{line_num+1}: {line[0:start]}"
                 f"\033[1;33m{line[start:end]}\033[0m"
                 f"{line[end:]}",
-                file=stderr
+                file=stderr,
             )
 
     @staticmethod
-    def __error_directive(
-        message: str, path: str, start: int, end: int | None
-    ) -> None:
+    def __error_directive(message: str, path: str, start: int, end: int | None) -> None:
         """
         Prints an error message. If end is not None, it will read the file and highlight the whole directive's
         text in yellow, with line numbers.
@@ -202,10 +201,13 @@ class Parser:
                 lines = file.read().splitlines()
                 if len(lines) <= end:
                     return
-                print("\n".join(f"{i+1}: \033[1;33m{line}\033[0m" for i, line in zip(range(start, end), lines[start:end])), file=stderr)
-
-
-
+                print(
+                    "\n".join(
+                        f"{i+1}: \033[1;33m{line}\033[0m"
+                        for i, line in zip(range(start, end), lines[start:end])
+                    ),
+                    file=stderr,
+                )
 
     # A token is either:
     # '['
@@ -226,7 +228,7 @@ class Parser:
 
         tokens = [
             Token(
-                content=line[match.start():match.end()],
+                content=line[match.start() : match.end()],
                 line=line,
                 line_num=self.__line_num,
                 path=self.__path,
@@ -266,7 +268,7 @@ class Parser:
                         pe.message,
                         directive_path,
                         directive_start,
-                        directive_end if current_path == directive_path else None
+                        directive_end if current_path == directive_path else None,
                     )
         parent = self.__directive_stack[-1]
         if not directive_type.is_valid_parent(parent):
@@ -298,7 +300,7 @@ class Parser:
         # if stack is per file, but this is not a problem in most .top files
         if_stack = [IfStackElem.Root]
 
-        with (open(path, "r") as f):
+        with open(path, "r") as f:
             # make lines whole through \
             cumulative = ""
             for i, line in enumerate(f):
@@ -338,10 +340,7 @@ class Parser:
                                 raise TokenParseException(
                                     token0, "#ifdef takes one argument."
                                 )
-                            if if_stack[-1] in {
-                                IfStackElem.DoBranch,
-                                IfStackElem.Root
-                            }:
+                            if if_stack[-1] in {IfStackElem.DoBranch, IfStackElem.Root}:
                                 if token1.content in self.__defines:
                                     if_stack.append(IfStackElem.DoBranch)
                                 else:
@@ -354,10 +353,7 @@ class Parser:
                                 raise TokenParseException(
                                     token0, "#ifndef takes one argument."
                                 )
-                            if if_stack[-1] in {
-                                IfStackElem.DoBranch,
-                                IfStackElem.Root
-                            }:
+                            if if_stack[-1] in {IfStackElem.DoBranch, IfStackElem.Root}:
                                 if token1.content in self.__defines:
                                     if_stack.append(IfStackElem.SkipBranch)
                                 else:
@@ -388,16 +384,12 @@ class Parser:
                                     token0, "#endif takes no argument."
                                 )
                             if if_stack[-1] == IfStackElem.Root:
-                                raise TokenParseException(
-                                    token0, "#endif unmatched."
-                                )
+                                raise TokenParseException(token0, "#endif unmatched.")
                             if_stack.pop()
                             continue
                         case "#end":
                             # possibly common mistake?
-                            raise TokenParseException(
-                                token0, "Please use #endif."
-                            )
+                            raise TokenParseException(token0, "Please use #endif.")
                         case "#if" | "#elif":
                             raise TokenParseException(
                                 token0, "Only #ifdef is implemented. #if, #elif is not."
@@ -413,10 +405,7 @@ class Parser:
 
                 # everything below this only happens if the #ifdef/#else
                 # says it should happen
-                if if_stack[-1] in {
-                    IfStackElem.SkipBranch,
-                    IfStackElem.SkippedIf
-                }:
+                if if_stack[-1] in {IfStackElem.SkipBranch, IfStackElem.SkippedIf}:
                     continue
 
                 if token0.content == "[":
@@ -428,7 +417,7 @@ class Parser:
                     if len(token_list) != 3:
                         raise TokenParseException(
                             token_list[-1],
-                            "Invalid directive, three tokens expected: '[', directive name, ']'."
+                            "Invalid directive, three tokens expected: '[', directive name, ']'.",
                         )
 
                     self.__start_directive(token_list.unwrap(1, "word"))
@@ -437,13 +426,12 @@ class Parser:
                         case "#include":
                             if len(token_list) != 2:
                                 raise TokenParseException(
-                                    token0,
-                                    "#include takes one argument."
+                                    token0, "#include takes one argument."
                                 )
                             name = token_list.unwrap(
                                 1,
                                 "string",
-                                error_msg="#include argument should be inside quotation marks or <>."
+                                error_msg="#include argument should be inside quotation marks or <>.",
                             )
                             search_dirs = [
                                 os.path.dirname(path),
@@ -455,16 +443,14 @@ class Parser:
                                 if os.path.isfile(new_path):
                                     if new_path in self.__included:
                                         raise TokenParseException(
-                                            token1,
-                                            f"Double inclusion of {new_path}."
+                                            token1, f"Double inclusion of {new_path}."
                                         )
                                     self.__parse(new_path)
                                     found = True
                                     break
                             if not found:
                                 raise TokenParseException(
-                                    token1,
-                                    f"File not found: {name}."
+                                    token1, f"File not found: {name}."
                                 )
                         case "#define":
                             if len(token_list) not in {2, 3}:
@@ -472,7 +458,7 @@ class Parser:
                                     token0,
                                     "#define takes one or two tokens arguments. "
                                     "Note: Only single token -> single token mappings are supported. "
-                                    "Preprocessor macros are not supported."
+                                    "Preprocessor macros are not supported.",
                                 )
                             key = token1.content
                             # now we can actually use an empty line, as long as it is in the dict #ifdef supports it
@@ -481,8 +467,7 @@ class Parser:
                         case "#undef":
                             if len(token_list) != 2:
                                 raise TokenParseException(
-                                    token0,
-                                    "#undef takes one argument."
+                                    token0, "#undef takes one argument."
                                 )
                             key = token1.content
                             if self.__defines.get(key):

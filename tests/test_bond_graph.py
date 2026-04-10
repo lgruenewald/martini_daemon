@@ -4,13 +4,14 @@ import random
 import pytest
 from time import time
 
+
 def test_make_whole():
     n_atoms = 50000
     n_mol = 100
     atoms_per_mol = n_atoms // n_mol
     bond_length = 0.5
 
-    box = PeriodicBox.orthogonal(5., 6., 7.)
+    box = PeriodicBox.orthogonal(5.0, 6.0, 7.0)
     box_np = np.array([box.a[0], box.b[1], box.c[2]])
     bg = BondGraph(n_atoms)
     pos = np.empty((n_atoms, 3), dtype=np.float64)
@@ -25,25 +26,26 @@ def test_make_whole():
                 disp = np.random.random(3)
                 disp *= bond_length / np.linalg.norm(disp)
                 pos[atom_idx] = pos[atom_idx - 1] + disp
-                bg.add_bond(atom_idx-1, atom_idx)
+                bg.add_bond(atom_idx - 1, atom_idx)
                 if atom_in_mol >= 2 and np.random.random() > 0.5:
-                    bg.add_bond(atom_idx-2, atom_idx)
+                    bg.add_bond(atom_idx - 2, atom_idx)
                 if atom_in_mol >= 3 and np.random.random() > 0.5:
-                    bg.add_bond(atom_idx-3, atom_idx)
+                    bg.add_bond(atom_idx - 3, atom_idx)
                 if atom_in_mol >= 4 and np.random.random() > 0.5:
-                    bg.add_bond(atom_idx-4, atom_idx)
+                    bg.add_bond(atom_idx - 4, atom_idx)
 
     pos_within = pos.copy()
     box.move_all_within(pos_within)
     pos_whole = pos_within.copy()
     bg.make_whole(box, pos_whole)
 
-    for (i, j) in bg.to_list():
-        assert not box.crosses_box(pos_whole[i], pos_whole[j]), (
-            f"Bond {i} to {j}\n pos {pos[i]}, {pos[j]};\n pos_within {pos_within[i]}, {pos_within[j]};\n pos_whole {pos_whole[i]}, {pos_whole[j]};"
-        )
+    for i, j in bg.to_list():
+        assert not box.crosses_box(
+            pos_whole[i], pos_whole[j]
+        ), f"Bond {i} to {j}\n pos {pos[i]}, {pos[j]};\n pos_within {pos_within[i]}, {pos_within[j]};\n pos_whole {pos_whole[i]}, {pos_whole[j]};"
 
     assert np.allclose(pos_whole, pos)
+
 
 @pytest.mark.parametrize("bonds_per_mol", [250, 500, 1500])
 def test_reachable_from(bonds_per_mol):
@@ -69,9 +71,7 @@ def test_reachable_from(bonds_per_mol):
             i = random.choice(molecules[mol_idx])
             while (j := random.choice(molecules[mol_idx])) == i:
                 pass
-            bg.add_bond(
-                i, j
-            )
+            bg.add_bond(i, j)
     print(f"bg construction took {time() - start} s.")
 
     # old cluster code

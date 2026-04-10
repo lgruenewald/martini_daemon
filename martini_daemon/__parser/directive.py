@@ -3,6 +3,7 @@ from typing import Any
 from abc import abstractmethod, ABC
 from .token_list import TokenList
 
+
 class Directive(ABC):
     """
     Base class for directives.

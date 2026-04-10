@@ -2,10 +2,12 @@ from .token import Token
 import re
 import math
 
+
 class TokenParseException(Exception):
     """
     Exception when .unwrap() fails
     """
+
     def __init__(self, token: Token, message: str):
         self.token = token
         self.message = message
@@ -18,6 +20,7 @@ class TokenList:
     Parser calls the line method of :doc:`Directive</autoapi/martini_daemon/Directive>` with this type as the argument.
     Directive implementations should call the unwrap method with the
     """
+
     __int_pat = re.compile("^[-+]?[0-9]+$")
     __float_pat = re.compile("^[-+]?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?$")
     __word_pat = re.compile("^[a-zA-Z0-9_.]+$")
@@ -55,17 +58,23 @@ class TokenList:
         if len(self.__tokens) > count:
             raise TokenParseException(
                 self.__tokens[count],
-                f"Received unexpected additional tokens. Maximum number of tokens on this line is {count}."
+                f"Received unexpected additional tokens. Maximum number of tokens on this line is {count}.",
             )
 
     def assert_at_least(self, count: int) -> None:
         if len(self.__tokens) < count:
             raise TokenParseException(
                 self.__tokens[count],
-                f"Minimum number of tokens on this line is {count}."
+                f"Minimum number of tokens on this line is {count}.",
             )
 
-    def unwrap(self, index: int, type_filter: str, default=__DEFAULT, error_msg: str | None = None):
+    def unwrap(
+        self,
+        index: int,
+        type_filter: str,
+        default=__DEFAULT,
+        error_msg: str | None = None,
+    ):
         """
         Given a TokenList try to index it and convert to a usable value
         based on type_filter. If the index is out of range, a default
@@ -96,13 +105,13 @@ class TokenList:
                 # if it's still __DEFAULT it means no value was specified by the user.
                 raise TokenParseException(
                     self.__tokens[-1],
-                    f"Not enough tokens, expected token at index {index}."
+                    f"Not enough tokens, expected token at index {index}.",
                 )
             else:
                 return default
 
         tok = self.__tokens[index]
-        content = tok.line[tok.start:tok.end]
+        content = tok.line[tok.start : tok.end]
 
         while (got := self.__defines.get(content)) is not None:
             content = got
@@ -116,10 +125,10 @@ class TokenList:
                     return float(content)
             case "positive":
                 if self.__float_pat.match(content):
-                    if float(content) <= 0.:
+                    if float(content) <= 0.0:
                         raise TokenParseException(
                             tok,
-                            error_msg or "Expected a positive non-zero real number."
+                            error_msg or "Expected a positive non-zero real number.",
                         )
                     return float(content)
             case "index":
@@ -127,8 +136,9 @@ class TokenList:
                     if int(content) <= 0:
                         raise TokenParseException(
                             tok,
-                            error_msg or "Expected index, got an integer 0 or smaller."
-                            "Note: indexing in .itp/.top files is usually 1 based."
+                            error_msg
+                            or "Expected index, got an integer 0 or smaller."
+                            "Note: indexing in .itp/.top files is usually 1 based.",
                         )
                     return int(content) - 1
             case "degree":
@@ -157,11 +167,9 @@ class TokenList:
                 return content
             case _:
                 raise TokenParseException(
-                    tok,
-                    f"Filter {type_filter} couldn't be understood."
+                    tok, f"Filter {type_filter} couldn't be understood."
                 )
 
         raise TokenParseException(
-            tok,
-            error_msg or f"Expected token of type {type_filter}."
+            tok, error_msg or f"Expected token of type {type_filter}."
         )

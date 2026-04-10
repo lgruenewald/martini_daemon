@@ -1,6 +1,7 @@
 from .interaction_directive import InteractionDirective
 from .gromacs_top_file import register_directive
 
+
 @register_directive
 class VirtualSites3(InteractionDirective):
     @classmethod
@@ -32,9 +33,11 @@ class VirtualSites3(InteractionDirective):
         _, args = cls.__type_data[type_]
         return len(args), len(args)
 
+
 def register_vsite3_type(type_: int, args: list[str]):
     def inner(class_):
         name = class_.get_name()
         VirtualSites3.register_type(type_, name, args)
         return class_
+
     return inner

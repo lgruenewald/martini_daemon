@@ -2,36 +2,33 @@ from typing import Any
 import openmm as mm
 
 from ..__core import BondedForce, register_available_force
-from ..__parser import InteractionDirective, register_directive, Directive, GromacsTopFile, TokenList, TokenParseException
+from ..__parser import (
+    InteractionDirective,
+    register_directive,
+    Directive,
+    GromacsTopFile,
+    TokenList,
+    TokenParseException,
+)
+
 
 @register_directive
 class CMAPTypeDirective(Directive):
     def line(self, tokens: TokenList) -> None:
-        parts = tuple(
-            self.parent.unwrap_atom_type(tokens, i)
-            for i in range(5)
-        )
+        parts = tuple(self.parent.unwrap_atom_type(tokens, i) for i in range(5))
         type_ = tokens.unwrap(5, "int")
         if type_ != 1:
-            raise TokenParseException(
-                tokens[5],
-                f"Unsupported CMAP type {type_}"
-            )
+            raise TokenParseException(tokens[5], f"Unsupported CMAP type {type_}")
         size = tokens.unwrap(6, "int")
         if size != tokens.unwrap(7, "int"):
-            raise TokenParseException(
-                tokens[7],
-                "Non-square CMAPs are not supported."
-            )
+            raise TokenParseException(tokens[7], "Non-square CMAPs are not supported.")
         if size < 8:
             raise TokenParseException(
                 tokens[6],
-                "CMAPs of size below 8 are too small. This might result in large errors in interpolation (compared to GROMACS)."
+                "CMAPs of size below 8 are too small. This might result in large errors in interpolation (compared to GROMACS).",
             )
 
-        params = [
-            tokens.unwrap(8+i, "float") for i in range(size*size)
-        ]
+        params = [tokens.unwrap(8 + i, "float") for i in range(size * size)]
 
         # rearrangement as in
         # https://github.com/openmm/openmm/blob/master/wrappers/python/openmm/app/gromacstopfile.py
@@ -48,7 +45,6 @@ class CMAPTypeDirective(Directive):
             for o in range(size):
                 row = (o + midpoint) % size
                 cmap.append(params[size * row + column])
-
 
         cmaps = self.parent.system.additional_data.get("cmap_maps")
         types = self.parent.system.additional_data.get("cmap_types")
@@ -110,25 +106,21 @@ class CMAPDirective(InteractionDirective):
     def is_exclusion(cls, type_: str) -> bool:
         return False
 
+
 @register_available_force
 class Cmap(BondedForce):
 
     def _add_to_force(self, members: list[int], params: list[float]) -> None:
         assert len(params) == 0
-        types = tuple(
-            self.system.get_type(member) for member in members
-        )
+        types = tuple(self.system.get_type(member) for member in members)
         map = self.system.additional_data["cmap_types"].get(types)
         if map is None:
             raise ValueError(f"Unknown CMAP type for {types}.")
 
         idx_i, idx_j, idx_k, idx_l, idx_m = members
         self.force.addTorsion(
-            map,
-            idx_i, idx_j, idx_k, idx_l,
-            idx_j, idx_k, idx_l, idx_m
+            map, idx_i, idx_j, idx_k, idx_l, idx_j, idx_k, idx_l, idx_m
         )
-
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         return params

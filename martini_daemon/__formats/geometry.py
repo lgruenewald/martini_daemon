@@ -2,6 +2,7 @@ from os.path import splitext
 from .gro_file import read_gro, write_gro
 from .xyz_file import read_xyz, write_xyz
 
+
 def read_geometry(path):
     """
     File format implied from extension.
@@ -17,7 +18,6 @@ def read_geometry(path):
             return read_xyz(path)
         case _:
             raise ValueError(f"Unknown geometry file format {ext} for {path}.")
-
 
 
 def write_geometry(path, title, atom_names, res_names, res_ids, box, pos, vel=None):
@@ -41,4 +41,3 @@ def write_geometry(path, title, atom_names, res_names, res_ids, box, pos, vel=No
             return write_xyz(path, atom_names, box, pos, vel)
         case _:
             raise ValueError(f"Unknown geometry file format {ext} for {path}.")
-

@@ -2,7 +2,15 @@ from typing import Any
 import difflib
 from math import pi, cos
 
-from ..__parser import Directive, register_directive, GromacsTopFile, TokenList, ParseException, TokenParseException, MoleculeTypeDirective
+from ..__parser import (
+    Directive,
+    register_directive,
+    GromacsTopFile,
+    TokenList,
+    ParseException,
+    TokenParseException,
+    MoleculeTypeDirective,
+)
 from ..__rust import DetectionTemplate
 from .modification_template import ModificationTemplate
 from .graph import GraphAtomType
@@ -21,7 +29,6 @@ class ReactionDirective(MoleculeTypeDirective):
         parent.system.additional_data["detection_templates"].append(self.d_template)
         self.system = parent.system
 
-
     def line(self, tokens: TokenList) -> None:
         name = tokens.unwrap(0, "word")
         self.d_template.name = name
@@ -30,9 +37,8 @@ class ReactionDirective(MoleculeTypeDirective):
         if self.system.molecule_types.get(name) is not None:
             raise TokenParseException(
                 tokens[0],
-                f"Reaction name {name} conflicts with existing reaction or molecule name."
+                f"Reaction name {name} conflicts with existing reaction or molecule name.",
             )
-
 
     def finish(self):
         super().finish()
@@ -55,6 +61,7 @@ class ReactionDirective(MoleculeTypeDirective):
         return isinstance(parent, GromacsTopFile)
 
     aliases = {"rx"}
+
     @classmethod
     def get_name(cls) -> str:
         return "reaction"
@@ -68,22 +75,23 @@ class ReactionDirective(MoleculeTypeDirective):
         if r_index < 0 or r_index >= len(self.d_template.reactants):
             raise TokenParseException(
                 tokens[index],
-                f"Reactant index {r_index} is out of range (1 to {len(self.d_template.reactants)})"
+                f"Reactant index {r_index} is out of range (1 to {len(self.d_template.reactants)})",
             )
-        graph = self.system.additional_data["graphs"][self.d_template.reactants[r_index]]
+        graph = self.system.additional_data["graphs"][
+            self.d_template.reactants[r_index]
+        ]
         a_index = graph.atom_name_to_index.get(a_name)
         if a_index is None:
             raise TokenParseException(
                 tokens[index],
-                f"Reaction atom {a_name} not found in graph {graph.name}."
+                f"Reaction atom {a_name} not found in graph {graph.name}.",
             )
         if graph.atoms[a_index][3] == GraphAtomType.NOT:
             raise TokenParseException(
                 tokens[index],
-                f"Reaction atom {a_name} is a forbidden atom, so it is impossible to reference it."
+                f"Reaction atom {a_name} is a forbidden atom, so it is impossible to reference it.",
             )
         return r_index, a_index
-
 
     # returns a flattened view, since MoleculeType does things in a flattened way
     def parse_index(self, tokens: TokenList, index: int) -> int:
@@ -95,17 +103,15 @@ class ReactionDirective(MoleculeTypeDirective):
             flattened_index += len(graph.atoms)
         return flattened_index
 
+
 @register_directive
 class ReactantsDirective(Directive):
     def line(self, tokens: TokenList) -> None:
         if len(self.parent.d_template.reactants) > 0:
             raise TokenParseException(
-                tokens[0],
-                "Only one line containing all reactants per reaction."
+                tokens[0], "Only one line containing all reactants per reaction."
             )
-        reactants = [
-            tokens.unwrap(i, "word") for i in range(len(tokens))
-        ]
+        reactants = [tokens.unwrap(i, "word") for i in range(len(tokens))]
         for i, r in enumerate(reactants):
             if (
                 self.parent.system.additional_data.get("graphs") is None
@@ -113,7 +119,7 @@ class ReactantsDirective(Directive):
             ):
                 raise TokenParseException(
                     tokens[i],
-                    f"Undefined reactant graph name {r}. Please put the required [graph] directive first."
+                    f"Undefined reactant graph name {r}. Please put the required [graph] directive first.",
                 )
         self.parent.molecule_type.reactants = reactants
         self.parent.d_template.reactants = reactants
@@ -134,15 +140,19 @@ class ReactantsDirective(Directive):
         return isinstance(parent, ReactionDirective)
 
     aliases = {"reactant"}
+
     @classmethod
     def get_name(cls) -> str:
         return "reactants"
+
 
 @register_directive
 class ConditionsDirective(Directive):
 
     @staticmethod
-    def __parse_angle_conditions(tokens: TokenList, start: int, wrap: bool) -> list[tuple[int, int]]:
+    def __parse_angle_conditions(
+        tokens: TokenList, start: int, wrap: bool
+    ) -> list[tuple[int, int]]:
         """
         If wrap is false, the "angle space" is 0 to pi
         If wrap is true, the "angle space" is -pi to pi and is considered periodic
@@ -154,44 +164,44 @@ class ConditionsDirective(Directive):
         while c_token < len(tokens):
             # note: unwrap with 'degree' converts from degrees to radian and puts it in the -pi to pi range automatically
             lower_bound = tokens.unwrap(c_token, "degree")
-            upper_bound = tokens.unwrap(c_token+2, "degree")
-            to = tokens.unwrap(c_token+1, "word")
-            if c_token+3 < len(tokens):
-                or_ = tokens.unwrap(c_token+3, "word")
+            upper_bound = tokens.unwrap(c_token + 2, "degree")
+            to = tokens.unwrap(c_token + 1, "word")
+            if c_token + 3 < len(tokens):
+                or_ = tokens.unwrap(c_token + 3, "word")
                 if or_ != "or":
                     raise TokenParseException(
-                        tokens[c_token+3],
-                        "Different allowed angle ranges should be delimited by 'or'."
+                        tokens[c_token + 3],
+                        "Different allowed angle ranges should be delimited by 'or'.",
                     )
             if to != "to":
                 raise TokenParseException(
-                    tokens[c_token+1],
-                    "Angle ranges should be specified with a lower and upper bounds separated by keyword 'to'."
+                    tokens[c_token + 1],
+                    "Angle ranges should be specified with a lower and upper bounds separated by keyword 'to'.",
                 )
             # check for overlaps
             for other_lower, other_upper in ranges:
                 if other_lower < lower_bound < other_upper:
                     raise TokenParseException(
                         tokens[c_token],
-                        f"Lower bound falls between an already allowed range {other_lower*180./pi:.2f} to {other_upper*180./pi:.2f}."
+                        f"Lower bound falls between an already allowed range {other_lower*180./pi:.2f} to {other_upper*180./pi:.2f}.",
                     )
                 if other_lower < upper_bound < other_upper:
                     raise TokenParseException(
-                        tokens[c_token+2],
-                        f"Upper bound falls between an already allowed range {other_lower*180./pi:.2f} to {other_upper*180./pi:.2f}."
+                        tokens[c_token + 2],
+                        f"Upper bound falls between an already allowed range {other_lower*180./pi:.2f} to {other_upper*180./pi:.2f}.",
                     )
 
             if not wrap:
                 # check for upper < lower
                 if upper_bound < lower_bound:
-                        raise TokenParseException(
-                            tokens[c_token+2],
-                            f"Angle upper bound {upper_bound*180./pi:.2f} lower than lower bound {lower_bound*180./pi:.2f}."
-                        )
-                if lower_bound < 0.:
+                    raise TokenParseException(
+                        tokens[c_token + 2],
+                        f"Angle upper bound {upper_bound*180./pi:.2f} lower than lower bound {lower_bound*180./pi:.2f}.",
+                    )
+                if lower_bound < 0.0:
                     raise TokenParseException(
                         tokens[c_token],
-                        f"Angle lower bound must be 0 or larger. Got {lower_bound*180./pi:.2f} instead."
+                        f"Angle lower bound must be 0 or larger. Got {lower_bound*180./pi:.2f} instead.",
                     )
                 ranges.append((lower_bound, upper_bound))
 
@@ -203,11 +213,10 @@ class ConditionsDirective(Directive):
                 else:
                     ranges.append((lower_bound, upper_bound))
 
-            if c_token+3 < len(tokens):
+            if c_token + 3 < len(tokens):
                 c_token += 4
             else:
                 c_token += 3
-
 
         # we don't necessarily expect them to be sorted
         ranges.sort()
@@ -216,14 +225,14 @@ class ConditionsDirective(Directive):
         res = []
 
         # disallow 0 to first allowed range
-        if not wrap and ranges[0][0] > 0.:
-            res.append((0., ranges[0][0]))
+        if not wrap and ranges[0][0] > 0.0:
+            res.append((0.0, ranges[0][0]))
         elif wrap and ranges[0][0] > -pi:
             res.append((-pi, ranges[0][0]))
 
         # disallow in between allowed ranges - note, we make sure they don't overlap
-        for i in range(len(ranges)-1):
-            res.append((ranges[i][1], ranges[i+1][0]))
+        for i in range(len(ranges) - 1):
+            res.append((ranges[i][1], ranges[i + 1][0]))
 
         if ranges[-1][1] < pi:
             res.append((ranges[-1][1], pi))
@@ -235,28 +244,25 @@ class ConditionsDirective(Directive):
         key = tokens.unwrap(0, "word")
         # sets on which angles and dihedrals were already defined
         angles = {
-            (a, b, c, d, e, f)
-            for a, b, c, d, e, f, _, _ in last_reaction.angle_limits
+            (a, b, c, d, e, f) for a, b, c, d, e, f, _, _ in last_reaction.angle_limits
         }
         dihedrals = {
             (a, b, c, d, e, f, g, h)
             for a, b, c, d, e, f, g, h, _, _ in last_reaction.dihedral_limits
         }
 
-        possible_keys = {
-            "r_max", "r_min", "angle", "dihedral", "rate", "probability"
-        }
+        possible_keys = {"r_max", "r_min", "angle", "dihedral", "rate", "probability"}
         if key not in possible_keys:
-            close_matches = difflib.get_close_matches(
-                key, possible_keys, 1
-            )
+            close_matches = difflib.get_close_matches(key, possible_keys, 1)
             raise TokenParseException(
                 tokens[0],
-                f"Keyword {key} not recognized." +
-                (
+                f"Keyword {key} not recognized."
+                + (
                     f" Perhaps you meant {close_matches[0]}?"
-                    if len(close_matches) > 0 else ""
-                ) + f" Valid keywords are: {', '.join(possible_keys)}."
+                    if len(close_matches) > 0
+                    else ""
+                )
+                + f" Valid keywords are: {', '.join(possible_keys)}.",
             )
 
         match key:
@@ -280,7 +286,7 @@ class ConditionsDirective(Directive):
                         f" the atoms {(idi, atom_i, idj, atom_j, idk, atom_k)}. "
                         "Please put all angles for these atoms on a single line."
                     )
-                for (from_, to) in self.__parse_angle_conditions(tokens, 4, False):
+                for from_, to in self.__parse_angle_conditions(tokens, 4, False):
                     last_reaction.add_angle_limit(
                         (idi, atom_i, idj, atom_j, idk, atom_k, cos(from_), cos(to)),
                     )
@@ -295,7 +301,7 @@ class ConditionsDirective(Directive):
                         f" the atoms {(idi, atom_i, idj, atom_j, idk, atom_k, idl, atom_l)}. "
                         "Please put all angles for these atoms on a single line."
                     )
-                for (from_, to) in self.__parse_angle_conditions(tokens, 5, True):
+                for from_, to in self.__parse_angle_conditions(tokens, 5, True):
                     last_reaction.add_dihedral_limit(
                         (idi, atom_i, idj, atom_j, idk, atom_k, idl, atom_l, from_, to),
                     )
@@ -323,12 +329,13 @@ class ConditionsDirective(Directive):
     def get_name(cls) -> str:
         return "conditions"
 
+
 @register_directive
 class BreakDirective(Directive):
     def line(self, tokens: TokenList) -> None:
-        self.parent.molecule_type.break_groups.append([
-            self.parent.parse_index(tokens, i) for i in range(len(tokens))
-        ])
+        self.parent.molecule_type.break_groups.append(
+            [self.parent.parse_index(tokens, i) for i in range(len(tokens))]
+        )
 
     def finish(self):
         pass
@@ -353,9 +360,9 @@ class BreakDirective(Directive):
 @register_directive
 class UpdateDirective(Directive):
     def line(self, tokens: TokenList) -> None:
-        self.parent.molecule_type.update_groups.append([
-            self.parent.parse_index(tokens, i) for i in range(len(tokens))
-        ])
+        self.parent.molecule_type.update_groups.append(
+            [self.parent.parse_index(tokens, i) for i in range(len(tokens))]
+        )
 
     def finish(self):
         pass
@@ -387,32 +394,28 @@ class RedefineDirective(Directive):
         while i < len(tokens):
             word = tokens.unwrap(i, "word")
             if word in changes:
-                raise TokenParseException(
-                    tokens[i],
-                    f"Duplicate entry {word}."
-                )
+                raise TokenParseException(tokens[i], f"Duplicate entry {word}.")
             changes.add(word)
             match word:
                 case "name":
-                    self.parent.molecule_type.renames.append((
-                        atom_index, tokens.unwrap(i+1, "word")
-                    ))
+                    self.parent.molecule_type.renames.append(
+                        (atom_index, tokens.unwrap(i + 1, "word"))
+                    )
                 case "type":
-                    self.parent.molecule_type.retypes.append((
-                        atom_index, tokens.unwrap(i+1, "word")
-                    ))
+                    self.parent.molecule_type.retypes.append(
+                        (atom_index, tokens.unwrap(i + 1, "word"))
+                    )
                 case "charge":
-                    self.parent.molecule_type.recharges.append((
-                        atom_index, tokens.unwrap(i+1, "float")
-                    ))
+                    self.parent.molecule_type.recharges.append(
+                        (atom_index, tokens.unwrap(i + 1, "float"))
+                    )
                 case "mass":
-                    self.parent.molecule_type.remasses.append((
-                        atom_index, tokens.unwrap(i+1, "float")
-                    ))
+                    self.parent.molecule_type.remasses.append(
+                        (atom_index, tokens.unwrap(i + 1, "float"))
+                    )
                 case _:
                     raise TokenParseException(
-                        tokens[1 + i * 2],
-                        f"Unknown atom property {word}."
+                        tokens[1 + i * 2], f"Unknown atom property {word}."
                     )
             i += 2
 
@@ -434,6 +437,7 @@ class RedefineDirective(Directive):
     @classmethod
     def get_name(cls) -> str:
         return "redefine"
+
 
 @register_directive
 class SoftCoreDirective(Directive):

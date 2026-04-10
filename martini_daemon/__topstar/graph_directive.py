@@ -1,15 +1,22 @@
 from typing import Any
 
 import difflib
-from ..__parser import register_directive, GromacsTopFile, Directive, TokenList, TokenParseException
+from ..__parser import (
+    register_directive,
+    GromacsTopFile,
+    Directive,
+    TokenList,
+    TokenParseException,
+)
 from ..__core import System
 from .graph import Graph, GraphAtomType
 
 keyword_to_GraphAtomType = {
     "atom": GraphAtomType.NORMAL,
     "atom?": GraphAtomType.OPT,
-    "atom!": GraphAtomType.NOT
+    "atom!": GraphAtomType.NOT,
 }
+
 
 @register_directive
 class GraphDirective(Directive):
@@ -44,33 +51,32 @@ class GraphDirective(Directive):
                 type_ = keyword_to_GraphAtomType[keyword]
                 self.graph.atoms.append((part_id, name_pat, type_pat, type_))
             case "equivalent":
-                parts = set(
-                    tokens.unwrap(i, "word") for i in range(1, len(tokens))
-                )
+                parts = set(tokens.unwrap(i, "word") for i in range(1, len(tokens)))
                 self.graph.equivalents.append(parts)
             case _:
                 if keyword in self.filters:
-                    parts = [
-                        tokens.unwrap(i, "word") for i in range(1, len(tokens))
-                    ]
+                    parts = [tokens.unwrap(i, "word") for i in range(1, len(tokens))]
                     self.graph.interactions.append((keyword, parts))
                 else:
                     possibilities = self.filters | {
-                        "atom", "atom?", "atom!", "name", "equivalent"
+                        "atom",
+                        "atom?",
+                        "atom!",
+                        "name",
+                        "equivalent",
                     }
 
-                    close_matches = difflib.get_close_matches(
-                        keyword, possibilities, 3
-                    )
+                    close_matches = difflib.get_close_matches(keyword, possibilities, 3)
                     raise TokenParseException(
                         tokens[0],
-                        f"Keyword {keyword} not recognized." +
-                        (
+                        f"Keyword {keyword} not recognized."
+                        + (
                             f" Perhaps you meant one of: {', '.join(close_matches)}"
-                            if len(close_matches) > 0 else ""
-                        ) + f" Valid keywords are: {', '.join(possibilities)}."
+                            if len(close_matches) > 0
+                            else ""
+                        )
+                        + f" Valid keywords are: {', '.join(possibilities)}.",
                     )
-
 
     def finish(self):
         self.graph.finish_init()

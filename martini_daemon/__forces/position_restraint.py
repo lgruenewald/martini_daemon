@@ -2,6 +2,7 @@ import openmm as mm
 from ..__core import BondedForce, register_available_force
 from ..__parser import InteractionDirective, register_directive, ParseException
 
+
 @register_directive
 class PositionRestraintDirective(InteractionDirective):
 
@@ -27,6 +28,7 @@ class PositionRestraintDirective(InteractionDirective):
     def get_name(cls) -> str:
         return "position_restraints"
 
+
 @register_available_force
 class PositionRestraint(BondedForce):
     def _add_to_force(self, members: list[int], params: list[float]) -> None:
@@ -38,7 +40,6 @@ class PositionRestraint(BondedForce):
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         return params
-
 
     @staticmethod
     def uses_pbc() -> bool:

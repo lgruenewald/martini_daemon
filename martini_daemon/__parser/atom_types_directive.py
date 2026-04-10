@@ -3,6 +3,7 @@ from .token_list import TokenList, TokenParseException
 from .parser import ParseException
 from .gromacs_top_file import GromacsTopFile, register_directive
 
+
 @register_directive
 class AtomTypesDirective(Directive):
 
@@ -17,21 +18,16 @@ class AtomTypesDirective(Directive):
         charge = tokens.unwrap(2, "float")
         atom_type = tokens.unwrap(3, "word")
         if atom_type != "A":
-            raise TokenParseException(
-                tokens[3],
-                "Only 'A' atom type supported."
-            )
+            raise TokenParseException(tokens[3], "Only 'A' atom type supported.")
         sigma = tokens.unwrap(4, "float")
         epsilon = tokens.unwrap(5, "float")
         if sigma != 0.0:
             raise TokenParseException(
-                tokens[4],
-                "Only sigma=0 is supported in [atomtypes]."
+                tokens[4], "Only sigma=0 is supported in [atomtypes]."
             )
         if epsilon != 0.0:
             raise TokenParseException(
-                tokens[5],
-                "Only epsilon=0 is supported in [atomtypes]."
+                tokens[5], "Only epsilon=0 is supported in [atomtypes]."
             )
         self.parent.system.add_atom_type(type, charge, mass)
 

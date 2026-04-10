@@ -2,6 +2,7 @@ from .token_list import TokenList, TokenParseException
 from .interaction_directive import InteractionDirective
 from .gromacs_top_file import register_directive
 
+
 @register_directive
 class VirtualSitesN(InteractionDirective):
     @classmethod
@@ -42,8 +43,7 @@ class VirtualSitesN(InteractionDirective):
         end = len(tokens) - n_params
         step = n_params + 1
         return [self.parent.parse_index(tokens, 0)] + [
-            self.parent.parse_index(tokens, i)
-            for i in range(start, end, step)
+            self.parent.parse_index(tokens, i) for i in range(start, end, step)
         ]
 
     def read_params(self, tokens: TokenList, type_: int) -> list[float]:
@@ -69,8 +69,7 @@ class VirtualSitesN(InteractionDirective):
         type_ = self.get_type(type_num)
         if type_ is None:
             raise TokenParseException(
-                tokens[1],
-                f"Invalid type {type_num} for directive {self.get_name()}"
+                tokens[1], f"Invalid type {type_num} for directive {self.get_name()}"
             )
         else:
             return type_num, type_
@@ -79,20 +78,22 @@ class VirtualSitesN(InteractionDirective):
         # we don't want to trigger nrexcl processing with these exclusions
         super().line(tokens)
         if len((members := self.read_members(tokens))) == 2:
-            self.parent.molecule_type.exclusions.add((
-                members[0], members[1],
-            ))
-
+            self.parent.molecule_type.exclusions.add(
+                (
+                    members[0],
+                    members[1],
+                )
+            )
 
 
 def register_vsiten_type(type_: int, args: list[str]):
     """
     args are per constructing atom
     """
+
     def inner(class_):
         name = class_.get_name()
         VirtualSitesN.register_type(type_, name, args)
         return class_
+
     return inner
-
-

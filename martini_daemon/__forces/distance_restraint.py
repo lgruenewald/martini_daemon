@@ -2,6 +2,7 @@ import openmm as mm
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_bond_type
 
+
 @register_bond_type(type_=10, args=["float", "float", "float", "float"], is_excl=True)
 @register_available_force
 class DistanceRestraint(BondedForce):

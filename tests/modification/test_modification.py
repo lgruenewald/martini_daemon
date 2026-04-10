@@ -15,19 +15,19 @@ tests = [
     # adding new interactions
     "bond_make",
     # [break]
-    "bond_break", "dihedral_break",
+    "bond_break",
+    "dihedral_break",
     # [update]
-    "update_group", "update_group4"
+    "update_group",
+    "update_group4",
 ]
 
 # == TEST CLASS ==
 
+
 def get_sim(top: str, gro: str) -> str:
     sim = Simulation(
-        top, gro, 0,
-        reporters=[
-            SystemDump(), FragCountReporter(), ReactionReporter()
-        ]
+        top, gro, 0, reporters=[SystemDump(), FragCountReporter(), ReactionReporter()]
     )
     sim.step(0, traj=True, dm=True)
     sim.finish()
@@ -44,12 +44,12 @@ def compare(dump_new: str, dump_reference: str) -> None:
         frame_ref, atoms_ref, forces_ref = reference[i]
         assert frame == frame_ref
         for j in range(len(atoms)):
-            assert atoms[j][0] == atoms_ref[j][0] # name
-            assert atoms[j][1] == atoms_ref[j][1] # resid
-            assert atoms[j][2] == atoms_ref[j][2] # res_name
-            assert atoms[j][3] == atoms_ref[j][3] # atom_type
-            assert isclose(atoms[j][4], atoms_ref[j][4]) # charge
-            assert isclose(atoms[j][5], atoms_ref[j][5]) # mass
+            assert atoms[j][0] == atoms_ref[j][0]  # name
+            assert atoms[j][1] == atoms_ref[j][1]  # resid
+            assert atoms[j][2] == atoms_ref[j][2]  # res_name
+            assert atoms[j][3] == atoms_ref[j][3]  # atom_type
+            assert isclose(atoms[j][4], atoms_ref[j][4])  # charge
+            assert isclose(atoms[j][5], atoms_ref[j][5])  # mass
         assert len(forces) == len(forces_ref)
         # each force obj
         forces.sort(key=lambda x: x[0])

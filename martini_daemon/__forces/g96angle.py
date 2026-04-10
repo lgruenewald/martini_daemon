@@ -2,6 +2,7 @@ import openmm as mm
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_angle_type
 
+
 @register_angle_type(type_=2, args=["degree", "float"])
 @register_available_force
 class G96Angle(BondedForce):
@@ -24,9 +25,7 @@ class G96Angle(BondedForce):
         return "g96_angle"
 
     def _set_force_obj(self):
-        self.force = mm.CustomAngleForce(
-            "0.5 * k * (cos(theta) - cos(theta0))^2"
-        )
+        self.force = mm.CustomAngleForce("0.5 * k * (cos(theta) - cos(theta0))^2")
         self.force.addPerAngleParameter("theta0")
         self.force.addPerAngleParameter("k")
 

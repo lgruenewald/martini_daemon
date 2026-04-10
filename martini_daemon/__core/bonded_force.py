@@ -3,6 +3,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Iterable
 from .force import Force
 
+
 class BondedForce(Force, metaclass=ABCMeta):
     """
     Parent class of all bonded forces.
@@ -17,10 +18,10 @@ class BondedForce(Force, metaclass=ABCMeta):
     - _parse(self, members, params) -> params
     - get_name()
     - uses_pbc()
-    
+
     Optionally, the following field should be set:
     - filters (set)
-    
+
     """
 
     def __init__(self, system):
@@ -40,7 +41,7 @@ class BondedForce(Force, metaclass=ABCMeta):
         """
         The force defined by members and params should add the entry
         to self.force.
-        
+
         Protected because only this class should call this.
         """
         raise NotImplementedError
@@ -60,7 +61,7 @@ class BondedForce(Force, metaclass=ABCMeta):
         """
         Given a list of members and parameters (as unwrapped = minimal pre-parsing), parse the params to how they
         should be stored in entries and passed to _add_to_force.
-        
+
         Protected because only this class should call this.
         """
         raise NotImplementedError

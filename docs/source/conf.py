@@ -6,22 +6,18 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'Martini Daemon'
-copyright = '2026, '
-author = ''
+project = "Martini Daemon"
+copyright = "2026, "
+author = ""
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = [
-    "sphinx.ext.autodoc",
-    "autoapi.extension",
-    "sphinx_rtd_theme"
-]
+extensions = ["sphinx.ext.autodoc", "autoapi.extension", "sphinx_rtd_theme"]
 
 html_theme = "sphinx_rtd_theme"
 
-templates_path = ['_templates']
+templates_path = ["_templates"]
 exclude_patterns = []
 autoapi_dirs = ["../../martini_daemon/"]
 # concat class and __init__ documentation
@@ -34,11 +30,11 @@ autoapi_options = [
     "undoc-members",
     "special-members",
     "show-module-summary",
-    "imported-members"
+    "imported-members",
 ]
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-#html_theme = 'alabaster'
-html_static_path = ['_static']
+# html_theme = 'alabaster'
+html_static_path = ["_static"]

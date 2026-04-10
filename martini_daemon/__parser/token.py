@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+
 @dataclass(frozen=True)
 class Token:
     """
@@ -12,11 +13,10 @@ class Token:
     :param start: The start position in the line for this Token.
     :param end: The end position in the line for this Token.
     """
+
     content: str
     line: str
     line_num: int
     path: str
     start: int
     end: int
-
-

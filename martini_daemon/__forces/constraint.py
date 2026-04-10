@@ -1,6 +1,7 @@
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_constraint_type
 
+
 @register_constraint_type(type_=1, args=["float"], is_excl=True)
 @register_constraint_type(type_=2, args=["float"], is_excl=False)
 @register_available_force

@@ -1,6 +1,7 @@
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_bond_type
 
+
 @register_bond_type(type_=5, args=[], is_excl=True)
 @register_available_force
 class Connection(BondedForce):

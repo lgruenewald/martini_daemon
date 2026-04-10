@@ -2,6 +2,7 @@ import openmm as mm
 from ..__core import VirtualSite, register_available_force
 from ..__parser import register_vsite4_type
 
+
 @register_vsite4_type(2, ["float", "float", "float"])
 @register_available_force
 class VSite4fdn(VirtualSite):
@@ -19,7 +20,7 @@ class VSite4fdn(VirtualSite):
             [1.0, 0.0, 0.0, 0.0],  # origin weights
             [1.0 - a, -1.0, a, 0.0],  # x direction weight
             [1.0 - b, -1.0, 0.0, b],  # y direction weight
-            [0.0, 0.0, c]  # coordinates
+            [0.0, 0.0, c],  # coordinates
         )
 
     filters = {"virtual_site", "vsite"}

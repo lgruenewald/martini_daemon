@@ -48,9 +48,7 @@ class Graph:
         Raises ParseExceptions.
         """
         if self.name is None:
-            raise ParseException(
-                "Graph has no name."
-            )
+            raise ParseException("Graph has no name.")
         nodes: dict[str, set[str]] = {}
         if len([x for x in self.atoms if x[3] == GraphAtomType.NORMAL]) == 0:
             raise ValueError("Graph must contain at least one normal atom")
@@ -92,6 +90,7 @@ class Graph:
             marked.add(atom)
             for other_atom in nodes[atom]:
                 mark(other_atom)
+
         mark(self.atoms[0][0])
         if len(marked) != len(self.atoms):
             assert len(self.atoms) == len(nodes.keys())
@@ -117,6 +116,7 @@ class GraphMatch:
     - next_inter - internal state for the graph matching algorithm, it should point to the next
         interaction index in the graph that was not attempted to be filled yet.
     """
+
     # mapping of atoms -> atom_id
     graph: Graph
     atoms: dict[str, int]
@@ -153,9 +153,7 @@ class GraphMatch:
         self.rev_atoms[atom_num] = name
 
     def add_inter(self, id: int, inter: tuple[str, int]) -> None:
-        assert (
-            self.interactions[id] is None and inter not in self.matched_inter
-        )
+        assert self.interactions[id] is None and inter not in self.matched_inter
         self.interactions[id] = inter
         self.matched_inter.add(inter)
 
@@ -165,7 +163,7 @@ class GraphMatch:
         # every time a new atom is added, all interactions are enforced
         # that can be enforced when adding that atom
         # TLDR only checks atoms, not interactions
-        for (name, _, _, atom_type) in self.graph.atoms:
+        for name, _, _, atom_type in self.graph.atoms:
             found = self.atoms.get(name) is not None
             if atom_type == GraphAtomType.NORMAL and not found:
                 return False
@@ -173,7 +171,7 @@ class GraphMatch:
 
     def is_acceptable(self) -> bool:
         # is_complete + NOT type checking
-        for (name, _, _, atom_type) in self.graph.atoms:
+        for name, _, _, atom_type in self.graph.atoms:
             found = self.atoms.get(name) is not None
             if atom_type == GraphAtomType.NORMAL and not found:
                 return False
@@ -196,7 +194,7 @@ class GraphMatch:
                 if all(
                     map(
                         lambda eqs: name not in eqs or other_name not in eqs,
-                        self.graph.equivalents
+                        self.graph.equivalents,
                     )
                 ):
                     return False
@@ -209,9 +207,7 @@ class AtomCache:
     functions to it.
     """
 
-    def __init__(
-            self, system: System
-    ):
+    def __init__(self, system: System):
         self.system = system
 
     def neighbors(self, atom: int) -> set[int]:
@@ -243,7 +239,9 @@ class AtomCache:
         """
         # g_ prefix -> graph things
         # s_ prefix -> S* things
-        s_inters = self.system.get_interactions_for_atom(atom_id)  # interactions for atom_id in S*
+        s_inters = self.system.get_interactions_for_atom(
+            atom_id
+        )  # interactions for atom_id in S*
         # interactions already considered
         skip: set[tuple[str, int]] = set(
             i for i in partial.interactions if i is not None
@@ -305,19 +303,14 @@ class AtomCache:
                 return False, []
         return True, matches
 
-    def is_name_type(
-        self, name_filter: str, type_filter: str, atom_id: int
-    ) -> bool:
+    def is_name_type(self, name_filter: str, type_filter: str, atom_id: int) -> bool:
         name = self.system.get_name(atom_id)
         type_ = self.system.get_type(atom_id)
         return fnmatch(name, name_filter) and fnmatch(type_, type_filter)
 
 
 # === MAIN MATCHING ALGO ===
-def match_atoms(
-    graph: Graph, atoms: set[int],
-    system: System
-) -> list[GraphMatch]:
+def match_atoms(graph: Graph, atoms: set[int], system: System) -> list[GraphMatch]:
     """
     Return all unique graph matches for graph against a given set of atoms.
     """
@@ -385,9 +378,7 @@ def match_atoms(
                 for cmissing in missing:
                     cmissing_id = graph.atom_name_to_index[cmissing]
                     _, name_filter, type_filter, _ = graph.atoms[cmissing_id]
-                    if not cache.is_name_type(
-                        name_filter, type_filter, new_atom
-                    ):
+                    if not cache.is_name_type(name_filter, type_filter, new_atom):
                         continue
                     valid, matches = cache.check_atom_interactions(
                         cmissing, new_atom, cmatch

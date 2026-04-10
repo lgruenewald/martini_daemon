@@ -3,9 +3,11 @@ import pytest
 import os
 from martini_daemon import Directive, Parser, TokenList
 
+
 @pytest.fixture
 def rootdir(request):
     return os.path.dirname(request.path)
+
 
 class Root(Directive):
     def __init__(self):
@@ -19,9 +21,7 @@ class Root(Directive):
         raise NotImplementedError()
 
     def line(self, tokens: TokenList) -> None:
-        self.root_lines.append([
-            tokens.unwrap(i, "raw") for i in range(len(tokens))
-        ])
+        self.root_lines.append([tokens.unwrap(i, "raw") for i in range(len(tokens))])
 
     def finish(self):
         pass
@@ -50,10 +50,7 @@ class A(Directive):
         self.lines = []
 
     def line(self, tokens: TokenList) -> None:
-        self.lines.append([
-            tokens.unwrap(i, "raw") for i in range(len(tokens))
-        ])
-
+        self.lines.append([tokens.unwrap(i, "raw") for i in range(len(tokens))])
 
     def finish(self):
         self.parent.finish_events.append("a")
@@ -84,9 +81,7 @@ class B(Directive):
         self.finish_events = parent.finish_events
 
     def line(self, tokens: TokenList) -> None:
-        self.lines.append([
-            tokens.unwrap(i, "raw") for i in range(len(tokens))
-        ])
+        self.lines.append([tokens.unwrap(i, "raw") for i in range(len(tokens))])
 
     def finish(self):
         self.parent.finish_events.append("b")
@@ -116,9 +111,7 @@ class C(Directive):
         self.lines.append(["START OF C"])
 
     def line(self, tokens: TokenList) -> None:
-        self.lines.append([
-            tokens.unwrap(i, "float") for i in range(len(tokens))
-        ])
+        self.lines.append([tokens.unwrap(i, "float") for i in range(len(tokens))])
 
     def finish(self):
         self.parent.finish_events.append("c")
@@ -138,6 +131,7 @@ class C(Directive):
     @classmethod
     def get_name(cls) -> str:
         return "c"
+
 
 def parse(path) -> tuple[bool, Root]:
     root = Root()
@@ -164,12 +158,22 @@ def test_parser(rootdir: str):
     assert ok
     root_lines = [
         ["root", "line1"],
-        ["root", "line2", "token1", "token2", "token3", '"token4 with space"', "< token5 with spaces >"],
+        [
+            "root",
+            "line2",
+            "token1",
+            "token2",
+            "token3",
+            '"token4 with space"',
+            "< token5 with spaces >",
+        ],
     ]
-    a_s = [[
-        ["line1", "val1"],
-        ["line2", "val2"],
-    ]]
+    a_s = [
+        [
+            ["line1", "val1"],
+            ["line2", "val2"],
+        ]
+    ]
     b_s = [
         [
             ["b1", "line"],
@@ -182,14 +186,10 @@ def test_parser(rootdir: str):
             ["START OF C"],
             [-1, -2],
             ["START OF C"],
-            [3.5, 0.9]
-        ]
+            [3.5, 0.9],
+        ],
     ]
-    finish_events = [
-        "c", "b",
-        "c", "c", "b",
-        "a"
-    ]
+    finish_events = ["c", "b", "c", "c", "b", "a"]
     for got, exp in zip(finish_events, root.finish_events):
         assert got == exp
     for got_list, exp_list in zip(root.root_lines, root_lines):
@@ -204,11 +204,9 @@ def test_parser(rootdir: str):
             for got, exp in zip(got_line, exp_line):
                 assert got == exp
 
-should_fail = [
-    "fail_mandatory.ini",
-    "fail_unique.ini",
-    "fail_wrong_parent.ini"
-]
+
+should_fail = ["fail_mandatory.ini", "fail_unique.ini", "fail_wrong_parent.ini"]
+
 
 @pytest.mark.parametrize("x", should_fail)
 def test_should_fail(x: str, rootdir):

@@ -1,7 +1,15 @@
 import openmm as mm
 
-from ..__parser import Directive, register_directive, GromacsTopFile, TokenList, InteractionDirective, TokenParseException
+from ..__parser import (
+    Directive,
+    register_directive,
+    GromacsTopFile,
+    TokenList,
+    InteractionDirective,
+    TokenParseException,
+)
 from ..__core import BondedForce, register_available_force
+
 
 @register_directive
 class PairTypes(Directive):
@@ -14,10 +22,7 @@ class PairTypes(Directive):
         t2 = self.parent.unwrap_atom_type(tokens, 1)
         type_ = tokens.unwrap(2, "int")
         if type_ != 1:
-            raise TokenParseException(
-                tokens[2],
-                f"Unsupported pair type {type_}."
-            )
+            raise TokenParseException(tokens[2], f"Unsupported pair type {type_}.")
         sigma = tokens.unwrap(3, "float")
         epsilon = tokens.unwrap(4, "float")
         pair_types[(t1, t2)] = (sigma, epsilon)
@@ -40,6 +45,7 @@ class PairTypes(Directive):
     @classmethod
     def get_name(cls) -> str:
         return "pairtypes"
+
 
 @register_directive
 class PairsDirective(InteractionDirective):
@@ -64,6 +70,7 @@ class PairsDirective(InteractionDirective):
     @classmethod
     def get_name(cls) -> str:
         return "pairs"
+
 
 @register_available_force
 class Pairs(BondedForce):
@@ -95,11 +102,10 @@ class Pairs(BondedForce):
 
         sigma, epsilon = params
 
-        c6 = 4 * epsilon * (sigma ** 6)
-        c12 = 4 * epsilon * (sigma ** 12)
+        c6 = 4 * epsilon * (sigma**6)
+        c12 = 4 * epsilon * (sigma**12)
 
         return [q_prod, c6, c12]
-
 
     @staticmethod
     def uses_pbc() -> bool:
@@ -129,4 +135,3 @@ class Pairs(BondedForce):
         # 1. update entries
         # 2. if force is not None, update force
         raise NotImplementedError
-

@@ -2,9 +2,10 @@ from ..__reporter import Reporter
 from ..__simulation import Simulation
 from ..__formats import TrajectoryWriter
 
+
 class XTCReporter(Reporter):
     def __init__(self):
-        self.path: str | None  = None
+        self.path: str | None = None
         self.writer: TrajectoryWriter | None = None
 
     def on_simulation_start(self, simulation: Simulation) -> None:

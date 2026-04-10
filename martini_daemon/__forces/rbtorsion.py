@@ -2,6 +2,7 @@ import openmm as mm
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_dihedral_type
 
+
 @register_dihedral_type(type_=3, args=["float" for _ in range(6)])
 @register_available_force
 class RBTorsion(BondedForce):
@@ -28,6 +29,7 @@ class RBTorsion(BondedForce):
 
     filters = {"dihedral"}
 
+
 @register_dihedral_type(type_=5, args=["float" for _ in range(4)])
 @register_available_force
 class FourierDihedral(BondedForce):
@@ -41,7 +43,7 @@ class FourierDihedral(BondedForce):
             -params[1] + 4 * params[3],
             -2 * params[2],
             -4 * params[3],
-            0.,
+            0.0,
         ]
 
     @staticmethod

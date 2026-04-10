@@ -2,6 +2,7 @@ import openmm as mm
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_bond_type
 
+
 @register_bond_type(type_=4, args=["float", "float", "float"], is_excl=True)
 @register_available_force
 class CubicBond(BondedForce):
@@ -19,9 +20,7 @@ class CubicBond(BondedForce):
         return 0
 
     def _set_force_obj(self) -> None:
-        self.force = mm.CustomBondForce(
-            "kb * (r - b)^2 + kb * kcub * (r - b)^3"
-        )
+        self.force = mm.CustomBondForce("kb * (r - b)^2 + kb * kcub * (r - b)^3")
         self.force.addPerBondParameter("b")  # equilibrium length
         self.force.addPerBondParameter("kb")  # force constant
         self.force.addPerBondParameter("kcub")  # cubic force constant

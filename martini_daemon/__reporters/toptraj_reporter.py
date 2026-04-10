@@ -2,6 +2,7 @@ from ..__reporter import Reporter
 from ..__simulation import Simulation
 from ..__formats import TopTrajWriter
 
+
 class ToptrajReporter(Reporter):
     def __init__(self):
         self.writer: TopTrajWriter | None = None
@@ -10,7 +11,7 @@ class ToptrajReporter(Reporter):
         self.writer = TopTrajWriter(
             simulation.request_path(".toptraj"),
             simulation.system.additional_data.get("title"),
-            simulation.system.initial_molecules
+            simulation.system.initial_molecules,
         )
 
     def on_trajectory_frame(self, simulation):
@@ -18,7 +19,7 @@ class ToptrajReporter(Reporter):
             simulation.trajectory_frame,
             simulation.current_step,
             simulation.time_ps,
-            simulation.system.atom_count()
+            simulation.system.atom_count(),
         )
         self.writer.register_frame_atoms(
             simulation.system.get_atom_names(),
@@ -26,7 +27,7 @@ class ToptrajReporter(Reporter):
             simulation.system.get_res_ids(),
             simulation.system.get_types(),
             simulation.system.get_charges(),
-            simulation.system.get_masses()
+            simulation.system.get_masses(),
         )
         self.writer.register_frame_bonds(
             simulation.system.collect_bonds(["vsite", "bond"]),
@@ -35,4 +36,3 @@ class ToptrajReporter(Reporter):
 
     def on_simulation_finish(self, simulation):
         self.writer.finish()
-

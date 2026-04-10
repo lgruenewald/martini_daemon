@@ -2,6 +2,7 @@ from datetime import datetime
 
 date_format = "%Y-%m-%d %H:%M:%S,%f"
 
+
 def extract_timings_from_log(path, ignore_first=False):
     categories_starts = {}
     categories_sums = {}
@@ -22,7 +23,7 @@ def extract_timings_from_log(path, ignore_first=False):
                     diff = parsed_date - prev_start
                     prev_diff = categories_sums.get(category) or 0.0
                     if ignore_first and categories_sums.get(category) is None:
-                        categories_sums[category] = 0.
+                        categories_sums[category] = 0.0
                     else:
                         categories_sums[category] = diff.total_seconds() + prev_diff
     except (UnicodeDecodeError, ValueError):
@@ -32,4 +33,3 @@ def extract_timings_from_log(path, ignore_first=False):
         # not a daemon log file we recognize
         return False
     return categories_sums
-

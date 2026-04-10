@@ -2,6 +2,7 @@ import openmm as mm
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_bond_type
 
+
 @register_bond_type(type_=2, args=["float", "float"], is_excl=True)
 @register_available_force
 class G96Bond(BondedForce):
@@ -19,9 +20,7 @@ class G96Bond(BondedForce):
         return 0
 
     def _set_force_obj(self) -> None:
-        self.force = mm.CustomBondForce(
-            "0.25 * k * (r^2-b^2)^2"
-        )
+        self.force = mm.CustomBondForce("0.25 * k * (r^2-b^2)^2")
         self.force.addPerBondParameter("b")  # equilibrium length
         self.force.addPerBondParameter("k")  # force constant
 

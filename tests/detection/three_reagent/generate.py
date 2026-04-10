@@ -42,10 +42,14 @@ for i in range(n_molecules):
     pos[i * 3 + 2, 1] = np.sin(angle) * d2
 
     # z for all 3 same
-    pos[i*3:i*3+3, 2] = i
+    pos[i * 3 : i * 3 + 3, 2] = i
 
     # would this react?
-    if d1_range[0] <= d1 <= d1_range[1] and d2_range[0] <= d2 <= d2_range[1] and angle_range[0] < angle < angle_range[1]:
+    if (
+        d1_range[0] <= d1 <= d1_range[1]
+        and d2_range[0] <= d2 <= d2_range[1]
+        and angle_range[0] < angle < angle_range[1]
+    ):
         reactions.append(
             f"0,tri;{r1},{i*3},{i*3};{r2},{i*3+1},{i*3+1};{r3},{i*3+2},{i*3+2}"
         )
@@ -56,10 +60,9 @@ for i in range(n_molecules):
     res_names.append(r1)
     res_names.append(r2)
     res_names.append(r3)
-    res_ids.append(i*3+1)
-    res_ids.append(i*3+2)
-    res_ids.append(i*3+3)
-
+    res_ids.append(i * 3 + 1)
+    res_ids.append(i * 3 + 2)
+    res_ids.append(i * 3 + 3)
 
 
 with open("expected.reactions", "w") as f:
@@ -70,7 +73,9 @@ with open("expected.reactions", "w") as f:
 write_geometry(
     "system.gro",
     "example trimolecular reaction",
-    atom_names, res_names, res_ids,
-    PeriodicBox.cubic(n_molecules + 5.),
-    pos
+    atom_names,
+    res_names,
+    res_ids,
+    PeriodicBox.cubic(n_molecules + 5.0),
+    pos,
 )

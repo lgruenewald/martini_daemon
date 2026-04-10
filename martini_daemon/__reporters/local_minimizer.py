@@ -8,10 +8,13 @@ import math
 class LocalMinimizer(Reporter):
 
     def __init__(
-        self, minimizer, minimization_steps=500,
-        r_movable=1., whole_molecule=True,
+        self,
+        minimizer,
+        minimization_steps=500,
+        r_movable=1.0,
+        whole_molecule=True,
         harmonic_constraints=True,
-        report_every=0
+        report_every=0,
     ):
         """
         Local Minimizer. Uses the Reporter API to locally minimize the energy after the modification algorithm runs.
@@ -33,7 +36,9 @@ class LocalMinimizer(Reporter):
         self.integrator_index = None
 
     def pre_simulation_start(self, simulation: Simulation):
-        self.integrator_index = simulation.integrator.addIntegrator(self.minimizer.integrator)
+        self.integrator_index = simulation.integrator.addIntegrator(
+            self.minimizer.integrator
+        )
 
     def reset(self, shape):
         self.minimizer.reset(shape)
@@ -61,18 +66,20 @@ class LocalMinimizer(Reporter):
         # set movable
         # atoms in reacting atoms only
         atoms = set()
-        for (_, frags) in reactions:
+        for _, frags in reactions:
             for frag in frags:
                 for atom in frag.atoms:
                     if atom != -1:
                         atoms.add(atom)
-        atoms = simulation.system.populate_neighbors(atoms, recursive=self.whole_molecule)
-        if self.r_movable > 0.:
+        atoms = simulation.system.populate_neighbors(
+            atoms, recursive=self.whole_molecule
+        )
+        if self.r_movable > 0.0:
             atoms |= box.which_atoms_within_distance(pos, atoms, self.r_movable)
 
         movable = np.zeros(shape=vel.shape)
         for atom in atoms:
-            movable[atom, :] = 1.
+            movable[atom, :] = 1.0
 
         simulation.info("atoms chosen")
         self.minimizer.set_movable(movable)
@@ -107,8 +114,9 @@ class LocalMinimizer(Reporter):
         simulation.info("back")
         simulation.close(suffix)
 
+
 class LocalGradientDescent:
-    def __init__(self, initial_step_size_nm=0.1, etol=0., smoothing_factor=0.1):
+    def __init__(self, initial_step_size_nm=0.1, etol=0.0, smoothing_factor=0.1):
         """
         Construct a (smoothed) gradient descent minimization integrator.
 
@@ -122,8 +130,8 @@ class LocalGradientDescent:
         Copyright (c) 2015-2019 Chodera lab // Memorial Sloan Kettering Cancer Center.
         """
 
-        assert initial_step_size_nm > 0., "initial step size must be larger than 0"
-        assert 0. < smoothing_factor <= 1., "smoothing factor must be between 0 and 1"
+        assert initial_step_size_nm > 0.0, "initial step size must be larger than 0"
+        assert 0.0 < smoothing_factor <= 1.0, "smoothing factor must be between 0 and 1"
 
         self.global_variables = {
             "step_size": initial_step_size_nm,
@@ -137,17 +145,12 @@ class LocalGradientDescent:
             "etol": etol,
             "x_sum": 0,
             "x_sum2": 0,
-            "v_sum": 0
+            "v_sum": 0,
         }
 
-        self.per_dof_variables = {
-            "x_old": 0,
-            "v_old": 0,
-            "est_grad": 0,
-            "movable": 0
-        }
+        self.per_dof_variables = {"x_old": 0, "v_old": 0, "est_grad": 0, "movable": 0}
 
-        self.integrator = mm.CustomIntegrator(0.)
+        self.integrator = mm.CustomIntegrator(0.0)
 
         for k, v in self.global_variables.items():
             self.integrator.addGlobalVariable(k, v)
@@ -171,11 +174,12 @@ class LocalGradientDescent:
         self.integrator.addComputeSum("x_sum2", "x*x")
         self.integrator.addComputeSum("v_sum", "v")
 
-
         # Take step, re-constraint positions.
         self.integrator.addComputePerDof("est_grad", "(1-eta)*est_grad + eta*f")
         self.integrator.addComputeSum("fnorm2", "est_grad^2")
-        self.integrator.addComputePerDof("x", "x+movable*step_size*est_grad/sqrt(fnorm2 + delta(fnorm2))")
+        self.integrator.addComputePerDof(
+            "x", "x+movable*step_size*est_grad/sqrt(fnorm2 + delta(fnorm2))"
+        )
         # x was changed, we need to do this again to actually be able to
         # see the energy
         self.integrator.addUpdateContextState()
@@ -186,29 +190,32 @@ class LocalGradientDescent:
         self.integrator.addComputeGlobal("delta_energy", "energy_new-energy_old")
 
         # Accept also checks for NaN
-        self.integrator.addComputeGlobal("accept", "step(-delta_energy) * delta(energy - energy_new)")
+        self.integrator.addComputeGlobal(
+            "accept", "step(-delta_energy) * delta(energy - energy_new)"
+        )
 
         self.integrator.beginIfBlock("accept = 0")
         # revert DoF positions
         self.integrator.addComputePerDof("x", "x_old")
         self.integrator.endBlock()
         self.integrator.addComputePerDof("v", "v_old")
-        #self.addComputePerDof("x", "accept*x + (1-accept)*x_old")
+        # self.addComputePerDof("x", "accept*x + (1-accept)*x_old")
 
         # Update step size.
-        self.integrator.addComputeGlobal("step_size", "step_size * (2.0*accept + 0.5*(1-accept))")
+        self.integrator.addComputeGlobal(
+            "step_size", "step_size * (2.0*accept + 0.5*(1-accept))"
+        )
 
         if etol > 0:
             # check convergence - must be not NaN and delta_energy < 0 and delta_energy > -etol
-            self.integrator.addComputeGlobal("converged", "delta(energy-energy_new) * step(-delta_energy) * step(delta_energy + etol)")
+            self.integrator.addComputeGlobal(
+                "converged",
+                "delta(energy-energy_new) * step(-delta_energy) * step(delta_energy + etol)",
+            )
             self.integrator.endBlock()
 
-
     def set_movable(self, movable):
-        self.integrator.setPerDofVariableByName(
-            "movable",
-            movable
-        )
+        self.integrator.setPerDofVariableByName("movable", movable)
 
     def is_converged(self) -> bool:
         return self.integrator.getGlobalVariableByName("converged") == 1
@@ -223,7 +230,10 @@ class LocalGradientDescent:
             self.integrator.setPerDofVariableByName(k, vals)
 
     def report(self) -> str:
-        return "\n".join(
-            f"{k}: {self.integrator.getGlobalVariableByName(k)}"
-            for k in self.global_variables.keys()
-        ) + "\n"
+        return (
+            "\n".join(
+                f"{k}: {self.integrator.getGlobalVariableByName(k)}"
+                for k in self.global_variables.keys()
+            )
+            + "\n"
+        )

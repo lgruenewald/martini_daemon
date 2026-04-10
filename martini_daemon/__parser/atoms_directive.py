@@ -14,19 +14,18 @@ class AtomsDirective(Directive):
         res_num = tokens.unwrap(2, "int")
         res_name = tokens.unwrap(3, "word")
         atom_name = tokens.unwrap(4, "word")
-        _ = tokens.unwrap(5, "int") # charge group number
+        _ = tokens.unwrap(5, "int")  # charge group number
         charge = tokens.unwrap(6, "float", None)
         mass = tokens.unwrap(7, "float", None)
         if index != len(self.parent.molecule_type.atoms):
             raise TokenParseException(
                 tokens[0],
                 "Bad atom ID, are they out of order?"
-                f" got id {index} but expected {len(self.parent.molecule_type.atoms)}"
+                f" got id {index} but expected {len(self.parent.molecule_type.atoms)}",
             )
         self.parent.molecule_type.atoms.append(
             (type_, res_num, res_name, atom_name, charge, mass)
         )
-
 
     def finish(self):
         pass

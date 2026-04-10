@@ -260,7 +260,7 @@ class System:
         """
         Used for constraints <=> harmonic bond replace.
         """
-        for i in range(self.__system.getNumConstraints()-1, -1, -1):
+        for i in range(self.__system.getNumConstraints() - 1, -1, -1):
             self.__system.removeConstraint(i)
         assert self.__system.getNumConstraints() == 0
 
@@ -273,7 +273,7 @@ class System:
             self.__harmonic_constraints.setName("harmonic_replacement_for_constraints")
             self.__del_all_constraints()
             for _, (members, params) in constraints.iterate_bonds():
-                self.__harmonic_constraints.addBond(*members, *params, 10000.)
+                self.__harmonic_constraints.addBond(*members, *params, 10000.0)
             # this sets reinitialize to True
             self._add_mm_force(self.__harmonic_constraints)
         else:
@@ -349,7 +349,9 @@ class System:
                 )
         bond_id = f._add_bond(members, params)
         for member in members:
-            assert member >= 0, f"Internal error: {member} is negative in {name}, {members}, {params}."
+            assert (
+                member >= 0
+            ), f"Internal error: {member} is negative in {name}, {members}, {params}."
             self.__interactions_by_atom[member].append((name, bond_id))
 
     def remove_interaction(self, force_name: str, bond_id: int) -> None:
@@ -493,7 +495,9 @@ class System:
             res.add(atom)
             for force, bond_id in self.__interactions_by_atom[atom]:
                 for m in self.get_force(force).get_members(bond_id):
-                    assert m >= 0, f"Internal error: m is {m}, for force {force}, bond_id {bond_id}."
+                    assert (
+                        m >= 0
+                    ), f"Internal error: m is {m}, for force {force}, bond_id {bond_id}."
                     if recursive:
                         stack.append(m)
                     else:

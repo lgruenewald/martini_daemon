@@ -53,17 +53,20 @@ for i in range(n_molecules):
     pos[index3, 1] = np.sin(angle) * d2
 
     # z for all 3 same
-    pos[i*3:i*3+3, 2] = i
+    pos[i * 3 : i * 3 + 3, 2] = i
 
     if not has_optional:
         index3 = -1
 
     # would this react?
     # atom at index3 is optional, if not present, ignoring conditions that contain it
-    if d1_range[0] <= d1 <= d1_range[1] and (not has_optional or (d2_range[0] <= d2 <= d2_range[1] and angle_range[0] < angle < angle_range[1])):
-        reactions.append(
-            f"0,{reaction_name};{r_name},{i},{index1},{index2},{index3}"
+    if d1_range[0] <= d1 <= d1_range[1] and (
+        not has_optional
+        or (
+            d2_range[0] <= d2 <= d2_range[1] and angle_range[0] < angle < angle_range[1]
         )
+    ):
+        reactions.append(f"0,{reaction_name};{r_name},{i},{index1},{index2},{index3}")
 
     atom_names.append(r1)
     atom_names.append(r2)
@@ -71,9 +74,9 @@ for i in range(n_molecules):
     res_names.append(r1)
     res_names.append(r2)
     res_names.append(r3)
-    res_ids.append(i+1)
-    res_ids.append(i+1)
-    res_ids.append(i+1)
+    res_ids.append(i + 1)
+    res_ids.append(i + 1)
+    res_ids.append(i + 1)
 
 
 with open("expected.reactions", "w") as f:
@@ -84,7 +87,9 @@ with open("expected.reactions", "w") as f:
 write_geometry(
     "system.gro",
     "example reaction with optional atoms",
-    atom_names, res_names, res_ids,
-    PeriodicBox.cubic(n_molecules + 5.),
-    pos
+    atom_names,
+    res_names,
+    res_ids,
+    PeriodicBox.cubic(n_molecules + 5.0),
+    pos,
 )

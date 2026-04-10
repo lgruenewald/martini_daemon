@@ -2,6 +2,7 @@ import openmm as mm
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_dihedral_type
 
+
 @register_dihedral_type(type_=1, args=["degree", "float", "float"])
 @register_dihedral_type(type_=4, args=["degree", "float", "float"])
 @register_dihedral_type(type_=9, args=["degree", "float", "float"])

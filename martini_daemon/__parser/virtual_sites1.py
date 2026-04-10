@@ -2,6 +2,7 @@ from .interaction_directive import InteractionDirective
 from .gromacs_top_file import register_directive
 from .token_list import TokenList
 
+
 @register_directive
 class VirtualSites1(InteractionDirective):
     @classmethod
@@ -36,14 +37,15 @@ class VirtualSites1(InteractionDirective):
     def line(self, tokens: TokenList) -> None:
         # we don't want to trigger nrexcl processing with these exclusions
         super().line(tokens)
-        self.parent.molecule_type.exclusions.add((
-            self.parent.parse_index(tokens, 0),
-            self.parent.parse_index(tokens, 1)
-        ))
+        self.parent.molecule_type.exclusions.add(
+            (self.parent.parse_index(tokens, 0), self.parent.parse_index(tokens, 1))
+        )
+
 
 def register_vsite1_type(type_: int, args: list[str]):
     def inner(class_):
         name = class_.get_name()
         VirtualSites1.register_type(type_, name, args)
         return class_
+
     return inner

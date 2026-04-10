@@ -2,6 +2,7 @@ import openmm as mm
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_angle_type
 
+
 @register_angle_type(type_=10, args=["degree", "float"])
 @register_available_force
 class RestrictedAngle(BondedForce):

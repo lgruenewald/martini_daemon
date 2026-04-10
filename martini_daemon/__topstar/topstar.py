@@ -3,6 +3,7 @@ from .modification_template import ModificationTemplate
 from .graph import Graph, GraphMatch, match_atoms
 from ..__core import System
 
+
 class TopStar:
     """
     The glue between the following components:
@@ -10,6 +11,7 @@ class TopStar:
     - detection algorithm
     - modification algorithm
     """
+
     def __init__(self, system: System):
         self.system = system
         self.n_atoms = system.atom_count()
@@ -24,9 +26,7 @@ class TopStar:
         for mol, n in system.initial_molecules:
             n_atoms = len(system.molecule_types.get(mol).atoms)
             for j in range(n):
-                self.try_match_graphs(
-                    set(range(i, i + n_atoms))
-                )
+                self.try_match_graphs(set(range(i, i + n_atoms)))
                 i += n_atoms
 
     def try_match_graphs(self, atoms: set[int]) -> None:
@@ -45,9 +45,7 @@ class TopStar:
 
         matches: list[GraphMatch] = []
         for graph in self.graphs.values():
-            matches += match_atoms(
-                graph, atoms, self.system
-            )
+            matches += match_atoms(graph, atoms, self.system)
         for m in matches:
             frag_atoms = []
             for key, _, _, _ in m.graph.atoms:
@@ -59,11 +57,14 @@ class TopStar:
                 else:
                     frag_atoms.append(val)
 
-            self.frag_list.add_fragment(
-                m.graph.name, frag_atoms
-            )
+            self.frag_list.add_fragment(m.graph.name, frag_atoms)
 
-    def update_rates(self, reactions: list[tuple[str, list[int]]], counts: dict[str, int], volume: float) -> None:
+    def update_rates(
+        self,
+        reactions: list[tuple[str, list[int]]],
+        counts: dict[str, int],
+        volume: float,
+    ) -> None:
         """
         Updates "observed rate" in detection templates based on the reactions happening and current
         reactant concentrations (specified using counts and volume).
@@ -77,14 +78,11 @@ class TopStar:
         Runs the detection algorithm, given a periodic box and atom positions and current state in TopStar.
         Returns the list of reactions.
         """
-        return detection(
-            self.frag_list,
-            self.detection_templates,
-            pbc,
-            pos
-        )
+        return detection(self.frag_list, self.detection_templates, pbc, pos)
 
-    def modification(self, reactions: list[tuple[str, list[int]]]) -> list[tuple[str, list[Fragment]]]:
+    def modification(
+        self, reactions: list[tuple[str, list[int]]]
+    ) -> list[tuple[str, list[Fragment]]]:
         """
         Runs the modification algorithm.
 
@@ -94,11 +92,8 @@ class TopStar:
         """
         completed = []
 
-        for (rx, frag_ids) in reactions:
-            frags = [
-                self.frag_list.get_fragment(frag_id)
-                for frag_id in frag_ids
-            ]
+        for rx, frag_ids in reactions:
+            frags = [self.frag_list.get_fragment(frag_id) for frag_id in frag_ids]
             if any(frag is None for frag in frags):
                 # pass reactions if a previous reactions' modification algorithm destroyed the reactant fragment
                 # of another reaction
@@ -129,11 +124,10 @@ class TopStar:
         return completed
 
     def toggle_softcore(self, reactions: list[tuple[str, list[Fragment]]], on: bool):
-        for (rx, frags) in reactions:
+        for rx, frags in reactions:
             m_template = self.system.molecule_types[rx]
             flattened_atoms = []
             for f in frags:
                 flattened_atoms.extend(f.atoms)
 
             m_template.toggle_softcore(self.system, flattened_atoms, on)
-

@@ -1,6 +1,7 @@
 from .interaction_directive import InteractionDirective
 from .gromacs_top_file import register_directive
 
+
 @register_directive
 class BondsDirective(InteractionDirective):
     @classmethod
@@ -11,7 +12,9 @@ class BondsDirective(InteractionDirective):
     __is_exclusion: dict[str, bool] = {}
 
     @classmethod
-    def register_type(cls, type_: int, name: str, args: list[str], is_excl: bool) -> None:
+    def register_type(
+        cls, type_: int, name: str, args: list[str], is_excl: bool
+    ) -> None:
         assert type_ not in cls.__type_data.keys()
         cls.__type_data[type_] = (name, args)
         cls.__is_exclusion[name] = is_excl
@@ -44,4 +47,5 @@ def register_bond_type(type_: int, args: list[str], is_excl: bool):
         name = class_.get_name()
         BondsDirective.register_type(type_, name, args, is_excl)
         return class_
+
     return inner

@@ -37,5 +37,6 @@ docs = [
 dev = [
   "python-lsp-server",
   "ruff",
+  "black",
   "ty"
 ]

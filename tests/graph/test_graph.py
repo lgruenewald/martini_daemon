@@ -3,6 +3,7 @@ import pytest
 import json
 from martini_daemon import TopStar, Simulation, Fragment
 
+
 # == CONFIG ==
 @pytest.fixture
 def rootdir(request):
@@ -10,35 +11,38 @@ def rootdir(request):
 
 
 tests = [
-    "single", "square", "star", "BDT", "opt", "equiv", "v_shape", "bicycle",
-    "spiked_triangle"
+    "single",
+    "square",
+    "star",
+    "BDT",
+    "opt",
+    "equiv",
+    "v_shape",
+    "bicycle",
+    "spiked_triangle",
 ]
 
 
 # == TEST CLASS ==
 def get_topology(path: str) -> TopStar:
-    sim = Simulation(
-        path, None, 0, []
-    )
+    sim = Simulation(path, None, 0, [])
     return sim.top
 
 
 def parse_expected(path) -> list[tuple[str, list[int]]]:
     """
-        Parses a json of the format
-        [
-            ["name1", *parts],
-            ...
-            ["namen", *parts]
-        ]
-        where *parts is a list of atom indices (1 indexed).
-        Converts the indexing to 0 based.
+    Parses a json of the format
+    [
+        ["name1", *parts],
+        ...
+        ["namen", *parts]
+    ]
+    where *parts is a list of atom indices (1 indexed).
+    Converts the indexing to 0 based.
     """
     assert os.path.isfile(path)
     with open(path) as f:
-        data = [
-            (line[0], [x - 1 for x in line[1:]]) for line in json.load(f)
-        ]
+        data = [(line[0], [x - 1 for x in line[1:]]) for line in json.load(f)]
     return data
 
 
@@ -58,9 +62,7 @@ def print_error(name, frags, expected: list[tuple[str, list[int]]]):
     print(f"found frags for {name}:")
     # convert to 1 based indexing
     for frag in frags:
-        atoms = [
-            atom + 1 if atom >= 0 else atom for atom in frag.atoms
-        ]
+        atoms = [atom + 1 if atom >= 0 else atom for atom in frag.atoms]
         print(f"frag {frag.name} {atoms}")
     print("expected frags:")
     for exp in expected:
@@ -75,7 +77,7 @@ def compare(name, top: TopStar, expected: list[tuple[str, list[int]]]):
     """
     matched_frags = set()
     all_frags = []
-    for (frag_name, part_ids) in expected:
+    for frag_name, part_ids in expected:
         frag_ids = top.frag_list.frag_ids_for(part_ids[0])
         frags = [top.frag_list.get_fragment(frag_id) for frag_id in frag_ids]
         all_frags += frags

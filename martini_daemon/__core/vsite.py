@@ -19,18 +19,14 @@ class VirtualSite(BondedForce, metaclass=ABCMeta):
         self._built = True
         for index, (members, params) in self.iterate_bonds():
             vid, *other = members
-            self.system._add_vsite(
-                vid, self._make_vsite(vid, other, params)
-            )
+            self.system._add_vsite(vid, self._make_vsite(vid, other, params))
 
     def delta_degrees_of_freedom(self) -> int:
         return self.num_bonds() * 3
 
     def _add_bond(self, members: list[int], params: list[float]) -> int:
         if self._built:
-            raise ValueError(
-                "Virtual sites cannot be added during the simulation."
-            )
+            raise ValueError("Virtual sites cannot be added during the simulation.")
         return super()._add_bond(members, params)
 
     @staticmethod
@@ -38,18 +34,13 @@ class VirtualSite(BondedForce, metaclass=ABCMeta):
         return False
 
     def _remove_bond(self, bond_id: int) -> None:
-        raise ValueError(
-            "Virtual sites cannot be removed during the simulation."
-        )
+        raise ValueError("Virtual sites cannot be removed during the simulation.")
 
     def _destroy(self) -> None:
-        raise ValueError(
-            "Virtual sites can't be destoryed."
-        )
+        raise ValueError("Virtual sites can't be destoryed.")
 
     def _set_force_obj(self) -> None:
-        assert False # unreachable
+        assert False  # unreachable
 
     def _add_to_force(self, members: list[int], params: list[float]) -> None:
-        assert False # unreachable
-
+        assert False  # unreachable

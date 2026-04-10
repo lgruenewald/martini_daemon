@@ -2,6 +2,7 @@ import openmm as mm
 from ..__core import VirtualSite, register_available_force
 from ..__parser import register_vsite3_type
 
+
 @register_vsite3_type(4, ["float", "float", "float"])
 @register_available_force
 class VSite3out(VirtualSite):
@@ -15,8 +16,6 @@ class VSite3out(VirtualSite):
     def _make_vsite(self, vid, members, params):
         i, j, k = members
         a, b, c = params
-        return mm.OutOfPlaneSite(
-            i, j, k, a, b, c
-        )
+        return mm.OutOfPlaneSite(i, j, k, a, b, c)
 
     filters = {"virtual_site", "vsite"}

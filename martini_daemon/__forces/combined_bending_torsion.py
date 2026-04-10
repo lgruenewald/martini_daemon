@@ -2,6 +2,7 @@ import openmm as mm
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_dihedral_type
 
+
 @register_dihedral_type(type_=11, args=["float" for _ in range(6)])
 @register_available_force
 class CombinedBendingTorsion(BondedForce):

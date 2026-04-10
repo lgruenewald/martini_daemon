@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
 
-from martini_daemon import Simulation, ReactionReporter, FragCountReporter, XTCReporter, VariablesReporter, ToptrajReporter
+from martini_daemon import (
+    Simulation,
+    ReactionReporter,
+    FragCountReporter,
+    XTCReporter,
+    VariablesReporter,
+    ToptrajReporter,
+)
 
 for rep in range(3):
     sim = Simulation(
-        top_path="system.top", geom_path="system.gro",
+        top_path="system.top",
+        geom_path="system.gro",
         sim_name=f"out_rep{rep}",
         defines={"RATE": "1"},
         reporters=[
@@ -12,9 +20,10 @@ for rep in range(3):
             FragCountReporter(),
             XTCReporter(),
             VariablesReporter(),
-            ToptrajReporter()
-         ],
-        md_steps=1000000, dm_frequency=100,
+            ToptrajReporter(),
+        ],
+        md_steps=1000000,
+        dm_frequency=100,
         traj_frequency=5000,
     )
     sim.simulate()

@@ -3,6 +3,7 @@ import glob
 import pytest
 from martini_daemon import Simulation, ReactionReporter
 
+
 # == CONFIG ==
 @pytest.fixture
 def rootdir(request):
@@ -20,21 +21,17 @@ tests = [
     "angle",
     "dihedral",
     "optional",
-    "overlap"
+    "overlap",
 ]
 
 
 def get_sim(top: str, gro: str) -> list[tuple[str, str, list[list[int]]]]:
     rep = ReactionReporter()
-    sim = Simulation(
-        top, gro, 0,
-        reporters=[
-            rep
-        ]
-    )
+    sim = Simulation(top, gro, 0, reporters=[rep])
     sim.step(0, traj=False, dm=True)
     sim.finish()
     return ReactionReporter.read_reactions("out.reactions")
+
 
 def compare(reactions, expected):
     dump = f"\nGot: {reactions}, expected: {expected}."
@@ -50,6 +47,7 @@ def compare(reactions, expected):
             for atom1, atom2 in zip(atoms1, atoms2):
                 assert atom1 == atom2, f"Atom differs. {dump}"
     assert len(reactions) == len(expected), f"first len check {dump}"
+
 
 @pytest.mark.parametrize("x", tests)
 def test_detection(x, rootdir):

@@ -1,6 +1,7 @@
 from ..__core import MoleculeType
 from ..__parser import ParseException
 
+
 class ModificationTemplate(MoleculeType):
     def __init__(self):
         super().__init__()
@@ -14,7 +15,6 @@ class ModificationTemplate(MoleculeType):
         self.recharges: list[tuple[int, float]] = []
         self.remasses: list[tuple[int, float]] = []
         self.soft_core: list[tuple[int, float, float]] = []
-
 
     def add_atoms_to_system(self, system):
         # reactions don't add atoms to system anymore
@@ -32,9 +32,13 @@ class ModificationTemplate(MoleculeType):
         """
         # breaking bonds
         for break_group in self.break_groups:
-            system.break_group(set(atom_indices[x] for x in break_group if atom_indices[x] >= 0))
+            system.break_group(
+                set(atom_indices[x] for x in break_group if atom_indices[x] >= 0)
+            )
         for update_group in self.update_groups:
-            system.update_group(set(atom_indices[x] for x in update_group if atom_indices[x] >= 0))
+            system.update_group(
+                set(atom_indices[x] for x in update_group if atom_indices[x] >= 0)
+            )
 
         # [bonds], [angles]...
         super().instantiate(system, atom_indices)
@@ -62,4 +66,4 @@ class ModificationTemplate(MoleculeType):
                 if on:
                     system.update_sc(atom_indices[i], sc_lam, sc_alpha)
                 else:
-                    system.update_sc(atom_indices[i], 1., 0.5)
+                    system.update_sc(atom_indices[i], 1.0, 0.5)

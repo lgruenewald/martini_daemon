@@ -2,6 +2,7 @@ import openmm as mm
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_angle_type
 
+
 @register_angle_type(type_=4, args=["float", "float", "float", "float"])
 @register_available_force
 class CrossBondAngle(BondedForce):
@@ -26,7 +27,7 @@ class CrossBondAngle(BondedForce):
     def _set_force_obj(self):
         self.force = mm.CustomCompoundBondForce(
             3,  # 3 particles per compund bond force
-            "k*(distance(p1,p3)-r3)*(distance(p1,p2)-r1+distance(p3,p2)-r2)"
+            "k*(distance(p1,p3)-r3)*(distance(p1,p2)-r1+distance(p3,p2)-r2)",
         )
         self.force.addPerBondParameter("r1")
         self.force.addPerBondParameter("r2")

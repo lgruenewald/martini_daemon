@@ -2,7 +2,12 @@
 # New benchmark, designed to be simple to run and fast to finish in contrast
 # with ./benchmark.py. Only runs 25 md steps, D/M step and xtc step once.
 
-from martini_daemon import Simulation, extract_timings_from_log, XTCReporter, ToptrajReporter
+from martini_daemon import (
+    Simulation,
+    extract_timings_from_log,
+    XTCReporter,
+    ToptrajReporter,
+)
 import os
 import sys
 import time
@@ -26,11 +31,13 @@ for inp in inputs:
     print("Input:", inp)
     start = time.time()
     sim = Simulation(
-        "../inputs/" + inp, "../inputs/" + inp.replace(".top", ".gro"),
+        "../inputs/" + inp,
+        "../inputs/" + inp.replace(".top", ".gro"),
         10000,
         [XTCReporter(), ToptrajReporter()],
-        25, 25,
-        defines={"REACT": "1"}
+        25,
+        25,
+        defines={"REACT": "1"},
     )
     start = time.time()
     for i in range(10):
@@ -45,4 +52,3 @@ for inp in inputs:
     print("")
 
     os.chdir("..")
-

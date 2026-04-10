@@ -30,7 +30,7 @@ class Force(metaclass=ABCMeta):
     - flag_add_atom()
     """
 
-    def __init__(self, system):# System):
+    def __init__(self, system):  # System):
         self.force: mm.Force | None = None
         self.system = system
         # If rebuild is set to True, it means that self.force is  no longer valid, or does not exist.
