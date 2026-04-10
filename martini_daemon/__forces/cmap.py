@@ -1,14 +1,15 @@
 from typing import Any
+
 import openmm as mm
 
 from ..__core import BondedForce, register_available_force
 from ..__parser import (
-    InteractionDirective,
-    register_directive,
     Directive,
     GromacsTopFile,
+    InteractionDirective,
     TokenList,
     TokenParseException,
+    register_directive,
 )
 
 
@@ -109,18 +110,18 @@ class CMAPDirective(InteractionDirective):
 
 @register_available_force
 class Cmap(BondedForce):
-
-    def _add_to_force(self, members: list[int], params: list[float]) -> None:
+    def _add_to_force(
+        self, force: mm.Force, members: list[int], params: list[float]
+    ) -> None:
         assert len(params) == 0
         types = tuple(self.system.get_type(member) for member in members)
-        map = self.system.additional_data["cmap_types"].get(types)
-        if map is None:
+        cmap = self.system.additional_data["cmap_types"].get(types)
+        if cmap is None:
             raise ValueError(f"Unknown CMAP type for {types}.")
 
         idx_i, idx_j, idx_k, idx_l, idx_m = members
-        self.force.addTorsion(
-            map, idx_i, idx_j, idx_k, idx_l, idx_j, idx_k, idx_l, idx_m
-        )
+        assert isinstance(force, mm.CMAPTorsionForce)
+        force.addTorsion(cmap, idx_i, idx_j, idx_k, idx_l, idx_j, idx_k, idx_l, idx_m)
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         return params

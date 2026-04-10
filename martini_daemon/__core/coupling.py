@@ -1,20 +1,19 @@
 # OpenMM coupling forces will be wrapped in this
 # note: this class doesn't allow them to be removed later, as the settings to generate them are unknown
 
-from .force import Force
-from typing import Type
+
 import openmm as mm
 
+from .force import Force
 
-def wrap_coupling(mm_force: mm.Force) -> Type[Force]:
-    """
-    Given an OpenMM force that should act as a coupling for a simulation,
+
+def wrap_coupling(mm_force: mm.Force) -> type[Force]:
+    """Given an OpenMM force that should act as a coupling for a simulation,
     it creates a Martini Daemon Force from it.
     """
     used = False
 
     class Coupling(Force):
-
         @classmethod
         def is_coupling(cls):
             return True

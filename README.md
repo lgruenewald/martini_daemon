@@ -68,9 +68,8 @@ Optional development tools are installed using `pip install .[dev]`. Here
 is an overview of which these are:
 
 - `pylsp` - Python LSP server used by helix, provides autocomplete.
-- `ruff` - the linter used. Run using `ruff --check`.
-- `black` - auto-formatter that leaves AST intact, but will fix overlong lines
-   and whitespace issues.
+- `ruff` - the linter and formatter used. Run using `ruff check` and `ruff format`.
+- `ty` - type checker. Run using `ty check`.
 
 To re-generate the type stubs for the rust parts, run `cargo run --bin stub_gen`.
 This only needs to be done when changing the rust part of the code, as the .pyi

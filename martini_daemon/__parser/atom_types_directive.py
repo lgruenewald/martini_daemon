@@ -1,12 +1,11 @@
 from .directive import Directive
-from .token_list import TokenList, TokenParseException
-from .parser import ParseException
 from .gromacs_top_file import GromacsTopFile, register_directive
+from .parser import ParseException
+from .token_list import TokenList, TokenParseException
 
 
 @register_directive
 class AtomTypesDirective(Directive):
-
     def line(self, tokens: TokenList) -> None:
         if len(tokens) != 6:
             raise ParseException(

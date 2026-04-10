@@ -1,8 +1,10 @@
-import os
 import glob
-import pytest
-from martini_daemon import Simulation, SystemDump, FragCountReporter, ReactionReporter
+import os
 from math import isclose
+
+import pytest
+
+from martini_daemon import FragCountReporter, ReactionReporter, Simulation, SystemDump
 
 
 # == CONFIG ==

@@ -1,5 +1,5 @@
-from .interaction_directive import InteractionDirective
 from .gromacs_top_file import register_directive
+from .interaction_directive import InteractionDirective
 
 
 @register_directive
@@ -15,7 +15,7 @@ class ConstraintsDirective(InteractionDirective):
     def register_type(
         cls, type_: int, name: str, args: list[str], is_excl: bool
     ) -> None:
-        assert type_ not in cls.__type_data.keys()
+        assert type_ not in cls.__type_data
         cls.__type_data[type_] = (name, args)
         cls.__is_exclusion[name] = is_excl
 

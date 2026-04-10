@@ -1,24 +1,23 @@
-from typing import Any
 import difflib
-from math import pi, cos
+from math import cos, pi
+from typing import Any
 
 from ..__parser import (
     Directive,
-    register_directive,
     GromacsTopFile,
-    TokenList,
-    ParseException,
-    TokenParseException,
     MoleculeTypeDirective,
+    ParseException,
+    TokenList,
+    TokenParseException,
+    register_directive,
 )
 from ..__rust import DetectionTemplate
-from .modification_template import ModificationTemplate
 from .graph import GraphAtomType
+from .modification_template import ModificationTemplate
 
 
 @register_directive
 class ReactionDirective(MoleculeTypeDirective):
-
     def __init__(self, parent, path, line_num):
         super().__init__(parent, path, line_num)
         self.d_template = DetectionTemplate()
@@ -148,13 +147,11 @@ class ReactantsDirective(Directive):
 
 @register_directive
 class ConditionsDirective(Directive):
-
     @staticmethod
     def __parse_angle_conditions(
         tokens: TokenList, start: int, wrap: bool
     ) -> list[tuple[int, int]]:
-        """
-        If wrap is false, the "angle space" is 0 to pi
+        """If wrap is false, the "angle space" is 0 to pi
         If wrap is true, the "angle space" is -pi to pi and is considered periodic
         """
         # 0 to 20 or 50 to 60 or 62 to 67
@@ -183,12 +180,12 @@ class ConditionsDirective(Directive):
                 if other_lower < lower_bound < other_upper:
                     raise TokenParseException(
                         tokens[c_token],
-                        f"Lower bound falls between an already allowed range {other_lower*180./pi:.2f} to {other_upper*180./pi:.2f}.",
+                        f"Lower bound falls between an already allowed range {other_lower * 180.0 / pi:.2f} to {other_upper * 180.0 / pi:.2f}.",
                     )
                 if other_lower < upper_bound < other_upper:
                     raise TokenParseException(
                         tokens[c_token + 2],
-                        f"Upper bound falls between an already allowed range {other_lower*180./pi:.2f} to {other_upper*180./pi:.2f}.",
+                        f"Upper bound falls between an already allowed range {other_lower * 180.0 / pi:.2f} to {other_upper * 180.0 / pi:.2f}.",
                     )
 
             if not wrap:
@@ -196,12 +193,12 @@ class ConditionsDirective(Directive):
                 if upper_bound < lower_bound:
                     raise TokenParseException(
                         tokens[c_token + 2],
-                        f"Angle upper bound {upper_bound*180./pi:.2f} lower than lower bound {lower_bound*180./pi:.2f}.",
+                        f"Angle upper bound {upper_bound * 180.0 / pi:.2f} lower than lower bound {lower_bound * 180.0 / pi:.2f}.",
                     )
                 if lower_bound < 0.0:
                     raise TokenParseException(
                         tokens[c_token],
-                        f"Angle lower bound must be 0 or larger. Got {lower_bound*180./pi:.2f} instead.",
+                        f"Angle lower bound must be 0 or larger. Got {lower_bound * 180.0 / pi:.2f} instead.",
                     )
                 ranges.append((lower_bound, upper_bound))
 
@@ -386,7 +383,6 @@ class UpdateDirective(Directive):
 
 @register_directive
 class RedefineDirective(Directive):
-
     def line(self, tokens: TokenList) -> None:
         atom_index = self.parent.parse_index(tokens, 0)
         changes = set()
@@ -441,7 +437,6 @@ class RedefineDirective(Directive):
 
 @register_directive
 class SoftCoreDirective(Directive):
-
     def line(self, tokens: TokenList) -> None:
         atom_index = self.parent.parse_index(tokens, 0)
         sc_lam = tokens.unwrap(1, "float")

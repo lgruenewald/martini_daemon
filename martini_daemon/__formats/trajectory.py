@@ -1,6 +1,8 @@
 from os.path import splitext
-from ..__rust import PeriodicBox
+
 import numpy as np
+
+from ..__rust import PeriodicBox
 
 
 class TrajectoryWriter:
@@ -35,23 +37,25 @@ class TrajectoryWriter:
         time_ps: float,
         box: PeriodicBox,
         pos: np.ndarray,
-        vel: np.ndarray = None,
+        vel: np.ndarray | None = None,
     ) -> None:
         match self.backend:
             case "xtc_openmm_internal":
-                from openmm.app.internal.xtc_utils import xtc_write_frame
+                from openmm.app.internal.xtc_utils import (
+                    xtc_write_frame,  # ty: ignore[unresolved-import]
+                )
 
                 pos = np.array(pos, dtype=np.float32)
                 n_atoms = len(pos)
                 assert pos.shape == (n_atoms, 3)
-                box = np.array([box.a, box.b, box.c], dtype=np.float32)
-                assert box.shape == (3, 3)
+                box_numpy = np.array([box.a, box.b, box.c], dtype=np.float32)
+                assert box_numpy.shape == (3, 3)
                 if pos.dtype != np.float32:
                     pos = np.array(pos, dtype=np.float32)
                 xtc_write_frame(
                     self.path.encode("utf-8"),  # title as byte string
                     pos,  # positions as float[:, :]
-                    box,  # box as float[:, :]
+                    box_numpy,  # box as float[:, :]
                     time_ps,  # time in ps
                     sim_step,
                 )
@@ -87,7 +91,9 @@ class TrajectoryReader:
         self.backend = backend
         match self.backend:
             case "xtc_openmm_internal":
-                from openmm.app.internal.xtc_utils import read_xtc
+                from openmm.app.internal.xtc_utils import (
+                    read_xtc,  # ty: ignore[unresolved-import]
+                )
 
                 self.pos, self.box, self.time, self.step = read_xtc(
                     path.encode("utf-8")
@@ -100,9 +106,7 @@ class TrajectoryReader:
     def read_frame(
         self,
     ) -> None | tuple[int, float, PeriodicBox, np.ndarray, np.ndarray | None]:
-        """
-        Returns a tuple of sim step, time (in ps), pbc, pos and vel if the format supports it
-        """
+        """Returns a tuple of sim step, time (in ps), pbc, pos and vel if the format supports it"""
         match self.backend:
             case "xtc_openmm_internal":
                 if self.c_frame >= self.n_frames:
@@ -111,7 +115,11 @@ class TrajectoryReader:
                 return (
                     self.step[self.c_frame - 1],
                     self.time[self.c_frame - 1],
-                    PeriodicBox(self.box[self.c_frame - 1]),
+                    PeriodicBox(
+                        self.box[self.c_frame - 1, 0],
+                        self.box[self.c_frame - 1, 1],
+                        self.box[self.c_frame - 1, 2],
+                    ),
                     self.pos[self.c_frame - 1],
                     None,
                 )

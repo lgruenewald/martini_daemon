@@ -1,12 +1,12 @@
-"""
-Readers for old formats used during Martini Daemon development, which have been replaced
+"""Readers for old formats used during Martini Daemon development, which have been replaced
 by a newer format.
 """
 
-import numpy as np
-import zlib
-import molly
 import struct
+import zlib
+
+import molly
+import numpy as np
 
 
 def read_compressed(path):
@@ -15,8 +15,7 @@ def read_compressed(path):
 
 
 def read_atoms(path):
-    """
-    file format - zlib compressed following:
+    """File format - zlib compressed following:
     header: n_atoms (64 bit unsigned int)
     body - for each frame, without any padding or separator:
         - n_atoms s8 atom names
@@ -31,14 +30,15 @@ def read_atoms(path):
     Returns:
     n_frames, n_atoms, names, types, charges, masses
     where the last 4 are numpy arrays of dimension (n_frames, n_atoms)
+
     """
     data = read_compressed(path)
     (n_atoms,) = struct.unpack("=Q", data[0:8])
     # length for a single atom: 8+8+4+4 = 24 bytes
     n_frames = (len(data) - 8) // (n_atoms * 24)
-    assert (len(data) - 8) % (
-        n_atoms * 24
-    ) == 0, "The .atoms file is incomplete or the wrong file type."
+    assert (len(data) - 8) % (n_atoms * 24) == 0, (
+        "The .atoms file is incomplete or the wrong file type."
+    )
     names = np.empty((n_frames, n_atoms), dtype="a8")
     types = np.empty((n_frames, n_atoms), dtype="a8")
     charges = np.empty((n_frames, n_atoms), dtype=np.float32)
@@ -59,8 +59,7 @@ def read_atoms(path):
 
 
 def read_bonds(path: str, read_n_atoms=True) -> tuple[int, int, list[np.ndarray]]:
-    """
-    0.1 .bonds file reader.
+    """0.1 .bonds file reader.
 
     File format - zlib compressed binary data:
     - n_atoms - 8 byte integer
@@ -99,15 +98,13 @@ def read_bonds(path: str, read_n_atoms=True) -> tuple[int, int, list[np.ndarray]
 def generate_vmd_readable_bonds(
     frames: list[np.ndarray], xtc_path: str, out_path: str
 ) -> None:
-    """
-    Given a list of bonds (from a .bonds file, loaded with
+    """Given a list of bonds (from a .bonds file, loaded with
     old_formats.read_bonds), and a matching trajectory .xtc file
     (input) write a file in a format that is
     suitable for visualization by daemon.tcl.
 
     May take a while, reports progress to stdout.
     """
-
     xtc = molly.XTCReader(xtc_path)
     print("Generating file for vmd bond visualization.")
 
@@ -153,31 +150,30 @@ def generate_vmd_readable_bonds(
 
 
 def parse_old_reactions(path, interval, frame_count):
-    """
-    Parses the old (before June 9 2025) .reactions format,
+    """Parses the old (before June 9 2025) .reactions format,
     returns a dict of reaction name -> reaction count per D/M frame
     (np.ndarray of shape (frame_count//interval,) and type np.int64)
 
-    args:
+    Args:
     path - path to the .reactions file
     interval - how often was there a D/M algo
     frame_count - how many total MD frames were written
 
     the latter two arguments are needed to produce the right dimension array
     even if there is no reactions in some frames.
-    """
 
+    """
     c_frame = 0
     reactions: dict[str, np.ndarray] = {}
 
-    with open(path, "r") as f:
+    with open(path) as f:
         lines = f.read().split("\n")
         for line in lines:
             if line[:5] == "Frame":
                 c_frame = int(line[6:].strip())
                 if c_frame > frame_count:
                     raise ValueError(
-                        "frame_count too low, .reactions contains frame " f"{c_frame}"
+                        f"frame_count too low, .reactions contains frame {c_frame}"
                     )
             elif line[:8] == "Reaction":
                 name = line.split()[1]
@@ -188,22 +184,21 @@ def parse_old_reactions(path, interval, frame_count):
 
 
 def parse_frag_counts(path, interval, frame_count):
-    """
-    Parses the old (pre 0.2) .frags format,
+    """Parses the old (pre 0.2) .frags format,
     returns a dict of frag name -> frag count per D/M frame
     (np.ndarray of shape (frame_count//interval,) and type np.int64)
 
-    args:
+    Args:
     path - path to the .frags file
     interval - how often was there a D/M algo
     frame_count - how many total MD frames were written
 
     the latter two args are needed for the dimension of the array
-    """
 
+    """
     counts: dict[str, np.ndarray] = {}
 
-    with open(path, "r") as f:
+    with open(path) as f:
         lines = f.read().split("\n")
         for line in lines:
             if line[:5] != "Frame":

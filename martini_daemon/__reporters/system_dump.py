@@ -1,8 +1,9 @@
+import re
+from typing import Any
+
 from ..__core import BondedForce
 from ..__reporter import Reporter
 from ..__simulation import Simulation
-from typing import Any
-import re
 
 
 def write_frame(sim: Simulation):
@@ -25,7 +26,7 @@ def write_frame(sim: Simulation):
     sim.print(".sstar", "")
     sim.print(".sstar", "Forces")
     for force in sys.get_forces():
-        if not issubclass(type(force), BondedForce):
+        if not isinstance(force, BondedForce):
             continue
         if len([force.iterate_bonds()]) == 0:
             continue
@@ -38,10 +39,8 @@ def write_frame(sim: Simulation):
 
 
 class SystemDump(Reporter):
-
     def __init__(self):
-        """
-        Dumps all info from System, including all atom details and all interactions
+        """Dumps all info from System, including all atom details and all interactions
         in a human-readable plaintext file. Dumps it at the start of a simulation and
         when there is any reactions.
 
@@ -64,7 +63,7 @@ class SystemDump(Reporter):
         simulation.print(".sstar", "# Written by Martini Daemon SystemDump")
         write_frame(simulation)
 
-    def on_reaction(self, simulation, _):
+    def on_reaction(self, simulation, reactions):
         write_frame(simulation)
 
     @staticmethod
@@ -77,8 +76,7 @@ class SystemDump(Reporter):
             list[tuple[str, list[Any]]],
         ]
     ]:
-        """
-        .sstar dump reader
+        """.sstar dump reader
 
         Returns a list of frames read.
 
@@ -96,9 +94,8 @@ class SystemDump(Reporter):
             * interaction list, which is a list of tuples.
                 * these tuples contain members (int) and parameters (floats).
         """
-
         frames = []
-        with open(path, "r") as f:
+        with open(path) as f:
             lines = f.read().splitlines()
 
         prev_i = None
@@ -163,6 +160,7 @@ class SystemDump(Reporter):
             nonlocal frames
             pat = re.compile("[0-9]+")
             num = pat.search(line)
+            assert num is not None
             atoms = []
             forces = []
             frame = (int(line[num.start() : num.end()]), atoms, forces)

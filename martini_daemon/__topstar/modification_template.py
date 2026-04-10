@@ -27,17 +27,15 @@ class ModificationTemplate(MoleculeType):
         super().process_nrexcl()
 
     def instantiate(self, system, atom_indices: list[int]):
-        """
-        Performs a modification template on selected (flattened) atom indices.
-        """
+        """Performs a modification template on selected (flattened) atom indices."""
         # breaking bonds
         for break_group in self.break_groups:
             system.break_group(
-                set(atom_indices[x] for x in break_group if atom_indices[x] >= 0)
+                {atom_indices[x] for x in break_group if atom_indices[x] >= 0}
             )
         for update_group in self.update_groups:
             system.update_group(
-                set(atom_indices[x] for x in update_group if atom_indices[x] >= 0)
+                {atom_indices[x] for x in update_group if atom_indices[x] >= 0}
             )
 
         # [bonds], [angles]...
@@ -58,9 +56,7 @@ class ModificationTemplate(MoleculeType):
                 system.remass(atom_indices[i], mass)
 
     def toggle_softcore(self, system, atom_indices: list[int], on: bool):
-        """
-        Toggles soft core on/off for minimization based on the reacting atom_indices.
-        """
+        """Toggles soft core on/off for minimization based on the reacting atom_indices."""
         for i, sc_lam, sc_alpha in self.soft_core:
             if atom_indices[i] >= 0:
                 if on:

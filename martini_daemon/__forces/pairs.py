@@ -1,14 +1,14 @@
 import openmm as mm
 
+from ..__core import BondedForce, register_available_force
 from ..__parser import (
     Directive,
-    register_directive,
     GromacsTopFile,
-    TokenList,
     InteractionDirective,
+    TokenList,
     TokenParseException,
+    register_directive,
 )
-from ..__core import BondedForce, register_available_force
 
 
 @register_directive
@@ -78,8 +78,11 @@ class Pairs(BondedForce):
         super().__init__(system)
         self.epsilon_r = system.additional_data["epsilon_r"]
 
-    def _add_to_force(self, members: list[int], params: list[float]) -> None:
-        self.force.addBond(*members, params)
+    def _add_to_force(
+        self, force: mm.Force, members: list[int], params: list[float]
+    ) -> None:
+        assert isinstance(force, mm.CustomBondForce)
+        force.addBond(*members, params)
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         # TODO what if charge/type changes during sim
@@ -130,7 +133,7 @@ class Pairs(BondedForce):
         self.force.addPerBondParameter("C6")
         self.force.addPerBondParameter("C12")
 
-    def flag_atom_change(self, atom_id, change_charge) -> None:
+    def flag_atom_change(self, atom_id: int, change_charge: bool = False) -> None:
         # TODO
         # 1. update entries
         # 2. if force is not None, update force

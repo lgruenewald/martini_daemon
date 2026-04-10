@@ -1,8 +1,10 @@
 # helper function for T* graph based fragments
 from __future__ import annotations
+
 from enum import Enum
-from ..__core import System
 from fnmatch import fnmatch
+
+from ..__core import BondedForce, System
 from ..__parser import ParseException
 
 
@@ -15,8 +17,7 @@ class GraphAtomType(Enum):
 
 class Graph:
     def __init__(self, name):
-        """
-        The class constructed from [graph]/[frag] directives that contains all
+        """The class constructed from [graph]/[frag] directives that contains all
         the information the user provided about a graph.
 
         Note: Graphs contain atoms that each have a name (which is what's used
@@ -33,6 +34,7 @@ class Graph:
         - interactions - list of (interaction_type, list of graph_atom_name)
         - equivalents - list of sets of str
         - atom_name_to_index - dict of str and int
+
         """
         self.name: str = name
         self.atoms: list[tuple[str, str, str, GraphAtomType]] = []
@@ -41,8 +43,7 @@ class Graph:
         self.atom_name_to_index: dict[str, int] = {}
 
     def finish_init(self) -> None:
-        """
-        Must be called after parsing the graph and before it's used.
+        """Must be called after parsing the graph and before it's used.
 
         Validates graphs and errors on malformed graphs.
         Raises ParseExceptions.
@@ -103,8 +104,7 @@ class Graph:
 
 # === MATCH HELPERS ===
 class GraphMatch:
-    """
-    Helper class that represents a (partially) mapped out graph to S*.
+    """Helper class that represents a (partially) mapped out graph to S*.
 
     Attributes:
     - graph - reference to a Graph instance that was (partially) matched
@@ -115,6 +115,7 @@ class GraphMatch:
     - matched_inter - same as interactions, but as a set and excluding None's
     - next_inter - internal state for the graph matching algorithm, it should point to the next
         interaction index in the graph that was not attempted to be filled yet.
+
     """
 
     # mapping of atoms -> atom_id
@@ -145,9 +146,7 @@ class GraphMatch:
         return res
 
     def add_atom(self, name: str, atom_num: int) -> None:
-        """
-        Add an graph atom name <=> atom_id mapping to the partial match.
-        """
+        """Add an graph atom name <=> atom_id mapping to the partial match."""
         assert self.atoms.get(name) is None and atom_num not in self.rev_atoms
         self.atoms[name] = atom_num
         self.rev_atoms[atom_num] = name
@@ -190,20 +189,16 @@ class GraphMatch:
             other_name = other.rev_atoms.get(id)
             if other_name is None:
                 return False
-            if other_name != name:
-                if all(
-                    map(
-                        lambda eqs: name not in eqs or other_name not in eqs,
-                        self.graph.equivalents,
-                    )
-                ):
-                    return False
+            if other_name != name and all(
+                name not in eqs or other_name not in eqs
+                for eqs in self.graph.equivalents
+            ):
+                return False
         return True
 
 
 class AtomCache:
-    """
-    Helper class that groups S* information and provides helper query
+    """Helper class that groups S* information and provides helper query
     functions to it.
     """
 
@@ -224,8 +219,7 @@ class AtomCache:
     def check_atom_interactions(
         self, g_atom: str, atom_id: int, partial: GraphMatch
     ) -> tuple[bool, list[tuple[int, tuple[str, int]]]]:
-        """
-        Returns True if adding g_atom=atom_id to the graph match is
+        """Returns True if adding g_atom=atom_id to the graph match is
         possible (all interaction requirements fulfilled).
         Returns False if there is an interaction requirement violated
         (missing interaction that should be there).
@@ -236,6 +230,7 @@ class AtomCache:
         partial -> partial graph match that g_atom=atom_id is considered
         for. Note: assumes g_atom=atom_id is not a part of partial yet.
         Note2: this function does not mutate partial.
+
         """
         # g_ prefix -> graph things
         # s_ prefix -> S* things
@@ -243,9 +238,7 @@ class AtomCache:
             atom_id
         )  # interactions for atom_id in S*
         # interactions already considered
-        skip: set[tuple[str, int]] = set(
-            i for i in partial.interactions if i is not None
-        )
+        skip: set[tuple[str, int]] = {i for i in partial.interactions if i is not None}
         matches: list[tuple[int, tuple[str, int]]] = []  # new matches
         # iterate over all interaction requirements in graph
         for i, (g_type, g_atoms) in enumerate(partial.graph.interactions):
@@ -283,7 +276,9 @@ class AtomCache:
             for s_inter in s_inters:
                 # S* interaction does not fulfill graph type filter
                 # we assume that it's a BondedForce
-                if not self.system.get_force(s_inter[0]).passes_filter(g_type):
+                force = self.system.get_force(s_inter[0])
+                assert isinstance(force, BondedForce)
+                if not force.passes_filter(g_type):
                     continue
                 # s_inter already used
                 if s_inter in skip:
@@ -311,9 +306,7 @@ class AtomCache:
 
 # === MAIN MATCHING ALGO ===
 def match_atoms(graph: Graph, atoms: set[int], system: System) -> list[GraphMatch]:
-    """
-    Return all unique graph matches for graph against a given set of atoms.
-    """
+    """Return all unique graph matches for graph against a given set of atoms."""
     # 1. build a atom cache
     cache = AtomCache(system)
     queue: list[GraphMatch] = []  # partial matches

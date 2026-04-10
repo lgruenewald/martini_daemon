@@ -1,4 +1,5 @@
 import openmm as mm
+
 from ..__core import VirtualSite, register_available_force
 from ..__parser import register_vsite4_type
 
@@ -13,10 +14,10 @@ class VSite4fdn(VirtualSite):
     def get_name(cls) -> str:
         return "4fdn"
 
-    def _make_vsite(self, vid, others, params):
+    def _make_vsite(self, vid, other, params) -> mm.VirtualSite:
         a, b, c = params
         return mm.LocalCoordinatesSite(
-            others,  # atoms
+            other,  # atoms
             [1.0, 0.0, 0.0, 0.0],  # origin weights
             [1.0 - a, -1.0, a, 0.0],  # x direction weight
             [1.0 - b, -1.0, 0.0, b],  # y direction weight

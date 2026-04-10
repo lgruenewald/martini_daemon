@@ -1,6 +1,8 @@
-from typing import Any
-import pytest
 import os
+from typing import Any
+
+import pytest
+
 from martini_daemon import Directive, Parser, TokenList
 
 
@@ -73,7 +75,6 @@ class A(Directive):
 
 
 class B(Directive):
-
     def __init__(self, parent: Any, path: str, line_num: int):
         super().__init__(parent, path, line_num)
         parent.b_s.append(self)
@@ -104,7 +105,6 @@ class B(Directive):
 
 
 class C(Directive):
-
     def __init__(self, parent: Any, path: str, line_num: int):
         super().__init__(parent, path, line_num)
         self.lines = parent.lines
@@ -148,8 +148,7 @@ def parse(path) -> tuple[bool, Root]:
 
 
 def test_parser(rootdir: str):
-    """
-    Test Parser() with manually added directives.
+    """Test Parser() with manually added directives.
 
     Relevant file: test.ini.
     """
@@ -210,8 +209,6 @@ should_fail = ["fail_mandatory.ini", "fail_unique.ini", "fail_wrong_parent.ini"]
 
 @pytest.mark.parametrize("x", should_fail)
 def test_should_fail(x: str, rootdir):
-    """
-    Test the Directive API's guarantee requirements.
-    """
+    """Test the Directive API's guarantee requirements."""
     ok, root = parse(x)
     assert not ok

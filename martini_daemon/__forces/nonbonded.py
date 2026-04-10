@@ -1,12 +1,14 @@
 from __future__ import annotations
-import openmm as mm
-from ..__core import Force, BondedForce
+
 from collections import OrderedDict
+
+import openmm as mm
+
+from ..__core import BondedForce, Force
 
 
 class NonBonded(Force):
-    """
-    A special force. It is special, because it is passed as an argument to Simulation rather than constructed
+    """A special force. It is special, because it is passed as an argument to Simulation rather than constructed
     based on .top files. It also is responsible for generating the Exclusion Helper. Simulation handles adding it
     to System, which does not treat it in a special way. The Exclusion Helper's name "exclusion" is also special,
     since molecule types hardcode it, since exclusion handling is its own whole thing.
@@ -36,8 +38,7 @@ class NonBonded(Force):
         self.__exclusions: None | ExclusionHelper = None
 
     def get_exclusion_helper(self):
-        """
-        Called by Simulation when adding the NonBonded force to the system.
+        """Called by Simulation when adding the NonBonded force to the system.
 
         ExclusionHelper is responsible for:
         - adding and removing exclusions from NonBonded and flagging reinitialize when that happens.
@@ -51,6 +52,7 @@ class NonBonded(Force):
         type_ = self.__atom_types[self.system.get_type(atom_id)]
         charge = self.system.get_charge(atom_id)
         sc_lam, sc_alpha = self.system.get_sc(atom_id)
+        assert isinstance(self.force, mm.CustomNonbondedForce)
         self.force.setParticleParameters(atom_id, [type_, charge, sc_lam, sc_alpha])
         self.system.flag_reinitialize()
 
@@ -59,6 +61,7 @@ class NonBonded(Force):
 
     def add_exclusion(self, i: int, j: int) -> None:
         if self.force is not None:
+            assert isinstance(self.force, mm.CustomNonbondedForce)
             self.force.addExclusion(i, j)
             self.system.flag_reinitialize()
 
@@ -66,6 +69,9 @@ class NonBonded(Force):
         self._destroy()
 
     def _set_force_obj(self):
+        if self.__exclusions is None:
+            raise AssertionError("Must call get_exclusion_helper() first!")
+        assert isinstance(self.__exclusions, ExclusionHelper)
         self.force = mm.CustomNonbondedForce(
             "(LJ - corr + ES);"
             "LJ = (1 - sc_lambda1) * (C12 / rA^2 - C6 / rA) + sc_lambda1 * (C12 / rB^2 - C6 / rB);"
@@ -91,9 +97,9 @@ class NonBonded(Force):
         for i, (type_name, _) in enumerate(self.system.iterate_atom_types()):
             if self.__atom_types.get(type_name) is not None:
                 # this shouldn't happen
-                assert (
-                    i == self.__atom_types[type_name]
-                ), "Internal error: atom types changed"
+                assert i == self.__atom_types[type_name], (
+                    "Internal error: atom types changed"
+                )
             self.__atom_types[type_name] = i
 
         for atom_id in range(self.system.atom_count()):
@@ -127,8 +133,7 @@ class NonBonded(Force):
 
 
 class ExclusionHelper(BondedForce):
-    """
-    The force behind the force name "exclusion". Instantiated by NonBonded.get_exclusion_helper().
+    """The force behind the force name "exclusion". Instantiated by NonBonded.get_exclusion_helper().
     Added to the system by Simulation. Each NonBonded force implementation should provide its own.
     Also handles the electrostatic self correction force
 
@@ -138,8 +143,11 @@ class ExclusionHelper(BondedForce):
     https://manual.gromacs.org/documentation/current/reference-manual/functions/nonbonded-interactions.html
     """
 
-    def _add_to_force(self, members: list[int], params: list[float]) -> None:
-        self.es_self_correction_add(*members)
+    def _add_to_force(
+        self, force: mm.Force, members: list[int], params: list[float]
+    ) -> None:
+        assert isinstance(force, mm.CustomBondForce)
+        self.es_self_correction_add(force, *members)
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         return params
@@ -172,7 +180,7 @@ class ExclusionHelper(BondedForce):
             charge = self.system.get_charge(i)
             if charge != 0:
                 # self term in reaction field correction
-                self.es_self_correction_add(i, i)
+                self.es_self_correction_add(self.force, i, i)
 
     @classmethod
     def get_name(cls) -> str:
@@ -184,14 +192,14 @@ class ExclusionHelper(BondedForce):
         self.epsilon_r = system.additional_data.get("epsilon_r")
         self.cutoff_nm = system.additional_data.get("cutoff")
 
-    def es_self_correction_add(self, i, j):
+    def es_self_correction_add(self, force: mm.CustomBondForce, i, j):
         q1 = self.system.get_charge(i)
         q2 = self.system.get_charge(j)
         q_prod = q1 * q2
         if i == j:
             q_prod *= 0.5
         if q_prod != 0:
-            self.force.addBond(i, j, [q_prod])
+            force.addBond(i, j, [q_prod])
 
     def _add_bond(self, members: list[int], params: list[float]) -> int:
         res = super()._add_bond(members, params)

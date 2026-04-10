@@ -2,9 +2,10 @@
 # ruff: noqa: E501, F401, F403, F405
 
 import builtins
+import typing
+
 import numpy
 import numpy.typing
-import typing
 
 __all__ = [
     "BondGraph",
@@ -32,21 +33,21 @@ class BondGraph:
 @typing.final
 class DetectionTemplate:
     @property
-    def name(self) -> typing.Optional[builtins.str]: ...
+    def name(self) -> builtins.str | None: ...
     @name.setter
-    def name(self, value: typing.Optional[builtins.str]) -> None: ...
+    def name(self, value: builtins.str | None) -> None: ...
     @property
     def reactants(self) -> builtins.list[builtins.str]: ...
     @reactants.setter
     def reactants(self, value: builtins.list[builtins.str]) -> None: ...
     @property
-    def rate(self) -> typing.Optional[builtins.float]: ...
+    def rate(self) -> builtins.float | None: ...
     @rate.setter
-    def rate(self, value: typing.Optional[builtins.float]) -> None: ...
+    def rate(self, value: builtins.float | None) -> None: ...
     @property
-    def observed_rate(self) -> typing.Optional[builtins.float]: ...
+    def observed_rate(self) -> builtins.float | None: ...
     @observed_rate.setter
-    def observed_rate(self, value: typing.Optional[builtins.float]) -> None: ...
+    def observed_rate(self, value: builtins.float | None) -> None: ...
     @property
     def probability(self) -> builtins.float: ...
     @probability.setter
@@ -85,8 +86,7 @@ class DetectionTemplate:
         self, entry: tuple[int, int, int, int, int, int, int, int, float, float]
     ) -> None: ...
     def complete(self) -> None:
-        r"""
-        Raises an exception if reaction is not valid.
+        r"""Raises an exception if reaction is not valid.
         Must be called when reaction is done parsing.
         """
 
@@ -96,7 +96,7 @@ class DetectionTemplateList:
     def add_detection_template(self, rx: DetectionTemplate) -> builtins.bool: ...
     def get_detection_template(
         self, name: builtins.str
-    ) -> typing.Optional[DetectionTemplate]: ...
+    ) -> DetectionTemplate | None: ...
     def reaction_names(self) -> builtins.list[builtins.str]: ...
 
 @typing.final
@@ -109,7 +109,7 @@ class FragList:
     def add_fragment(
         self, name: builtins.str, atoms: typing.Sequence[builtins.int]
     ) -> builtins.int: ...
-    def get_fragment(self, index: builtins.int) -> typing.Optional[Fragment]: ...
+    def get_fragment(self, index: builtins.int) -> Fragment | None: ...
     def delete_fragment(self, index: builtins.int) -> builtins.bool: ...
     def delete_fragments_for_atoms(
         self, atoms: typing.Sequence[builtins.int]
@@ -147,12 +147,12 @@ class PeriodicBox:
         ax: builtins.float,
         by: builtins.float,
         cz: builtins.float,
-        ay: typing.Optional[builtins.float] = None,
-        az: typing.Optional[builtins.float] = None,
-        bx: typing.Optional[builtins.float] = None,
-        bz: typing.Optional[builtins.float] = None,
-        cx: typing.Optional[builtins.float] = None,
-        cy: typing.Optional[builtins.float] = None,
+        ay: builtins.float | None = None,
+        az: builtins.float | None = None,
+        bx: builtins.float | None = None,
+        bz: builtins.float | None = None,
+        cx: builtins.float | None = None,
+        cy: builtins.float | None = None,
     ) -> PeriodicBox: ...
     def to_gro(self) -> builtins.str: ...
     @staticmethod
@@ -174,8 +174,7 @@ class PeriodicBox:
     def move_within(
         self, v: typing.Sequence[builtins.float]
     ) -> builtins.list[builtins.float]:
-        r"""
-        Move atom within the same copy of the PBC.
+        r"""Move atom within the same copy of the PBC.
         Note: moves it within the box 0,0,0 to a.x,b.y,c.z, not the box a,b,c.
         """
 
@@ -184,15 +183,12 @@ class PeriodicBox:
         reference: typing.Sequence[builtins.float],
         v: typing.Sequence[builtins.float],
     ) -> builtins.list[builtins.float]:
-        r"""
-        Translates v by periodic box vectors so it is the closest possible to reference
+        r"""Translates v by periodic box vectors so it is the closest possible to reference
         in non-periodic space.
         """
 
     def move_all_within(self, array: numpy.typing.NDArray[numpy.float64]) -> None:
-        r"""
-        Move_within but for 2D numpy arrays of positions of shape (n, 3).
-        """
+        r"""Move_within but for 2D numpy arrays of positions of shape (n, 3)."""
 
     def which_atoms_within_distance(
         self,
@@ -234,8 +230,7 @@ class PeriodicBox:
     def is_almost_inside(
         self, pos: typing.Sequence[builtins.float], cutoff: builtins.float
     ) -> builtins.bool:
-        r"""
-        Returns whether a position is either:
+        r"""Returns whether a position is either:
         - inside the "within" copy of the pbc
         - within a cutoff distance of the pbc
         Non-exactly! It can return true even if it is not within cutoff.
@@ -250,15 +245,12 @@ class PeriodicBox:
         j: builtins.int,
         k: builtins.int,
     ) -> builtins.list[builtins.float]:
-        r"""
-        Translates pos by i, j, k times periodic box vectors. This returns the same point
+        r"""Translates pos by i, j, k times periodic box vectors. This returns the same point
         in a different copy of the periodic box.
         """
 
 def build_version() -> builtins.str:
-    r"""
-    Returns the current version and git commit.
-    """
+    r"""Returns the current version and git commit."""
 
 def detection(
     frag_list: FragList,
@@ -266,8 +258,7 @@ def detection(
     pbc: PeriodicBox,
     pos: numpy.typing.NDArray[numpy.float64],
 ) -> builtins.list[tuple[builtins.str, builtins.list[builtins.int]]]:
-    r"""
-    Main entry point for the detection algorithm
+    r"""Main entry point for the detection algorithm
     - takes T* components FragList and DetectionTemplateList, a pbc and the current positions.
     - builds a current frame neighbor list.
     - runs the detection algorithm on all possible reaction-reactant combinations.

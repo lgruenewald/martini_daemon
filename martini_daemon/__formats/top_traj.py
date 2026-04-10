@@ -1,7 +1,8 @@
-from typing import Collection
-from dataclasses import dataclass
-import zlib
 import struct
+import zlib
+from collections.abc import Collection
+from dataclasses import dataclass
+
 from ..__rust import BondGraph
 
 # TODO improve docs
@@ -11,8 +12,7 @@ from ..__rust import BondGraph
 
 
 class TopTrajWriter:
-    """
-    The Topology-Trajectory File Format .toptraj is described here.
+    """The Topology-Trajectory File Format .toptraj is described here.
 
     Goals of this format:
     - Store per-trajectory data for:
@@ -89,6 +89,10 @@ class TopTrajWriter:
     """
 
     def __init__(self, path: str, title: str, initial_molecules: list[tuple[str, int]]):
+        """Creates a Topology Trajectory writer.
+
+        Note: this class owns a file handle. If using it directly, call .finish() manually when done!
+        """
         # version 1.0
         header = b"\xc0TOPTR\x01\x00"
         title_bytes = title.encode("utf-8")
@@ -108,13 +112,14 @@ class TopTrajWriter:
         checksum = zlib.crc32(header + body)
         body += struct.pack("<I", checksum)
 
-        self.handle = open(path, "wb")
+        self.handle = open(path, "wb")  # noqa: SIM115
         self.handle.write(header)
         self.comp = zlib.compressobj()
         self.handle.write(self.comp.compress(body))
         self.handle.write(self.comp.flush(zlib.Z_PARTIAL_FLUSH))
         self.handle.flush()
         self.last_frame = -1
+        self.crc32 = 0
         # for now, this keeps a lot of information in memory both here
         # and in system
         #
@@ -126,19 +131,17 @@ class TopTrajWriter:
         self.previous_frame = None
 
     def new_frame(self, frame_num: int, sim_step: int, time_ps: float, n_atoms: int):
-        """
-        Create a new frame.
-        """
+        """Create a new frame."""
         assert frame_num - self.last_frame == 1, (
             "Frames passed to TopTrajWriter must be in a sequence. "
             f"Got frame num {frame_num}, expected {self.last_frame + 1}."
         )
         assert self.frame is None, "Only call new_frame after write_frame()!"
         self.last_frame = frame_num
-        self.frame = {
-            "n_atoms": n_atoms,
-            "header": struct.pack("<IIQd", frame_num, n_atoms, sim_step, time_ps),
-        }
+
+        self.write(struct.pack("<IIQd", frame_num, n_atoms, sim_step, time_ps))
+
+        self.frame = {"n_atoms": n_atoms}
 
     def register_frame_atoms(
         self,
@@ -149,12 +152,12 @@ class TopTrajWriter:
         charges: Collection[float],
         masses: Collection[float],
     ):
-        """
-        Write current state of atoms to current frame.
-        """
-        assert (
-            self.frame.get("atoms") is None
-        ), "Should only call register_frame_atoms once per frame!"
+        """Writes the current frame atom information to disk."""
+        if self.frame is None:
+            raise ValueError("Must call new_frame() first!")
+
+        if self.frame.get("atoms") is not None:
+            raise ValueError("Should only call register_frame_atoms once per frame!")
 
         assert (
             len(names)
@@ -166,59 +169,52 @@ class TopTrajWriter:
         )
         assert len(names) == self.frame["n_atoms"]
 
-        self.frame["atoms"] = {
-            "names": names,
-            "res_names": res_names,
-            "res_ids": res_ids,
-            "atom_types": atom_types,
-            "charges": charges,
-            "masses": masses,
-        }
-
-    def register_frame_bonds(self, bonds: BondGraph):
-        assert (
-            self.frame.get("bonds") is None
-        ), "Should only call register_frame_bonds once per frame!"
-        self.frame["bonds"] = bonds
-
-    def write_frame(self):
-        """
-        Write current frame to disk.
-        """
-        raw_bytes = bytearray(self.frame["header"])
-        for name in self.frame["atoms"]["names"]:
+        for name in names:
             name_bytes = name.encode("utf-8")
-            raw_bytes += struct.pack(
-                f"<B{len(name_bytes)}s", len(name_bytes), name_bytes
+            self.write(
+                struct.pack(f"<B{len(name_bytes)}s", len(name_bytes), name_bytes)
             )
 
-        for name in self.frame["atoms"]["res_names"]:
+        for name in res_names:
             name_bytes = name.encode("utf-8")
-            raw_bytes += struct.pack(
-                f"<B{len(name_bytes)}s", len(name_bytes), name_bytes
+            self.write(
+                struct.pack(f"<B{len(name_bytes)}s", len(name_bytes), name_bytes)
             )
 
-        for res_id in self.frame["atoms"]["res_ids"]:
-            raw_bytes += struct.pack("<I", res_id)
+        for res_id in res_ids:
+            self.write(struct.pack("<I", res_id))
 
-        for atom_type in self.frame["atoms"]["atom_types"]:
+        for atom_type in atom_types:
             atom_type_bytes = atom_type.encode("utf-8")
-            raw_bytes += struct.pack(
-                f"<B{len(atom_type_bytes)}s", len(atom_type_bytes), atom_type_bytes
+            self.write(
+                struct.pack(
+                    f"<B{len(atom_type_bytes)}s", len(atom_type_bytes), atom_type_bytes
+                )
             )
 
-        for charge in self.frame["atoms"]["charges"]:
-            raw_bytes += struct.pack("<f", charge)
+        for charge in charges:
+            self.write(struct.pack("<f", charge))
 
-        for mass in self.frame["atoms"]["masses"]:
-            raw_bytes += struct.pack("<f", mass)
+        for mass in masses:
+            self.write(struct.pack("<f", mass))
+
+        self.frame["atoms"] = True
+
+    def register_frame_bonds(self, bonds: BondGraph) -> None:
+        """Writes the bonds for the current frame to disk."""
+        if self.frame is None:
+            raise ValueError("Must call new_frame() first!")
+        if self.frame.get("bonds") is not None:
+            raise ValueError("Must only call register_frame_bonds once per frame!")
+
+        self.frame["bonds"] = True
+        raw_bytes = bytearray()
 
         bonds_len = len(raw_bytes)
         raw_bytes += struct.pack("<Q", 0)
         n_bonds = 0
         wrote = set()
-        for i, j in self.frame["bonds"].to_list():
-            # TODO optimize
+        for i, j in bonds.to_list():
             if i == j:
                 continue
 
@@ -230,18 +226,35 @@ class TopTrajWriter:
             n_bonds += 1
             raw_bytes += struct.pack("<II", smaller, larger)
         raw_bytes[bonds_len : bonds_len + 8] = struct.pack("<Q", n_bonds)
-        raw_bytes += struct.pack("<I", zlib.crc32(raw_bytes))
-        self.handle.write(self.comp.compress(raw_bytes))
-        self.handle.write(self.comp.flush(zlib.Z_PARTIAL_FLUSH))
-        self.handle.flush()
-        self.previous_frame = self.frame
-        self.frame = None
+        self.write(raw_bytes)
 
-    def flush(self):
-        self.handle.write(self.comp.flush())
+    def write_frame(self):
+        """Finishes writing the current frame to disk. Must call register_frame_atoms and register_frame_bonds exactly once first."""
+        self.frame = None
+        self.write_crc32()
+        self.flush(partial=True)
+
+    def write(self, raw_bytes: bytes | bytearray) -> None:
+        assert self.handle is not None
+        assert self.comp is not None
+        self.handle.write(self.comp.compress(raw_bytes))
+        self.crc32 = zlib.crc32(raw_bytes, self.crc32)
+
+    def write_crc32(self):
+        self.write(struct.pack("<I", self.crc32))
+        self.crc32 = 0
+
+    def flush(self, partial=False):
+        assert self.handle is not None
+        assert self.comp is not None
+        if partial:
+            self.handle.write(self.comp.flush(zlib.Z_PARTIAL_FLUSH))
+        else:
+            self.handle.write(self.comp.flush())
         self.handle.flush()
 
     def finish(self):
+        assert self.handle is not None
         self.flush()
         self.handle.close()
         self.handle = None
@@ -264,9 +277,7 @@ class TopTrajFrame:
 
 
 class TopTrajReader:
-    """
-    For a description of the file format, see TopTrajWriter.
-    """
+    """For a description of the file format, see TopTrajWriter."""
 
     def __init__(self, path: str):
         self.path = path
@@ -293,9 +304,9 @@ class TopTrajReader:
 
         chunk1 = self.header + self.content[: self.i]
         (crc,) = struct.unpack("<I", self.content[self.i : self.i + 4])
-        assert (
-            zlib.crc32(chunk1) == crc
-        ), f"File {path} appears to be corrupt. Header CRC32 {crc} doesn't match {zlib.crc32(chunk1)}."
+        assert zlib.crc32(chunk1) == crc, (
+            f"File {path} appears to be corrupt. Header CRC32 {crc} doesn't match {zlib.crc32(chunk1)}."
+        )
         self.i += 4
         self.frame = 0
 
@@ -342,9 +353,9 @@ class TopTrajReader:
             self.i += 8
         (crc,) = struct.unpack("<I", self.content[self.i : self.i + 4])
         self.i += 4
-        assert (
-            zlib.crc32(self.content[frame_start : self.i - 4]) == crc
-        ), f"Frame {frame} corrupt, CRC32 mismatch."
+        assert zlib.crc32(self.content[frame_start : self.i - 4]) == crc, (
+            f"Frame {frame} corrupt, CRC32 mismatch."
+        )
 
         return TopTrajFrame(
             frame,

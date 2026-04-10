@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 from martini_daemon import (
+    ReactionReporter,
     Simulation,
     ToptrajReporter,
     VariablesReporter,
     XTCReporter,
-    ReactionReporter,
 )
 
 sim = Simulation(
@@ -22,6 +22,6 @@ sim = Simulation(
     dm_frequency=100,
     traj_frequency=5000,
 )
-sim.context.minimize_energy()
-sim.context.generate_velocities(300)
+sim.get_context().minimize_energy()
+sim.get_context().generate_velocities(300)
 sim.simulate()

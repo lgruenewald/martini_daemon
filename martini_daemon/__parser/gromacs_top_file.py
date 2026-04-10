@@ -1,8 +1,9 @@
-from typing import Type, Any
+from typing import Any
+
+from ..__core import System
 from .directive import Directive
 from .parser import Parser
 from .token_list import TokenList, TokenParseException
-from ..__core import System
 
 
 class InvalidTopologyError(Exception):
@@ -10,20 +11,17 @@ class InvalidTopologyError(Exception):
 
 
 class GromacsTopFile(Directive):
-    """
-    This class is:
+    """This class is:
     * Metadata about the .top format, allowing for the construction of parsers and generators of said format.
     * A class you can instantiate given a .top file, which will perform the parsing into itself that you can then read out.
     """
 
     # static fields
-    __top_directives: list[Type[Directive]] = []
+    __top_directives: list[type[Directive]] = []
 
     @classmethod
-    def add_top_directive(cls, directive_: Type[Directive]) -> None:
-        """
-        Add a directive to the global .top format parser.
-        """
+    def add_top_directive(cls, directive_: type[Directive]) -> None:
+        """Add a directive to the global .top format parser."""
         cls.__top_directives.append(directive_)
 
     def __init__(
@@ -33,8 +31,7 @@ class GromacsTopFile(Directive):
         include_dirs: list[str] | None = None,
         defines: dict[str, str] | None = None,
     ):
-        """
-        :param path: Path to the .top file.
+        """:param path: Path to the .top file.
         :param system: __core.System.
         :param include_dirs: List of directories to be searched if #include fails to find a file in the current dir.
         :param defines: dict[str, str] of keys and values for token replacements by the limited C preprocessor impl.
@@ -95,6 +92,6 @@ class GromacsTopFile(Directive):
         raise NotImplementedError()
 
 
-def register_directive(class_: Type[Directive]) -> Type[Directive]:
+def register_directive(class_: type[Directive]) -> type[Directive]:
     GromacsTopFile.add_top_directive(class_)
     return class_

@@ -2,8 +2,9 @@
 # quick python script that parses Daemon .log files to generate a cost
 # overview of different old_components (MD, D/M, reinit, xtc write)
 
-from martini_daemon import extract_timings_from_log
 import sys
+
+from martini_daemon import extract_timings_from_log
 
 path = sys.argv[1]
 

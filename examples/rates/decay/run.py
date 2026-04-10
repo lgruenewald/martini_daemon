@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 from martini_daemon import (
-    Simulation,
-    ReactionReporter,
     FragCountReporter,
-    XTCReporter,
+    ReactionReporter,
+    Simulation,
     VariablesReporter,
+    XTCReporter,
 )
 
 sim = Simulation(

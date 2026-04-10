@@ -1,6 +1,6 @@
+from ..__formats import TrajectoryWriter
 from ..__reporter import Reporter
 from ..__simulation import Simulation
-from ..__formats import TrajectoryWriter
 
 
 class XTCReporter(Reporter):
@@ -13,8 +13,13 @@ class XTCReporter(Reporter):
         self.writer = TrajectoryWriter(self.path)
 
     def on_trajectory_frame(self, simulation: Simulation) -> None:
-        pos, box = simulation.context.get_positions()
+        assert self.writer is not None
+        assert simulation.__context is not None, (
+            "Simulation context is None. Was it constructed with "
+        )
+        pos, box = simulation.__context.get_positions()
         self.writer.write_frame(simulation.current_step, simulation.time_ps, box, pos)
 
     def on_simulation_finish(self, simulation: Simulation) -> None:
+        assert self.writer is not None
         self.writer.finish()

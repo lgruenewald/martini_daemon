@@ -1,12 +1,11 @@
-from .token import Token
-import re
 import math
+import re
+
+from .token import Token
 
 
 class TokenParseException(Exception):
-    """
-    Exception when .unwrap() fails
-    """
+    """Exception when .unwrap() fails"""
 
     def __init__(self, token: Token, message: str):
         self.token = token
@@ -14,8 +13,7 @@ class TokenParseException(Exception):
 
 
 class TokenList:
-    """
-    A list of tokens.
+    """A list of tokens.
 
     Parser calls the line method of :doc:`Directive</autoapi/martini_daemon/Directive>` with this type as the argument.
     Directive implementations should call the unwrap method with the
@@ -31,8 +29,7 @@ class TokenList:
     __DEFAULT = object()
 
     def __init__(self, line: str, tokens: list[Token], defines: dict[str, str]):
-        """
-        Note that tokenization has to performed first before constructing TokenList. This is done by the Parser.
+        """Note that tokenization has to performed first before constructing TokenList. This is done by the Parser.
         This is because the Parser needs to process line continuations first.
 
         :param line: Line that was tokenized.
@@ -75,8 +72,7 @@ class TokenList:
         default=__DEFAULT,
         error_msg: str | None = None,
     ):
-        """
-        Given a TokenList try to index it and convert to a usable value
+        """Given a TokenList try to index it and convert to a usable value
         based on type_filter. If the index is out of range, a default
         value can be specified in place. Will also perform preprocessor #define
         replacements.
@@ -107,8 +103,7 @@ class TokenList:
                     self.__tokens[-1],
                     f"Not enough tokens, expected token at index {index}.",
                 )
-            else:
-                return default
+            return default
 
         tok = self.__tokens[index]
         content = tok.line[tok.start : tok.end]

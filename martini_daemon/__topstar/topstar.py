@@ -1,12 +1,11 @@
-from ..__rust import Fragment, FragList, DetectionTemplateList, detection, PeriodicBox
-from .modification_template import ModificationTemplate
-from .graph import Graph, GraphMatch, match_atoms
 from ..__core import System
+from ..__rust import DetectionTemplateList, FragList, Fragment, PeriodicBox, detection
+from .graph import Graph, GraphMatch, match_atoms
+from .modification_template import ModificationTemplate
 
 
 class TopStar:
-    """
-    The glue between the following components:
+    """The glue between the following components:
     - graph matching algorithm
     - detection algorithm
     - modification algorithm
@@ -24,14 +23,15 @@ class TopStar:
         # run the graph matching algorithm on all molecules separately
         i = 0
         for mol, n in system.initial_molecules:
-            n_atoms = len(system.molecule_types.get(mol).atoms)
+            mol_type = system.molecule_types.get(mol)
+            assert mol_type is not None
+            n_atoms = len(mol_type.atoms)
             for j in range(n):
                 self.try_match_graphs(set(range(i, i + n_atoms)))
                 i += n_atoms
 
     def try_match_graphs(self, atoms: set[int]) -> None:
-        """
-        Given a set of atoms, find all graph matches of all known
+        """Given a set of atoms, find all graph matches of all known
         graphs and add them to the fragment list.
 
         Should be called after system is constructed.
@@ -42,7 +42,6 @@ class TopStar:
         and all their neighbors. Remove all pre-existing fragments
         that contain atoms on which try_match_graphs is called first!
         """
-
         matches: list[GraphMatch] = []
         for graph in self.graphs.values():
             matches += match_atoms(graph, atoms, self.system)
@@ -65,8 +64,7 @@ class TopStar:
         counts: dict[str, int],
         volume: float,
     ) -> None:
-        """
-        Updates "observed rate" in detection templates based on the reactions happening and current
+        """Updates "observed rate" in detection templates based on the reactions happening and current
         reactant concentrations (specified using counts and volume).
         """
         # TODO
@@ -74,8 +72,7 @@ class TopStar:
         pass
 
     def detection(self, pbc: PeriodicBox, pos) -> list[tuple[str, list[int]]]:
-        """
-        Runs the detection algorithm, given a periodic box and atom positions and current state in TopStar.
+        """Runs the detection algorithm, given a periodic box and atom positions and current state in TopStar.
         Returns the list of reactions.
         """
         return detection(self.frag_list, self.detection_templates, pbc, pos)
@@ -83,8 +80,7 @@ class TopStar:
     def modification(
         self, reactions: list[tuple[str, list[int]]]
     ) -> list[tuple[str, list[Fragment]]]:
-        """
-        Runs the modification algorithm.
+        """Runs the modification algorithm.
 
         Modifies TopStar and System according to the reaction templates.
 
@@ -94,6 +90,7 @@ class TopStar:
 
         for rx, frag_ids in reactions:
             frags = [self.frag_list.get_fragment(frag_id) for frag_id in frag_ids]
+
             if any(frag is None for frag in frags):
                 # pass reactions if a previous reactions' modification algorithm destroyed the reactant fragment
                 # of another reaction
@@ -101,6 +98,7 @@ class TopStar:
 
             flattened_atoms = []
             for f in frags:
+                assert f is not None
                 flattened_atoms.extend(f.atoms)
 
             # execute modification tempate
@@ -125,7 +123,9 @@ class TopStar:
 
     def toggle_softcore(self, reactions: list[tuple[str, list[Fragment]]], on: bool):
         for rx, frags in reactions:
-            m_template = self.system.molecule_types[rx]
+            m_template = self.system.molecule_types.get(rx)
+            assert isinstance(m_template, ModificationTemplate)
+
             flattened_atoms = []
             for f in frags:
                 flattened_atoms.extend(f.atoms)

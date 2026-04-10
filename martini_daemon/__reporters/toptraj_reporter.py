@@ -1,6 +1,6 @@
+from ..__formats import TopTrajWriter
 from ..__reporter import Reporter
 from ..__simulation import Simulation
-from ..__formats import TopTrajWriter
 
 
 class ToptrajReporter(Reporter):
@@ -8,13 +8,16 @@ class ToptrajReporter(Reporter):
         self.writer: TopTrajWriter | None = None
 
     def on_simulation_start(self, simulation: Simulation):
+        title = simulation.system.additional_data.get("title")
+        assert type(title) is str
         self.writer = TopTrajWriter(
             simulation.request_path(".toptraj"),
-            simulation.system.additional_data.get("title"),
+            title,
             simulation.system.initial_molecules,
         )
 
     def on_trajectory_frame(self, simulation):
+        assert self.writer is not None
         self.writer.new_frame(
             simulation.trajectory_frame,
             simulation.current_step,
@@ -35,4 +38,5 @@ class ToptrajReporter(Reporter):
         self.writer.write_frame()
 
     def on_simulation_finish(self, simulation):
+        assert self.writer is not None
         self.writer.finish()

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 from martini_daemon import (
+    FragCountReporter,
+    ReactionReporter,
     Simulation,
     ToptrajReporter,
     VariablesReporter,
     XTCReporter,
-    ReactionReporter,
-    FragCountReporter,
 )
 
 sim = Simulation(
@@ -24,5 +24,5 @@ sim = Simulation(
     dm_frequency=250,
     traj_frequency=5000,
 )
-sim.context.generate_velocities(300)
+sim.get_context().generate_velocities(300)
 sim.simulate()

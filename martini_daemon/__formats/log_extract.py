@@ -7,7 +7,7 @@ def extract_timings_from_log(path, ignore_first=False):
     categories_starts = {}
     categories_sums = {}
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             for line in f.readlines():
                 date = line[:23]
                 content = line[24:]

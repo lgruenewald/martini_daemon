@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # very quick script to generate system.gro and expected.reactions
 
-from martini_daemon import write_geometry, PeriodicBox
 import numpy as np
+
+from martini_daemon import PeriodicBox, write_geometry
 
 title_line = "# frame,reaction_name;reactant1_name,reactant1_id,atoms...;reactantn_name,reactantn_id,atoms..."
 reactions = []
@@ -51,7 +52,7 @@ for i in range(n_molecules):
         and angle_range[0] < angle < angle_range[1]
     ):
         reactions.append(
-            f"0,tri;{r1},{i*3},{i*3};{r2},{i*3+1},{i*3+1};{r3},{i*3+2},{i*3+2}"
+            f"0,tri;{r1},{i * 3},{i * 3};{r2},{i * 3 + 1},{i * 3 + 1};{r3},{i * 3 + 2},{i * 3 + 2}"
         )
 
     atom_names.append(r1)

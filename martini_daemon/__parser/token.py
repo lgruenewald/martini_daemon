@@ -3,8 +3,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Token:
-    """
-    A single whitespace separated token from parsing.
+    """A single whitespace separated token from parsing.
 
     :param content: The processed content of the token.
     :param line: The whole line that contains the token. Before preprocessing, after removing comments and making lines whole across backslashes.

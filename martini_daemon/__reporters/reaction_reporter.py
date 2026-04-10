@@ -1,16 +1,15 @@
 import re
 
 from ..__reporter import Reporter
-from ..__simulation import Simulation
 from ..__rust import Fragment
+from ..__simulation import Simulation
 
 
 class ReactionReporter(Reporter):
     """A reporter that reports all reactions to <name>.reactions"""
 
     def __init__(self):
-        """
-        A reporter that reports all reactions to <name>.reactions.
+        """A reporter that reports all reactions to <name>.reactions.
 
         The created file has a text format, where every line is a reaction.
         First, the frame number and reaction name are separated by a comma,
@@ -23,6 +22,7 @@ class ReactionReporter(Reporter):
 
         Example:
         frame,reaction_name;reactant1_name,reactant1_id(res:resid1,...residn),atoms...;...reactantn_name(res:resid1,...residn),reactantn_id,atoms...
+
         """
         self.reactions = 0
 
@@ -67,13 +67,12 @@ class ReactionReporter(Reporter):
 
     @staticmethod
     def read_reactions(path) -> list[tuple[int, str, list[list[int]]]]:
-        """
-        .reactions format reader suited for test_detection.py
+        """.reactions format reader suited for test_detection.py
 
         Returns a list of simulation steps, reaction names and list of reactant atom lists
         """
         reactions = []
-        with open(path, "r") as f:
+        with open(path) as f:
             lines = f.read().splitlines()
             for line in lines:
                 if line[0] == "#" or len(line) == 0:

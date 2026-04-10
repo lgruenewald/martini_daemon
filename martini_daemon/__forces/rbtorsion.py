@@ -1,4 +1,5 @@
 import openmm as mm
+
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_dihedral_type
 
@@ -6,9 +7,11 @@ from ..__parser import register_dihedral_type
 @register_dihedral_type(type_=3, args=["float" for _ in range(6)])
 @register_available_force
 class RBTorsion(BondedForce):
-
-    def _add_to_force(self, members: list[int], params: list[float]) -> None:
-        self.force.addTorsion(*members, *params)
+    def _add_to_force(
+        self, force: mm.Force, members: list[int], params: list[float]
+    ) -> None:
+        assert isinstance(force, mm.RBTorsionForce)
+        force.addTorsion(*members, *params)
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         return params
@@ -33,8 +36,11 @@ class RBTorsion(BondedForce):
 @register_dihedral_type(type_=5, args=["float" for _ in range(4)])
 @register_available_force
 class FourierDihedral(BondedForce):
-    def _add_to_force(self, members: list[int], params: list[float]) -> None:
-        self.force.addTorsion(*members, *params)
+    def _add_to_force(
+        self, force: mm.Force, members: list[int], params: list[float]
+    ) -> None:
+        assert isinstance(force, mm.RBTorsionForce)
+        force.addTorsion(*members, *params)
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         return [

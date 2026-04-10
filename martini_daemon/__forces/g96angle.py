@@ -1,4 +1,5 @@
 import openmm as mm
+
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_angle_type
 
@@ -6,9 +7,11 @@ from ..__parser import register_angle_type
 @register_angle_type(type_=2, args=["degree", "float"])
 @register_available_force
 class G96Angle(BondedForce):
-
-    def _add_to_force(self, members: list[int], params: list[float]) -> None:
-        self.force.addAngle(*members, params)
+    def _add_to_force(
+        self, force: mm.Force, members: list[int], params: list[float]
+    ) -> None:
+        assert isinstance(force, mm.CustomAngleForce)
+        force.addAngle(*members, params)
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         return params

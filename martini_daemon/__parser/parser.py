@@ -1,26 +1,23 @@
-import re
-from enum import Enum
 import os
+import re
 import traceback
+from enum import Enum
 from sys import stderr
-from typing import Type
-from .token import Token
-from .token_list import TokenParseException, TokenList
+
 from .directive import Directive
+from .token import Token
+from .token_list import TokenList, TokenParseException
 
 
 class ParseException(Exception):
     def __init__(self, message: str):
-        """
-        Generic exception raised during parsing.
-        """
+        """Generic exception raised during parsing."""
         self.message = message
 
 
 class DirectiveException(Exception):
     def __init__(self, message: str, path, start_line, end_line):
-        """
-        Exception raised during the finish() method of directives.
+        """Exception raised during the finish() method of directives.
         ParseExceptions get re-raised as this type automatically.
         """
         self.path = path
@@ -44,8 +41,7 @@ class Parser:
         include_dirs: list[str] | None = None,
         defines: dict[str, str] | None = None,
     ):
-        """
-        Generic Gromacs-style .ini format parser.
+        """Generic Gromacs-style .ini format parser.
 
         See :doc:`/autoapi/martini_daemon/GromacsTopFile` for the parser specifically for GROMACS ``.top`` files,
         which inherits this class. For extending Martini Daemon with custom directives, also see :doc:`/extending`.
@@ -71,7 +67,7 @@ class Parser:
         :param defines: dict[str, str] of keys and values for token replacements by the limited C preprocessor impl.
         """
         # stores types, not instances
-        self.__directives: dict[str, Type[Directive]] = {}
+        self.__directives: dict[str, type[Directive]] = {}
         self.__line_num: int = 0
         self.__path: str = path
         self.__defines: dict[str, str] = defines or {}
@@ -84,9 +80,8 @@ class Parser:
         # state
         self.__done = False
 
-    def add_directive(self, directive: Type[Directive]) -> None:
-        """
-        Add a new directive to this Parser.
+    def add_directive(self, directive: type[Directive]) -> None:
+        """Add a new directive to this Parser.
 
         :param directive: the directive to add.
         """
@@ -94,14 +89,13 @@ class Parser:
         assert name not in self.__directives, f"Directive [{name}] was already defined."
         self.__directives[name] = directive
         for alias in directive.aliases:
-            assert (
-                alias not in self.__directives
-            ), f"Directive [{alias}] was already defined."
+            assert alias not in self.__directives, (
+                f"Directive [{alias}] was already defined."
+            )
             self.__directives[alias] = directive
 
     def parse(self) -> bool:
-        """
-        Performs the parsing and mutates the root argument passed during construction.
+        """Performs the parsing and mutates the root argument passed during construction.
 
         :returns: Whether parsing succeeded. If not, the error message was already printed to stderr.
 
@@ -156,8 +150,7 @@ class Parser:
     def __error_message_location(
         message: str, path: str, line_num: int, line: str | None, start=None, end=None
     ) -> None:
-        """
-        Prints an error message. Three modes available:
+        """Prints an error message. Three modes available:
 
         - ``line``, ``start``, ``end`` are all None - will print the line based on the file on disk
         - only ``line`` is not None - will print ``line`` as line content
@@ -168,17 +161,17 @@ class Parser:
 
         if start is None or end is None:
             if line is None:
-                with open(path, "r") as file:
+                with open(path) as file:
                     lines = file.read().splitlines()
                     if len(lines) <= line_num:
                         return
                     line = lines[line_num]
 
-            print(f"{line_num+1}: \033[1;33m{line}\033[0m", file=stderr)
+            print(f"{line_num + 1}: \033[1;33m{line}\033[0m", file=stderr)
         else:
             assert line is not None
             print(
-                f"{line_num+1}: {line[0:start]}"
+                f"{line_num + 1}: {line[0:start]}"
                 f"\033[1;33m{line[start:end]}\033[0m"
                 f"{line[end:]}",
                 file=stderr,
@@ -186,24 +179,22 @@ class Parser:
 
     @staticmethod
     def __error_directive(message: str, path: str, start: int, end: int | None) -> None:
-        """
-        Prints an error message. If end is not None, it will read the file and highlight the whole directive's
+        """Prints an error message. If end is not None, it will read the file and highlight the whole directive's
         text in yellow, with line numbers.
         """
-
         assert end is None or end > start
 
         print(f"\033[1;33m{message}\033[0m", file=stderr)
         print(f"In file {path} at line {start + 1}.", file=stderr)
 
         if end is not None:
-            with open(path, "r") as file:
+            with open(path) as file:
                 lines = file.read().splitlines()
                 if len(lines) <= end:
                     return
                 print(
                     "\n".join(
-                        f"{i+1}: \033[1;33m{line}\033[0m"
+                        f"{i + 1}: \033[1;33m{line}\033[0m"
                         for i, line in zip(range(start, end), lines[start:end])
                     ),
                     file=stderr,
@@ -218,14 +209,12 @@ class Parser:
     __token_pat = re.compile(r'\[|]|"[^"]*"|<[^>]*>|[^ \t\n\r\f\v\[\]"<>]+')
 
     def __tokenize(self, line: str) -> TokenList:
-        """
-        Splits a line-up into a list of tokens.
+        """Splits a line-up into a list of tokens.
 
         * Assumes lines have been made whole already, and that comments were removed.
         * Separates based on whitespace.
         * Performs #define replacements.
         """
-
         tokens = [
             Token(
                 content=line[match.start() : match.end()],
@@ -251,25 +240,24 @@ class Parser:
             # find the outermost valid parent
             if directive_type.is_valid_parent(self.__directive_stack[-1]):
                 break
-            else:
-                # directive ends previous directive -- call finishers
-                old_dir = self.__directive_stack.pop()
+            # directive ends previous directive -- call finishers
+            old_dir = self.__directive_stack.pop()
 
-                # info for potential exceptions
-                directive_end = self.__line_num
-                current_path = self.__path
-                directive_path, directive_start = old_dir.where()
-                # finisher
-                try:
-                    old_dir.finish()
-                except ParseException as pe:
-                    # we need good error messages from finish hooks, so let's re-raise ParseExceptions
-                    raise DirectiveException(
-                        pe.message,
-                        directive_path,
-                        directive_start,
-                        directive_end if current_path == directive_path else None,
-                    )
+            # info for potential exceptions
+            directive_end = self.__line_num
+            current_path = self.__path
+            directive_path, directive_start = old_dir.where()
+            # finisher
+            try:
+                old_dir.finish()
+            except ParseException as pe:
+                # we need good error messages from finish hooks, so let's re-raise ParseExceptions
+                raise DirectiveException(
+                    pe.message,
+                    directive_path,
+                    directive_start,
+                    directive_end if current_path == directive_path else None,
+                )
         parent = self.__directive_stack[-1]
         if not directive_type.is_valid_parent(parent):
             raise ParseException(
@@ -287,12 +275,10 @@ class Parser:
         self.__directive_stack.append(directive)
 
     def __parse(self, path: str) -> None:
-        """
-        Parses a single file at path.
+        """Parses a single file at path.
 
         Recursively calls itself through #includes.
         """
-
         self.__included.add(path)
         old_path = self.__path
         self.__path = path
@@ -300,7 +286,7 @@ class Parser:
         # if stack is per file, but this is not a problem in most .top files
         if_stack = [IfStackElem.Root]
 
-        with open(path, "r") as f:
+        with open(path) as f:
             # make lines whole through \
             cumulative = ""
             for i, line in enumerate(f):
@@ -424,7 +410,7 @@ class Parser:
                 elif token0.content[0] == "#":
                     match token0.content:
                         case "#include":
-                            if len(token_list) != 2:
+                            if token1 is None or len(token_list) != 2:
                                 raise TokenParseException(
                                     token0, "#include takes one argument."
                                 )
@@ -453,7 +439,7 @@ class Parser:
                                     token1, f"File not found: {name}."
                                 )
                         case "#define":
-                            if len(token_list) not in {2, 3}:
+                            if token1 is None or len(token_list) not in {2, 3}:
                                 raise TokenParseException(
                                     token0,
                                     "#define takes one or two tokens arguments. "
@@ -465,13 +451,12 @@ class Parser:
                             value = token_list[2].content
                             self.__defines[key] = value
                         case "#undef":
-                            if len(token_list) != 2:
+                            if token1 is None or len(token_list) != 2:
                                 raise TokenParseException(
                                     token0, "#undef takes one argument."
                                 )
                             key = token1.content
-                            if self.__defines.get(key):
-                                self.__defines.pop(key)
+                            self.__defines.pop(key, None)
                         case _:
                             # unreachable
                             assert False

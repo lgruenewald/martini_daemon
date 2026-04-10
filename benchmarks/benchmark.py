@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
 
+import json
+import logging
 import os
+import platform
+import shutil
+import subprocess
 import sys
 import time
-import json
-import numpy as np
-import platform
-import psutil
-import subprocess
-import openmm.version
-import logging
-import shutil
 from datetime import datetime
 
-from martini_daemon.old_simulation import Simulation
-from martini_daemon.utils import backup_try
+import numpy as np
+import openmm.version
+
+from martini_daemon import Simulation
 
 # setup logging
 result_path = f"{datetime.now()}.log"
-backup_try(result_path)
 mm_platform = "CUDA"
 tmpdir = ".tmp"
 
@@ -40,8 +38,7 @@ cached = {}
 
 
 def bench_gromacs(top, gro, steps):
-    """
-    In a temporary folder that it creates and cleans up after,
+    """In a temporary folder that it creates and cleans up after,
     it runs a gmx simulation of top, gro for steps steps,
     and returns the time it took as a tuple: (grompp time, mdrun time)
 
@@ -81,8 +78,7 @@ def bench_gromacs(top, gro, steps):
 
 # daemon n repetition setup
 def setup_daemon():
-    """
-    called before n repetitions
+    """Called before n repetitions
 
     side effects:
     makes and enters a temporary folder
@@ -93,8 +89,7 @@ def setup_daemon():
 
 # daemon run
 def bench_daemon(top, gro, steps, freq, reactive, force_reinit):
-    """
-    single repetition of daemon, returns the simulation log file name
+    """Single repetition of daemon, returns the simulation log file name
 
     side effect: creation of the log file the name of which is returned
     """
@@ -105,43 +100,40 @@ def bench_daemon(top, gro, steps, freq, reactive, force_reinit):
     sim_name = f"out_{datetime.now()}"
     logger.info(
         f"Running daemon with {top} {gro} for {steps} steps {freq} "
-        f"freq {reactive} reactive force_reinit {force_reinit}."
+        f"freq {reactive} reactive."
     )
     start_grompp = time.time()
     sim = Simulation(
         top_path=top,
-        gro_path=gro,
+        geom_path=gro,
         md_steps=steps,
         dm_frequency=freq,
-        xtc_frequency=5000,
+        traj_frequency=5000,
         sim_name=sim_name,
         platform=mm_platform,
         defines=defines,
-        force_reinitialize=force_reinit,
     )
-    sim.minimize_energy()
-    sim.generate_velocities(300)
+    sim.get_context().minimize_energy()
+    sim.get_context().generate_velocities(300)
     end_grompp = time.time()
     grompp = end_grompp - start_grompp
 
     logger.info(f"Parsing done in {grompp:.1f} s.")
     start_mdrun = time.time()
-    sim.simulate()
+    sim.simulate(finish=False)
     end_mdrun = time.time()
     mdrun = end_mdrun - start_mdrun
     logger.info(f"Simulation done in {mdrun:.1f} s.")
 
     probe_start = time.time()
-    sim.current_step(100000, xtc=True, dm=False, neighbor=False)
+    sim.step(100000, traj=True, dm=False)
     probe_end = time.time()
     probe = probe_end - probe_start
     logger.info(f"Probe 100k steps took {probe:.2f} s.")
 
-    for h in sim.logger.handlers:
-        h.flush_all()
-        h.close()
+    sim.finish()
 
-    return (sim_name + ".log", grompp, mdrun, probe)
+    return sim_name + ".log", grompp, mdrun, probe
 
 
 # log extractor, dat writer
@@ -152,8 +144,7 @@ categories = ["Parsing", "MD", "Detection", "Modification", "Reinitialize", "XTC
 
 
 def extract(log_path, result_prefix, result_hist_prefix):
-    """
-    Takes daemon .log file at log_path, returns data about how much time
+    """Takes daemon .log file at log_path, returns data about how much time
     the different old_components took (md, detection, reinit, ...)
 
     Also writes the processed log file data to result_paths
@@ -175,7 +166,7 @@ def extract(log_path, result_prefix, result_hist_prefix):
         categories_values[cat] = [0.0]
     i = 0
 
-    with open(log_path, "r") as f:
+    with open(log_path) as f:
         for line in f.readlines():
             date = line[:23]
             content = line[24:]
@@ -249,11 +240,10 @@ def extract(log_path, result_prefix, result_hist_prefix):
 
 # n repetition collector
 def finish_daemon(result_dir, name, reactive_runs, non_reactive_runs):
-    """
-    called after n repetitions, with the result of every run of bench_daemon
+    """Called after n repetitions, with the result of every run of bench_daemon
     as a list
 
-    args:
+    Args:
     name - name of the run, used to generate the result .dat path
     two lists - reactive and non reactive log file names
 
@@ -270,10 +260,11 @@ def finish_daemon(result_dir, name, reactive_runs, non_reactive_runs):
 
     exits and cleans up the temporary folder, deleting the logs, xtc, ...
 
-    returns:
+    Returns:
     a dictionary that contains the averaged-over-repetitions
     times that each component took during a single run
     (required for the summary)
+
     """
     logger.info(f"Finishing runs for {name}.")
     os.chdir("..")
@@ -338,8 +329,7 @@ def finish_daemon(result_dir, name, reactive_runs, non_reactive_runs):
         f"{non_reactive_runtime:.1f} to run."
     )
     logger.info(
-        f"Parse slowdown of {parse_slowdown:.1f}%. "
-        f"Run slowdown of {run_slowdown:.1f}%."
+        f"Parse slowdown of {parse_slowdown:.1f}%. Run slowdown of {run_slowdown:.1f}%."
     )
     logger.info(
         f"Reactive probe {reactive_probe:.2f}. "
@@ -360,8 +350,7 @@ def finish_daemon(result_dir, name, reactive_runs, non_reactive_runs):
 
 # main helper
 def run_recipe(recipe_name, data):
-    """
-    args: recipe name, data json object, which is a list of dictionaries.
+    """args: recipe name, data json object, which is a list of dictionaries.
 
     A recipe is a list of reactive MD simulation parameters.
 
@@ -386,7 +375,6 @@ def run_recipe(recipe_name, data):
     - reactive, non reactive and gromacs for every entry
     - Plottable graph of time of each component, in seconds
     """
-
     logger.info(f"Starting recipe {recipe_name}.")
     result_dir = os.path.join("results", recipe_name)
     os.mkdir(result_dir)
@@ -437,7 +425,6 @@ def run_recipe(recipe_name, data):
     # generate summary
     summary = os.path.join(result_dir, "summary.dat")
     with open(summary, "w") as f:
-
         cats = ",".join(categories)
         f.write(
             "# Autogenerated by benchmark.py\n"
@@ -503,12 +490,13 @@ def run_recipe(recipe_name, data):
 
 
 # print data about hardware and current utilization of resources
-def get_cpu_model():
+def get_cpu_model() -> str:
     command = "cat /proc/cpuinfo"
     info = subprocess.check_output(command, shell=True).decode().strip()
     for line in info.split("\n"):
         if "model name" in line:
             return line.split(":")[1].strip()
+    return ""
 
 
 def get_gpu_stats():
@@ -532,7 +520,7 @@ def get_gpu_stats():
 logger.debug(f"Log file: {result_path}")
 logger.debug(f"Hostname: {platform.node()}")
 logger.debug(f"Platform: {platform.platform()}")
-logger.debug(f"CPU model: {get_cpu_model()} utilization {psutil.cpu_percent()}%")
+logger.debug(f"CPU model: {get_cpu_model()}")
 logger.debug(f"{get_gpu_stats()}")
 logger.debug(f"OpenMM version: {openmm.version.version}")
 logger.debug(f"OpenMM platform being used: {mm_platform}")

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 from martini_daemon import (
-    Simulation,
-    ReactionReporter,
     FragCountReporter,
-    XTCReporter,
-    VariablesReporter,
+    ReactionReporter,
+    Simulation,
     ToptrajReporter,
+    VariablesReporter,
+    XTCReporter,
 )
 
 sim = Simulation(
@@ -24,6 +24,6 @@ sim = Simulation(
     platform="CUDA",
     context_parameters={"DeviceIndex": "0"},
 )
-sim.context.minimize_energy()
-sim.context.generate_velocities(300)
+sim.get_context().minimize_energy()
+sim.get_context().generate_velocities(300)
 sim.simulate()

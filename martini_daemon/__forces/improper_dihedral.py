@@ -1,5 +1,7 @@
-import openmm as mm
 import math
+
+import openmm as mm
+
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_dihedral_type
 
@@ -7,9 +9,11 @@ from ..__parser import register_dihedral_type
 @register_dihedral_type(type_=2, args=["degree", "float"])
 @register_available_force
 class ImproperDihedral(BondedForce):
-
-    def _add_to_force(self, members: list[int], params: list[float]) -> None:
-        self.force.addTorsion(*members, params)
+    def _add_to_force(
+        self, force: mm.Force, members: list[int], params: list[float]
+    ) -> None:
+        assert isinstance(force, mm.CustomTorsionForce)
+        force.addTorsion(*members, params)
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         return params

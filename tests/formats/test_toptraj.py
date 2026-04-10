@@ -1,20 +1,29 @@
 #!/usr/bin/env python3
 
-from martini_daemon import TopTrajWriter, TopTrajReader, BondGraph
-import numpy as np
+import os
+import random
 import string
 from math import isclose
 
+import numpy as np
+import pytest
+
+from martini_daemon import BondGraph, TopTrajReader, TopTrajWriter
+
 
 def get_random_name():
-    return "".join(
-        np.random.choice(list(string.ascii_uppercase))
-        for _ in range(np.random.randint(1, 8))
-    )
+    return random.choice(list(string.ascii_uppercase))
 
 
-def test_toptraj_writer():
-    w = TopTrajWriter("out.toptraj", "example title", [("a", 1), ("b", 2), ("c", 3)])
+@pytest.fixture
+def rootdir(request):
+    return os.path.dirname(request.path)
+
+
+def test_toptraj_writer(rootdir):
+    os.chdir(rootdir)
+    tmp_file = ".out.toptraj"
+    w = TopTrajWriter(tmp_file, "example title", [("a", 1), ("b", 2), ("c", 3)])
 
     print("generating data")
     # generate data
@@ -61,7 +70,7 @@ def test_toptraj_writer():
     w.finish()
 
     print("reading from file and verifying")
-    r = TopTrajReader("out.toptraj")
+    r = TopTrajReader(tmp_file)
     assert r.title == b"example title"
     assert r.initial_molecules[0] == (b"a", 1)
     assert r.initial_molecules[1] == (b"b", 2)
@@ -69,6 +78,7 @@ def test_toptraj_writer():
 
     for i, frame in enumerate(frames):
         f = r.read_frame()
+        assert f is not None
         assert f.sim_step == i * 5000
         assert f.frame_index == i
         assert isclose(f.sim_time, i * 0.1, rel_tol=1e-5)
@@ -88,6 +98,4 @@ def test_toptraj_writer():
 
     assert r.read_frame() is None
 
-
-if __name__ == "__main__":
-    test_toptraj_writer()
+    os.remove(tmp_file)

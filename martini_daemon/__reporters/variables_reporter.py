@@ -13,10 +13,10 @@ def write_energies(title, suffix, sim: Simulation, first=False):
         )
         return
     n = sim.system.atom_count()
-    ke, pe, te = sim.context.get_energies()
+    ke, pe, te = sim.get_context().get_energies()
     degrees_of_freedom = sim.system.get_number_of_degrees_of_freedom()
     t = ke / degrees_of_freedom / 0.008314 * 2
-    _, box = sim.context.get_positions()
+    _, box = sim.get_context().get_positions()
     box_x = box.a[0]
     box_y = box.b[1]
     box_z = box.c[2]
@@ -28,7 +28,6 @@ def write_energies(title, suffix, sim: Simulation, first=False):
 
 
 class VariablesReporter(Reporter):
-
     def on_simulation_start(self, simulation: Simulation):
         simulation.open(".ener")
         write_energies("", ".ener", simulation, True)

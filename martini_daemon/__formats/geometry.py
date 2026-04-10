@@ -1,11 +1,11 @@
 from os.path import splitext
+
 from .gro_file import read_gro, write_gro
 from .xyz_file import read_xyz, write_xyz
 
 
 def read_geometry(path):
-    """
-    File format implied from extension.
+    """File format implied from extension.
 
     :param path: path to file
     :return: periodic box (PeriodicBox), positions (numpy float64 array), velocities (numpy float64 array or None).
@@ -21,8 +21,7 @@ def read_geometry(path):
 
 
 def write_geometry(path, title, atom_names, res_names, res_ids, box, pos, vel=None):
-    """
-    File format implied from extension.
+    """File format implied from extension.
 
     :param path: path to file
     :param title: title of geometry

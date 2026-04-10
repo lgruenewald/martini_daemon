@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 from martini_daemon import (
-    Simulation,
-    XTCReporter,
-    ToptrajReporter,
-    ReactionReporter,
     FragCountReporter,
+    ReactionReporter,
+    Simulation,
+    ToptrajReporter,
+    XTCReporter,
 )
 
 sim = Simulation(
@@ -22,7 +22,7 @@ sim = Simulation(
     traj_frequency=1000,
     sim_name="out",
 )
-sim.context.minimize_energy()
-sim.context.generate_velocities(300.0)
+sim.get_context().minimize_energy()
+sim.get_context().generate_velocities(300.0)
 sim.simulate()
 sim.save_geometry("out.gro")

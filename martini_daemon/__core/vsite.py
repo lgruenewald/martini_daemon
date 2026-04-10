@@ -1,10 +1,11 @@
-from .bonded_force import BondedForce
 from abc import ABCMeta, abstractmethod
+
 import openmm as mm
+
+from .bonded_force import BondedForce
 
 
 class VirtualSite(BondedForce, metaclass=ABCMeta):
-
     def __init__(self, system):
         super().__init__(system)
         self._built = False
@@ -42,5 +43,7 @@ class VirtualSite(BondedForce, metaclass=ABCMeta):
     def _set_force_obj(self) -> None:
         assert False  # unreachable
 
-    def _add_to_force(self, members: list[int], params: list[float]) -> None:
+    def _add_to_force(
+        self, force: mm.Force, members: list[int], params: list[float]
+    ) -> None:
         assert False  # unreachable

@@ -1,10 +1,10 @@
 from typing import Any
 
-from .parser import ParseException
-from .directive import Directive
-from .token_list import TokenList, TokenParseException
-from .gromacs_top_file import GromacsTopFile, register_directive
 from ..__core import MoleculeType
+from .directive import Directive
+from .gromacs_top_file import GromacsTopFile, register_directive
+from .parser import ParseException
+from .token_list import TokenList, TokenParseException
 
 
 @register_directive

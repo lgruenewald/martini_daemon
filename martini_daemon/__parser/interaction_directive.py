@@ -1,16 +1,14 @@
-from typing import Any
 from abc import ABCMeta, abstractmethod
+from typing import Any
 
 from .directive import Directive
-from .token_list import TokenList, TokenParseException
 from .molecule_type_directive import MoleculeTypeDirective
+from .token_list import TokenList, TokenParseException
 
 
 class InteractionDirective(Directive, metaclass=ABCMeta):
     def __init__(self, parent, path, line_num) -> None:
-        """
-        Base class for custom .top file directives that add interactions to [moleculetype].
-        """
+        """Base class for custom .top file directives that add interactions to [moleculetype]."""
         super().__init__(parent, path, line_num)
 
     # default Directive boilerplate
@@ -82,8 +80,7 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
                 tokens[self.get_number_members()],
                 f"Invalid type {type_num} for directive {self.get_name()}",
             )
-        else:
-            return type_num, type_
+        return type_num, type_
 
     # for most child classes, number of members leads to a good default impl of read_type, read_members, read_params
     @classmethod
@@ -94,9 +91,7 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
     @classmethod
     @abstractmethod
     def get_number_params(cls, type_: int) -> tuple[int, int]:
-        """
-        Return the minimum and maximum number of params.
-        """
+        """Return the minimum and maximum number of params."""
         raise NotImplementedError
 
     # metadata for molecule type

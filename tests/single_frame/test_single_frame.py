@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
+import math
 import os
+
+import numpy as np
 import openmm as mm
 import openmm.app as mmapp
-import numpy as np
-import math
 import pytest
 
 from martini_daemon import Simulation, read_geometry
@@ -106,21 +107,19 @@ tests = [
 # == TEST CLASS ==
 class TestSingleFrame:
     def apply_constraints(self):
-        """
-        applies constraints and vsites and checks for position change
-        """
+        """Applies constraints and vsites and checks for position change"""
         _, reference, _ = read_geometry(self.gro)
         _, respos, _ = read_geometry(self.respos)
         sim = Simulation(
             self.top, self.gro, 0, [], options={"respos": respos}, platform="Reference"
         )
-        sim.context.apply_constraints()
-        new_pos, box = sim.context.get_positions()
+        sim.get_context().apply_constraints()
+        new_pos, box = sim.get_context().get_positions()
         for i in range(len(reference)):
             r_diff = box.distance(reference[i], new_pos[i])
-            assert (
-                r_diff < r_tol
-            ), f"Constraint/VSite position moved by {r_diff} nm (particle {i})."
+            assert r_diff < r_tol, (
+                f"Constraint/VSite position moved by {r_diff} nm (particle {i})."
+            )
 
     def compare_daemon_gmx(self):
         _, respos, _ = read_geometry(self.respos)
@@ -128,8 +127,8 @@ class TestSingleFrame:
             self.top, self.gro, 0, [], options={"respos": respos}, platform="Reference"
         )
 
-        _, energy, _ = sim.context.get_energies()
-        forces = sim.context.get_forces().flatten()
+        _, energy, _ = sim.get_context().get_energies()
+        forces = sim.get_context().get_forces().flatten()
         for i in range(sim.system.atom_count()):
             if sim.system.get_mass(i) == 0.0:
                 forces[i * 3] = 0.0
@@ -176,7 +175,7 @@ class TestSingleFrame:
         c_ftol = ftol_override.get(self.test_name)
         if c_ftol == 0:
             return
-        elif c_ftol is None:
+        if c_ftol is None:
             c_ftol = f_tol
 
         f_diff = np.fabs(self.gmx_forces - forces) / (np.fabs(forces) + f_tol)
@@ -194,12 +193,12 @@ class TestSingleFrame:
             dist = box.distance(pos[atom_index], pos[other_atom])
             if np.isclose(dist, cutoff_nm):
                 print(
-                    f"Atoms {atom_index+1} and {other_atom}+1 are exactly cutoff apart!"
+                    f"Atoms {atom_index + 1} and {other_atom}+1 are exactly cutoff apart!"
                 )
                 print("This can cause artifacts in forces.")
         assert np.allclose(self.gmx_forces, forces, c_ftol, 0), (
             f"Gmx and daemon forces different by {f_percent:.2f} %.\n"
-            f"Particle {atom_index+1} (<-- indexes start from 1) "
+            f"Particle {atom_index + 1} (<-- indexes start from 1) "
             f"dimension {atom_dim}\n"
             f"Absolute diff: {abs_diff:.3e}    relative diff: {max:.3e}\n"
             f"Daemon force: {force:.10e}\n"
@@ -217,10 +216,10 @@ class TestSingleFrame:
         assert os.path.isfile("energy.xvg"), f"./gmxrun.sh failure for {x} (E)"
         assert os.path.isfile("forces.xvg"), f"./gmxrun.sh failure for {x} (F)"
         with open("energy.xvg") as f:
-            lines = [line for line in f]
+            lines = f.readlines()
             self.gmx_energy = float(lines[-1].split()[-1])
         with open("forces.xvg") as f:
-            lines = [line for line in f]
+            lines = f.readlines()
             gmx_force_line = lines[-1].split()
             self.gmx_forces = np.array([float(x) for x in gmx_force_line][1:])
         self.top = "system.top"

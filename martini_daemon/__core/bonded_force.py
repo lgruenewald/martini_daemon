@@ -1,12 +1,15 @@
 from __future__ import annotations
+
 from abc import ABCMeta, abstractmethod
-from typing import Iterable
+from collections.abc import Iterable
+
+import openmm as mm
+
 from .force import Force
 
 
 class BondedForce(Force, metaclass=ABCMeta):
-    """
-    Parent class of all bonded forces.
+    """Parent class of all bonded forces.
 
     Manages the list of bonds (as a dict of bond_id -> members, params).
     Provides an API to add/remove bonds, while it appropriately keeps
@@ -31,24 +34,25 @@ class BondedForce(Force, metaclass=ABCMeta):
 
     def _prepare_force_obj(self) -> None:
         super()._prepare_force_obj()
+        assert self.force is not None
         if self.uses_pbc():
-            self.force.setUsesPeriodicBoundaryConditions(True)
+            # uses_pbc is used for exactly this...
+            self.force.setUsesPeriodicBoundaryConditions(True)  # ty: ignore[unresolved-attribute]
         for members, params in self.__entries.values():
-            self._add_to_force(members, params)
+            self._add_to_force(self.force, members, params)
 
     @abstractmethod
-    def _add_to_force(self, members: list[int], params: list[float]) -> None:
-        """
-        The force defined by members and params should add the entry
-        to self.force.
+    def _add_to_force(
+        self, force: mm.Force, members: list[int], params: list[float]
+    ) -> None:
+        """The force defined by members and params should add the entry to force.
 
         Protected because only this class should call this.
         """
         raise NotImplementedError
 
     def should_build(self) -> bool:
-        """
-        If True, build() will be called on a global rebuild.
+        """If True, build() will be called on a global rebuild.
 
         By default this happens if there are any entries and there is no force.
 
@@ -58,8 +62,7 @@ class BondedForce(Force, metaclass=ABCMeta):
 
     @abstractmethod
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
-        """
-        Given a list of members and parameters (as unwrapped = minimal pre-parsing), parse the params to how they
+        """Given a list of members and parameters (as unwrapped = minimal pre-parsing), parse the params to how they
         should be stored in entries and passed to _add_to_force.
 
         Protected because only this class should call this.
@@ -75,8 +78,7 @@ class BondedForce(Force, metaclass=ABCMeta):
     @staticmethod
     @abstractmethod
     def uses_pbc() -> bool:
-        """
-        Should return False if and only if this interaction is unable to handle being its constituent atoms be
+        """Should return False if and only if this interaction is unable to handle being its constituent atoms be
         in different instances of the periodic box.
 
         Note: will call setUsesPeriodicBoundaryConditions on self.force. Override _prepare_force_obj for really
@@ -85,30 +87,26 @@ class BondedForce(Force, metaclass=ABCMeta):
         raise NotImplementedError
 
     def _add_bond(self, members: list[int], params: list[float]) -> int:
-        """
-        API function to parse parameters and add it to the force.
+        """API function to parse parameters and add it to the force.
 
         Protected because only System should call this.
         """
         params = self._parse(members, params)
         self.__entries[self.__next_entry_id] = (members, params)
         if self.force is not None:
-            self._add_to_force(members, params)
+            self._add_to_force(self.force, members, params)
             self.system.flag_reinitialize()
         self.__next_entry_id += 1
         return self.__next_entry_id - 1
 
     def _remove_bond(self, bond_id: int) -> None:
-        """
-        Protected because only System should call this.
-        """
+        """Protected because only System should call this."""
         del self.__entries[bond_id]
         if self.force is not None:
             self._destroy()
 
     def iterate_bonds(self) -> Iterable[tuple[int, tuple[list[int], list[float]]]]:
-        """
-        Returns an Iterable over bond_id's and a tuple of members and params.
+        """Returns an Iterable over bond_id's and a tuple of members and params.
 
         WARNING! Do not edit the bonds given by this function!
         """
@@ -118,9 +116,7 @@ class BondedForce(Force, metaclass=ABCMeta):
         return len(self.__entries)
 
     def get_members(self, bond_id: int) -> list[int]:
-        """
-        Given a bond_id, return which atoms are part of it.
-        """
+        """Given a bond_id, return which atoms are part of it."""
         members, _ = self.__entries[bond_id]
         return members
 

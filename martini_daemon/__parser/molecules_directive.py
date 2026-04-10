@@ -1,14 +1,12 @@
 from typing import Any
 
 from .directive import Directive
-from .gromacs_top_file import register_directive
+from .gromacs_top_file import GromacsTopFile, register_directive
 from .token_list import TokenList
-from .gromacs_top_file import GromacsTopFile
 
 
 @register_directive
 class MoleculesDirective(Directive):
-
     def line(self, tokens: TokenList) -> None:
         self.parent.system.initial_molecules.append(
             (tokens.unwrap(0, "word"), tokens.unwrap(1, "int"))

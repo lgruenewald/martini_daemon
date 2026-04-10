@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 
 import openmm as mm
+from openmm.unit import kelvin, picosecond  # ty: ignore[unresolved-import]
+
 from martini_daemon import (
+    FragCountReporter,
+    ReactionReporter,
     Simulation,
     ToptrajReporter,
     VariablesReporter,
     XTCReporter,
-    ReactionReporter,
-    FragCountReporter,
 )
 
 sim = Simulation(
@@ -25,9 +27,11 @@ sim = Simulation(
     traj_frequency=500,
     platform="CUDA",
     integrator=mm.LangevinIntegrator(
-        0.01 * mm.unit.picosecond, 1.0 / mm.unit.picosecond, 298.0 * mm.unit.kelvin
+        0.01 * picosecond,
+        1.0 / picosecond,
+        298.0 * kelvin,  # ty: ignore[unsupported-operator]
     ),
 )
-sim.context.minimize_energy()
-sim.context.generate_velocities(298.0)
+sim.get_context().minimize_energy()
+sim.get_context().generate_velocities(298.0)
 sim.simulate()

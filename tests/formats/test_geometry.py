@@ -1,7 +1,9 @@
-from martini_daemon import read_geometry, write_geometry, PeriodicBox
+import os
+
 import numpy as np
 import pytest
-import os
+
+from martini_daemon import PeriodicBox, read_geometry, write_geometry
 
 
 @pytest.fixture
@@ -52,12 +54,12 @@ def test_read_write_geometry(format, rootdir):
         [pbc.a, pbc.b, pbc.c], [read_box.a, read_box.b, read_box.c], rtol=1e-5
     )
     largest = np.argmax(np.abs(read_pos - pos))
-    assert np.allclose(
-        read_pos, pos, atol=1e-3
-    ), f"Largest deviation in pos at {largest // 3}, with a difference of {np.abs(read_pos[largest]-pos[largest])} between original {pos[largest]} and read back {read_pos[largest]}."
+    assert np.allclose(read_pos, pos, atol=1e-3), (
+        f"Largest deviation in pos at {largest // 3}, with a difference of {np.abs(read_pos[largest] - pos[largest])} between original {pos[largest]} and read back {read_pos[largest]}."
+    )
     largest = np.argmax(np.abs(read_vel - vel))
-    assert np.allclose(
-        read_vel, vel, atol=1e-3
-    ), f"Largest deviation in pos at {largest // 3}, , with a difference of {np.abs(read_vel[largest]-vel[largest])} between original {vel[largest]} and read back {read_vel[largest]}."
+    assert np.allclose(read_vel, vel, atol=1e-3), (
+        f"Largest deviation in pos at {largest // 3}, , with a difference of {np.abs(read_vel[largest] - vel[largest])} between original {vel[largest]} and read back {read_vel[largest]}."
+    )
 
     os.remove(tmp_path)

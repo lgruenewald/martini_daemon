@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 from martini_daemon import (
-    Simulation,
-    ReactionReporter,
     FragCountReporter,
-    XTCReporter,
-    VariablesReporter,
+    ReactionReporter,
+    Simulation,
     ToptrajReporter,
+    VariablesReporter,
+    XTCReporter,
 )
 
 for rep in range(3):

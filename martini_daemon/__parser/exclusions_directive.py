@@ -1,14 +1,13 @@
 from typing import Any
 
 from .directive import Directive
-from .molecule_type_directive import MoleculeTypeDirective
 from .gromacs_top_file import register_directive
-from ..__parser import TokenList
+from .molecule_type_directive import MoleculeTypeDirective
+from .token_list import TokenList
 
 
 @register_directive
 class ExclusionsDirective(Directive):
-
     def line(self, tokens: TokenList) -> None:
         i = self.parent.parse_index(tokens, 0)
         # j is mandatory -> separate

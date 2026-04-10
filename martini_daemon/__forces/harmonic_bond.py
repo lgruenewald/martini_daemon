@@ -1,4 +1,5 @@
 import openmm as mm
+
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_bond_type
 
@@ -7,8 +8,11 @@ from ..__parser import register_bond_type
 @register_bond_type(type_=6, args=["float", "float"], is_excl=False)
 @register_available_force
 class HarmonicBond(BondedForce):
-    def _add_to_force(self, members: list[int], params: list[float]) -> None:
-        self.force.addBond(*members, *params)
+    def _add_to_force(
+        self, force: mm.Force, members: list[int], params: list[float]
+    ) -> None:
+        assert isinstance(force, mm.HarmonicBondForce)
+        force.addBond(*members, *params)
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         return params

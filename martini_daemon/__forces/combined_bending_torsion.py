@@ -1,14 +1,17 @@
 import openmm as mm
+
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_dihedral_type
 
 
-@register_dihedral_type(type_=11, args=["float" for _ in range(6)])
+@register_dihedral_type(type_=11, args=["float"] * 6)
 @register_available_force
 class CombinedBendingTorsion(BondedForce):
-
-    def _add_to_force(self, members: list[int], params: list[float]) -> None:
-        self.force.addBond(members, params)
+    def _add_to_force(
+        self, force: mm.Force, members: list[int], params: list[float]
+    ) -> None:
+        assert isinstance(force, mm.CustomCompoundBondForce)
+        force.addBond(members, params)
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         return params

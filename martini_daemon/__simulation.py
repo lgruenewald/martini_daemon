@@ -1,20 +1,23 @@
+import math
+import os
+import sys
+import zlib
+from collections.abc import Callable
+from datetime import datetime
+from importlib.metadata import version
+from time import time
+from typing import Any
+
 import openmm as mm
 import openmm.app as mmapp
-import os
-import zlib
-import math
-import sys
-from datetime import datetime
-from time import time
-from importlib.metadata import version
-from typing import Any, Type, Callable
+from openmm.unit import bar, kelvin, picosecond  # ty: ignore[unresolved-import]
 
-from .__formats import write_geometry, read_geometry
-from .__parser import GromacsTopFile, InvalidTopologyError
-from .__core import System, Context, wrap_coupling
+from .__core import Context, System, wrap_coupling
 from .__forces import NonBonded
-from .__rust import build_version, Fragment
+from .__formats import read_geometry, write_geometry
+from .__parser import GromacsTopFile, InvalidTopologyError
 from .__reporter import Reporter
+from .__rust import Fragment, build_version
 from .__topstar import TopStar
 
 
@@ -32,14 +35,13 @@ class Simulation:
         coupling=None,
         integrator: mm.Integrator | None = None,
         options: dict[str, Any] | None = None,
-        include_dirs: list[str] = None,
-        defines: dict[str, str] = None,
+        include_dirs: list[str] | None = None,
+        defines: dict[str, str] | None = None,
         platform: str | None | mm.Platform = None,
         context_parameters: None | dict[str, str] = None,
-        nonbonded: Callable[[System], NonBonded] | Type[NonBonded] | None = None,
+        nonbonded: Callable[[System], NonBonded] | type[NonBonded] | None = None,
     ):
-        """
-        Simulation class.
+        """Simulation class.
 
         * Provides a friendly interface for reporters requesting output files. Contains default values for Martini simulations.
         * Holds simulation metadata, such as current step, simulation name.
@@ -87,16 +89,19 @@ class Simulation:
         self.__sim_name = sim_name
         self.time_ps: float = 0.0
         md_integrator = integrator or mm.LangevinMiddleIntegrator(
-            300 * mm.unit.kelvin, 1.0 / mm.unit.picosecond, 0.02 * mm.unit.picosecond
+            300 * mm.unit.kelvin,  # ty: ignore[unsupported-operator]
+            1.0 / picosecond,
+            0.02 * picosecond,
         )
         if coupling is None:
             coupling = [
-                mm.MonteCarloBarostat(1.0 * mm.unit.bar, 300 * mm.unit.kelvin),
+                mm.MonteCarloBarostat(
+                    1.0 * bar,
+                    300.0 * kelvin,  # ty: ignore[unsupported-operator]
+                ),
                 mm.CMMotionRemover(),
             ]
-        self.dt_ps: float = md_integrator.getStepSize().value_in_unit(
-            mm.unit.picosecond
-        )
+        self.dt_ps: float = md_integrator.getStepSize().value_in_unit(picosecond)
         self.dm_frequency: int = dm_frequency
         self.traj_frequency: int = traj_frequency
         if type(platform) is str:
@@ -154,16 +159,15 @@ class Simulation:
             options["epsilon_r"] = 15.0
         if options.get("cutoff") is None:
             options["cutoff"] = 1.1
-        if options.get("respos") is None:
-            if geom_path is not None:
-                options["respos"] = read_geometry(geom_path)[1]
+        if options.get("respos") is None and geom_path is not None:
+            options["respos"] = read_geometry(geom_path)[1]
 
         # Parsing
         self.info("Parsing start")
         self.system: System = System(options=options)
         try:
             GromacsTopFile(
-                self.system, top_path, include_dirs=[include_dirs], defines=defines
+                self.system, top_path, include_dirs=include_dirs, defines=defines
             )
         except InvalidTopologyError:
             self.error("Fatal error during .top parsing.")
@@ -199,7 +203,7 @@ class Simulation:
         for r in self.__reporters:
             r.pre_simulation_start(self)
 
-        self.context: Context | None = None
+        self.__context: Context | None = None
         # build context
         if geom_path is not None:
             box, start_pos, start_vel = read_geometry(geom_path)
@@ -208,14 +212,14 @@ class Simulation:
             )
 
             self.info("Building context")
-            self.context = Context(
+            self.__context = Context(
                 self.system, self.integrator, box, platform, context_parameters
             )
 
             # set pos, vel
-            self.context.set_positions(start_pos, box)
+            self.__context.set_positions(start_pos, box)
             if start_vel is not None:
-                self.context.set_velocities(start_vel)
+                self.__context.set_velocities(start_vel)
 
         # it's owned by context now
         self.integrator = None
@@ -245,29 +249,33 @@ class Simulation:
             print(f"Backed up {path} to {bkup_path}")
 
     def request_path(self, suffix) -> str:
-        """
-        Convert suffix to path based on simulation name. Will try to back up existing file if it exists.
-        """
+        """Convert suffix to path based on simulation name. Will try to back up existing file if it exists."""
         path = self.__sim_name + suffix
         self.__backup_try(path)
         return path
 
     def open(self, suffix, compress=False) -> None:
-        """
-        Opens a new file handle for writing.
+        """Opens a new file handle for writing, and ties the file handle's lifetime to the Simulation object.
+        Note, the true path of the file will be a combination of simulation name and suffix. Also note, that
+        if the file already exists, it will be backed up, and the new path will be printed to stdout.
+        Writing to these files should happen using Simulation.write() and Simulation.print().
+
+        Simulation.finish() will automatically close it when the simulation ends. Simulation.close() should
+        be called if an output file is no longer necessary.
+
+        :param suffix: suffix to append to sim_name to get the path.
+        :param compress: if True, a zlib compression will be applied to writes to the file.
         """
         if suffix in self.__output_files:
             raise ValueError(f"{suffix} is already open.")
         path = self.request_path(suffix)
         self.__output_files[suffix] = (
-            open(path, "wb"),
+            open(path, "wb"),  # noqa: SIM115
             zlib.compressobj(6) if compress else None,
         )
 
     def write(self, suffix, bytes_or_text) -> None:
-        """
-        Writes to open handle.
-        """
+        """Writes to open handle."""
         if type(bytes_or_text) is str:
             bytes_or_text = bytes_or_text.encode("utf-8")
         if self.__output_files[suffix][1] is not None:
@@ -275,9 +283,7 @@ class Simulation:
         self.__output_files[suffix][0].write(bytes_or_text)
 
     def print(self, suffix, *args, sep=" ", end="\n") -> None:
-        """
-        Writes all args to output file, separated by separator (space). Writes a newline after.
-        """
+        """Writes all args to output file, separated by separator (space). Writes a newline after."""
         for i, arg in enumerate(args):
             if i > 0:
                 self.write(suffix, sep)
@@ -286,33 +292,26 @@ class Simulation:
         self.flush(suffix)
 
     def flush(self, suffix: str) -> None:
-        """
-        Flushes a single output file handle.
-        """
+        """Flushes a single output file handle."""
         handle, comp = self.__output_files[suffix]
         if comp is not None:
             handle.write(comp.flush_all())
         handle.flush()
 
     def flush_all(self) -> None:
-        """
-        Flushes all output files. Also called at trajectory frames automatically.
-        """
-        for suffix in self.__output_files.keys():
+        """Flushes all output files. Also called at trajectory frames automatically."""
+        for suffix in self.__output_files:
             self.flush(suffix)
 
     def close(self, suffix) -> None:
-        """
-        Closes a single open file.
-        """
+        """Closes a single open file."""
         self.flush(suffix)
         h, _ = self.__output_files[suffix]
         h.close()
         del self.__output_files[suffix]
 
     def finish(self) -> None:
-        """
-        1. Runs finish on all reporters.
+        """1. Runs finish on all reporters.
         2. Flushes output files and closes output file handles.
 
         Called by simulate(), or should be called by the user manually otherwise.
@@ -328,9 +327,7 @@ class Simulation:
         self.__output_files = {}
 
     def info(self, *args) -> None:
-        """
-        Writes a message to log.
-        """
+        """Writes a message to log."""
         self.print(
             ".log",
             datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S,%f")[:-3],
@@ -338,33 +335,27 @@ class Simulation:
         )
 
     def warn(self, message) -> None:
-        """
-        Writes a warning to the log file and to stderr.
-        """
+        """Writes a warning to the log file and to stderr."""
         self.info("[WARNING] " + message)
         print("[WARNING]", message, file=sys.stderr)
 
     def error(self, message) -> None:
-        """
-        Writes an error to the log file and stderr.
-        """
+        """Writes an error to the log file and stderr."""
         self.info("[ERROR] " + message)
         print("[ERROR]", message, file=sys.stderr)
 
     # Friendly interface for setting up and running simulations
     @staticmethod
     def set_process_title(newname=b"daemon") -> None:
-        """
-        Set process title to something else than "python". Nothing critical, purely aesthetic.
+        """Set process title to something else than "python". Nothing critical, purely aesthetic.
         Only works on (some versions of) linux. May fail silently with no exceptions thrown.
 
         Based on: https://stackoverflow.com/questions/564695/is-there-a-way-to-change-effective-process-name-in-python
 
         :param newname: new process name, as a byte string.
         """
-
         try:
-            from ctypes import cdll, byref, create_string_buffer
+            from ctypes import byref, cdll, create_string_buffer
 
             libc = cdll.LoadLibrary("libc.so.6")
             buff = create_string_buffer(len(newname) + 1)
@@ -373,9 +364,15 @@ class Simulation:
         finally:
             pass
 
+    def get_context(self) -> Context:
+        if self.__context is None:
+            raise ValueError(
+                "This Simulation has no context. Was Simulation() constructed with no geom_path?"
+            )
+        return self.__context
+
     def save_geometry(self, path) -> None:
-        """
-        Save the current simulation geometry to path.
+        """Save the current simulation geometry to path.
 
         This may include atom names, residue id, residue names, timestep, current time,
         simulation name, positions, velocities and the pbc box, depending on the file format used.
@@ -384,8 +381,8 @@ class Simulation:
 
         :param path: path to save geometry to.
         """
-        pos, box = self.context.get_positions()
-        vel = self.context.get_velocities()
+        pos, box = self.get_context().get_positions()
+        vel = self.get_context().get_velocities()
         write_geometry(
             path,
             f"Simulation {self.__sim_name}, step {self.current_step}, time {self.time_ps} ps.",
@@ -400,13 +397,14 @@ class Simulation:
         # TODO replay
         # TODO checkpoints
 
-    def simulate(self):
-        """
-        Performs the remaining steps (self.total_steps - self.current_step), and then calls self.finish().
+    def simulate(self, finish=True):
+        """Performs the remaining steps (self.total_steps - self.current_step), and then calls self.finish() if finish is True.
 
         Will perform Detection/Modification and Trajectory writing according to their frequencies specified in
         the constructor for Simulation. Catches uncaught exceptions and logs them,
         and finishes the simulation prematurely if one occurs.
+
+        :param finish: whether to close all output files. If False, must call finish() manually.
         """
         remaining = self.total_steps - self.current_step
         sim_ps = self.total_steps * self.dt_ps
@@ -433,7 +431,8 @@ class Simulation:
         except Exception as e:
             self.error(f"!!! Unexpected Exception!!!\n{e}")
         finally:
-            self.finish()
+            if finish:
+                self.finish()
 
     @staticmethod
     def __format_time(total):
@@ -455,10 +454,9 @@ class Simulation:
     def __format_sim_time(ps):
         if ps < 1000.0:
             return f"{ps:.2f} ps"
-        elif ps < 1000000.0:
-            return f"{ps/1000.:.2f} ns"
-        else:
-            return f"{ps/1000000:.2f} μs"
+        if ps < 1000000.0:
+            return f"{ps / 1000.0:.2f} ns"
+        return f"{ps / 1000000:.2f} μs"
 
     def __do_traj_frame(self):
         for r in self.__reporters:
@@ -468,8 +466,7 @@ class Simulation:
         self.trajectory_frame += 1
 
     def get_openmm_topology(self) -> mmapp.Topology:
-        """
-        Helper that generates an OpenMM Topology object required for creating an OpenMMApp Simulation object.
+        """Helper that generates an OpenMM Topology object required for creating an OpenMMApp Simulation object.
 
         Chains will be set to initial molecules, residues will be set to initial residues.
         The periodic box, bonds, atom names and charges reflect the current state of the system.
@@ -478,8 +475,8 @@ class Simulation:
         """
         top = mmapp.Topology()
 
-        if self.context is not None:
-            _, box = self.context.get_positions()
+        if self.__context is not None:
+            _, box = self.__context.get_positions()
 
             top.setPeriodicBoxVectors([box.a, box.b, box.c])
 
@@ -534,8 +531,7 @@ class Simulation:
         return top
 
     def step(self, n_steps: int, traj=False, dm=False, silent=False):
-        """
-        Does the following:
+        """Does the following:
         - steps n_steps
         - D/M algorithm if dm is true
         - trigger a trajectory frame on reporters if traj is True
@@ -561,10 +557,10 @@ class Simulation:
         if n_steps > 0:
             self.info(f"md_steps {n_steps}")
             self.info("Reinitialize start")
-            self.context.do_steps(0)
+            self.get_context().do_steps(0)
             self.info("Reinitialize finished")
             self.info("MD start")
-            self.context.do_steps(n_steps)
+            self.get_context().do_steps(n_steps)
             self.info("MD finished")
         if self.total_steps > 0 and n_steps > 0 and not silent:
             self.time_ps += self.dt_ps * n_steps
@@ -582,7 +578,7 @@ class Simulation:
             )
         if dm:
             self.info("Detection start")
-            pos, box = self.context.get_positions()
+            pos, box = self.get_context().get_positions()
             reactions: list[tuple[str, list[int]]] = self.top.detection(box, pos)
             self.info(f"After detection there were {len(reactions)} reactions")
             self.info("Detection finished")

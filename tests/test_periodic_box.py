@@ -1,5 +1,6 @@
-from martini_daemon import PeriodicBox
 import numpy as np
+
+from martini_daemon import PeriodicBox
 
 
 def test_which_atoms_within_distance():

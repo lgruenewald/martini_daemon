@@ -1,12 +1,13 @@
+import math
+
+import numpy as np
+import openmm as mm
+
 from ..__reporter import Reporter
 from ..__simulation import Simulation
-import openmm as mm
-import numpy as np
-import math
 
 
 class LocalMinimizer(Reporter):
-
     def __init__(
         self,
         minimizer,
@@ -16,8 +17,7 @@ class LocalMinimizer(Reporter):
         harmonic_constraints=True,
         report_every=0,
     ):
-        """
-        Local Minimizer. Uses the Reporter API to locally minimize the energy after the modification algorithm runs.
+        """Local Minimizer. Uses the Reporter API to locally minimize the energy after the modification algorithm runs.
 
         :param minimizer: The minimization algorithm choice. LocalGradientDescent is currently the only one.
         :param minimization_steps: The number of steps to run the minimization algorithm for.
@@ -36,6 +36,7 @@ class LocalMinimizer(Reporter):
         self.integrator_index = None
 
     def pre_simulation_start(self, simulation: Simulation):
+        assert simulation.integrator is not None
         self.integrator_index = simulation.integrator.addIntegrator(
             self.minimizer.integrator
         )
@@ -51,12 +52,12 @@ class LocalMinimizer(Reporter):
 
     def on_reaction(self, simulation: Simulation, reactions):
         # save velocities
-
+        assert self.integrator_index is not None
         simulation.info("on_reaction Local Minimizer")
-        vel = simulation.context.get_velocities()
-        pos, box = simulation.context.get_positions()
-        old_integrator = simulation.context.get_current_integrator()
-        simulation.context.set_current_integrator(self.integrator_index)
+        vel = simulation.get_context().get_velocities()
+        pos, box = simulation.get_context().get_positions()
+        old_integrator = simulation.get_context().get_current_integrator()
+        simulation.get_context().set_current_integrator(self.integrator_index)
         simulation.top.toggle_softcore(reactions, True)
         if self.harmonic_constraints:
             simulation.system.toggle_constraints_as_harmonic_bonds(True)
@@ -95,7 +96,7 @@ class LocalMinimizer(Reporter):
         simulation.info("initial reporting done, minimizing now")
         while remaining > 0:
             c_steps = min(gcd, remaining)
-            simulation.context.do_steps(c_steps)
+            simulation.get_context().do_steps(c_steps)
             remaining -= c_steps
             if self.report_every > 0 and remaining % self.report_every == 0:
                 self.report(simulation, suffix, remaining)
@@ -104,21 +105,20 @@ class LocalMinimizer(Reporter):
                 break
 
         simulation.info("minimization over")
-        simulation.context.set_velocities(vel)
+        simulation.get_context().set_velocities(vel)
         simulation.info("velocities reset")
         if self.harmonic_constraints:
             simulation.system.toggle_constraints_as_harmonic_bonds(False)
         simulation.top.toggle_softcore(reactions, False)
         simulation.info("preparing to set integrator back")
-        simulation.context.set_current_integrator(old_integrator)
+        simulation.get_context().set_current_integrator(old_integrator)
         simulation.info("back")
         simulation.close(suffix)
 
 
 class LocalGradientDescent:
     def __init__(self, initial_step_size_nm=0.1, etol=0.0, smoothing_factor=0.1):
-        """
-        Construct a (smoothed) gradient descent minimization integrator.
+        """Construct a (smoothed) gradient descent minimization integrator.
 
         :param initial_step_size_nm: Only matters at the start. An adaptive step size is used.
         :param etol: energy tolerance, will stop doing anything once the change in energy reaches this for 1 step. If 0, no convergence check is performed.
@@ -129,7 +129,6 @@ class LocalGradientDescent:
         originally distributed under the MIT license,
         Copyright (c) 2015-2019 Chodera lab // Memorial Sloan Kettering Cancer Center.
         """
-
         assert initial_step_size_nm > 0.0, "initial step size must be larger than 0"
         assert 0.0 < smoothing_factor <= 1.0, "smoothing factor must be between 0 and 1"
 
@@ -233,7 +232,7 @@ class LocalGradientDescent:
         return (
             "\n".join(
                 f"{k}: {self.integrator.getGlobalVariableByName(k)}"
-                for k in self.global_variables.keys()
+                for k in self.global_variables
             )
             + "\n"
         )

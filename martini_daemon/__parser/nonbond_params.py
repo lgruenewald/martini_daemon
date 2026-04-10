@@ -1,6 +1,6 @@
 from .directive import Directive
-from .token_list import TokenList, TokenParseException
 from .gromacs_top_file import GromacsTopFile, register_directive
+from .token_list import TokenList, TokenParseException
 
 
 @register_directive

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # very quick script to generate system.gro and expected.reactions
 
-from martini_daemon import write_geometry, PeriodicBox
 import numpy as np
+
+from martini_daemon import PeriodicBox, write_geometry
 
 title_line = "# frame,reaction_name;reactant1_name,reactant1_id,atoms...;reactantn_name,reactantn_id,atoms..."
 reactions = []

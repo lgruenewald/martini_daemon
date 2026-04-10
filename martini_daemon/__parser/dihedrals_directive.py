@@ -1,5 +1,5 @@
-from .interaction_directive import InteractionDirective
 from .gromacs_top_file import register_directive
+from .interaction_directive import InteractionDirective
 
 
 @register_directive
@@ -12,7 +12,7 @@ class DihedralsDirective(InteractionDirective):
 
     @classmethod
     def register_type(cls, class_, type_: int, name: str, args: list[str]) -> None:
-        assert type_ not in cls.__type_data.keys()
+        assert type_ not in cls.__type_data
         cls.__type_data[type_] = (name, args)
 
     @classmethod
@@ -22,7 +22,9 @@ class DihedralsDirective(InteractionDirective):
 
     @classmethod
     def get_type_args(cls, type_int: int) -> list[str]:
-        return cls.__type_data.get(type_int)[1]
+        got = cls.__type_data.get(type_int)
+        assert got is not None
+        return got[1]
 
     @classmethod
     def get_name(cls) -> str:

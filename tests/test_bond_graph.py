@@ -1,8 +1,10 @@
-import numpy as np
-from martini_daemon import PeriodicBox, BondGraph
 import random
-import pytest
 from time import time
+
+import numpy as np
+import pytest
+
+from martini_daemon import BondGraph, PeriodicBox
 
 
 def test_make_whole():
@@ -40,9 +42,9 @@ def test_make_whole():
     bg.make_whole(box, pos_whole)
 
     for i, j in bg.to_list():
-        assert not box.crosses_box(
-            pos_whole[i], pos_whole[j]
-        ), f"Bond {i} to {j}\n pos {pos[i]}, {pos[j]};\n pos_within {pos_within[i]}, {pos_within[j]};\n pos_whole {pos_whole[i]}, {pos_whole[j]};"
+        assert not box.crosses_box(pos_whole[i], pos_whole[j]), (
+            f"Bond {i} to {j}\n pos {pos[i]}, {pos[j]};\n pos_within {pos_within[i]}, {pos_within[j]};\n pos_whole {pos_whole[i]}, {pos_whole[j]};"
+        )
 
     assert np.allclose(pos_whole, pos)
 

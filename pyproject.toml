@@ -21,6 +21,18 @@ module-name = "martini_daemon.__rust"
 features = ["pyo3/extension-module"]
 python-source = "."
 
+[tool.ruff.lint]
+extend-select = [
+  "F", # Pyflakes
+  "I", # Import sorting
+  "UP", # Warn on older python features such as %
+  "C4", # flag unneccessary iteration patterns
+  "RET", # warn on useless else blocks and explicit "return None"
+  "SIM", # simplifications
+  "ANN", # missing type annotations
+  "D" # warn on missing documentation
+]
+
 [project.optional-dependencies]
 
 test = [
@@ -37,6 +49,9 @@ docs = [
 dev = [
   "python-lsp-server",
   "ruff",
-  "black",
   "ty"
+]
+
+molly = [
+  "molly@git+https://git.sr.ht/~ma3ke/molly#egg=molly&subdirectory=bindings/python",
 ]

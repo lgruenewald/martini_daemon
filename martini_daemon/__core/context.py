@@ -1,9 +1,8 @@
-"""
-Context inheriting openmm context
-"""
+"""Context inheriting openmm context"""
 
 import numpy as np
 import openmm as mm
+from openmm.unit import nanometer  # ty: ignore[unresolved-import]
 
 from ..__rust import PeriodicBox
 from .system import System
@@ -34,7 +33,7 @@ class Context:
                 system.get_openmm_system(), integrator, platform, params
             )
         self.system = system
-        self.__integrator = integrator
+        self.__integrator: mm.Integrator = integrator
         system._bind_context(self)
         self.N = system.atom_count()
 
@@ -47,8 +46,7 @@ class Context:
             self.__integrator.step(n)
 
     def __reinitialize(self):
-        """
-        Automatically called before stepping, reading energies or forces.
+        """Automatically called before stepping, reading energies or forces.
 
         If self.reinitialize was "flagged" to True, rebuilds system and then reinitializes the context.
         """
@@ -59,18 +57,17 @@ class Context:
         self.reinitialize = False
 
     def get_current_integrator(self) -> int:
-        """
-        If supplied integrator was an OpenMM compound integrator, get the current index.
+        """If supplied integrator was an OpenMM compound integrator, get the current index.
 
         Note: Simulation always sets up compound integrators, so generally it will be a compound integrator if using
         the Simulation API.
         """
+        assert isinstance(self.__integrator, mm.CompoundIntegrator)
         return self.__integrator.getCurrentIntegrator()
 
     def set_current_integrator(self, idx: int) -> None:
-        """
-        If supplied integrator was an OpenMM compound integrator, set the current index.
-        """
+        """If supplied integrator was an OpenMM compound integrator, set the current index."""
+        assert isinstance(self.__integrator, mm.CompoundIntegrator)
         self.__integrator.setCurrentIntegrator(idx)
 
     def set_positions(self, positions: np.ndarray, box: PeriodicBox) -> None:
@@ -99,13 +96,13 @@ class Context:
         pos_before = (
             self.__context.getState(positions=True)
             .getPositions(asNumpy=True)
-            .value_in_unit(mm.unit.nanometer)
+            .value_in_unit(nanometer)
         )
         self.__context.applyConstraints(tol=1e-10)
         pos_after = (
             self.__context.getState(positions=True)
             .getPositions(asNumpy=True)
-            .value_in_unit(mm.unit.nanometer)
+            .value_in_unit(nanometer)
         )
         return pos_before, pos_after
 
@@ -117,7 +114,7 @@ class Context:
             [vecs[1].x, vecs[1].y, vecs[1].z],
             [vecs[2].x, vecs[2].y, vecs[2].z],
         )
-        pos = state.getPositions(asNumpy=True).value_in_unit(mm.unit.nanometer)
+        pos = state.getPositions(asNumpy=True).value_in_unit(nanometer)
         if np.any(np.abs(pos) > 2147483.0):
             # would be too large to store without remaindering, so likely
             # the system blew up
@@ -135,9 +132,7 @@ class Context:
         )  # nm / ps
 
     def get_energies(self) -> tuple[float, float, float]:
-        """
-        Kinetic, Potential, Total Energy, in MD units
-        """
+        """Kinetic, Potential, Total Energy, in MD units"""
         self.__reinitialize()
         state = self.__context.getState(energy=True)
         pe = state.getPotentialEnergy().value_in_unit_system(mm.unit.md_unit_system)

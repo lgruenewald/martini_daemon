@@ -1,7 +1,9 @@
-import os
-import pytest
 import json
-from martini_daemon import TopStar, Simulation, Fragment
+import os
+
+import pytest
+
+from martini_daemon import Fragment, Simulation, TopStar
 
 
 # == CONFIG ==
@@ -30,8 +32,7 @@ def get_topology(path: str) -> TopStar:
 
 
 def parse_expected(path) -> list[tuple[str, list[int]]]:
-    """
-    Parses a json of the format
+    """Parses a json of the format
     [
         ["name1", *parts],
         ...
@@ -42,8 +43,7 @@ def parse_expected(path) -> list[tuple[str, list[int]]]:
     """
     assert os.path.isfile(path)
     with open(path) as f:
-        data = [(line[0], [x - 1 for x in line[1:]]) for line in json.load(f)]
-    return data
+        return [(line[0], [x - 1 for x in line[1:]]) for line in json.load(f)]
 
 
 def try_match(frag: Fragment, name: str, parts: list[int]):
@@ -52,10 +52,7 @@ def try_match(frag: Fragment, name: str, parts: list[int]):
     frag_parts = list(filter(lambda x: x != -1, frag.atoms))
     if len(frag_parts) != len(parts):
         return False
-    for i, atom in enumerate(frag_parts):
-        if atom != parts[i]:
-            return False
-    return True
+    return all(atom == parts[i] for i, atom in enumerate(frag_parts))
 
 
 def print_error(name, frags, expected: list[tuple[str, list[int]]]):
@@ -70,8 +67,7 @@ def print_error(name, frags, expected: list[tuple[str, list[int]]]):
 
 
 def compare(name, top: TopStar, expected: list[tuple[str, list[int]]]):
-    """
-    Makes sure top has all of and only the fragments in expected.
+    """Makes sure top has all of and only the fragments in expected.
     Expected contains the frag names and particles.
     Note: the order of expected is arbitrary.
     """

@@ -1,4 +1,5 @@
 import openmm as mm
+
 from ..__core import VirtualSite, register_available_force
 from ..__parser import register_vsiten_type
 
@@ -6,7 +7,6 @@ from ..__parser import register_vsiten_type
 @register_vsiten_type(2, [])
 @register_available_force
 class VSiteCenterOfMass(VirtualSite):
-
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         return params
 
@@ -14,12 +14,12 @@ class VSiteCenterOfMass(VirtualSite):
     def get_name(cls) -> str:
         return "center_of_mass"
 
-    def _make_vsite(self, vid, others, params) -> mm.VirtualSite:
-        n = len(others)
-        masses = [self.system.get_mass(i) for i in others]
+    def _make_vsite(self, vid, other, params) -> mm.VirtualSite:
+        n = len(other)
+        masses = [self.system.get_mass(i) for i in other]
         weights = [m / sum(masses) for m in masses]
         return mm.LocalCoordinatesSite(
-            others,  # atoms
+            other,  # atoms
             weights,  # origin weights
             [0.0] * n,  # x direction weight
             [0.0] * n,  # y direction weight

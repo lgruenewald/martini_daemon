@@ -1,19 +1,18 @@
 # Simple gromacs gro file read/write
 import numpy as np
+
 from ..__rust import PeriodicBox
 
 
 def read_gro(path):
-    """
-    Reads .gro file at path, returns box, pos, vel.
+    """Reads .gro file at path, returns box, pos, vel.
     box is a PeriodicBox instance.
     pos and vel are float64 numpy arrays.
 
     If there are no velocities in the gro file, returns None for vel.
     (if even a single velocity is missing, it returns None).
     """
-
-    with open(path, "r") as file:
+    with open(path) as file:
         file.readline()  # skip title
         try:
             n_atoms = int(file.readline().strip())
@@ -51,7 +50,7 @@ def read_gro(path):
                 )
         last_line = file.readline().strip().split()
         try:
-            box_floats = list(map(lambda x: float(x), last_line))
+            box_floats = [float(x) for x in last_line]
         except ValueError:
             raise ValueError(
                 "Error parsing gro file, the coordinates line contains non numbers. Is the number of atoms correct?"
@@ -64,8 +63,7 @@ def read_gro(path):
 def write_gro(
     path, title, atom_names, res_names, res_ids, box: PeriodicBox, pos, vel=None
 ) -> None:
-    """
-    Write .gro file at path.
+    """Write .gro file at path.
 
     :param path: path to .gro file
     :param title: title of .gro file

@@ -1,14 +1,14 @@
+import difflib
 from typing import Any
 
-import difflib
+from ..__core import System
 from ..__parser import (
-    register_directive,
-    GromacsTopFile,
     Directive,
+    GromacsTopFile,
     TokenList,
     TokenParseException,
+    register_directive,
 )
-from ..__core import System
 from .graph import Graph, GraphAtomType
 
 keyword_to_GraphAtomType = {
@@ -51,7 +51,7 @@ class GraphDirective(Directive):
                 type_ = keyword_to_GraphAtomType[keyword]
                 self.graph.atoms.append((part_id, name_pat, type_pat, type_))
             case "equivalent":
-                parts = set(tokens.unwrap(i, "word") for i in range(1, len(tokens)))
+                parts = {tokens.unwrap(i, "word") for i in range(1, len(tokens))}
                 self.graph.equivalents.append(parts)
             case _:
                 if keyword in self.filters:

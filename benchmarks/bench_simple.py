@@ -2,17 +2,18 @@
 # New benchmark, designed to be simple to run and fast to finish in contrast
 # with ./benchmark.py. Only runs 25 md steps, D/M step and xtc step once.
 
-from martini_daemon import (
-    Simulation,
-    extract_timings_from_log,
-    XTCReporter,
-    ToptrajReporter,
-)
+import datetime
 import os
+import platform
 import sys
 import time
-import platform
-import datetime
+
+from martini_daemon import (
+    Simulation,
+    ToptrajReporter,
+    XTCReporter,
+    extract_timings_from_log,
+)
 
 print("Hostname:", platform.node())
 print("Date: ", datetime.datetime.now())

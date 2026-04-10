@@ -1,6 +1,6 @@
-from .token_list import TokenList, TokenParseException
-from .interaction_directive import InteractionDirective
 from .gromacs_top_file import register_directive
+from .interaction_directive import InteractionDirective
+from .token_list import TokenList, TokenParseException
 
 
 @register_directive
@@ -11,13 +11,15 @@ class VirtualSitesN(InteractionDirective):
 
     @classmethod
     def get_number_params(cls, type_: int) -> tuple[int, int]:
-        return len(cls.__type_data.get(type_)[1]), len(cls.__type_data.get(type_)[1])
+        got = cls.__type_data.get(type_)
+        assert got is not None
+        return len(got[1]), len(got[1])
 
     __type_data: dict[int, tuple[str, list[str]]] = {}
 
     @classmethod
     def register_type(cls, type_: int, name: str, args: list[str]) -> None:
-        assert type_ not in cls.__type_data.keys()
+        assert type_ not in cls.__type_data
         cls.__type_data[type_] = (name, args)
 
     @classmethod
@@ -27,7 +29,9 @@ class VirtualSitesN(InteractionDirective):
 
     @classmethod
     def get_type_args(cls, type_int: int) -> list[str]:
-        return cls.__type_data.get(type_int)[1]
+        got = cls.__type_data.get(type_int)
+        assert got is not None
+        return got[1]
 
     @classmethod
     def get_name(cls) -> str:
@@ -71,13 +75,12 @@ class VirtualSitesN(InteractionDirective):
             raise TokenParseException(
                 tokens[1], f"Invalid type {type_num} for directive {self.get_name()}"
             )
-        else:
-            return type_num, type_
+        return type_num, type_
 
     def line(self, tokens: TokenList) -> None:
         # we don't want to trigger nrexcl processing with these exclusions
         super().line(tokens)
-        if len((members := self.read_members(tokens))) == 2:
+        if len(members := self.read_members(tokens)) == 2:
             self.parent.molecule_type.exclusions.add(
                 (
                     members[0],
@@ -87,9 +90,7 @@ class VirtualSitesN(InteractionDirective):
 
 
 def register_vsiten_type(type_: int, args: list[str]):
-    """
-    args are per constructing atom
-    """
+    """Args are per constructing atom"""
 
     def inner(class_):
         name = class_.get_name()

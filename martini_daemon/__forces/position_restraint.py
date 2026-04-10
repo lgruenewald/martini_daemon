@@ -1,11 +1,11 @@
 import openmm as mm
+
 from ..__core import BondedForce, register_available_force
-from ..__parser import InteractionDirective, register_directive, ParseException
+from ..__parser import InteractionDirective, ParseException, register_directive
 
 
 @register_directive
 class PositionRestraintDirective(InteractionDirective):
-
     @classmethod
     def get_number_members(cls) -> int:
         return 1
@@ -31,12 +31,15 @@ class PositionRestraintDirective(InteractionDirective):
 
 @register_available_force
 class PositionRestraint(BondedForce):
-    def _add_to_force(self, members: list[int], params: list[float]) -> None:
+    def _add_to_force(
+        self, force: mm.Force, members: list[int], params: list[float]
+    ) -> None:
         assert len(members) == 1
         i = members[0]
         kx, ky, kz = params
         x0, y0, z0 = self.system.additional_data["respos"][i]
-        self.force.addParticle(i, (kx, ky, kz, x0, y0, z0))
+        assert isinstance(force, mm.CustomExternalForce)
+        force.addParticle(i, (kx, ky, kz, x0, y0, z0))
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         return params

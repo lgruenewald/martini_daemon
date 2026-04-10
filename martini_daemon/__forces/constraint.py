@@ -1,3 +1,5 @@
+import openmm as mm
+
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_constraint_type
 
@@ -6,7 +8,6 @@ from ..__parser import register_constraint_type
 @register_constraint_type(type_=2, args=["float"], is_excl=False)
 @register_available_force
 class Constraint(BondedForce):
-
     def __init__(self, system) -> None:
         super().__init__(system)
         self.__built = False
@@ -43,7 +44,9 @@ class Constraint(BondedForce):
     def should_build(self) -> bool:
         assert False
 
-    def _add_to_force(self, members: list[int], params: list[float]) -> None:
+    def _add_to_force(
+        self, force: mm.Force, members: list[int], params: list[float]
+    ) -> None:
         assert False
 
     def _destroy(self):

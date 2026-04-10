@@ -1,7 +1,9 @@
-import os
 import glob
+import os
+
 import pytest
-from martini_daemon import Simulation, ReactionReporter
+
+from martini_daemon import ReactionReporter, Simulation
 
 
 # == CONFIG ==
@@ -25,7 +27,7 @@ tests = [
 ]
 
 
-def get_sim(top: str, gro: str) -> list[tuple[str, str, list[list[int]]]]:
+def get_sim(top: str, gro: str) -> list[tuple[int, str, list[list[int]]]]:
     rep = ReactionReporter()
     sim = Simulation(top, gro, 0, reporters=[rep])
     sim.step(0, traj=False, dm=True)
@@ -33,7 +35,10 @@ def get_sim(top: str, gro: str) -> list[tuple[str, str, list[list[int]]]]:
     return ReactionReporter.read_reactions("out.reactions")
 
 
-def compare(reactions, expected):
+def compare(
+    reactions: list[tuple[int, str, list[list[int]]]],
+    expected: list[tuple[int, str, list[list[int]]]],
+):
     dump = f"\nGot: {reactions}, expected: {expected}."
     for (_, r1, frags1), (_, r2, frags2) in zip(reactions, expected):
         # while order in theory can be different, it is simpler
