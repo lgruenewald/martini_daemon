@@ -1,32 +1,19 @@
 #!/usr/bin/env python3
-
-from martini_daemon import old_simulation
-from martini_daemon.old_reporters.bond_reporter import BondReporter
-from martini_daemon.old_reporters.variables_reporter import VariablesReporter
-from martini_daemon.old_reporters.topstar import FragCountReporter, ReactionReporter
-from martini_daemon.old_reporters.checkpoint_reporter import CheckpointReporter
-import freud.parallel
-
-
-gpu = 0
-n_threads = 10
-
-freud.parallel.set_num_threads(n_threads)
-
-sim = simulation.Simulation(
+from martini_daemon import Simulation, ReactionReporter, FragCountReporter, XTCReporter, VariablesReporter, ToptrajReporter
+sim = Simulation(
     "system.top", "system.gro",
     reporters=[
-        BondReporter(),
-        VariablesReporter(),
         ReactionReporter(),
         FragCountReporter(),
-        CheckpointReporter(100000)
+        XTCReporter(),
+        VariablesReporter(),
+        ToptrajReporter()
     ],
     md_steps=100000000, dm_frequency=250,
-    xtc_frequency=50000,
+    traj_frequency=50000,
     platform="CUDA",
-    context_parameters={"DeviceIndex": f"{gpu}"}
+    context_parameters={"DeviceIndex": "0"}
 )
-sim.minimize_energy()
-sim.generate_velocities(300)
+sim.context.minimize_energy()
+sim.context.generate_velocities(300)
 sim.simulate()

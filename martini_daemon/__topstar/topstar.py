@@ -1,5 +1,4 @@
-import numpy as np
-from ..__rust import Fragment, FragList, DetectionTemplate, DetectionTemplateList, detection, PeriodicBox
+from ..__rust import Fragment, FragList, DetectionTemplateList, detection, PeriodicBox
 from .modification_template import ModificationTemplate
 from .graph import Graph, GraphMatch, match_atoms
 from ..__core import System

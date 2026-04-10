@@ -1,10 +1,10 @@
-from .one import VSiteOne
-from .two_fd import VSite2fd
-from .two import VSiteTwo
-from .three import VSiteThree
-from .three_fd import VSite3fd
-from .three_fad import VSite3fad
-from .three_out import VSite3out
-from .four_fdn import VSite4fdn
-from .weighted_average import VSiteWeightedAverage
-from .center_of_mass import VSiteCenterOfMass
+from .one import VSiteOne as VSiteOne
+from .two_fd import VSite2fd as VSite2fd
+from .two import VSiteTwo as VSiteTwo
+from .three import VSiteThree as VSiteThree
+from .three_fd import VSite3fd as VSite3fd
+from .three_fad import VSite3fad as VSite3fad
+from .three_out import VSite3out as VSite3out
+from .four_fdn import VSite4fdn as VSite4fdn
+from .weighted_average import VSiteWeightedAverage as VSiteWeightedAverage
+from .center_of_mass import VSiteCenterOfMass as VSiteCenterOfMass

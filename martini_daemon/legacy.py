@@ -6,7 +6,6 @@ import numpy as np
 import zlib
 import molly
 import struct
-import re
 
 def read_compressed(path):
     with open(path, "rb") as f:

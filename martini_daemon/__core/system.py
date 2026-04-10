@@ -437,6 +437,8 @@ class System:
                     if force.passes_filter(filt):
                         do_force = True
                         break
+            if not do_force:
+                continue
             for _, (members, _) in force.iterate_bonds():
                 if force.passes_filter("vsite"):
                     # hardcoded special case, modeled as vsite bonded to all constructing particles

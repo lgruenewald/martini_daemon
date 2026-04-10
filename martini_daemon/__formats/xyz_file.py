@@ -23,7 +23,7 @@ def read_xyz(path, pos_conversion=0.1, vel_conversion=0.1):
         try:
             n_atoms = int(file.readline().strip())
         except ValueError:
-            raise ValueError(f"Error parsing xyz file: first line should be the number of atoms.")
+            raise ValueError("Error parsing xyz file: first line should be the number of atoms.")
 
         try:
             title_line = file.readline().strip()

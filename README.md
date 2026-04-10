@@ -64,11 +64,17 @@ Some single_frame tests have looser tolerances, this is documented at the top of
 
 ## Development
 
-It's recommended to install pylsp and use an editor supporting autocomplete,
-as it makes navigating the API easier. If using the editor helix, `pip install .[dev]` should install it, then
-it should work out of the box.
+For non-IDE users: It's recommended to install pylsp and use an editor
+supporting autocomplete, as it makes navigating the API easier.
+If using the editor helix, `pip install .[dev]` should install it, then
+it should work out of the box. Vim, neovim and similar might need a plugin
+or further configuration before lsp can be used.
 
 To re-generate the type stubs for the rust parts, run `cargo run --bin stub_gen`.
+This only needs to be done when changing the rust part of the code, as the .pyi
+file (`martini_daemon/__rust/__init__.pyi`) is commited to the repository.
+
+Linters currently used are ruff (also installed by `pip install .[dev]`).
 
 # License
 

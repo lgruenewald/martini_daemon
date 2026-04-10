@@ -17,7 +17,7 @@ def read_gro(path):
         try:
             n_atoms = int(file.readline().strip())
         except ValueError:
-            raise ValueError(f"Error parsing gro file: second line should be the number of atoms.")
+            raise ValueError("Error parsing gro file: second line should be the number of atoms.")
         pos = np.zeros((n_atoms, 3), dtype=np.float64)
         vel = np.zeros((n_atoms, 3), dtype=np.float64)
         for i in range(n_atoms):
@@ -44,7 +44,7 @@ def read_gro(path):
         try:
             box_floats = list(map(lambda x: float(x), last_line))
         except ValueError:
-            raise ValueError(f"Error parsing gro file, the coordinates line contains non numbers. Is the number of atoms correct?")
+            raise ValueError("Error parsing gro file, the coordinates line contains non numbers. Is the number of atoms correct?")
         assert len(box_floats) >= 3
         box = PeriodicBox.from_gro(*box_floats)
         return box, pos, vel

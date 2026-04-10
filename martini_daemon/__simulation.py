@@ -9,7 +9,7 @@ from time import time
 from importlib.metadata import version
 from typing import Any, Type, Callable
 
-from .__formats import *
+from .__formats import write_geometry, read_geometry
 from .__parser import GromacsTopFile, InvalidTopologyError
 from .__core import System, Context, wrap_coupling
 from .__forces import NonBonded
@@ -218,6 +218,8 @@ class Simulation:
         """
         Opens a new file handle for writing.
         """
+        if suffix in self.__output_files:
+            raise ValueError(f"{suffix} is already open.")
         path = self.request_path(suffix)
         self.__output_files[suffix] = (open(path, "wb"), zlib.compressobj(6) if compress else None)
 
@@ -258,6 +260,14 @@ class Simulation:
         for suffix in self.__output_files.keys():
             self.flush(suffix)
 
+    def close(self, suffix) -> None:
+        """
+        Closes a single open file.
+        """
+        self.flush(suffix)
+        h, _ = self.__output_files[suffix]
+        h.close()
+        del self.__output_files[suffix]
 
     def finish(self) -> None:
         """

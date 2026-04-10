@@ -1,27 +1,22 @@
 #!/usr/bin/env python3
 
-from martini_daemon import old_simulation
-from martini_daemon.old_reporters.bond_reporter import BondReporter
-from martini_daemon.old_reporters.atom_reporter import AtomReporter
-from martini_daemon.old_reporters.variables_reporter import VariablesReporter
-from martini_daemon.old_reporters.topstar import FragCountReporter, ReactionReporter
-from martini_daemon.old_reporters.checkpoint_reporter import CheckpointReporter
+import openmm as mm
+from martini_daemon import Simulation, ToptrajReporter, VariablesReporter, XTCReporter, ReactionReporter, FragCountReporter
 
-sim = simulation.Simulation(
+sim = Simulation(
     "system.top", "system.gro",
     reporters=[
-        BondReporter(),
-        AtomReporter(),
+        ToptrajReporter(),
         VariablesReporter(),
+        XTCReporter(),
         ReactionReporter(),
         FragCountReporter(),
-        CheckpointReporter(100000)
     ],
     md_steps=10000000, dm_frequency=250,
-    xtc_frequency=500,
+    traj_frequency=500,
     platform="CUDA",
-    dt_ps=0.01
+    integrator=mm.LangevinIntegrator(0.01 * mm.unit.picosecond, 1. / mm.unit.picosecond, 298. * mm.unit.kelvin)
 )
-sim.minimize_energy()
-sim.generate_velocities(300)
+sim.context.minimize_energy()
+sim.context.generate_velocities(298.)
 sim.simulate()

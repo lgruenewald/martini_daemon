@@ -122,11 +122,11 @@ class Cmap(BondedForce):
         if map is None:
             raise ValueError(f"Unknown CMAP type for {types}.")
 
-        i, j, k, l, m = members
+        idx_i, idx_j, idx_k, idx_l, idx_m = members
         self.force.addTorsion(
             map,
-            i, j, k, l,
-            j, k, l, m
+            idx_i, idx_j, idx_k, idx_l,
+            idx_j, idx_k, idx_l, idx_m
         )
 
 

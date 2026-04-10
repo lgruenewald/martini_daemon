@@ -48,7 +48,7 @@ class AtomTypesDirective(Directive):
 
     @classmethod
     def is_valid_parent(cls, parent) -> bool:
-        return type(parent) == GromacsTopFile
+        return type(parent) is GromacsTopFile
 
     @classmethod
     def get_name(cls) -> str:

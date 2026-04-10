@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 
-from martini_daemon import old_simulation
-from martini_daemon.old_reporters.topstar import ReactionReporter, FragCountReporter
+from martini_daemon import Simulation, ReactionReporter, FragCountReporter, XTCReporter, VariablesReporter
 
-sim = simulation.Simulation(
-    top_path="system.top", gro_path="system.gro",
+sim = Simulation(
+    top_path="system.top", geom_path="system.gro",
     sim_name="out",
-    p_bar=1., friction_ps_1=2.0,
     reporters=[
         ReactionReporter(),
         FragCountReporter(),
+        XTCReporter(),
+        VariablesReporter(),
     ],
     md_steps=1000000, dm_frequency=100,
-    xtc_frequency=10000,
-    rate_highest_probability=0.05
+    traj_frequency=10000,
 )
 sim.simulate()

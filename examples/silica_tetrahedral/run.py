@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
 
-from martini_daemon import old_simulation
-from martini_daemon.old_reporters.bond_reporter2 import BondReporter
-from martini_daemon.old_reporters.topstar import ReactionReporter, FragCountReporter
-from martini_daemon.old_reporters.checkpoint_reporter import CheckpointReporter
-from martini_daemon.old_reporters.variables_reporter import VariablesReporter
+from martini_daemon import Simulation, ToptrajReporter, VariablesReporter, XTCReporter, ReactionReporter, FragCountReporter
 
-sim = simulation.Simulation(
-    top_path="system.top", gro_path="system.gro", 
+
+sim = Simulation(
+    top_path="system.top", geom_path="system.gro",
     sim_name="out",
     reporters=[
-        BondReporter(),
+        ToptrajReporter(),
+        VariablesReporter(),
+        XTCReporter(),
         ReactionReporter(),
         FragCountReporter(),
-        VariablesReporter(),
-        CheckpointReporter(100000)
     ],
     md_steps=10000000, dm_frequency=250,
-    xtc_frequency=5000
+    traj_frequency=5000
 )
-sim.generate_velocities(300)
+sim.context.generate_velocities(300)
 sim.simulate()

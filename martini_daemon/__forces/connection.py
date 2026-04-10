@@ -27,9 +27,6 @@ class Connection(BondedForce):
     def get_name(cls) -> str:
         return "connection"
 
-    def build(self):
-        pass
-
     def _destroy(self):
         pass
 

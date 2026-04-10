@@ -1,4 +1,3 @@
-import openmm as mm
 from ..__core import BondedForce, register_available_force
 from ..__parser import register_constraint_type
 

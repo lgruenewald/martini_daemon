@@ -4,11 +4,12 @@ import openmm as mm
 import numpy as np
 import math
 
+
 class LocalMinimizer(Reporter):
 
     def __init__(
         self, minimizer, minimization_steps=500,
-        r_movable = 1., whole_molecule=True,
+        r_movable=1., whole_molecule=True,
         harmonic_constraints=True,
         report_every=0
     ):
@@ -46,6 +47,7 @@ class LocalMinimizer(Reporter):
     def on_reaction(self, simulation: Simulation, reactions):
         # save velocities
 
+        simulation.info("on_reaction Local Minimizer")
         vel = simulation.context.get_velocities()
         pos, box = simulation.context.get_positions()
         old_integrator = simulation.context.get_current_integrator()
@@ -53,6 +55,7 @@ class LocalMinimizer(Reporter):
         simulation.top.toggle_softcore(reactions, True)
         if self.harmonic_constraints:
             simulation.system.toggle_constraints_as_harmonic_bonds(True)
+        simulation.info("prep done")
         # integrator state setup
         self.reset(vel.shape)
         # set movable
@@ -71,7 +74,9 @@ class LocalMinimizer(Reporter):
         for atom in atoms:
             movable[atom, :] = 1.
 
+        simulation.info("atoms chosen")
         self.minimizer.set_movable(movable)
+        simulation.info("atoms set")
 
         gcd = math.gcd(self.report_every, 10) if self.report_every > 0 else 10
         remaining = self.minimization_steps
@@ -80,6 +85,7 @@ class LocalMinimizer(Reporter):
             simulation.open(suffix)
             self.report(simulation, suffix, remaining)
 
+        simulation.info("initial reporting done, minimizing now")
         while remaining > 0:
             c_steps = min(gcd, remaining)
             simulation.context.do_steps(c_steps)
@@ -87,13 +93,19 @@ class LocalMinimizer(Reporter):
             if self.report_every > 0 and remaining % self.report_every == 0:
                 self.report(simulation, suffix, remaining)
             if self.minimizer.is_converged():
+                simulation.info("minimizer converged")
                 break
 
+        simulation.info("minimization over")
         simulation.context.set_velocities(vel)
+        simulation.info("velocities reset")
         if self.harmonic_constraints:
             simulation.system.toggle_constraints_as_harmonic_bonds(False)
         simulation.top.toggle_softcore(reactions, False)
+        simulation.info("preparing to set integrator back")
         simulation.context.set_current_integrator(old_integrator)
+        simulation.info("back")
+        simulation.close(suffix)
 
 class LocalGradientDescent:
     def __init__(self, initial_step_size_nm=0.1, etol=0., smoothing_factor=0.1):

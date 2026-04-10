@@ -55,4 +55,4 @@ def test_read_write_geometry(format, rootdir):
     largest = np.argmax(np.abs(read_vel-vel))
     assert np.allclose(read_vel, vel, atol=1e-3), f"Largest deviation in pos at {largest // 3}, , with a difference of {np.abs(read_vel[largest]-vel[largest])} between original {vel[largest]} and read back {read_vel[largest]}."
 
-    #os.remove(tmp_path)
+    os.remove(tmp_path)

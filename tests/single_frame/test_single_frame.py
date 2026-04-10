@@ -3,7 +3,6 @@
 import os
 import openmm as mm
 import openmm.app as mmapp
-from openmm.unit import femtosecond, kilojoule_per_mole, kilojoule, mole, nanometer
 import numpy as np
 import math
 import pytest
@@ -98,7 +97,6 @@ class TestSingleFrame:
 
     def compare_daemon_gmx(self):
         _, respos, _ = read_geometry(self.respos)
-        platform = mm.Platform.getPlatformByName("Reference")
         sim = Simulation(
             self.top, self.gro, 0, [], options={"respos": respos}, platform="Reference"
         )

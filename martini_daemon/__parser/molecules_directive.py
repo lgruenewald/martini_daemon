@@ -28,7 +28,7 @@ class MoleculesDirective(Directive):
 
     @classmethod
     def is_valid_parent(cls, parent: Any) -> bool:
-        return type(parent) == GromacsTopFile
+        return type(parent) is GromacsTopFile
 
     @classmethod
     def get_name(cls) -> str:

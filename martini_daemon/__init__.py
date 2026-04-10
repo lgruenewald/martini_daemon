@@ -1,4 +1,5 @@
 # select exported symbols for public API
+# ruff: noqa: F401, F403
 from .__core import *
 from .__parser import *
 from .__formats import *

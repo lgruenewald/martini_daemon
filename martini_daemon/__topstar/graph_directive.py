@@ -1,7 +1,7 @@
 from typing import Any
 
 import difflib
-from ..__parser import register_directive, GromacsTopFile, Directive, TokenList, TokenParseException, ParseException
+from ..__parser import register_directive, GromacsTopFile, Directive, TokenList, TokenParseException
 from ..__core import System
 from .graph import Graph, GraphAtomType
 
