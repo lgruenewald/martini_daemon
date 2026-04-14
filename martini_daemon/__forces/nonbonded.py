@@ -102,7 +102,7 @@ class NonBonded(Force):
                 )
             self.__atom_types[type_name] = i
 
-        for atom_id in range(self.system.atom_count()):
+        for atom_id in range(self.system.num_atoms()):
             type_ = self.__atom_types[self.system.get_type(atom_id)]
             charge = self.system.get_charge(atom_id)
             sc_lam, sc_alpha = self.system.get_sc(atom_id)
@@ -176,7 +176,7 @@ class ExclusionHelper(BondedForce):
         self.force.addPerBondParameter("q_product")
 
         # trigger rebuild! if a charge changes
-        for i in range(self.system.atom_count()):
+        for i in range(self.system.num_atoms()):
             charge = self.system.get_charge(i)
             if charge != 0:
                 # self term in reaction field correction

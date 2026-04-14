@@ -37,7 +37,8 @@ extend-select = [
 
 test = [
   "pytest",
-  "mdtraj"
+  "mdtraj",
+  "molly@git+https://git.sr.ht/~ma3ke/molly#egg=molly&subdirectory=bindings/python",
 ]
 
 docs = [
@@ -54,4 +55,8 @@ dev = [
 
 molly = [
   "molly@git+https://git.sr.ht/~ma3ke/molly#egg=molly&subdirectory=bindings/python",
+]
+
+trr = [
+  "mdtraj"
 ]

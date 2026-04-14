@@ -4,8 +4,8 @@ from martini_daemon import (
     ReactionReporter,
     Simulation,
     ToptrajReporter,
+    TrajectoryReporter,
     VariablesReporter,
-    XTCReporter,
 )
 
 sim = Simulation(
@@ -15,13 +15,13 @@ sim = Simulation(
     reporters=[
         ToptrajReporter(),
         VariablesReporter(),
-        XTCReporter(),
+        TrajectoryReporter(),
         ReactionReporter(),
     ],
     md_steps=100000000,
     dm_frequency=100,
     traj_frequency=5000,
 )
-sim.get_context().minimize_energy()
-sim.get_context().generate_velocities(300)
+sim.context.minimize_energy()
+sim.context.generate_velocities(300)
 sim.simulate()

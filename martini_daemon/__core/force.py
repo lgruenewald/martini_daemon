@@ -1,51 +1,53 @@
 from abc import ABCMeta, abstractmethod
+from typing import Any
 
 import openmm as mm
 
 
 class Force(metaclass=ABCMeta):
-    """Parent metaclass for all forces in the system.
+    def __init__(self, system: Any):
+        """Parent metaclass for all forces in the system.
 
-    Note the following invariant:
+        Note the following invariant:
+
         - self.force should be not None if and only if it represents the most up-to-date state
-        of the system and is present in the OpenMM system.
-        When it becomes outdated it should be removed from System and self.force
-        should be set to None.
+            of the system and is present in the OpenMM system.
+            When it becomes outdated it should be removed from System and self.force
+            should be set to None.
         - if self.force is None, self._set_force_obj() will be called if
-        self.should_build() returns True, before the energies/forces are read out.
-        self._set_force_obj() is called by build(), which is in turn called
-        by System automatically.
+            self.should_build() returns True, before the energies/forces are read out.
+            self._set_force_obj() is called by build(), which is in turn called
+            by System automatically.
 
-    You should implement the following in child classes:
-    - get_name()
-    - delta_degrees_of_freedom()
-    - is_coupling()
-    - _set_force_obj()
+        You should implement the following in child classes:
 
-    You can optionally implement the following in child classes
-    (if you know what you're doing):
-    - _prepare_force_obj()
-    - should_build()
-    - flag_atom_change()
-    - flag_add_atom()
-    """
+        - get_name()
+        - delta_degrees_of_freedom()
+        - is_coupling()
+        - _set_force_obj()
 
-    def __init__(self, system):  # System):
+        You can optionally implement the following in child classes (if you know what you're doing):
+
+        - _prepare_force_obj()
+        - should_build()
+        - flag_atom_change()
+        - flag_add_atom()
+
+        :param system: A Martini Daemon System instance. Note: type hint incorrect to avoid circular dependencies.
+            self.system is set to system. Classes that inherit this class can safely import System, and can safely
+            assume that self.system is always a Martini Daemon system.
+        """
         self.force: mm.Force | None = None
         self.system = system
-        # If rebuild is set to True, it means that self.force is  no longer valid, or does not exist.
-        # Happens e.g. during construction or if a bond was removed.
 
-    def build(self, must=False) -> None:
+    def build(self, must: bool = False) -> None:
         """System calls this before initializing or reinitializing the context.
-        It actually creates the OpenMM force
-        and adds it to the system.
+        It actually creates the OpenMM force and adds it to the system.
 
-        If must is True, then assume that the force object has been deleted
-        manually and a new one is needed, don't check.
-        Currently must=True is only used for constraints <=> harmonic bonds
-        conversion during minimization.
-        Don't call with must=True if you don't know what you're doing.
+        :param must: If must is True, then assume that the force object has been deleted manually and a new one is
+            needed, don't check.
+            Currently must=True is only used for constraints <=> harmonic bonds conversion during minimization.
+            Don't call with must=True if you don't know what you're doing.
         """
         if must or self.should_build():
             self._set_force_obj()
@@ -58,7 +60,7 @@ class Force(metaclass=ABCMeta):
 
         Note: the force will automatically get rebuilt before continuing the simulation.
 
-        Protected because it should only be called by this class.
+        Protected because it should only be called by methods in this class and its children.
         """
         if self.force is not None:
             self.system._remove_mm_force(self.force)
@@ -76,6 +78,7 @@ class Force(metaclass=ABCMeta):
 
     def should_build(self) -> bool:
         """Returns whether the force should be built when appropriate.
+
         If it returns False, the force is either built or it does not need to be
         built (because it makes 0 difference whether it's present). By default
         returns True if self.force is None.
@@ -86,7 +89,7 @@ class Force(metaclass=ABCMeta):
 
     @classmethod
     @abstractmethod
-    def is_coupling(cls):
+    def is_coupling(cls) -> bool:
         """Whether this Force wraps an OpenMM Force that is a type of coupling (temperature, pressure, COMM removal)."""
         raise NotImplementedError
 
@@ -111,11 +114,11 @@ class Force(metaclass=ABCMeta):
     @classmethod
     @abstractmethod
     def get_name(cls) -> str:
-        """There can only be one force with this name per martini_daemon.System."""
-        raise NotImplementedError
+        """Return the name associated with this force.
 
-    def has_force_obj(self) -> bool:
-        return self.force is not None
+        There can only be one force with this name per martini_daemon.System.
+        """
+        raise NotImplementedError
 
     def flag_atom_change(self, atom_id: int, change_charge: bool = False) -> None:
         """Called by System when an atom's type, charge or mass are changed.
@@ -126,11 +129,11 @@ class Force(metaclass=ABCMeta):
         """
         pass
 
-    def flag_atom_add(self):
+    def flag_atom_add(self) -> None:
         """Called by System when a new atom is added.
 
         Note: currently this only happens during system construction.
 
-        Note: you should check if self.force exists, before doing anything to it.
+        Note: if you inherit this, you should check if self.force exists, before doing anything to it.
         """
         pass

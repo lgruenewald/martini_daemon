@@ -1,16 +1,17 @@
 # Simple gromacs gro file read/write
 import numpy as np
+import numpy.typing as npt
 
 from ..__rust import PeriodicBox
 
 
-def read_gro(path):
-    """Reads .gro file at path, returns box, pos, vel.
-    box is a PeriodicBox instance.
-    pos and vel are float64 numpy arrays.
+def read_gro(
+    path: str,
+) -> tuple[PeriodicBox, npt.NDArray[np.float64], npt.NDArray[np.float64] | None]:
+    """Reads .gro file at path.
 
-    If there are no velocities in the gro file, returns None for vel.
-    (if even a single velocity is missing, it returns None).
+    :return: periodic box (PeriodicBox), numpy array of positions in nm,
+        numpy array of velocities in nm/picosecond if present.
     """
     with open(path) as file:
         file.readline()  # skip title
@@ -61,18 +62,25 @@ def read_gro(path):
 
 
 def write_gro(
-    path, title, atom_names, res_names, res_ids, box: PeriodicBox, pos, vel=None
+    path: str,
+    title: str,
+    atom_names: list[str],
+    res_names: list[str],
+    res_ids: list[int],
+    box: PeriodicBox,
+    pos: npt.NDArray[np.float64 | np.float32],
+    vel: npt.NDArray[np.float64 | np.float32] | None = None,
 ) -> None:
     """Write .gro file at path.
 
-    :param path: path to .gro file
-    :param title: title of .gro file
-    :param atom_names: list of atom names
-    :param res_names: list of residue names
-    :param res_ids: list of residue IDs
+    :param path: path to .gro file.
+    :param title: title of .gro file.
+    :param atom_names: list of atom names.
+    :param res_names: list of residue names.
+    :param res_ids: list of residue IDs.
     :param box: PeriodicBox instance.
-    :param pos: numpy array of positions in nm.
-    :param vel: numpy array of velocities in nm/picosecond or None.
+    :param pos: Positions in nm.
+    :param vel: Velocities in nm/picosecond or None.
     """
     title = title.strip()
     assert "\n" not in title, "Title must not contain newlines"

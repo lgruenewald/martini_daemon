@@ -3,11 +3,11 @@
 Martini Daemon is a tool facilitating template based chemical reactions in MD simulations with the [Martini force field](https://cgmartini.nl/) and the [OpenMM](https://openmm.org/) MD engine.
 
 This is achieved by combining multiple components in one repo / one python package:
-- a friendly Python API for running MD simulations with reactions (`simulation.py`)
-- a parser for GROMACS `.top` files targeting OpenMM (`__parser`, `__forces` and `__vsites`)
-- a thin wrapper on top of OpenMM's API facilitating bond addition and removal (`__core`)
-- a graph matching system to find reactants (`__topstar`)
-- a detection/modification algorithm to execute reaction templates (`__topstar`)
+- Thin wrapper on top of OpenMM's API (`__core`)
+- Parser for GROMACS `.top` files (`__parser`, `__forces` and `__vsites`)
+- Friendly Python API for running MD simulations with reactions (`simulation.py`)
+- User experience somewhere between GROMACS and OpenMM, to create a familiar workflow for running any Martini simulation with OpenMM.
+- Graph matching and detection/modification algorithms to facilitate template based reactions (`__topstar`).
 
 ## Installation (from source)
 
@@ -20,6 +20,18 @@ This is achieved by combining multiple components in one repo / one python packa
    - (optional) after installing, verify which platforms are available with `python -m openmm.testInstallation`
 - (Within the virtual environment) install maturin (`pip install maturin` or `uv tool install maturin`).
 - Install to the virtual environment using `maturin develop -r`.
+
+# Optional dependencies
+
+## Additional trajectory formats
+
+By default, Martini Daemon uses OpenMM's built-in internal XTC reader and
+writer. Optional dependencies can enable other trajectory backends.
+Here is a list of optional dependency tags, based on what's currently possible:
+
+- [molly](https://github.com/ma3ke/molly) - Alternative fast backend for XTC.
+- [trr] - Gromacs .trr files, uses [mdtraj](https://www.mdtraj.org).
+   Full precision, stores velocities.
 
 ## Docs
 
@@ -67,7 +79,7 @@ Some single_frame tests have looser tolerances, this is documented at the top of
 Optional development tools are installed using `pip install .[dev]`. Here
 is an overview of which these are:
 
-- `pylsp` - Python LSP server used by helix, provides autocomplete.
+- `pylsp` - Python LSP server for autocomplete.
 - `ruff` - the linter and formatter used. Run using `ruff check` and `ruff format`.
 - `ty` - type checker. Run using `ty check`.
 

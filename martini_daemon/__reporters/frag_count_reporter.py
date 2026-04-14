@@ -3,8 +3,9 @@ from ..__simulation import Simulation
 
 
 class FragCountReporter(Reporter):
-    def on_simulation_start(self, simulation: Simulation):
-        simulation.open(".frags")
+    def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
+        simulation.open(".frags", append=continue_sim)
+        # TODO truncate
 
     def on_trajectory_frame(self, simulation: Simulation):
         simulation.print(

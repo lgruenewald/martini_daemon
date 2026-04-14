@@ -13,7 +13,7 @@ class TopStar:
 
     def __init__(self, system: System):
         self.system = system
-        self.n_atoms = system.atom_count()
+        self.n_atoms = system.num_atoms()
         self.frag_list = FragList(self.n_atoms)
         self.detection_templates = DetectionTemplateList()
         for d in system.additional_data.get("detection_templates", []):

@@ -113,8 +113,8 @@ class TestSingleFrame:
         sim = Simulation(
             self.top, self.gro, 0, [], options={"respos": respos}, platform="Reference"
         )
-        sim.get_context().apply_constraints()
-        new_pos, box = sim.get_context().get_positions()
+        sim.context.apply_constraints()
+        new_pos, box = sim.context.get_positions()
         for i in range(len(reference)):
             r_diff = box.distance(reference[i], new_pos[i])
             assert r_diff < r_tol, (
@@ -127,9 +127,9 @@ class TestSingleFrame:
             self.top, self.gro, 0, [], options={"respos": respos}, platform="Reference"
         )
 
-        _, energy, _ = sim.get_context().get_energies()
-        forces = sim.get_context().get_forces().flatten()
-        for i in range(sim.system.atom_count()):
+        _, energy, _ = sim.context.get_energies()
+        forces = sim.context.get_forces().flatten()
+        for i in range(sim.system.num_atoms()):
             if sim.system.get_mass(i) == 0.0:
                 forces[i * 3] = 0.0
                 forces[i * 3 + 1] = 0.0

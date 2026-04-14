@@ -11,8 +11,8 @@ from martini_daemon import (
     ReactionReporter,
     Simulation,
     ToptrajReporter,
+    TrajectoryReporter,
     VariablesReporter,
-    XTCReporter,
 )
 
 
@@ -34,7 +34,7 @@ def test_integration(x, rootdir):
         "system.gro",
         2500,
         [
-            XTCReporter(),
+            TrajectoryReporter(),
             ToptrajReporter(),
             LocalMinimizer(
                 minimizer=LocalGradientDescent(
@@ -56,9 +56,8 @@ def test_integration(x, rootdir):
         1000,
         sim_name="out",
     )
-    assert sim.get_context() is not None
-    sim.get_context().minimize_energy()
-    sim.get_context().generate_velocities(298)
+    sim.context.minimize_energy()
+    sim.context.generate_velocities(298)
     sim.simulate()
 
     for filename in glob.glob("./out*"):

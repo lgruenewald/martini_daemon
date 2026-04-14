@@ -1,11 +1,13 @@
-class MoleculeType:
-    """A class that contains all the information that is in a moleculetype.
-    Along with helpers to mutate system to add the required atoms for it
-    to system, and then to instantiate the bonded interactions on top
-    of the new atoms added.
-    """
+from typing import Any
 
+
+class MoleculeType:
     def __init__(self):
+        """A class that contains all the information that is in a moleculetype.
+        Along with helpers to mutate system to add the required atoms for it
+        to system, and then to instantiate the bonded interactions on top
+        of the new atoms added.
+        """
         self.name: str | None = None
         self.nrexcl: int | None = None
 
@@ -16,9 +18,11 @@ class MoleculeType:
         self.interactions: list[tuple[str, list[int], list[float], bool]] = []
 
     # methods called by [molecules] and reactions
-    def add_atoms_to_system(self, system) -> list[int]:
-        """Adds the atoms in molecule type to system and returns
-        the atom_id of them.
+    def add_atoms_to_system(self, system: Any) -> list[int]:
+        """Adds the atoms in molecule type to system.
+
+        :param system: The Martini Daemon system.
+        :return: list of atom indices that got added to the system.
         """
         res = []
         last_res = -1
@@ -29,20 +33,22 @@ class MoleculeType:
             res.append(system.add_atom(atom_name, res_name, type_, charge, mass))
         return res
 
-    def process_nrexcl(self):
-        """Called after parsing. It parses self.interactions
-        to see which bonds generate exclusions, and then
-        it adds the generated exclusions to it.
+    def process_nrexcl(self) -> None:
+        """Process bond-generated exclusions.
+
+        Called after parsing. It looks at self.interactions to see which bonds generate exclusions, and then
+        it adds the generated exclusions to it based on the nr_excl argument in [moleculetype].
         """
         for _, members, _, is_excl in self.interactions:
             if is_excl:
                 assert len(members) == 2
                 self.exclusions.add((members[0], members[1]))
 
-    def instantiate(self, system, atom_indices: list[int]):
-        """Adds the bonded interactions and exclusions
-        stored in this MoleculeType to the selected atom
-        indices (should call add_atoms_to_system to get those first).
+    def instantiate(self, system, atom_indices: list[int]) -> None:
+        """Adds the bonded interactions and exclusions stored in this MoleculeType to system.
+
+        :param system: The Martini Daemon system.
+        :param atom_indices: the selected atom indices belonging to this molecule.
         """
         # lookup force by name in system
         # call add interaction

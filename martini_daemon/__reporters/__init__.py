@@ -9,5 +9,5 @@ from .reaction_energy_reporter import ReactionEnergyReporter as ReactionEnergyRe
 from .reaction_reporter import ReactionReporter as ReactionReporter
 from .system_dump import SystemDump as SystemDump
 from .toptraj_reporter import ToptrajReporter as ToptrajReporter
+from .trajectory_reporter import TrajectoryReporter as TrajectoryReporter
 from .variables_reporter import VariablesReporter as VariablesReporter
-from .xtc_reporter import XTCReporter as XTCReporter

@@ -7,7 +7,9 @@ class ToptrajReporter(Reporter):
     def __init__(self):
         self.writer: TopTrajWriter | None = None
 
-    def on_simulation_start(self, simulation: Simulation):
+    def on_simulation_start(self, simulation: Simulation, continue_sim: bool):
+        if continue_sim:
+            raise NotImplementedError()  # TODO
         title = simulation.system.additional_data.get("title")
         assert type(title) is str
         self.writer = TopTrajWriter(
@@ -22,9 +24,9 @@ class ToptrajReporter(Reporter):
             simulation.trajectory_frame,
             simulation.current_step,
             simulation.time_ps,
-            simulation.system.atom_count(),
+            simulation.system.num_atoms(),
         )
-        self.writer.register_frame_atoms(
+        self.writer.write_frame_atoms(
             simulation.system.get_atom_names(),
             simulation.system.get_res_names(),
             simulation.system.get_res_ids(),
@@ -32,7 +34,7 @@ class ToptrajReporter(Reporter):
             simulation.system.get_charges(),
             simulation.system.get_masses(),
         )
-        self.writer.register_frame_bonds(
+        self.writer.write_frame_bonds(
             simulation.system.collect_bonds(["vsite", "bond"]),
         )
         self.writer.write_frame()

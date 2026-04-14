@@ -15,7 +15,7 @@ def wrap_coupling(mm_force: mm.Force) -> type[Force]:
 
     class Coupling(Force):
         @classmethod
-        def is_coupling(cls):
+        def is_coupling(cls) -> bool:
             return True
 
         def delta_degrees_of_freedom(self) -> int:

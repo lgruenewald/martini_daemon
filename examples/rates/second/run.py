@@ -5,8 +5,8 @@ from martini_daemon import (
     ReactionReporter,
     Simulation,
     ToptrajReporter,
+    TrajectoryReporter,
     VariablesReporter,
-    XTCReporter,
 )
 
 for rep in range(3):
@@ -18,7 +18,7 @@ for rep in range(3):
         reporters=[
             ReactionReporter(),
             FragCountReporter(),
-            XTCReporter(),
+            TrajectoryReporter(),
             VariablesReporter(),
             ToptrajReporter(),
         ],

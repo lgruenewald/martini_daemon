@@ -1,16 +1,17 @@
 import math
 import os
+import shutil
 import sys
-import zlib
+import traceback
 from collections.abc import Callable
 from datetime import datetime
 from importlib.metadata import version
 from time import time
-from typing import Any
+from typing import Any, BinaryIO
 
 import openmm as mm
 import openmm.app as mmapp
-from openmm.unit import bar, kelvin, picosecond  # ty: ignore[unresolved-import]
+from openmm.unit import md_unit_system
 
 from .__core import Context, System, wrap_coupling
 from .__forces import NonBonded
@@ -31,7 +32,6 @@ class Simulation:
         dm_frequency: int = 0,
         traj_frequency: int = 0,
         sim_name: str = "out",
-        continue_sim=False,
         coupling=None,
         integrator: mm.Integrator | None = None,
         options: dict[str, Any] | None = None,
@@ -40,6 +40,7 @@ class Simulation:
         platform: str | None | mm.Platform = None,
         context_parameters: None | dict[str, str] = None,
         nonbonded: Callable[[System], NonBonded] | type[NonBonded] | None = None,
+        continue_sim: bool = False,
     ):
         """Simulation class.
 
@@ -57,7 +58,6 @@ class Simulation:
         :param dm_frequency: Frequency of the Detection/Modification algorithm.
         :param traj_frequency: Frequency of Trajectory frames.
         :param sim_name: Short name of the simulation. All output files will be prefixed by this name.
-        :param continue_sim: Attempt to continue previous simulation with the same name?
         :param coupling: List of OpenMM coupling forces to use. If None, pressure coupling at 1 bar and 300 kelvin,
             and center of mass motion removal will be employed.
         :param integrator: Base integrator to use during the simulation. Note: a compound integrator will be set up
@@ -75,6 +75,8 @@ class Simulation:
         :param nonbonded: Nonbonded force to use, passed as a type or a function that returns the martini daemon Force
             when called with system as its argument. By default, the Martini compatible shifted Lennard-Jones
             and reaction-field electrostatics are used.
+        :param continue_sim: Whether this is a continuation of a previous simulation. Do not use manually! Use
+            ReactionReporter's replay method to continue simulations.
 
         Note: You may want to take a look at the following attributes, which also contain methods for common simulation
         tasks:
@@ -89,19 +91,21 @@ class Simulation:
         self.__sim_name = sim_name
         self.time_ps: float = 0.0
         md_integrator = integrator or mm.LangevinMiddleIntegrator(
-            300 * mm.unit.kelvin,  # ty: ignore[unsupported-operator]
-            1.0 / picosecond,
-            0.02 * picosecond,
+            298.0,  # kelvin
+            1.0,  # ps^-1
+            0.02,  # ps
         )
         if coupling is None:
             coupling = [
                 mm.MonteCarloBarostat(
-                    1.0 * bar,
-                    300.0 * kelvin,  # ty: ignore[unsupported-operator]
+                    1.0,  # bar
+                    298.0,  # kelvin
                 ),
                 mm.CMMotionRemover(),
             ]
-        self.dt_ps: float = md_integrator.getStepSize().value_in_unit(picosecond)
+        self.dt_ps: float = md_integrator.getStepSize().value_in_unit_system(
+            md_unit_system
+        )  # ps
         self.dm_frequency: int = dm_frequency
         self.traj_frequency: int = traj_frequency
         if type(platform) is str:
@@ -127,7 +131,7 @@ class Simulation:
 
         # file handles setup
         # dict of suffix -> (handle, compression_obj | None)
-        self.__output_files = {}
+        self.__output_files: dict[str, BinaryIO] = {}
 
         self.open(".log")
         self.info(f"Martini Daemon {version('martini_daemon')} log file")
@@ -199,6 +203,7 @@ class Simulation:
         for c in coupling:
             self.system.add_force(wrap_coupling(c)(self.system))
 
+        # Reporters!
         # reporters can add integrators only here
         for r in self.__reporters:
             r.pre_simulation_start(self)
@@ -212,6 +217,7 @@ class Simulation:
             )
 
             self.info("Building context")
+            assert platform is None or isinstance(platform, mm.Platform)
             self.__context = Context(
                 self.system, self.integrator, box, platform, context_parameters
             )
@@ -225,7 +231,7 @@ class Simulation:
         self.integrator = None
 
         for r in self.__reporters:
-            r.on_simulation_start(self)
+            r.on_simulation_start(self, continue_sim)
 
         # for the estimated time left display
         self.__last_step_time = 0.0
@@ -237,7 +243,7 @@ class Simulation:
 
     # File handles and loggers
     @staticmethod
-    def __backup_try(path):
+    def __backup_try(path: str, copy: bool = False) -> None:
         parent, filename = os.path.split(path)
         if os.path.isfile(path):
             bkup_num = 0
@@ -245,44 +251,67 @@ class Simulation:
             while os.path.isfile(bkup_path):
                 bkup_num += 1
                 bkup_path = os.path.join(parent, f"#{filename}.{bkup_num}#")
-            os.rename(path, bkup_path)
+            if copy:
+                os.rename(path, bkup_path)
+            else:
+                shutil.copy(path, bkup_path)
             print(f"Backed up {path} to {bkup_path}")
 
-    def request_path(self, suffix) -> str:
-        """Convert suffix to path based on simulation name. Will try to back up existing file if it exists."""
+    def request_path(self, suffix: str, copy: bool = False) -> str:
+        """Request a writable path for an output file. Back up the file if it already exists.
+
+        :param suffix: suffix to use. Usually a file extension, e.g. ".xtc".
+        :param copy: If True, it will make a copy of the original contents at the original path.
+            Generally, only pass False, if you intend to append to the contents.
+        """
         path = self.__sim_name + suffix
-        self.__backup_try(path)
+        self.__backup_try(path, copy=copy)
         return path
 
-    def open(self, suffix, compress=False) -> None:
+    def open(self, suffix: str, append: bool = False) -> None:
         """Opens a new file handle for writing, and ties the file handle's lifetime to the Simulation object.
-        Note, the true path of the file will be a combination of simulation name and suffix. Also note, that
-        if the file already exists, it will be backed up, and the new path will be printed to stdout.
+
+        Note, the true path of the file will be a combination of simulation name and suffix.
+
+        Also note that if the file already exists, it will be first backed up, and the new path will be printed to
+        stdout.
+
         Writing to these files should happen using Simulation.write() and Simulation.print().
 
         Simulation.finish() will automatically close it when the simulation ends. Simulation.close() should
-        be called if an output file is no longer necessary.
+        be called if an output file handle is no longer necessary before the simulation ends.
+
+        If the handle is already open, it will only seek to the end, so that appending may resume.
 
         :param suffix: suffix to append to sim_name to get the path.
-        :param compress: if True, a zlib compression will be applied to writes to the file.
+        :param append: if True, open file for appending, don't erase the file first.
         """
         if suffix in self.__output_files:
-            raise ValueError(f"{suffix} is already open.")
-        path = self.request_path(suffix)
-        self.__output_files[suffix] = (
-            open(path, "wb"),  # noqa: SIM115
-            zlib.compressobj(6) if compress else None,
-        )
+            self.__output_files[suffix].seek(0, os.SEEK_END)
+        else:
+            # if appending, make a copy instead
+            path = self.request_path(suffix, copy=append)
+            mode = "ab" if append else "wb"
+            self.__output_files[suffix] = open(path, mode)  # noqa: SIM115
 
-    def write(self, suffix, bytes_or_text) -> None:
+    def get_handle(self, suffix: str) -> BinaryIO:
+        """Get file handle to do any operations on.
+
+        Note: do not close the handle manually.
+        Prefer Simulation.flush(), Simulation.close(), Simulation.write(), Simulation.print() for common operations.
+
+        Note, the mode is always a binary mode. encode/decode manually from/to strings.
+        """
+        return self.__output_files[suffix]
+
+    def write(self, suffix: str, bytes_or_text) -> None:
         """Writes to open handle."""
         if type(bytes_or_text) is str:
             bytes_or_text = bytes_or_text.encode("utf-8")
-        if self.__output_files[suffix][1] is not None:
-            bytes_or_text = self.__output_files[suffix][1].compress(bytes_or_text)
-        self.__output_files[suffix][0].write(bytes_or_text)
+        assert self.__output_files.get(suffix) is not None
+        self.__output_files[suffix].write(bytes_or_text)
 
-    def print(self, suffix, *args, sep=" ", end="\n") -> None:
+    def print(self, suffix: str, *args, sep=" ", end="\n") -> None:
         """Writes all args to output file, separated by separator (space). Writes a newline after."""
         for i, arg in enumerate(args):
             if i > 0:
@@ -293,10 +322,8 @@ class Simulation:
 
     def flush(self, suffix: str) -> None:
         """Flushes a single output file handle."""
-        handle, comp = self.__output_files[suffix]
-        if comp is not None:
-            handle.write(comp.flush_all())
-        handle.flush()
+        assert self.__output_files.get(suffix) is not None
+        self.__output_files[suffix].flush()
 
     def flush_all(self) -> None:
         """Flushes all output files. Also called at trajectory frames automatically."""
@@ -306,8 +333,7 @@ class Simulation:
     def close(self, suffix) -> None:
         """Closes a single open file."""
         self.flush(suffix)
-        h, _ = self.__output_files[suffix]
-        h.close()
+        self.__output_files[suffix].close()
         del self.__output_files[suffix]
 
     def finish(self) -> None:
@@ -322,9 +348,8 @@ class Simulation:
         for r in self.__reporters:
             r.on_simulation_finish(self)
         self.flush_all()
-        for handle, _ in self.__output_files.values():
-            handle.close()
-        self.__output_files = {}
+        for suffix in self.__output_files:
+            self.close(suffix)
 
     def info(self, *args) -> None:
         """Writes a message to log."""
@@ -364,7 +389,8 @@ class Simulation:
         finally:
             pass
 
-    def get_context(self) -> Context:
+    @property
+    def context(self) -> Context:
         if self.__context is None:
             raise ValueError(
                 "This Simulation has no context. Was Simulation() constructed with no geom_path?"
@@ -381,8 +407,8 @@ class Simulation:
 
         :param path: path to save geometry to.
         """
-        pos, box = self.get_context().get_positions()
-        vel = self.get_context().get_velocities()
+        pos, box = self.context.get_positions()
+        vel = self.context.get_velocities()
         write_geometry(
             path,
             f"Simulation {self.__sim_name}, step {self.current_step}, time {self.time_ps} ps.",
@@ -429,6 +455,7 @@ class Simulation:
             self.__do_traj_frame()
             print()
         except Exception as e:
+            traceback.print_exc()
             self.error(f"!!! Unexpected Exception!!!\n{e}")
         finally:
             if finish:
@@ -496,7 +523,7 @@ class Simulation:
         c_res = None
         must_be_new_residue = True
         atoms = []
-        for i in range(self.system.atom_count()):
+        for i in range(self.system.num_atoms()):
             resid = self.system.get_res_id(i)
             if last_residue < resid:
                 last_residue = resid
@@ -557,10 +584,10 @@ class Simulation:
         if n_steps > 0:
             self.info(f"md_steps {n_steps}")
             self.info("Reinitialize start")
-            self.get_context().do_steps(0)
+            self.context.do_steps(0)
             self.info("Reinitialize finished")
             self.info("MD start")
-            self.get_context().do_steps(n_steps)
+            self.context.do_steps(n_steps)
             self.info("MD finished")
         if self.total_steps > 0 and n_steps > 0 and not silent:
             self.time_ps += self.dt_ps * n_steps
@@ -578,7 +605,7 @@ class Simulation:
             )
         if dm:
             self.info("Detection start")
-            pos, box = self.get_context().get_positions()
+            pos, box = self.context.get_positions()
             reactions: list[tuple[str, list[int]]] = self.top.detection(box, pos)
             self.info(f"After detection there were {len(reactions)} reactions")
             self.info("Detection finished")

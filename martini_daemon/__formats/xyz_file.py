@@ -2,24 +2,26 @@
 import re
 
 import numpy as np
+import numpy.typing as npt
 
 from ..__rust import PeriodicBox
 
 
-def read_xyz(path, pos_conversion=0.1, vel_conversion=0.1):
+def read_xyz(
+    path: str,
+) -> tuple[PeriodicBox, npt.NDArray[np.float64], npt.NDArray[np.float64] | None]:
     """Reads an extended .xyz file at path, returns box, pos, vel.
-    box is a python tuple of 3 floating point numbers.
-    pos and vel are float64 numpy arrays.
 
-    If there are no velocities in the xyz file, returns None
-    (if even a single velocity is missing, it returns None).
+    Coordinates in the .xyz file are assumed to be in Angstroms.
+    Velocities in the .xyz file are assumed to be in Angstroms/picosecond.
 
-    Coordinates are assumed to be in Angstroms by default.
-    Velocities are assumed to be in Angstroms/picosecond by default.
-
-    Custom units can be used by passing pos_conversion and vel_conversion.
-    The values in the files are multiplied by these factors.
+    :param path: path to .xyz file to read.
+    :return: The periodic box, positions in nanometers, and velocities in nanometers/picosecond if present.
     """
+    # unit conversion constants
+    pos_conversion = 0.1
+    vel_conversion = 0.1
+
     with open(path) as file:
         try:
             n_atoms = int(file.readline().strip())
@@ -82,19 +84,24 @@ def read_xyz(path, pos_conversion=0.1, vel_conversion=0.1):
         return box, pos, vel
 
 
-def write_xyz(path, atoms, box, pos, vel=None) -> None:
-    """Write .xyz file at path based on params.
+def write_xyz(
+    path: str,
+    atoms: list[str],
+    box: PeriodicBox,
+    pos: npt.NDArray[np.float64 | np.float32],
+    vel: npt.NDArray[np.float64 | np.float32] | None = None,
+) -> None:
+    """Write an .xyz file.
 
-    Does not round / writes all digits, even ones that
-    are not relevant.
+    Does not round / writes all digits, even ones that are not relevant.
 
     Writes in Angstrom and Angstroms/picosecond.
 
-    :param path: path to .xyz file
-    :param atoms: list of atom names
-    :param box: PeriodicBox, units of nm
-    :param pos: numpy array of positions in nm
-    :param vel: numpy array of velocities in nm/picosecond, or None
+    :param path: path to .xyz file to write.
+    :param atoms: list of atom names.
+    :param box: PeriodicBox, units of nm.
+    :param pos: numpy array of positions in nm.
+    :param vel: numpy array of velocities in nm/picosecond, or None.
     """
     n_atoms = len(atoms)
     assert len(atoms) == len(pos)

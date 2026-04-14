@@ -15,7 +15,7 @@ def write_frame(sim: Simulation):
         ".sstar", "# (name, resid, resname, type, charge, mass, sc_lam, sc_alpha)"
     )
 
-    for atom in range(sys.atom_count()):
+    for atom in range(sys.num_atoms()):
         sim.print(
             ".sstar",
             f"('{sys.get_name(atom)}', {sys.get_res_id(atom)}, '{sys.get_res_name(atom)}', "
@@ -52,15 +52,18 @@ class SystemDump(Reporter):
         Uses the file extension ``.sstar``.
         Due to the debug-oriented nature of this format,
         no commitments are made to keep this format forward or backward compatible.
+        Due to the debug-oriented nature of this format, it will not be truncated when continuing simulations
+        from an older frame.
         """
         pass
 
-    def on_simulation_start(self, simulation):
-        simulation.open(".sstar")
-        n = simulation.system.atom_count()
+    def on_simulation_start(self, simulation, continue_sim: bool):
+        simulation.open(".sstar", append=continue_sim)
+        n = simulation.system.num_atoms()
         assert n > 0
-        simulation.print(".sstar", "Format: SStar Dump")
-        simulation.print(".sstar", "# Written by Martini Daemon SystemDump")
+        if not continue_sim:
+            simulation.print(".sstar", "Format: SStar Dump")
+            simulation.print(".sstar", "# Written by Martini Daemon SystemDump")
         write_frame(simulation)
 
     def on_reaction(self, simulation, reactions):

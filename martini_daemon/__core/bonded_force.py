@@ -9,30 +9,39 @@ from .force import Force
 
 
 class BondedForce(Force, metaclass=ABCMeta):
-    """Parent class of all bonded forces.
-
-    Manages the list of bonds (as a dict of bond_id -> members, params).
-    Provides an API to add/remove bonds, while it appropriately keeps
-    the OpenMM state up to date, hidden from the user. An appropriate API
-    is exposed through System for this too.
-
-    New BondedForces should implement the following:
-    - _add_to_force(self, members, params)
-    - _parse(self, members, params) -> params
-    - get_name()
-    - uses_pbc()
-
-    Optionally, the following field should be set:
-    - filters (set)
-
-    """
-
     def __init__(self, system):
+        """Parent class of all bonded forces.
+
+        Manages the list of bonds (as a dict of bond_id -> members, params).
+        Provides an API to add/remove bonds, while it appropriately keeps
+        the OpenMM state up to date, hidden from the user. An appropriate API
+        is exposed through System for this too.
+
+        New BondedForces should implement the following:
+        - _add_to_force(self, members, params)
+        - _parse(self, members, params) -> params
+        - get_name()
+        - uses_pbc()
+
+        Optionally, the following field should be set:
+        - filters (set)
+
+        """
         super().__init__(system)
         self.__entries: dict[int, tuple[list[int], list[float]]] = {}
         self.__next_entry_id = 0
 
     def _prepare_force_obj(self) -> None:
+        """Prepares the OpenMM force object before it is added to System, after _set_force_obj().
+
+        The BondedForce version if it:
+
+        * sets the name to the result of self.get_name()
+        * adds all interaction entries to it
+        * sets pbc handling, if self.uses_pbc() returns True
+
+        Only override if you know what you're doing.
+        """
         super()._prepare_force_obj()
         assert self.force is not None
         if self.uses_pbc():
@@ -52,10 +61,9 @@ class BondedForce(Force, metaclass=ABCMeta):
         raise NotImplementedError
 
     def should_build(self) -> bool:
-        """If True, build() will be called on a global rebuild.
+        """Returns whether the force should be built when appropriate.
 
-        By default this happens if there are any entries and there is no force.
-
+        By default, this happens if there are any entries and there is no force.
         To trigger a rebuild, you generally therefore want to call _destroy().
         """
         return len(self.__entries) > 0 and self.force is None
@@ -65,7 +73,7 @@ class BondedForce(Force, metaclass=ABCMeta):
         """Given a list of members and parameters (as unwrapped = minimal pre-parsing), parse the params to how they
         should be stored in entries and passed to _add_to_force.
 
-        Protected because only this class should call this.
+        Protected because only this class should call this, but children must override it.
         """
         raise NotImplementedError
 

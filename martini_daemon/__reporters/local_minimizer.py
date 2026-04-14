@@ -54,10 +54,10 @@ class LocalMinimizer(Reporter):
         # save velocities
         assert self.integrator_index is not None
         simulation.info("on_reaction Local Minimizer")
-        vel = simulation.get_context().get_velocities()
-        pos, box = simulation.get_context().get_positions()
-        old_integrator = simulation.get_context().get_current_integrator()
-        simulation.get_context().set_current_integrator(self.integrator_index)
+        vel = simulation.context.get_velocities()
+        pos, box = simulation.context.get_positions()
+        old_integrator = simulation.context.get_current_integrator()
+        simulation.context.set_current_integrator(self.integrator_index)
         simulation.top.toggle_softcore(reactions, True)
         if self.harmonic_constraints:
             simulation.system.toggle_constraints_as_harmonic_bonds(True)
@@ -96,7 +96,7 @@ class LocalMinimizer(Reporter):
         simulation.info("initial reporting done, minimizing now")
         while remaining > 0:
             c_steps = min(gcd, remaining)
-            simulation.get_context().do_steps(c_steps)
+            simulation.context.do_steps(c_steps)
             remaining -= c_steps
             if self.report_every > 0 and remaining % self.report_every == 0:
                 self.report(simulation, suffix, remaining)
@@ -105,15 +105,17 @@ class LocalMinimizer(Reporter):
                 break
 
         simulation.info("minimization over")
-        simulation.get_context().set_velocities(vel)
+        simulation.context.set_velocities(vel)
         simulation.info("velocities reset")
         if self.harmonic_constraints:
             simulation.system.toggle_constraints_as_harmonic_bonds(False)
         simulation.top.toggle_softcore(reactions, False)
         simulation.info("preparing to set integrator back")
-        simulation.get_context().set_current_integrator(old_integrator)
+        simulation.context.set_current_integrator(old_integrator)
         simulation.info("back")
-        simulation.close(suffix)
+
+        if self.report_every > 0:
+            simulation.close(suffix)
 
 
 class LocalGradientDescent:

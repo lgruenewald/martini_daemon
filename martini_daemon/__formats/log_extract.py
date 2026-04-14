@@ -3,7 +3,15 @@ from datetime import datetime
 date_format = "%Y-%m-%d %H:%M:%S,%f"
 
 
-def extract_timings_from_log(path, ignore_first=False):
+def extract_timings_from_log(path: str, ignore_first: bool = False) -> dict[str, float]:
+    """Given a Martini Daemon log file, extract the timing information of different components.
+
+    This can be used for benchmarking purposes.
+
+    :param path: Path to the log file.
+    :param ignore_first: If True, ignore the first frame, skipping the startup cost.
+    :return: Dictionary of category to time in seconds.
+    """
     categories_starts = {}
     categories_sums = {}
     try:
@@ -28,8 +36,11 @@ def extract_timings_from_log(path, ignore_first=False):
                         categories_sums[category] = diff.total_seconds() + prev_diff
     except (UnicodeDecodeError, ValueError):
         # not a text file / not a log file with dates
-        return False
+        raise ValueError(f"{path} is not a valid log file.")
     if len(categories_sums) == 0:
         # not a daemon log file we recognize
-        return False
+        raise ValueError(f"{path} is not a valid log file.")
+    for category in list(categories_sums.keys()):
+        if categories_sums[category] == 0:
+            del categories_sums[category]
     return categories_sums

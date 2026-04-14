@@ -9,8 +9,13 @@ class Reporter:
         before context initialization.
         """
 
-    def on_simulation_start(self, simulation) -> None:
-        """Called once when Simulation is constructed. After the context is initialized."""
+    def on_simulation_start(self, simulation, continue_sim: bool) -> None:
+        """Called once when Simulation is constructed. After the context is initialized.
+
+        :param continue_sim: If True, should append instead of overwrite. Warning! May need to truncate files to
+        simulation.current_step first! Do not write headers twice! Prefer to raise NotImplementedError if truncating
+        is needed, but it is not implemented.
+        """
         pass
 
     def on_simulation_finish(self, simulation) -> None:

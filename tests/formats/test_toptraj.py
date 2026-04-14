@@ -57,7 +57,7 @@ def test_toptraj_writer(rootdir):
             frame_num * 0.1,
             frame["n_atoms"],
         )
-        w.register_frame_atoms(
+        w.write_frame_atoms(
             frame["names"],
             frame["res_names"],
             frame["res_ids"],
@@ -65,7 +65,7 @@ def test_toptraj_writer(rootdir):
             frame["charges"],
             frame["masses"],
         )
-        w.register_frame_bonds(frame["bonds"])
+        w.write_frame_bonds(frame["bonds"])
         w.write_frame()
     w.finish()
 

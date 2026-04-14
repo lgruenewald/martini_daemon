@@ -1,3 +1,5 @@
+import os
+
 from ..__reporter import Reporter
 from ..__simulation import Simulation
 from .variables_reporter import write_energies
@@ -13,9 +15,27 @@ class ReactionEnergyReporter(Reporter):
         self.write_coords = write_coords
         self.ext = ext
 
-    def on_simulation_start(self, simulation: Simulation) -> None:
-        simulation.open(".rxener")
-        write_energies("", ".rxener", simulation, True)
+    def __truncate(self, sim: Simulation):
+        h = sim.get_handle(".rxener")
+        h.seek(0, os.SEEK_SET)
+        prev_pos = 0
+        while (line := h.readline()) != b"":
+            frame = int(line.decode("utf-8").split(",")[1])
+            if frame > sim.current_step:
+                break
+            prev_pos = h.tell()
+        h.seek(prev_pos)
+        pos = h.tell()
+        h.truncate(prev_pos + 1)
+        h.seek(0, os.SEEK_END)
+        assert h.tell() == pos
+
+    def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
+        simulation.open(".rxener", append=continue_sim)
+        if continue_sim:
+            self.__truncate(simulation)
+        else:
+            write_energies("", ".rxener", simulation, True)
 
     def __write_pos(self, title, sim: Simulation):
         if self.write_coords:

@@ -1,3 +1,4 @@
+import os
 import re
 
 from ..__reporter import Reporter
@@ -26,14 +27,32 @@ class ReactionReporter(Reporter):
         """
         self.reactions = 0
 
-    def on_simulation_start(self, simulation):
-        simulation.open(".reactions")
-        simulation.print(
-            ".reactions",
-            "# frame,reaction_name;"
-            "reactant1_name,reactant1_id(res:resid1,...residn),atoms...;..."
-            "reactantn_name,reactantn_id(res:resid1,...residn),atoms...;",
-        )
+    def __truncate(self, sim: Simulation):
+        h = sim.get_handle(".reactions")
+        h.seek(0, os.SEEK_SET)
+        prev_pos = 0
+        while (line := h.readline()) != b"":
+            frame = int(line.decode("utf-8").split(",")[0])
+            if frame > sim.current_step:
+                break
+            prev_pos = h.tell()
+        h.seek(prev_pos)
+        pos = h.tell()
+        h.truncate(prev_pos + 1)
+        h.seek(0, os.SEEK_END)
+        assert h.tell() == pos
+
+    def on_simulation_start(self, simulation, continue_sim: bool):
+        simulation.open(".reactions", append=continue_sim)
+        if continue_sim:
+            self.__truncate(simulation)
+        else:
+            simulation.print(
+                ".reactions",
+                "# sim step,reaction_name;"
+                + "reactant1_name,reactant1_id(res:resid1,...residn),atoms...;..."
+                + "reactantn_name,reactantn_id(res:resid1,...residn),atoms...;",
+            )
 
     @staticmethod
     def __get_resids(sim: Simulation, atoms):

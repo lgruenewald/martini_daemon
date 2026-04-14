@@ -113,8 +113,8 @@ def bench_daemon(top, gro, steps, freq, reactive, force_reinit):
         platform=mm_platform,
         defines=defines,
     )
-    sim.get_context().minimize_energy()
-    sim.get_context().generate_velocities(300)
+    sim.context.minimize_energy()
+    sim.context.generate_velocities(300)
     end_grompp = time.time()
     grompp = end_grompp - start_grompp
 

@@ -195,6 +195,16 @@ impl PeriodicBox {
         self.c.into()
     }
 
+    /// Get the lengths of the three pbc vectors.
+    pub fn cell_lengths(&self) -> [f64; 3] {
+        [
+            self.a.x,
+            self.b.length(),
+            self.c.length()
+        ]
+    }
+
+
     pub fn diff(&self, v1: [f64; 3], v2: [f64; 3]) -> [f64; 3] {
         let v1 = DVec3::from(self.move_within(v1));
         let v2: DVec3 = DVec3::from(self.move_within(v2));
@@ -224,14 +234,26 @@ impl PeriodicBox {
         self.distance_squared(v1, v2).sqrt()
     }
 
+    /// Get the cosine of the periodic space angle between v1, v2 and v3.
     pub fn cos_angle(&self, v1: [f64; 3], v2: [f64; 3], v3: [f64; 3]) -> f64 {
         let t = DVec3::from(self.diff(v2, v1));
         let u = DVec3::from(self.diff(v2, v3));
         (t.dot(u) / t.length() / u.length()).clamp(-1.0, 1.0)
     }
 
+    /// Get the periodic space angle between v1, v2 and v3, in radians.
     pub fn angle(&self, v1: [f64; 3], v2: [f64; 3], v3: [f64; 3]) -> f64 {
         self.cos_angle(v1, v2, v3).acos()
+    }
+
+    /// Get the angles between the pbc vectors, in radians.
+    ///
+    /// Returned in order of alpha (b, c), beta (a, c), gamma (a, b).
+    pub fn cell_angles(&self) -> [f64; 3] {
+        let alpha = (self.b.dot(self.c) / self.b.length() / self.c.length()).clamp(-1.0, 1.0).acos();
+        let beta = (self.a.dot(self.c) / self.a.length() / self.c.length()).clamp(-1.0, 1.0).acos();
+        let gamma = (self.a.dot(self.b) / self.a.length() / self.b.length()).clamp(-1.0, 1.0).acos();
+        [ alpha, beta, gamma ]
     }
 
     pub fn dihedral(&self, v1: [f64; 3], v2: [f64; 3], v3: [f64; 3], v4: [f64; 3]) -> f64 {

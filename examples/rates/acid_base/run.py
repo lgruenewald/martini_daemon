@@ -4,8 +4,8 @@ from martini_daemon import (
     FragCountReporter,
     ReactionReporter,
     Simulation,
+    TrajectoryReporter,
     VariablesReporter,
-    XTCReporter,
 )
 
 sim = Simulation(
@@ -15,7 +15,7 @@ sim = Simulation(
     reporters=[
         ReactionReporter(),
         FragCountReporter(),
-        XTCReporter(),
+        TrajectoryReporter(),
         VariablesReporter(),
     ],
     md_steps=1000000,

@@ -11,7 +11,7 @@ import time
 from martini_daemon import (
     Simulation,
     ToptrajReporter,
-    XTCReporter,
+    TrajectoryReporter,
     extract_timings_from_log,
 )
 
@@ -35,11 +35,13 @@ for inp in inputs:
         "../inputs/" + inp,
         "../inputs/" + inp.replace(".top", ".gro"),
         10000,
-        [XTCReporter(), ToptrajReporter()],
+        [TrajectoryReporter(), ToptrajReporter()],
         25,
         25,
         defines={"REACT": "1"},
     )
+    sim.context.minimize_energy()
+    sim.context.generate_velocities(298.0)
     start = time.time()
     for i in range(10):
         sim.step(250, traj=True, dm=True)

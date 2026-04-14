@@ -41,6 +41,18 @@ class DetectionTemplate:
     @reactants.setter
     def reactants(self, value: builtins.list[builtins.str]) -> None: ...
     @property
+    def distance_max(
+        self,
+    ) -> builtins.list[
+        tuple[builtins.int, builtins.int, builtins.int, builtins.int, builtins.float]
+    ]: ...
+    @property
+    def distance_min(
+        self,
+    ) -> builtins.list[
+        tuple[builtins.int, builtins.int, builtins.int, builtins.int, builtins.float]
+    ]: ...
+    @property
     def rate(self) -> builtins.float | None: ...
     @rate.setter
     def rate(self, value: builtins.float | None) -> None: ...
@@ -56,6 +68,14 @@ class DetectionTemplate:
     def total_reaction_count(self) -> builtins.int: ...
     @total_reaction_count.setter
     def total_reaction_count(self, value: builtins.int) -> None: ...
+    @property
+    def angle_limits(
+        self,
+    ) -> list[tuple[int, int, int, int, int, int, float, float]]: ...
+    @property
+    def dihedral_limits(
+        self,
+    ) -> list[tuple[int, int, int, int, int, int, int, int, float, float]]: ...
     def __new__(cls) -> DetectionTemplate: ...
     def add_distance_max(
         self,
@@ -177,7 +197,6 @@ class PeriodicBox:
         r"""Move atom within the same copy of the PBC.
         Note: moves it within the box 0,0,0 to a.x,b.y,c.z, not the box a,b,c.
         """
-
     def move_to(
         self,
         reference: typing.Sequence[builtins.float],
@@ -186,16 +205,16 @@ class PeriodicBox:
         r"""Translates v by periodic box vectors so it is the closest possible to reference
         in non-periodic space.
         """
-
     def move_all_within(self, array: numpy.typing.NDArray[numpy.float64]) -> None:
         r"""Move_within but for 2D numpy arrays of positions of shape (n, 3)."""
-
     def which_atoms_within_distance(
         self,
         positions: numpy.typing.NDArray[numpy.float64],
         reference: builtins.set[builtins.int],
         r: builtins.float,
     ) -> builtins.set[builtins.int]: ...
+    def cell_lengths(self) -> builtins.list[builtins.float]:
+        r"""Get the lengths of the three pbc vectors."""
     def diff(
         self, v1: typing.Sequence[builtins.float], v2: typing.Sequence[builtins.float]
     ) -> builtins.list[builtins.float]: ...
@@ -213,13 +232,20 @@ class PeriodicBox:
         v1: typing.Sequence[builtins.float],
         v2: typing.Sequence[builtins.float],
         v3: typing.Sequence[builtins.float],
-    ) -> builtins.float: ...
+    ) -> builtins.float:
+        r"""Get the cosine of the periodic space angle between v1, v2 and v3."""
     def angle(
         self,
         v1: typing.Sequence[builtins.float],
         v2: typing.Sequence[builtins.float],
         v3: typing.Sequence[builtins.float],
-    ) -> builtins.float: ...
+    ) -> builtins.float:
+        r"""Get the periodic space angle between v1, v2 and v3, in radians."""
+    def cell_angles(self) -> builtins.list[builtins.float]:
+        r"""Get the angles between the pbc vectors, in radians.
+
+        Returned in order of alpha (b, c), beta (a, c), gamma (a, b).
+        """
     def dihedral(
         self,
         v1: typing.Sequence[builtins.float],
@@ -237,7 +263,6 @@ class PeriodicBox:
         The only guarantee is that if it returns false, the distance between pos
         and the pbc box is larger than cutoff.
         """
-
     def translate_by(
         self,
         pos: typing.Sequence[builtins.float],

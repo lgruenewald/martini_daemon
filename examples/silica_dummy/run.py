@@ -5,7 +5,7 @@ from martini_daemon import (
     ReactionReporter,
     Simulation,
     ToptrajReporter,
-    XTCReporter,
+    TrajectoryReporter,
 )
 
 sim = Simulation(
@@ -14,7 +14,7 @@ sim = Simulation(
     md_steps=1000000,
     reporters=[
         ToptrajReporter(),
-        XTCReporter(),
+        TrajectoryReporter(".h5"),
         ReactionReporter(),
         FragCountReporter(),
     ],
@@ -22,7 +22,7 @@ sim = Simulation(
     traj_frequency=1000,
     sim_name="out",
 )
-sim.get_context().minimize_energy()
-sim.get_context().generate_velocities(300.0)
+sim.context.minimize_energy()
+sim.context.generate_velocities(300.0)
 sim.simulate()
 sim.save_geometry("out.gro")

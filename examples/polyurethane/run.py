@@ -4,8 +4,8 @@ from martini_daemon import (
     ReactionReporter,
     Simulation,
     ToptrajReporter,
+    TrajectoryReporter,
     VariablesReporter,
-    XTCReporter,
 )
 
 sim = Simulation(
@@ -14,7 +14,7 @@ sim = Simulation(
     reporters=[
         ReactionReporter(),
         FragCountReporter(),
-        XTCReporter(),
+        TrajectoryReporter(),
         VariablesReporter(),
         ToptrajReporter(),
     ],
@@ -24,6 +24,6 @@ sim = Simulation(
     platform="CUDA",
     context_parameters={"DeviceIndex": "0"},
 )
-sim.get_context().minimize_energy()
-sim.get_context().generate_velocities(300)
+sim.context.minimize_energy()
+sim.context.generate_velocities(300)
 sim.simulate()

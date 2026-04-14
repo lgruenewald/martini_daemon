@@ -44,6 +44,8 @@ def test_read_write_geometry(format, rootdir):
 
     read_box, read_pos, read_vel = read_geometry(tmp_path)
 
+    assert read_vel is not None
+
     pos = pos.flatten()
     read_pos = read_pos.flatten()
     vel = vel.flatten()
