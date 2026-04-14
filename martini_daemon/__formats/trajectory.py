@@ -14,7 +14,7 @@ def _to_int32(n: int) -> int:
     """Put a value back into int32"""
     n = n % (np.iinfo(np.uint32).max + 1)
     if n > np.iinfo(np.int32).max:
-        n -= np.iinfo(np.uint32).max + 1
+        n -= (np.iinfo(np.uint32).max + 1)
     return n
 
 
@@ -56,10 +56,12 @@ class TrajectoryWriter:
             See TrajectoryWriter.backends for the list of available backends, as well as TrajectoryWriter.default_backends
             for the default choices. Some backends may require self-explanatory optional dependencies.
             See pyproject.toml or the README in the repo for details.
-        :param append: Whether to append to the trajectory or not. TODO
-        :param truncate: If appending, the last simulation step to keep. TODO
+        :param append: Whether to append to the trajectory or not.
+        :param truncate: If appending, the last simulation step to keep.
         """
         self.path = path
+        if not append:
+            assert truncate is None, "Truncate is only valid if append is True."
         if backend is None:
             _, ext = splitext(path)
             self.backend = self.default_backends.get(ext)
@@ -74,13 +76,31 @@ class TrajectoryWriter:
         match self.backend:
             case "xtc_openmm_internal":
                 # reopens the file every time I guess
+                assert append is False, "can't append with xtc_openmm_internal"
+                assert truncate is None, "Can't truncate file using xtc_openmm_internal."
                 pass
             case "xtc_molly":
                 import molly
+                if append and truncate is not None:
+                    reader = molly.XTCReader(path)
+                    last = 0
+                    last_tell = 0
+                    while last < truncate:
+                        last_tell = reader.tell()
+                        f = reader.pop_frame()
+                        last = _from_int32(f.step, last)
+                    reader.close()
 
-                self.__writer_molly = molly.XTCWriter(path)
+                    with open(path, "rb+") as f:
+                        f.seek(last_tell)
+                        f.truncate(last_tell+1)
+                        assert f.tell() == last_tell
+
+                self.__writer_molly = molly.XTCWriter(path, append)
             case "trr_mdtraj":
                 import mdtraj.formats
+                assert truncate is None, "TODO" # TODO
+                assert append is False, "TODO" # TODO
 
                 self.__writer_trr = mdtraj.formats.TRRTrajectoryFile(path, "w")
             case _:
@@ -119,7 +139,8 @@ class TrajectoryWriter:
                     pos,  # positions as float[:, :]
                     box_numpy,  # box as float[:, :]
                     time_ps,  # time in ps
-                    _to_int32(sim_step),
+                    #_to_int32(sim_step),
+                    sim_step
                 )
             case "xtc_molly":
                 import molly
@@ -200,7 +221,7 @@ class TrajectoryReader:
                 self.__pos, self.__box, self.__time, self.__step = read_xtc(
                     path.encode("utf-8")  # must be bytestring
                 )
-                self.__n_frames = len(self.__pos)
+                self.__n_frames = self.__pos.shape[2]
                 self.__c_frame = 0
                 self.__last_step = 0
             case "xtc_molly":
@@ -270,6 +291,8 @@ class TrajectoryReader:
                         1, None
                     )
                     assert vel is None
+                if len(xyz) == 0:
+                    return None
                 step = _from_int32(step[0], self.__last_step)
                 self.__last_step = step
                 return (
