@@ -1,14 +1,78 @@
+"""Test the class PeriodicBox."""
+
+import mdtraj
 import numpy as np
+import pytest
 
 from martini_daemon import PeriodicBox
 
+boxes = [
+    PeriodicBox.cubic(10.0),
+    PeriodicBox.orthogonal(5.0, 7.0, 9.0),
+    PeriodicBox([10.0, 0.0, 0.0], [4.0, 10.0, 0.0], [4.0, -4.0, 10.0]),
+    PeriodicBox([10.0, 0.0, 0.0], [-4.0, 10.0, 0.0], [-4.0, -4.0, 10.0]),
+    PeriodicBox([10.0, 0.0, 0.0], [0.0, 10.0, 0.0], [2.0, 4.0, 10.0]),
+]
 
-def test_which_atoms_within_distance():
-    pbc = PeriodicBox.cubic(5.0)
+
+@pytest.mark.parametrize("pbc", boxes)
+def test_distances(pbc: PeriodicBox) -> None:
+    """Test PeriodicBox.distance() and PeriodicBox.distance_squared()."""
+    n_atoms = 100
+    xyz = np.random.rand(n_atoms * 3).reshape((1, n_atoms, 3)) * 100.0 - 50.0
+    traj = mdtraj.Trajectory(xyz, None)
+    traj.unitcell_vectors = np.array([[pbc.a, pbc.b, pbc.c]])
+    for i in range(n_atoms):
+        for j in range(i):
+            dist_ref = float(mdtraj.compute_distances(traj, [(i, j)])[0][0])
+            dist = pbc.distance(xyz[0, i], xyz[0, j])
+            dist_sq = pbc.distance_squared(xyz[0, i], xyz[0, j])
+            assert np.isclose(dist_ref, dist, atol=1e-5)
+            assert np.isclose(dist_ref**2, dist_sq, atol=1e-5)
+
+
+@pytest.mark.parametrize("pbc", boxes)
+def test_angles(pbc: PeriodicBox) -> None:
+    """Test PeriodicBox.angle() and PeriodicBox.cos_angle()."""
+    n_atoms = 50
+    xyz = np.random.rand(n_atoms * 3).reshape((1, n_atoms, 3)) * 100.0 - 50.0
+    traj = mdtraj.Trajectory(xyz, None)
+    traj.unitcell_vectors = np.array([[pbc.a, pbc.b, pbc.c]])
+    for i in range(n_atoms):
+        for j in range(i):
+            for k in range(j):
+                angle_ref = float(mdtraj.compute_angles(traj, [(i, j, k)])[0][0])
+                angle = pbc.angle(xyz[0, i], xyz[0, j], xyz[0, k])
+                cos_angle = pbc.cos_angle(xyz[0, i], xyz[0, j], xyz[0, k])
+                assert np.isclose(angle_ref, angle, atol=1e-5)
+                assert np.isclose(np.cos(angle_ref), cos_angle, atol=1e-3)
+
+
+@pytest.mark.parametrize("pbc", boxes)
+def test_dihedrals(pbc: PeriodicBox) -> None:
+    """Test PeriodicBox.dihedral()."""
+    n_atoms = 10
+    xyz = np.random.rand(n_atoms * 3).reshape((1, n_atoms, 3)) * 100.0 - 50.0
+    traj = mdtraj.Trajectory(xyz, None)
+    traj.unitcell_vectors = np.array([[pbc.a, pbc.b, pbc.c]])
+    for i in range(n_atoms):
+        for j in range(i):
+            for k in range(j):
+                for m in range(k):
+                    dih_ref = float(
+                        mdtraj.compute_dihedrals(traj, [(i, j, k, m)])[0][0]
+                    )
+                    dih = pbc.dihedral(xyz[0, i], xyz[0, j], xyz[0, k], xyz[0, m])
+                    assert np.isclose(dih, dih_ref, atol=1e-3)
+
+
+@pytest.mark.parametrize("pbc", boxes)
+def test_which_atoms_within_distance(pbc: PeriodicBox) -> None:
+    """Test PeriodicBox.which_atoms_within_distance()."""
     n_atoms = 50000
     r = 0.5
 
-    atoms = np.random.rand(n_atoms * 3).reshape((n_atoms, 3)) * 5.0
+    atoms = np.random.rand(n_atoms * 3).reshape((n_atoms, 3)) * 10.0
 
     slow = set()
     for i, atom in enumerate(atoms):
@@ -20,8 +84,9 @@ def test_which_atoms_within_distance():
     assert fast == slow
 
 
-def test_which_atoms_within_distance_multiple():
-    pbc = PeriodicBox.cubic(5.0)
+@pytest.mark.parametrize("pbc", boxes)
+def test_which_atoms_within_distance_multiple(pbc: PeriodicBox) -> None:
+    """Test PeriodicBox.which_atoms_within_distance() with multiple atoms."""
     n_atoms = 500000
     r = 0.5
 
@@ -39,6 +104,3 @@ def test_which_atoms_within_distance_multiple():
     fast = pbc.which_atoms_within_distance(atoms, selection, r)
 
     assert fast == slow
-
-
-# TODO rest of the stuff

@@ -29,9 +29,8 @@ By default, Martini Daemon uses OpenMM's built-in internal XTC reader and
 writer. Optional dependencies can enable other trajectory backends.
 Here is a list of optional dependency tags, based on what's currently possible:
 
-- [molly](https://github.com/ma3ke/molly) - Alternative fast backend for XTC.
-- [trr] - Gromacs .trr files, uses [mdtraj](https://www.mdtraj.org).
-   Full precision, stores velocities.
+- [[molly](https://github.com/ma3ke/molly)] - Alternative fast backend for XTC.
+- [trr] - Gromacs .trr files, uses [mdtraj](https://www.mdtraj.org). Full precision, stores velocities.
 
 ## Docs
 

@@ -1,3 +1,5 @@
+"""Test the in-house .toptraj format reader and writer bundled with Martini Daemon."""
+
 #!/usr/bin/env python3
 
 import os
@@ -11,16 +13,19 @@ import pytest
 from martini_daemon import BondGraph, TopTrajReader, TopTrajWriter
 
 
-def get_random_name():
+def get_random_name() -> str:
+    """Get a random name for atom names, residue names or atom types."""
     return random.choice(list(string.ascii_uppercase))
 
 
 @pytest.fixture
-def rootdir(request):
+def rootdir(request: pytest.FixtureRequest) -> str:
+    """Fixture to get root directory."""
     return os.path.dirname(request.path)
 
 
-def test_toptraj_writer(rootdir):
+def test_toptraj_writer(rootdir: str) -> None:
+    """Write a .toptraj file with random data and read it back to compare."""
     os.chdir(rootdir)
     tmp_file = ".out.toptraj"
     w = TopTrajWriter(tmp_file, "example title", [("a", 1), ("b", 2), ("c", 3)])

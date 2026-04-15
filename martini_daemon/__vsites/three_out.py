@@ -14,7 +14,9 @@ class VSite3out(VirtualSite):
     def get_name(cls) -> str:
         return "3out"
 
-    def _make_vsite(self, vid, other, params) -> mm.VirtualSite:
+    def _make_vsite(
+        self, vid: int, other: list[int], params: list[float]
+    ) -> mm.VirtualSite:
         i, j, k = other
         a, b, c = params
         return mm.OutOfPlaneSite(i, j, k, a, b, c)

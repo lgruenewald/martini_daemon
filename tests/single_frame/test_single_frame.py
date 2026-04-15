@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+"""Test still MD frames, compare energies and forces between engines."""
 
 import math
 import os
@@ -45,7 +45,8 @@ cutoff_nm = 1.1
 
 
 @pytest.fixture
-def rootdir(request):
+def rootdir(request: pytest.FixtureRequest) -> str:
+    """Get the root directory where this test is located."""
     return os.path.dirname(request.path)
 
 
@@ -106,8 +107,10 @@ tests = [
 
 # == TEST CLASS ==
 class TestSingleFrame:
-    def apply_constraints(self):
-        """Applies constraints and vsites and checks for position change"""
+    """Single frame test class."""
+
+    def apply_constraints(self) -> None:
+        """Apply constraints and vsites and checks for position change."""
         _, reference, _ = read_geometry(self.gro)
         _, respos, _ = read_geometry(self.respos)
         sim = Simulation(
@@ -121,7 +124,8 @@ class TestSingleFrame:
                 f"Constraint/VSite position moved by {r_diff} nm (particle {i})."
             )
 
-    def compare_daemon_gmx(self):
+    def compare_daemon_gmx(self) -> None:
+        """Compare Martini Daemon and GROMACS energies and forces."""
         _, respos, _ = read_geometry(self.respos)
         sim = Simulation(
             self.top, self.gro, 0, [], options={"respos": respos}, platform="Reference"
@@ -206,7 +210,8 @@ class TestSingleFrame:
         )
 
     @pytest.mark.parametrize("x", tests)
-    def test_single_frame(self, x, rootdir):
+    def test_single_frame(self, x: str, rootdir: str) -> None:
+        """Do the single frame test."""
         self.test_name = x
         os.chdir(rootdir)
         assert os.path.isfile("gmxrun.sh")

@@ -1,3 +1,5 @@
+"""Modification algorithm tests."""
+
 import glob
 import os
 from math import isclose
@@ -9,7 +11,8 @@ from martini_daemon import FragCountReporter, ReactionReporter, Simulation, Syst
 
 # == CONFIG ==
 @pytest.fixture
-def rootdir(request):
+def rootdir(request: pytest.FixtureRequest) -> str:
+    """Get the root directory for this test."""
     return os.path.dirname(request.path)
 
 
@@ -28,6 +31,7 @@ tests = [
 
 
 def get_sim(top: str, gro: str) -> str:
+    """Get a SysStar dump based on a single modification frame, based on top and gro."""
     sim = Simulation(
         top, gro, 0, reporters=[SystemDump(), FragCountReporter(), ReactionReporter()]
     )
@@ -37,6 +41,7 @@ def get_sim(top: str, gro: str) -> str:
 
 
 def compare(dump_new: str, dump_reference: str) -> None:
+    """Compare two SysStar dumps."""
     reference = SystemDump.read_dump(dump_reference)
     new = SystemDump.read_dump(dump_new)
     assert len(new) == len(reference)
@@ -66,7 +71,8 @@ def compare(dump_new: str, dump_reference: str) -> None:
 
 
 @pytest.mark.parametrize("x", tests)
-def test_detection(x, rootdir):
+def test_modification(x: str, rootdir: str) -> None:
+    """Test the modification algorithm by comparing SysStar dumps."""
     # enter dir
     os.chdir(rootdir)
     assert os.path.isdir(x)

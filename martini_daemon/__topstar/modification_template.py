@@ -1,9 +1,9 @@
-from ..__core import MoleculeType
+from ..__core import MoleculeType, System
 from ..__parser import ParseException
 
 
 class ModificationTemplate(MoleculeType):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         # reactants directive validates that the graphs exist btw
         self.reactants = []
@@ -16,18 +16,26 @@ class ModificationTemplate(MoleculeType):
         self.remasses: list[tuple[int, float]] = []
         self.soft_core: list[tuple[int, float, float]] = []
 
-    def add_atoms_to_system(self, system):
+    def add_atoms_to_system(self, system: System) -> None:
+        """Add atoms to the system.
+
+        Invalid to call for reactions, therefore it will raise an exception.
+        """
         # reactions don't add atoms to system anymore
         raise ParseException(
             "Attempt to add a reaction to a [system]/[molecules]. Please use a [moleculetype] molecule."
         )
 
-    def process_nrexcl(self):
+    def process_nrexcl(self) -> None:
+        """Process nr_excl for a reaction.
+
+        Only self.nrexcl == 1 is allowed for modification templates.
+        """
         assert self.nrexcl == 1
         super().process_nrexcl()
 
-    def instantiate(self, system, atom_indices: list[int]):
-        """Performs a modification template on selected (flattened) atom indices."""
+    def instantiate(self, system: System, atom_indices: list[int]) -> None:
+        """Apply a modification template on selected (flattened) atom indices."""
         # breaking bonds
         for break_group in self.break_groups:
             system.break_group(
@@ -55,8 +63,8 @@ class ModificationTemplate(MoleculeType):
             if atom_indices[i] >= 0:
                 system.remass(atom_indices[i], mass)
 
-    def toggle_softcore(self, system, atom_indices: list[int], on: bool):
-        """Toggles soft core on/off for minimization based on the reacting atom_indices."""
+    def toggle_softcore(self, system: System, atom_indices: list[int], on: bool) -> None:
+        """Toggle soft core on/off for minimization based on the reacting atom_indices."""
         for i, sc_lam, sc_alpha in self.soft_core:
             if atom_indices[i] >= 0:
                 if on:

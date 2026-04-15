@@ -1,5 +1,4 @@
 import difflib
-from typing import Any
 
 from ..__core import System
 from ..__parser import (
@@ -20,7 +19,7 @@ keyword_to_GraphAtomType = {
 
 @register_directive
 class GraphDirective(Directive):
-    def __init__(self, parent: GromacsTopFile, path, line_num) -> None:
+    def __init__(self, parent: GromacsTopFile, path: str, line_num: int) -> None:
         super().__init__(parent, path, line_num)
         self.graph = Graph(None)
         self.system: System = parent.system
@@ -78,20 +77,20 @@ class GraphDirective(Directive):
                         + f" Valid keywords are: {', '.join(possibilities)}.",
                     )
 
-    def finish(self):
+    def finish(self) -> None:
         self.graph.finish_init()
         self.graphs[self.graph.name] = self.graph
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return False
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return False
 
     @classmethod
-    def is_valid_parent(cls, parent: Any) -> bool:
+    def is_valid_parent(cls, parent: Directive) -> bool:
         return isinstance(parent, GromacsTopFile)
 
     @classmethod

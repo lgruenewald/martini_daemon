@@ -15,7 +15,9 @@ class VSiteThree(VirtualSite):
     def get_name(cls) -> str:
         return "vsite3"
 
-    def _make_vsite(self, vid, other, params) -> mm.VirtualSite:
+    def _make_vsite(
+        self, vid: int, other: list[int], params: list[float]
+    ) -> mm.VirtualSite:
         return mm.ThreeParticleAverageSite(
             other[0], other[1], other[2], params[0], params[1], params[2]
         )

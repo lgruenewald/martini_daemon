@@ -14,7 +14,7 @@ def _to_int32(n: int) -> int:
     """Put a value back into int32"""
     n = n % (np.iinfo(np.uint32).max + 1)
     if n > np.iinfo(np.int32).max:
-        n -= (np.iinfo(np.uint32).max + 1)
+        n -= np.iinfo(np.uint32).max + 1
     return n
 
 
@@ -77,10 +77,13 @@ class TrajectoryWriter:
             case "xtc_openmm_internal":
                 # reopens the file every time I guess
                 assert append is False, "can't append with xtc_openmm_internal"
-                assert truncate is None, "Can't truncate file using xtc_openmm_internal."
+                assert truncate is None, (
+                    "Can't truncate file using xtc_openmm_internal."
+                )
                 pass
             case "xtc_molly":
                 import molly
+
                 if append and truncate is not None:
                     reader = molly.XTCReader(path)
                     last = 0
@@ -92,15 +95,16 @@ class TrajectoryWriter:
                     reader.close()
 
                     with open(path, "rb+") as f:
-                        f.seek(last_tell)
-                        f.truncate(last_tell+1)
-                        assert f.tell() == last_tell
+                        #f.seek(last_tell)
+                        f.truncate(last_tell)
+                        #assert f.tell() == last_tell
 
                 self.__writer_molly = molly.XTCWriter(path, append)
             case "trr_mdtraj":
                 import mdtraj.formats
-                assert truncate is None, "TODO" # TODO
-                assert append is False, "TODO" # TODO
+
+                assert truncate is None, "TODO"  # TODO
+                assert append is False, "TODO"  # TODO
 
                 self.__writer_trr = mdtraj.formats.TRRTrajectoryFile(path, "w")
             case _:
@@ -139,8 +143,8 @@ class TrajectoryWriter:
                     pos,  # positions as float[:, :]
                     box_numpy,  # box as float[:, :]
                     time_ps,  # time in ps
-                    #_to_int32(sim_step),
-                    sim_step
+                    # _to_int32(sim_step),
+                    sim_step,
                 )
             case "xtc_molly":
                 import molly

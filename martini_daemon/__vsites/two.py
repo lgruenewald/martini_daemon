@@ -14,7 +14,9 @@ class VSiteTwo(VirtualSite):
     def get_name(cls) -> str:
         return "vsite2"
 
-    def _make_vsite(self, vid, other, params) -> mm.VirtualSite:
+    def _make_vsite(
+        self, vid: int, other: list[int], params: list[float]
+    ) -> mm.VirtualSite:
         return mm.TwoParticleAverageSite(other[0], other[1], params[0], params[1])
 
     _filters = {"virtual_site", "vsite"}

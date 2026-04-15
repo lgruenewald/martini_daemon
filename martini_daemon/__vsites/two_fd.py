@@ -14,7 +14,9 @@ class VSite2fd(VirtualSite):
     def get_name(cls) -> str:
         return "2fd"
 
-    def _make_vsite(self, vid, other, params) -> mm.VirtualSite:
+    def _make_vsite(
+        self, vid: int, other: list[int], params: list[float]
+    ) -> mm.VirtualSite:
         i, j = other
         return mm.LocalCoordinatesSite(
             [i, j, j],  # atoms

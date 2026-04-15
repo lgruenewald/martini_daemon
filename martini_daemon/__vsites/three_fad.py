@@ -16,7 +16,9 @@ class VSite3fad(VirtualSite):
     def get_name(cls) -> str:
         return "3fad"
 
-    def _make_vsite(self, vid, other, params) -> mm.VirtualSite:
+    def _make_vsite(
+        self, vid: int, other: list[int], params: list[float]
+    ) -> mm.VirtualSite:
         theta, d = params
         return mm.LocalCoordinatesSite(
             other,  # atoms

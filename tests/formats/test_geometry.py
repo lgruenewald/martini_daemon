@@ -1,3 +1,5 @@
+"""Test the different geometry file readers and writers bundled with Martini Daemon."""
+
 import os
 
 import numpy as np
@@ -7,17 +9,19 @@ from martini_daemon import PeriodicBox, read_geometry, write_geometry
 
 
 @pytest.fixture
-def rootdir(request):
+def rootdir(request: pytest.FixtureRequest) -> str:
+    """Fixture to get root directory."""
     return os.path.dirname(request.path)
 
 
 formats = [".xyz", ".gro"]
 
 
-@pytest.mark.parametrize("format", formats)
-def test_read_write_geometry(format, rootdir):
+@pytest.mark.parametrize("format_", formats)
+def test_read_write_geometry(format_: str, rootdir: str) -> None:
+    """Test by writing random data to a file and reading it back."""
     os.chdir(rootdir)
-    tmp_path = ".tmp" + format
+    tmp_path = ".tmp" + format_
     # intentionally more than 5 characters
     n_atoms = 200000
 

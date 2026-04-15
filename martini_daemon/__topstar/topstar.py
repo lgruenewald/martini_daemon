@@ -1,3 +1,6 @@
+import numpy as np
+import numpy.typing as npt
+
 from ..__core import System
 from ..__rust import DetectionTemplateList, FragList, Fragment, PeriodicBox, detection
 from .graph import Graph, GraphMatch, match_atoms
@@ -5,13 +8,16 @@ from .modification_template import ModificationTemplate
 
 
 class TopStar:
-    """The glue between the following components:
-    - graph matching algorithm
-    - detection algorithm
-    - modification algorithm
-    """
+    def __init__(self, system: System) -> None:
+        """Create a TopStar object.
 
-    def __init__(self, system: System):
+        The glue between the following components:
+        - graph matching algorithm
+        - detection algorithm
+        - modification algorithm
+
+        :param system: Martini Daemon system to link with this TopStar object.
+        """
         self.system = system
         self.n_atoms = system.num_atoms()
         self.frag_list = FragList(self.n_atoms)
@@ -31,7 +37,9 @@ class TopStar:
                 i += n_atoms
 
     def try_match_graphs(self, atoms: set[int]) -> None:
-        """Given a set of atoms, find all graph matches of all known
+        """Run the graph matching algorithm on atoms.
+
+        Given a set of atoms, find all graph matches of all known
         graphs and add them to the fragment list.
 
         Should be called after system is constructed.
@@ -64,27 +72,32 @@ class TopStar:
         counts: dict[str, int],
         volume: float,
     ) -> None:
-        """Updates "observed rate" in detection templates based on the reactions happening and current
-        reactant concentrations (specified using counts and volume).
+        """Update "observed rate" in detection templates.
+
+        Based on the reactions happening and current reactant concentrations (specified using counts and volume).
         """
         # TODO
         # note we only have post-rate adjusted rates
         pass
 
-    def detection(self, pbc: PeriodicBox, pos) -> list[tuple[str, list[int]]]:
-        """Runs the detection algorithm, given a periodic box and atom positions and current state in TopStar.
-        Returns the list of reactions.
+    def detection(self, pbc: PeriodicBox, pos: npt.NDArray[np.float64]) -> list[tuple[str, list[int]]]:
+        """Run the detection algorithm.
+
+        :param pbc: Periodic Box.
+        :param pos: Atom positions.
+        :return: The list of reactions found.
         """
         return detection(self.frag_list, self.detection_templates, pbc, pos)
 
     def modification(
         self, reactions: list[tuple[str, list[int]]]
     ) -> list[tuple[str, list[Fragment]]]:
-        """Runs the modification algorithm.
+        """Run the modification algorithm.
 
         Modifies TopStar and System according to the reaction templates.
 
-        Returns the list of reactions that were successfully applied to the system.
+        :param reactions: The list of reactions from the detection algorithm.
+        :return: The list of reactions that were successfully applied to the system.
         """
         completed = []
 
@@ -121,7 +134,14 @@ class TopStar:
 
         return completed
 
-    def toggle_softcore(self, reactions: list[tuple[str, list[Fragment]]], on: bool):
+    def toggle_softcore(self, reactions: list[tuple[str, list[Fragment]]], on: bool) -> None:
+        """Toggle soft core on/off based on the provided reactions.
+
+        Will look up the modification template to see which atoms need soft core.
+
+        :param reactions: List of reactions. Each reaction provided as a template name and list of fragments.
+        :param on: Whether to toggle soft core on/off.
+        """
         for rx, frags in reactions:
             m_template = self.system.molecule_types.get(rx)
             assert isinstance(m_template, ModificationTemplate)

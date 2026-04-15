@@ -1,3 +1,5 @@
+"""Test the detection algorithm."""
+
 import glob
 import os
 
@@ -8,7 +10,8 @@ from martini_daemon import ReactionReporter, Simulation
 
 # == CONFIG ==
 @pytest.fixture
-def rootdir(request):
+def rootdir(request: pytest.FixtureRequest) -> str:
+    """Fixture to get root directory."""
     return os.path.dirname(request.path)
 
 
@@ -28,6 +31,7 @@ tests = [
 
 
 def get_sim(top: str, gro: str) -> list[tuple[int, str, list[list[int]]]]:
+    """Run a single frame detection algorithm and return the reactions."""
     rep = ReactionReporter()
     sim = Simulation(top, gro, 0, reporters=[rep])
     sim.step(0, traj=False, dm=True)
@@ -38,7 +42,8 @@ def get_sim(top: str, gro: str) -> list[tuple[int, str, list[list[int]]]]:
 def compare(
     reactions: list[tuple[int, str, list[list[int]]]],
     expected: list[tuple[int, str, list[list[int]]]],
-):
+) -> None:
+    """Compare expected and obtained reactions, raise errors if not the same."""
     dump = f"\nGot: {reactions}, expected: {expected}."
     for (_, r1, frags1), (_, r2, frags2) in zip(reactions, expected):
         # while order in theory can be different, it is simpler
@@ -55,7 +60,8 @@ def compare(
 
 
 @pytest.mark.parametrize("x", tests)
-def test_detection(x, rootdir):
+def test_detection(x: str, rootdir: str) -> None:
+    """Test the detection algorithm."""
     # enter dir
     os.chdir(rootdir)
     assert os.path.isdir(x)

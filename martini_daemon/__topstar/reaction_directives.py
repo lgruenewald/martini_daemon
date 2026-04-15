@@ -1,6 +1,5 @@
 import difflib
 from math import cos, pi
-from typing import Any
 
 from ..__parser import (
     Directive,
@@ -18,7 +17,11 @@ from .modification_template import ModificationTemplate
 
 @register_directive
 class ReactionDirective(MoleculeTypeDirective):
-    def __init__(self, parent, path, line_num):
+    def __init__(self, parent: Directive, path: str, line_num: int) -> None:
+        """Create a new [reaction] directive.
+
+        Instantiated by the parser.
+        """
         super().__init__(parent, path, line_num)
         self.d_template = DetectionTemplate()
         self.molecule_type: ModificationTemplate = ModificationTemplate()
@@ -39,7 +42,7 @@ class ReactionDirective(MoleculeTypeDirective):
                 f"Reaction name {name} conflicts with existing reaction or molecule name.",
             )
 
-    def finish(self):
+    def finish(self) -> None:
         super().finish()
         try:
             # called during parsing
@@ -48,15 +51,15 @@ class ReactionDirective(MoleculeTypeDirective):
             raise ParseException(str(e))
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return False
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return False
 
     @classmethod
-    def is_valid_parent(cls, parent: Any) -> bool:
+    def is_valid_parent(cls, parent: Directive) -> bool:
         return isinstance(parent, GromacsTopFile)
 
     aliases = {"rx"}
@@ -123,19 +126,19 @@ class ReactantsDirective(Directive):
         self.parent.molecule_type.reactants = reactants
         self.parent.d_template.reactants = reactants
 
-    def finish(self):
+    def finish(self) -> None:
         pass
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return False
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return False
 
     @classmethod
-    def is_valid_parent(cls, parent: Any) -> bool:
+    def is_valid_parent(cls, parent: Directive) -> bool:
         return isinstance(parent, ReactionDirective)
 
     aliases = {"reactant"}
@@ -144,97 +147,98 @@ class ReactantsDirective(Directive):
     def get_name(cls) -> str:
         return "reactants"
 
+def _parse_angle_conditions(
+    tokens: TokenList, start: int, wrap: bool
+) -> list[tuple[int, int]]:
+    """Parse a line containing an angle or dihedral condition.
+
+    If wrap is false, the "angle space" is 0 to pi
+    If wrap is true, the "angle space" is -pi to pi and is considered periodic
+    """
+    # 0 to 20 or 50 to 60 or 62 to 67
+    ranges = []
+
+    c_token = start
+    while c_token < len(tokens):
+        # note: unwrap with 'degree' converts from degrees to radian and puts it in the -pi to pi range automatically
+        lower_bound = tokens.unwrap(c_token, "degree")
+        upper_bound = tokens.unwrap(c_token + 2, "degree")
+        to = tokens.unwrap(c_token + 1, "word")
+        if c_token + 3 < len(tokens):
+            or_ = tokens.unwrap(c_token + 3, "word")
+            if or_ != "or":
+                raise TokenParseException(
+                    tokens[c_token + 3],
+                    "Different allowed angle ranges should be delimited by 'or'.",
+                )
+        if to != "to":
+            raise TokenParseException(
+                tokens[c_token + 1],
+                "Angle ranges should be specified with a lower and upper bounds separated by keyword 'to'.",
+            )
+        # check for overlaps
+        for other_lower, other_upper in ranges:
+            if other_lower < lower_bound < other_upper:
+                raise TokenParseException(
+                    tokens[c_token],
+                    f"Lower bound falls between an already allowed range {other_lower * 180.0 / pi:.2f} to {other_upper * 180.0 / pi:.2f}.",
+                )
+            if other_lower < upper_bound < other_upper:
+                raise TokenParseException(
+                    tokens[c_token + 2],
+                    f"Upper bound falls between an already allowed range {other_lower * 180.0 / pi:.2f} to {other_upper * 180.0 / pi:.2f}.",
+                )
+
+        if not wrap:
+            # check for upper < lower
+            if upper_bound < lower_bound:
+                raise TokenParseException(
+                    tokens[c_token + 2],
+                    f"Angle upper bound {upper_bound * 180.0 / pi:.2f} lower than lower bound {lower_bound * 180.0 / pi:.2f}.",
+                )
+            if lower_bound < 0.0:
+                raise TokenParseException(
+                    tokens[c_token],
+                    f"Angle lower bound must be 0 or larger. Got {lower_bound * 180.0 / pi:.2f} instead.",
+                )
+            ranges.append((lower_bound, upper_bound))
+
+        else:
+            # if it's wrapping, pass
+            if upper_bound < lower_bound:
+                ranges.append((upper_bound, pi))
+                ranges.append((-pi, lower_bound))
+            else:
+                ranges.append((lower_bound, upper_bound))
+
+        if c_token + 3 < len(tokens):
+            c_token += 4
+        else:
+            c_token += 3
+
+    # we don't necessarily expect them to be sorted
+    ranges.sort()
+
+    # inverting ranges - list of disallowed places
+    res = []
+
+    # disallow 0 to first allowed range
+    if not wrap and ranges[0][0] > 0.0:
+        res.append((0.0, ranges[0][0]))
+    elif wrap and ranges[0][0] > -pi:
+        res.append((-pi, ranges[0][0]))
+
+    # disallow in between allowed ranges - note, we make sure they don't overlap
+    for i in range(len(ranges) - 1):
+        res.append((ranges[i][1], ranges[i + 1][0]))
+
+    if ranges[-1][1] < pi:
+        res.append((ranges[-1][1], pi))
+
+    return res
 
 @register_directive
 class ConditionsDirective(Directive):
-    @staticmethod
-    def __parse_angle_conditions(
-        tokens: TokenList, start: int, wrap: bool
-    ) -> list[tuple[int, int]]:
-        """If wrap is false, the "angle space" is 0 to pi
-        If wrap is true, the "angle space" is -pi to pi and is considered periodic
-        """
-        # 0 to 20 or 50 to 60 or 62 to 67
-        ranges = []
-
-        c_token = start
-        while c_token < len(tokens):
-            # note: unwrap with 'degree' converts from degrees to radian and puts it in the -pi to pi range automatically
-            lower_bound = tokens.unwrap(c_token, "degree")
-            upper_bound = tokens.unwrap(c_token + 2, "degree")
-            to = tokens.unwrap(c_token + 1, "word")
-            if c_token + 3 < len(tokens):
-                or_ = tokens.unwrap(c_token + 3, "word")
-                if or_ != "or":
-                    raise TokenParseException(
-                        tokens[c_token + 3],
-                        "Different allowed angle ranges should be delimited by 'or'.",
-                    )
-            if to != "to":
-                raise TokenParseException(
-                    tokens[c_token + 1],
-                    "Angle ranges should be specified with a lower and upper bounds separated by keyword 'to'.",
-                )
-            # check for overlaps
-            for other_lower, other_upper in ranges:
-                if other_lower < lower_bound < other_upper:
-                    raise TokenParseException(
-                        tokens[c_token],
-                        f"Lower bound falls between an already allowed range {other_lower * 180.0 / pi:.2f} to {other_upper * 180.0 / pi:.2f}.",
-                    )
-                if other_lower < upper_bound < other_upper:
-                    raise TokenParseException(
-                        tokens[c_token + 2],
-                        f"Upper bound falls between an already allowed range {other_lower * 180.0 / pi:.2f} to {other_upper * 180.0 / pi:.2f}.",
-                    )
-
-            if not wrap:
-                # check for upper < lower
-                if upper_bound < lower_bound:
-                    raise TokenParseException(
-                        tokens[c_token + 2],
-                        f"Angle upper bound {upper_bound * 180.0 / pi:.2f} lower than lower bound {lower_bound * 180.0 / pi:.2f}.",
-                    )
-                if lower_bound < 0.0:
-                    raise TokenParseException(
-                        tokens[c_token],
-                        f"Angle lower bound must be 0 or larger. Got {lower_bound * 180.0 / pi:.2f} instead.",
-                    )
-                ranges.append((lower_bound, upper_bound))
-
-            else:
-                # if it's wrapping, pass
-                if upper_bound < lower_bound:
-                    ranges.append((upper_bound, pi))
-                    ranges.append((-pi, lower_bound))
-                else:
-                    ranges.append((lower_bound, upper_bound))
-
-            if c_token + 3 < len(tokens):
-                c_token += 4
-            else:
-                c_token += 3
-
-        # we don't necessarily expect them to be sorted
-        ranges.sort()
-
-        # inverting ranges - list of disallowed places
-        res = []
-
-        # disallow 0 to first allowed range
-        if not wrap and ranges[0][0] > 0.0:
-            res.append((0.0, ranges[0][0]))
-        elif wrap and ranges[0][0] > -pi:
-            res.append((-pi, ranges[0][0]))
-
-        # disallow in between allowed ranges - note, we make sure they don't overlap
-        for i in range(len(ranges) - 1):
-            res.append((ranges[i][1], ranges[i + 1][0]))
-
-        if ranges[-1][1] < pi:
-            res.append((ranges[-1][1], pi))
-
-        return res
 
     def line(self, tokens: TokenList) -> None:
         last_reaction = self.parent.d_template
@@ -283,7 +287,7 @@ class ConditionsDirective(Directive):
                         f" the atoms {(idi, atom_i, idj, atom_j, idk, atom_k)}. "
                         "Please put all angles for these atoms on a single line."
                     )
-                for from_, to in self.__parse_angle_conditions(tokens, 4, False):
+                for from_, to in _parse_angle_conditions(tokens, 4, False):
                     last_reaction.add_angle_limit(
                         (idi, atom_i, idj, atom_j, idk, atom_k, cos(from_), cos(to)),
                     )
@@ -298,7 +302,7 @@ class ConditionsDirective(Directive):
                         f" the atoms {(idi, atom_i, idj, atom_j, idk, atom_k, idl, atom_l)}. "
                         "Please put all angles for these atoms on a single line."
                     )
-                for from_, to in self.__parse_angle_conditions(tokens, 5, True):
+                for from_, to in _parse_angle_conditions(tokens, 5, True):
                     last_reaction.add_dihedral_limit(
                         (idi, atom_i, idj, atom_j, idk, atom_k, idl, atom_l, from_, to),
                     )
@@ -307,19 +311,19 @@ class ConditionsDirective(Directive):
             case "probability":
                 last_reaction.probability = tokens.unwrap(1, "positive")
 
-    def finish(self):
+    def finish(self) -> None:
         pass
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return False
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return False
 
     @classmethod
-    def is_valid_parent(cls, parent: Any) -> bool:
+    def is_valid_parent(cls, parent: Directive) -> bool:
         return isinstance(parent, ReactionDirective)
 
     @classmethod
@@ -334,19 +338,19 @@ class BreakDirective(Directive):
             [self.parent.parse_index(tokens, i) for i in range(len(tokens))]
         )
 
-    def finish(self):
+    def finish(self) -> None:
         pass
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return False
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return False
 
     @classmethod
-    def is_valid_parent(cls, parent: Any) -> bool:
+    def is_valid_parent(cls, parent: Directive) -> bool:
         return isinstance(parent, ReactionDirective)
 
     @classmethod
@@ -361,19 +365,19 @@ class UpdateDirective(Directive):
             [self.parent.parse_index(tokens, i) for i in range(len(tokens))]
         )
 
-    def finish(self):
+    def finish(self) -> None:
         pass
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return False
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return False
 
     @classmethod
-    def is_valid_parent(cls, parent: Any) -> bool:
+    def is_valid_parent(cls, parent: Directive) -> bool:
         return isinstance(parent, ReactionDirective)
 
     @classmethod
@@ -415,19 +419,19 @@ class RedefineDirective(Directive):
                     )
             i += 2
 
-    def finish(self):
+    def finish(self) -> None:
         pass
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return False
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return False
 
     @classmethod
-    def is_valid_parent(cls, parent: Any) -> bool:
+    def is_valid_parent(cls, parent: Directive) -> bool:
         return isinstance(parent, ReactionDirective)
 
     @classmethod
@@ -443,19 +447,19 @@ class SoftCoreDirective(Directive):
         sc_alpha = tokens.unwrap(2, "float")
         self.parent.molecule_type.soft_core.append((atom_index, sc_lam, sc_alpha))
 
-    def finish(self):
+    def finish(self) -> None:
         pass
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return False
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return False
 
     @classmethod
-    def is_valid_parent(cls, parent: Any) -> bool:
+    def is_valid_parent(cls, parent: Directive) -> bool:
         return isinstance(parent, ReactionDirective)
 
     @classmethod

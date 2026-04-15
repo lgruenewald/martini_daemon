@@ -10,7 +10,7 @@ from ..__rust import PeriodicBox
 def read_xyz(
     path: str,
 ) -> tuple[PeriodicBox, npt.NDArray[np.float64], npt.NDArray[np.float64] | None]:
-    """Reads an extended .xyz file at path, returns box, pos, vel.
+    """Read an extended .xyz file at path, returns box, pos, vel.
 
     Coordinates in the .xyz file are assumed to be in Angstroms.
     Velocities in the .xyz file are assumed to be in Angstroms/picosecond.

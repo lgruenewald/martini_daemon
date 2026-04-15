@@ -14,7 +14,9 @@ class VSiteCenterOfMass(VirtualSite):
     def get_name(cls) -> str:
         return "center_of_mass"
 
-    def _make_vsite(self, vid, other, params) -> mm.VirtualSite:
+    def _make_vsite(
+        self, vid: int, other: list[int], params: list[float]
+    ) -> mm.VirtualSite:
         n = len(other)
         masses = [self.system.get_mass(i) for i in other]
         weights = [m / sum(masses) for m in masses]

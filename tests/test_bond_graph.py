@@ -1,3 +1,5 @@
+"""Test the class BondGraph."""
+
 import random
 from time import time
 
@@ -6,14 +8,23 @@ import pytest
 
 from martini_daemon import BondGraph, PeriodicBox
 
+boxes = [
+    PeriodicBox.cubic(10.0),
+    PeriodicBox.orthogonal(5.0, 7.0, 9.0),
+    PeriodicBox([10.0, 0.0, 0.0], [4.0, 10.0, 0.0], [4.0, -4.0, 10.0]),
+    PeriodicBox([10.0, 0.0, 0.0], [-4.0, 10.0, 0.0], [-4.0, -4.0, 10.0]),
+    PeriodicBox([10.0, 0.0, 0.0], [0.0, 10.0, 0.0], [2.0, 4.0, 10.0]),
+]
 
-def test_make_whole():
+
+@pytest.mark.parametrize("box", boxes)
+def test_make_whole(box: PeriodicBox) -> None:
+    """Test whether a randomly generated molecule can be made whole across the PBC."""
     n_atoms = 50000
     n_mol = 100
     atoms_per_mol = n_atoms // n_mol
     bond_length = 0.5
 
-    box = PeriodicBox.orthogonal(5.0, 6.0, 7.0)
     box_np = np.array([box.a[0], box.b[1], box.c[2]])
     bg = BondGraph(n_atoms)
     pos = np.empty((n_atoms, 3), dtype=np.float64)
@@ -50,7 +61,8 @@ def test_make_whole():
 
 
 @pytest.mark.parametrize("bonds_per_mol", [250, 500, 1500])
-def test_reachable_from(bonds_per_mol):
+def test_reachable_from(bonds_per_mol: int) -> None:
+    """Test the BondGraph.reachable_from() function."""
     n_atoms = 50000
     min_n_mol = 100
     atoms_per_mol = n_atoms // min_n_mol

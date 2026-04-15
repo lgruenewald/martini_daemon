@@ -1,3 +1,5 @@
+"""Test the features of different trajectory formats supported in Martini Daemon."""
+
 import os
 
 import numpy as np
@@ -7,7 +9,8 @@ from martini_daemon import PeriodicBox, TrajectoryReader, TrajectoryWriter
 
 
 @pytest.fixture
-def rootdir(request):
+def rootdir(request: pytest.FixtureRequest) -> str:
+    """Return the root directory for this test."""
     return os.path.dirname(request.path)
 
 
@@ -28,7 +31,7 @@ def test_read_write_trajectory(backend: str, rootdir: str) -> None:
     n_frames = 1000
     n_atoms = 2000
     # making sure it overflows int32!=
-    #steps_per_frame = 10000000
+    # steps_per_frame = 10000000
     steps_per_frame = 100
 
     box_size = 10.0
@@ -67,6 +70,7 @@ def test_read_write_trajectory(backend: str, rootdir: str) -> None:
 
     os.remove(tmp_path)
 
+
 @pytest.mark.parametrize("backend", backends)
 def test_truncate_append_trajectory(backend: str, rootdir: str) -> None:
     """Read/write trajectories in available backends.
@@ -74,7 +78,7 @@ def test_truncate_append_trajectory(backend: str, rootdir: str) -> None:
     Will skip formats with missing optional dependencies.
     """
     if backend != "xtc_molly":
-        pytest.skip("Not yet implemented.") # TODO
+        pytest.skip("Not yet implemented.")  # TODO
     os.chdir(rootdir)
     format = "." + backend.split("_")[0]
     tmp_path = ".tmp" + format
@@ -84,7 +88,7 @@ def test_truncate_append_trajectory(backend: str, rootdir: str) -> None:
     n_frames = 1000
     truncate_at = 500
     n_atoms = 2000
-    #steps_per_frame = 10000000
+    # steps_per_frame = 10000000
     steps_per_frame = 100
 
     box_size = 10.0
@@ -113,7 +117,9 @@ def test_truncate_append_trajectory(backend: str, rootdir: str) -> None:
 
     # rewrite the others
     pos[truncate_at:] = np.random.rand(n_frames - truncate_at, n_atoms, 3) * box_size
-    vel[truncate_at:] = np.random.rand(n_frames - truncate_at, n_atoms, 3) * max_vel * 2.0 - max_vel
+    vel[truncate_at:] = (
+        np.random.rand(n_frames - truncate_at, n_atoms, 3) * max_vel * 2.0 - max_vel
+    )
 
     for i in range(truncate_at, n_frames):
         w.write_frame(i * steps_per_frame, i * 5.0, pbc, pos[i], vel[i])

@@ -1,3 +1,5 @@
+"""Run short simulations to explore the Martini Daemon components in conjunction and see if any exceptions arise."""
+
 import glob
 import os
 
@@ -17,7 +19,8 @@ from martini_daemon import (
 
 
 @pytest.fixture
-def rootdir(request):
+def rootdir(request: pytest.FixtureRequest) -> str:
+    """Return the root directory for this test."""
     return os.path.dirname(request.path)
 
 
@@ -25,7 +28,8 @@ tests = ["silica_dummy"]
 
 
 @pytest.mark.parametrize("x", tests)
-def test_integration(x, rootdir):
+def test_integration(x: str, rootdir: str) -> None:
+    """Run a short simulation with many reporters."""
     os.chdir(rootdir)
     os.chdir(x)
 

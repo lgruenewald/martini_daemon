@@ -16,8 +16,10 @@ class GraphAtomType(Enum):
 
 
 class Graph:
-    def __init__(self, name):
-        """The class constructed from [graph]/[frag] directives that contains all
+    def __init__(self, name: str) -> None:
+        """Create a Graph instance.
+
+        The class constructed from [graph]/[frag] directives that contains all
         the information the user provided about a graph.
 
         Note: Graphs contain atoms that each have a name (which is what's used
@@ -85,11 +87,11 @@ class Graph:
         marked: set[str] = set()
 
         # go from atom 1 and mark all
-        def mark(atom: str):
-            if atom in marked:
+        def mark(atom_: str) -> None:
+            if atom_ in marked:
                 return
-            marked.add(atom)
-            for other_atom in nodes[atom]:
+            marked.add(atom_)
+            for other_atom in nodes[atom_]:
                 mark(other_atom)
 
         mark(self.atoms[0][0])
@@ -104,19 +106,6 @@ class Graph:
 
 # === MATCH HELPERS ===
 class GraphMatch:
-    """Helper class that represents a (partially) mapped out graph to S*.
-
-    Attributes:
-    - graph - reference to a Graph instance that was (partially) matched
-    - atoms - dict of atoms that were matched, dict of atom name to atom_id
-    - interactions - interaction matches for each interaction in graph. All are None or an Interaction
-        (a tuple of force name and bond_id).
-    - rev_atoms - atom_id to atom name mapping
-    - matched_inter - same as interactions, but as a set and excluding None's
-    - next_inter - internal state for the graph matching algorithm, it should point to the next
-        interaction index in the graph that was not attempted to be filled yet.
-
-    """
 
     # mapping of atoms -> atom_id
     graph: Graph
@@ -128,7 +117,20 @@ class GraphMatch:
     matched_inter: set[tuple[str, int]]
     next_inter: int
 
-    def __init__(self, graph: Graph):
+    def __init__(self, graph: Graph) -> None:
+        """Create a Helper class that represents a (partially) mapped out graph to S*.
+
+        Attributes:
+        - graph - reference to a Graph instance that was (partially) matched
+        - atoms - dict of atoms that were matched, dict of atom name to atom_id
+        - interactions - interaction matches for each interaction in graph. All are None or an Interaction
+            (a tuple of force name and bond_id).
+        - rev_atoms - atom_id to atom name mapping
+        - matched_inter - same as interactions, but as a set and excluding None's
+        - next_inter - internal state for the graph matching algorithm, it should point to the next
+            interaction index in the graph that was not attempted to be filled yet.
+
+        """
         self.graph = graph
         self.atoms = {}
         self.interactions = [None for _ in graph.interactions]
@@ -198,11 +200,9 @@ class GraphMatch:
 
 
 class AtomCache:
-    """Helper class that groups S* information and provides helper query
-    functions to it.
-    """
 
-    def __init__(self, system: System):
+    def __init__(self, system: System) -> None:
+        """Create a Helper class that groups S* information and provides helper query functions to it."""
         self.system = system
 
     def neighbors(self, atom: int) -> set[int]:
@@ -219,18 +219,21 @@ class AtomCache:
     def check_atom_interactions(
         self, g_atom: str, atom_id: int, partial: GraphMatch
     ) -> tuple[bool, list[tuple[int, tuple[str, int]]]]:
-        """Returns True if adding g_atom=atom_id to the graph match is
+        """Check if atom_id can be g_atom in the graph, based on interaction filters.
+
+        Returns True if adding g_atom=atom_id to the graph match is
         possible (all interaction requirements fulfilled).
         Returns False if there is an interaction requirement violated
         (missing interaction that should be there).
 
-        Args:
-        g_atom -> graph atom name
-        atom_id -> S* atom ID candidate for g_name
-        partial -> partial graph match that g_atom=atom_id is considered
-        for. Note: assumes g_atom=atom_id is not a part of partial yet.
-        Note2: this function does not mutate partial.
+        :param g_atom: Graph atom name
+        :param atom_id: S* atom ID candidate for g_name
+        :param partial: Partial graph match that g_atom=atom_id is considered
+            for.
 
+        Note: assumes g_atom=atom_id is not a part of partial yet.
+
+        Note2: this function does not mutate partial.
         """
         # g_ prefix -> graph things
         # s_ prefix -> S* things

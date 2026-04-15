@@ -14,7 +14,9 @@ class VSite4fdn(VirtualSite):
     def get_name(cls) -> str:
         return "4fdn"
 
-    def _make_vsite(self, vid, other, params) -> mm.VirtualSite:
+    def _make_vsite(
+        self, vid: int, other: list[int], params: list[float]
+    ) -> mm.VirtualSite:
         a, b, c = params
         return mm.LocalCoordinatesSite(
             other,  # atoms

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# very quick script to generate system.gro and expected.reactions
+"""Very quick script to generate system.gro and expected.reactions."""
 
 import numpy as np
 

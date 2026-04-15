@@ -1,3 +1,5 @@
+"""Test the graph matching algorithm."""
+
 import json
 import os
 
@@ -8,7 +10,8 @@ from martini_daemon import Fragment, Simulation, TopStar
 
 # == CONFIG ==
 @pytest.fixture
-def rootdir(request):
+def rootdir(request: pytest.FixtureRequest) -> str:
+    """Return the root directory for this test."""
     return os.path.dirname(request.path)
 
 
@@ -27,12 +30,15 @@ tests = [
 
 # == TEST CLASS ==
 def get_topology(path: str) -> TopStar:
+    """Return a TopStar instance from a topology file."""
     sim = Simulation(path, None, 0, [])
     return sim.top
 
 
-def parse_expected(path) -> list[tuple[str, list[int]]]:
-    """Parses a json of the format
+def parse_expected(path: str) -> list[tuple[str, list[int]]]:
+    """Parse a json of excepted graph match results.
+
+    Format:
     [
         ["name1", *parts],
         ...
@@ -46,7 +52,8 @@ def parse_expected(path) -> list[tuple[str, list[int]]]:
         return [(line[0], [x - 1 for x in line[1:]]) for line in json.load(f)]
 
 
-def try_match(frag: Fragment, name: str, parts: list[int]):
+def try_match(frag: Fragment, name: str, parts: list[int]) -> bool:
+    """Check if a fragment matches the expected graph."""
     if frag.name != name:
         return False
     frag_parts = list(filter(lambda x: x != -1, frag.atoms))
@@ -55,7 +62,8 @@ def try_match(frag: Fragment, name: str, parts: list[int]):
     return all(atom == parts[i] for i, atom in enumerate(frag_parts))
 
 
-def print_error(name, frags, expected: list[tuple[str, list[int]]]):
+def print_error(name: str, frags: list[Fragment], expected: list[tuple[str, list[int]]]) -> None:
+    """Print error message and details of frags and expected."""
     print(f"found frags for {name}:")
     # convert to 1 based indexing
     for frag in frags:
@@ -66,8 +74,9 @@ def print_error(name, frags, expected: list[tuple[str, list[int]]]):
         print(exp)
 
 
-def compare(name, top: TopStar, expected: list[tuple[str, list[int]]]):
-    """Makes sure top has all of and only the fragments in expected.
+def compare(name: str, top: TopStar, expected: list[tuple[str, list[int]]]) -> None:
+    """Make sure top has all of and only the fragments in expected.
+
     Expected contains the frag names and particles.
     Note: the order of expected is arbitrary.
     """
@@ -94,7 +103,8 @@ def compare(name, top: TopStar, expected: list[tuple[str, list[int]]]):
 
 
 @pytest.mark.parametrize("x", tests)
-def test_graph(x, rootdir):
+def test_graph(x: str, rootdir: str) -> None:
+    """Test the graph matching algorithm by comparing results with expected .json files."""
     os.chdir(rootdir)
     assert os.path.isdir(x)
     os.chdir(x)
