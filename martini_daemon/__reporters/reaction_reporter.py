@@ -36,23 +36,26 @@ class ReactionReporter(Reporter):
             if frame > sim.current_step:
                 break
             prev_pos = h.tell()
-        h.seek(prev_pos)
-        pos = h.tell()
-        h.truncate(prev_pos + 1)
+        h.truncate(prev_pos)
         h.seek(0, os.SEEK_END)
-        assert h.tell() == pos
 
     def on_simulation_start(self, simulation, continue_sim: bool):
-        simulation.open(".reactions", append=continue_sim)
+        self.handle = open(
+            simulation.request_path(".reactions", copy=continue_sim), "r+"
+        )
         if continue_sim:
             self.__truncate(simulation)
         else:
+            self.handle.seek(0, os.SEEK_END)
             simulation.print(
                 ".reactions",
                 "# sim step,reaction_name;"
                 + "reactant1_name,reactant1_id(res:resid1,...residn),atoms...;..."
                 + "reactantn_name,reactantn_id(res:resid1,...residn),atoms...;",
             )
+
+    def on_simulation_finish(self, simulation) -> None:
+        self.handle.close()
 
     @staticmethod
     def __get_resids(sim: Simulation, atoms):

@@ -11,12 +11,13 @@ class TrajectoryReporter(Reporter):
         self.writer: TrajectoryWriter | None = None
 
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
-        # TODO truncate
-        if continue_sim:
-            raise NotImplementedError()
-
         self.path = simulation.request_path(self.__format)
-        self.writer = TrajectoryWriter(self.path, backend=self.__backend)
+        self.writer = TrajectoryWriter(
+            self.path,
+            backend=self.__backend,
+            append=continue_sim,
+            truncate=simulation.current_step,
+        )
 
     def on_trajectory_frame(self, simulation: Simulation) -> None:
         assert self.writer is not None

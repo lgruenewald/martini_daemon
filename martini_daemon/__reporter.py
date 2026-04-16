@@ -1,7 +1,9 @@
+from abc import ABC, abstractmethod
+
 from .__rust import Fragment
 
 
-class Reporter:
+class Reporter(ABC):
     def pre_simulation_start(self, simulation) -> None:
         """Called just before the context is initialized.
 
@@ -9,17 +11,25 @@ class Reporter:
         before context initialization.
         """
 
+    @abstractmethod
     def on_simulation_start(self, simulation, continue_sim: bool) -> None:
         """Called once when Simulation is constructed. After the context is initialized.
 
+        Must be implemented, as all output files that live through the whole simulations should be opened in this.
+
         :param continue_sim: If True, should append instead of overwrite. Warning! May need to truncate files to
         simulation.current_step first! Do not write headers twice! Prefer to raise NotImplementedError if truncating
-        is needed, but it is not implemented.
+        is needed, but it is not implemented. Truncate to the MD step specified by simulation.current_step,
+        if possible, verify that the same truncation would be obtained by simulation.time_ps.
         """
         pass
 
+    @abstractmethod
     def on_simulation_finish(self, simulation) -> None:
-        """Called once when simulation's finish() is called."""
+        """Called once when simulation's finish() is called.
+
+        Must be implemented, as handles owned by reporters must be closed in it.
+        """
         pass
 
     def on_trajectory_frame(self, simulation) -> None:

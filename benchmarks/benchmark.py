@@ -105,7 +105,7 @@ def bench_daemon(top, gro, steps, freq, reactive, force_reinit):
     start_grompp = time.time()
     sim = Simulation(
         top_path=top,
-        geom_path=gro,
+        geometry=gro,
         md_steps=steps,
         dm_frequency=freq,
         traj_frequency=5000,

@@ -1,4 +1,3 @@
-from typing import Any
 
 import openmm as mm
 
@@ -59,19 +58,19 @@ class CMAPTypeDirective(Directive):
         types[parts] = len(cmaps)
         cmaps.append((size, cmap))
 
-    def finish(self):
+    def finish(self) -> None:
         pass
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return False
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return False
 
     @classmethod
-    def is_valid_parent(cls, parent: Any) -> bool:
+    def is_valid_parent(cls, parent: Directive) -> bool:
         return isinstance(parent, GromacsTopFile)
 
     @classmethod

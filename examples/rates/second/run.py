@@ -12,7 +12,7 @@ from martini_daemon import (
 for rep in range(3):
     sim = Simulation(
         top_path="system.top",
-        geom_path="system.gro",
+        geometry="system.gro",
         sim_name=f"out_rep{rep}",
         defines={"RATE": "1"},
         reporters=[

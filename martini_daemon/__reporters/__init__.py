@@ -1,3 +1,9 @@
+from .checkpoint_reporter import (
+    CheckpointLoader as CheckpointLoader,
+)
+from .checkpoint_reporter import (
+    CheckpointReporter as CheckpointReporter,
+)
 from .frag_count_reporter import FragCountReporter as FragCountReporter
 from .local_minimizer import (
     LocalGradientDescent as LocalGradientDescent,

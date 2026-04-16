@@ -1,7 +1,5 @@
 """Test the in-house .toptraj format reader and writer bundled with Martini Daemon."""
 
-#!/usr/bin/env python3
-
 import os
 import random
 import string

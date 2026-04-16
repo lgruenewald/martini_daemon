@@ -106,7 +106,6 @@ class Graph:
 
 # === MATCH HELPERS ===
 class GraphMatch:
-
     # mapping of atoms -> atom_id
     graph: Graph
     atoms: dict[str, int]
@@ -200,7 +199,6 @@ class GraphMatch:
 
 
 class AtomCache:
-
     def __init__(self, system: System) -> None:
         """Create a Helper class that groups S* information and provides helper query functions to it."""
         self.system = system

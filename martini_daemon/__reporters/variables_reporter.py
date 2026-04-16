@@ -1,15 +1,17 @@
+import os
+from typing import TextIO
+
 from ..__reporter import Reporter
 from ..__simulation import Simulation
 
 
-def write_energies(title, suffix, sim: Simulation, first=False):
+def write_energies(title, handle: TextIO, sim: Simulation, first=False):
     if first:
-        sim.print(
-            suffix,
+        handle.write(
             "# Entry type,Simulation step,N,Kinetic energy (kJ/mol),Potential energy (kJ/mol),"
             "Total energy (kJ/mol),"
             "Temperature (Kelvin),"
-            "Box X (nm),Box Y (nm),Box Z (nm),Volume (nm^3)",
+            "Box X (nm),Box Y (nm),Box Z (nm),Volume (nm^3)\n",
         )
         return
     n = sim.system.num_atoms()
@@ -21,19 +23,35 @@ def write_energies(title, suffix, sim: Simulation, first=False):
     box_y = box.b[1]
     box_z = box.c[2]
     v = box_x * box_y * box_z
-    sim.print(
-        suffix,
-        f"{title},{sim.current_step},{n},{ke},{pe},{te},{t},{box_x},{box_y},{box_z},{v}",
+    handle.write(
+        f"{title},{sim.current_step},{n},{ke},{pe},{te},{t},{box_x},{box_y},{box_z},{v}\n",
     )
+
+
+def truncate_energies(handle: TextIO, sim: Simulation):
+    handle.seek(0, os.SEEK_SET)
+    prev_pos = 0
+    while (line := handle.readline()) != b"":
+        frame = int(line.decode("utf-8").split(",")[1])
+        if frame > sim.current_step:
+            break
+        prev_pos = handle.tell()
+    handle.truncate(prev_pos)
+    handle.seek(0, os.SEEK_END)
 
 
 class VariablesReporter(Reporter):
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool):
-        simulation.open(".ener", append=continue_sim)
-        # TODO truncate
+        self.handle = open(simulation.request_path(".ener", copy=continue_sim), "r+")
 
-        if not continue_sim:
-            write_energies("", ".ener", simulation, True)
+        if continue_sim:
+            truncate_energies(self.handle, simulation)
+        else:
+            self.handle.seek(0, os.SEEK_END)
+            write_energies("", self.handle, simulation, True)
+
+    def on_simulation_finish(self, simulation) -> None:
+        self.handle.close()
 
     def on_trajectory_frame(self, simulation: Simulation):
-        write_energies("Trajectory frame", ".ener", simulation)
+        write_energies("Trajectory frame", self.handle, simulation)

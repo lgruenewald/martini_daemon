@@ -95,9 +95,9 @@ class TrajectoryWriter:
                     reader.close()
 
                     with open(path, "rb+") as f:
-                        #f.seek(last_tell)
+                        # f.seek(last_tell)
                         f.truncate(last_tell)
-                        #assert f.tell() == last_tell
+                        # assert f.tell() == last_tell
 
                 self.__writer_molly = molly.XTCWriter(path, append)
             case "trr_mdtraj":

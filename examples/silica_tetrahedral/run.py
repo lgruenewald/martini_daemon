@@ -11,7 +11,7 @@ from martini_daemon import (
 
 sim = Simulation(
     top_path="system.top",
-    geom_path="system.gro",
+    geometry="system.gro",
     sim_name="out",
     reporters=[
         ToptrajReporter(),

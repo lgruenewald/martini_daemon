@@ -62,7 +62,9 @@ def try_match(frag: Fragment, name: str, parts: list[int]) -> bool:
     return all(atom == parts[i] for i, atom in enumerate(frag_parts))
 
 
-def print_error(name: str, frags: list[Fragment], expected: list[tuple[str, list[int]]]) -> None:
+def print_error(
+    name: str, frags: list[Fragment], expected: list[tuple[str, list[int]]]
+) -> None:
     """Print error message and details of frags and expected."""
     print(f"found frags for {name}:")
     # convert to 1 based indexing

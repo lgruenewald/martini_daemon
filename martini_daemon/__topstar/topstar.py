@@ -80,7 +80,9 @@ class TopStar:
         # note we only have post-rate adjusted rates
         pass
 
-    def detection(self, pbc: PeriodicBox, pos: npt.NDArray[np.float64]) -> list[tuple[str, list[int]]]:
+    def detection(
+        self, pbc: PeriodicBox, pos: npt.NDArray[np.float64]
+    ) -> list[tuple[str, list[int]]]:
         """Run the detection algorithm.
 
         :param pbc: Periodic Box.
@@ -134,7 +136,9 @@ class TopStar:
 
         return completed
 
-    def toggle_softcore(self, reactions: list[tuple[str, list[Fragment]]], on: bool) -> None:
+    def toggle_softcore(
+        self, reactions: list[tuple[str, list[Fragment]]], on: bool
+    ) -> None:
         """Toggle soft core on/off based on the provided reactions.
 
         Will look up the modification template to see which atoms need soft core.

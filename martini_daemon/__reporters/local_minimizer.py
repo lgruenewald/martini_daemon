@@ -1,4 +1,5 @@
 import math
+from typing import TextIO
 
 import numpy as np
 import openmm as mm
@@ -44,11 +45,12 @@ class LocalMinimizer(Reporter):
     def reset(self, shape):
         self.minimizer.reset(shape)
 
-    def report(self, simulation: Simulation, suffix, rem):
-        simulation.write(suffix, "==============================================\n")
-        simulation.write(suffix, f"remaining steps: {rem}\n")
-        simulation.write(suffix, self.minimizer.report())
-        simulation.write(suffix, "\n==============================================\n")
+    def report(self, handle: TextIO, rem: int) -> None:
+        """Write optimization progress to the file handle."""
+        handle.write("==============================================\n")
+        handle.write(f"remaining steps: {rem}\n")
+        handle.write(self.minimizer.report())
+        handle.write("\n==============================================\n")
 
     def on_reaction(self, simulation: Simulation, reactions):
         # save velocities
@@ -90,8 +92,8 @@ class LocalMinimizer(Reporter):
         remaining = self.minimization_steps
         suffix = f"_minimization{simulation.current_step}.log"
         if self.report_every > 0:
-            simulation.open(suffix)
-            self.report(simulation, suffix, remaining)
+            handle = open(simulation.request_path(suffix), "w")
+            self.report(handle, remaining)
 
         simulation.info("initial reporting done, minimizing now")
         while remaining > 0:
@@ -99,10 +101,13 @@ class LocalMinimizer(Reporter):
             simulation.context.do_steps(c_steps)
             remaining -= c_steps
             if self.report_every > 0 and remaining % self.report_every == 0:
-                self.report(simulation, suffix, remaining)
+                self.report(handle, remaining)
             if self.minimizer.is_converged():
                 simulation.info("minimizer converged")
                 break
+
+        if simulation.report_every > 0:
+            handle.close()
 
         simulation.info("minimization over")
         simulation.context.set_velocities(vel)
@@ -113,9 +118,6 @@ class LocalMinimizer(Reporter):
         simulation.info("preparing to set integrator back")
         simulation.context.set_current_integrator(old_integrator)
         simulation.info("back")
-
-        if self.report_every > 0:
-            simulation.close(suffix)
 
 
 class LocalGradientDescent:

@@ -1,41 +1,37 @@
 import re
-from typing import Any
+from typing import Any, TextIO
 
 from ..__core import BondedForce
 from ..__reporter import Reporter
 from ..__simulation import Simulation
 
 
-def write_frame(sim: Simulation):
-    sim.print(".sstar", f"==== Frame {sim.current_step} ====")
+def write_frame(handle: TextIO, sim: Simulation) -> None:
+    handle.write(f"==== Frame {sim.current_step} ====\n")
 
     sys = sim.system
-    sim.print(".sstar", "Atoms")
-    sim.print(
-        ".sstar", "# (name, resid, resname, type, charge, mass, sc_lam, sc_alpha)"
-    )
+    handle.write("Atoms\n")
+    handle.write("# (name, resid, resname, type, charge, mass, sc_lam, sc_alpha)\n")
 
     for atom in range(sys.num_atoms()):
-        sim.print(
-            ".sstar",
+        handle.write(
             f"('{sys.get_name(atom)}', {sys.get_res_id(atom)}, '{sys.get_res_name(atom)}', "
-            f"'{sys.get_type(atom)}', {sys.get_charge(atom)}, {sys.get_mass(atom)}, "
-            f"{sys.get_sc_lam(atom)}, {sys.get_sc_alpha(atom)})",
+            + f"'{sys.get_type(atom)}', {sys.get_charge(atom)}, {sys.get_mass(atom)}, "
+            + f"{sys.get_sc_lam(atom)}, {sys.get_sc_alpha(atom)})\n",
         )
 
-    sim.print(".sstar", "")
-    sim.print(".sstar", "Forces")
+    handle.write("\n")
+    handle.write("Forces\n")
     for force in sys.get_forces():
         if not isinstance(force, BondedForce):
             continue
         if len([force.iterate_bonds()]) == 0:
             continue
-        sim.print(".sstar", f"Force:{force.get_name()}")
+        handle.write(f"Force:{force.get_name()}\n")
         for _, (members, params) in force.iterate_bonds():
-            sim.print(".sstar", "(" + ", ".join(str(x) for x in members + params) + ")")
+            handle.write("(" + ", ".join(str(x) for x in members + params) + ")\n")
 
-    sim.print(".sstar", "End Frame")
-    sim.print(".sstar", "")
+    handle.write("End Frame\n\n")
 
 
 class SystemDump(Reporter):
@@ -58,16 +54,19 @@ class SystemDump(Reporter):
         pass
 
     def on_simulation_start(self, simulation, continue_sim: bool):
-        simulation.open(".sstar", append=continue_sim)
+        self.handle = open(simulation.request_path(".sstar", copy=continue_sim), "a")
         n = simulation.system.num_atoms()
         assert n > 0
         if not continue_sim:
             simulation.print(".sstar", "Format: SStar Dump")
             simulation.print(".sstar", "# Written by Martini Daemon SystemDump")
-        write_frame(simulation)
+        write_frame(self.handle, simulation)
+
+    def on_simulation_finish(self, simulation) -> None:
+        self.handle.close()
 
     def on_reaction(self, simulation, reactions):
-        write_frame(simulation)
+        write_frame(self.handle, simulation)
 
     @staticmethod
     def read_dump(

@@ -2,7 +2,7 @@ import os
 
 from ..__reporter import Reporter
 from ..__simulation import Simulation
-from .variables_reporter import write_energies
+from .variables_reporter import truncate_energies, write_energies
 
 
 class ReactionEnergyReporter(Reporter):
@@ -15,27 +15,15 @@ class ReactionEnergyReporter(Reporter):
         self.write_coords = write_coords
         self.ext = ext
 
-    def __truncate(self, sim: Simulation):
-        h = sim.get_handle(".rxener")
-        h.seek(0, os.SEEK_SET)
-        prev_pos = 0
-        while (line := h.readline()) != b"":
-            frame = int(line.decode("utf-8").split(",")[1])
-            if frame > sim.current_step:
-                break
-            prev_pos = h.tell()
-        h.seek(prev_pos)
-        pos = h.tell()
-        h.truncate(prev_pos + 1)
-        h.seek(0, os.SEEK_END)
-        assert h.tell() == pos
-
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
-        simulation.open(".rxener", append=continue_sim)
+
+        self.handle = open(simulation.request_path(".ener", copy=continue_sim), "r+")
+
         if continue_sim:
-            self.__truncate(simulation)
+            truncate_energies(self.handle, simulation)
         else:
-            write_energies("", ".rxener", simulation, True)
+            self.handle.seek(0, os.SEEK_END)
+            write_energies("", self.handle, simulation, True)
 
     def __write_pos(self, title, sim: Simulation):
         if self.write_coords:
@@ -43,9 +31,12 @@ class ReactionEnergyReporter(Reporter):
 
     def pre_modification(self, simulation: Simulation):
         # minimizations happen in "on_reaction", this is guaranteed to be before it
-        write_energies("pre-reaction", ".rxener", simulation)
+        write_energies("pre-reaction", self.handle, simulation)
         self.__write_pos("premin", simulation)
 
     def post_reaction(self, simulation):
-        write_energies("post-minimization", ".rxener", simulation)
+        write_energies("post-minimization", self.handle, simulation)
         self.__write_pos("postmin", simulation)
+
+    def on_simulation_finish(self, simulation) -> None:
+        self.handle.close()

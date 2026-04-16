@@ -147,6 +147,7 @@ class ReactantsDirective(Directive):
     def get_name(cls) -> str:
         return "reactants"
 
+
 def _parse_angle_conditions(
     tokens: TokenList, start: int, wrap: bool
 ) -> list[tuple[int, int]]:
@@ -237,9 +238,9 @@ def _parse_angle_conditions(
 
     return res
 
+
 @register_directive
 class ConditionsDirective(Directive):
-
     def line(self, tokens: TokenList) -> None:
         last_reaction = self.parent.d_template
         key = tokens.unwrap(0, "word")
