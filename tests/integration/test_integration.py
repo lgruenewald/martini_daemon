@@ -36,7 +36,7 @@ def test_integration(x: str, rootdir: str) -> None:
     sim = Simulation(
         "system.top",
         "system.gro",
-        2500,
+        5000,
         [
             TrajectoryReporter(),
             ToptrajReporter(),

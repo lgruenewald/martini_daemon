@@ -16,6 +16,7 @@ MAGIC = b"\xc0DMNCK\x00\x01"
 
 def write_checkpoint(
     path: str,
+    sim_name: str,
     current_step: int,
     trajectory_frame: int,
     reactions_so_far: int,
@@ -35,6 +36,9 @@ def write_checkpoint(
             f.write(b)
 
         write_and_crc(MAGIC)
+        sim_name = sim_name.encode("utf-8")
+        write_and_crc(struct.pack("<I", len(sim_name)))
+        write_and_crc(sim_name)
         write_and_crc(struct.pack("<Q", current_step))
         write_and_crc(struct.pack("<Q", trajectory_frame))
         write_and_crc(struct.pack("<Q", reactions_so_far))
@@ -54,6 +58,7 @@ def write_checkpoint(
 
 @dataclass
 class Checkpoint:
+    sim_name: str
     current_step: int
     trajectory_frame: int
     reactions_so_far: int
@@ -79,6 +84,9 @@ def read_checkpoint(path: str) -> Checkpoint:
             raise ValueError(
                 f"MAGIC number mismatch, {path} is not a valid .chk file, or is from a different version."
             )
+        sim_name_len = struct.unpack("<I", read_and_crc(4))[0]
+        sim_name = read_and_crc(sim_name_len).decode("utf-8")
+
         current_step, trajectory_frame, reactions_so_far, time_ps, n_atoms = (
             struct.unpack("<QQQdQ", read_and_crc(5 * 8))
         )
@@ -96,6 +104,7 @@ def read_checkpoint(path: str) -> Checkpoint:
             raise ValueError(f"CRC mismatch, {path} is corrupt.")
 
         return Checkpoint(
+            sim_name,
             current_step,
             trajectory_frame,
             reactions_so_far,

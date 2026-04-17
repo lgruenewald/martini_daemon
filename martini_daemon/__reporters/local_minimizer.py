@@ -9,6 +9,12 @@ from ..__simulation import Simulation
 
 
 class LocalMinimizer(Reporter):
+    def on_simulation_start(self, simulation, continue_sim: bool) -> None:
+        pass
+
+    def on_simulation_finish(self, simulation) -> None:
+        pass
+
     def __init__(
         self,
         minimizer,
@@ -106,7 +112,7 @@ class LocalMinimizer(Reporter):
                 simulation.info("minimizer converged")
                 break
 
-        if simulation.report_every > 0:
+        if self.report_every > 0:
             handle.close()
 
         simulation.info("minimization over")

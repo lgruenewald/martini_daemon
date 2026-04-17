@@ -1,9 +1,22 @@
 import os
 import re
+from typing import TextIO
 
 from ..__reporter import Reporter
 from ..__rust import Fragment
 from ..__simulation import Simulation
+
+
+def truncate_reactions(handle: TextIO, current_step: int):
+    prev_pos = 0
+    while (line := handle.readline()) != b"":
+        if len(line) > 0 and line[0] != "#":
+            frame = int(line.split(",")[0])
+            if frame > current_step:
+                break
+        prev_pos = handle.tell()
+    handle.truncate(prev_pos)
+    handle.seek(0, os.SEEK_END)
 
 
 class ReactionReporter(Reporter):
@@ -27,31 +40,19 @@ class ReactionReporter(Reporter):
         """
         self.reactions = 0
 
-    def __truncate(self, sim: Simulation):
-        h = sim.get_handle(".reactions")
-        h.seek(0, os.SEEK_SET)
-        prev_pos = 0
-        while (line := h.readline()) != b"":
-            frame = int(line.decode("utf-8").split(",")[0])
-            if frame > sim.current_step:
-                break
-            prev_pos = h.tell()
-        h.truncate(prev_pos)
-        h.seek(0, os.SEEK_END)
 
     def on_simulation_start(self, simulation, continue_sim: bool):
-        self.handle = open(
-            simulation.request_path(".reactions", copy=continue_sim), "r+"
-        )
-        if continue_sim:
-            self.__truncate(simulation)
+        self.path = simulation.request_path(".reactions", copy=continue_sim)
+        truncate = continue_sim and os.path.exists(self.path)
+        self.handle = open(self.path, "r+" if truncate else "w")  # noqa: SIM115
+
+        if truncate:
+            truncate_reactions(self.handle, simulation.current_step)
         else:
-            self.handle.seek(0, os.SEEK_END)
-            simulation.print(
-                ".reactions",
+            self.handle.write(
                 "# sim step,reaction_name;"
                 + "reactant1_name,reactant1_id(res:resid1,...residn),atoms...;..."
-                + "reactantn_name,reactantn_id(res:resid1,...residn),atoms...;",
+                + "reactantn_name,reactantn_id(res:resid1,...residn),atoms...;\n",
             )
 
     def on_simulation_finish(self, simulation) -> None:
@@ -70,8 +71,7 @@ class ReactionReporter(Reporter):
         self, simulation: Simulation, reactions: list[tuple[str, list[Fragment]]]
     ):
         for rx, frags in reactions:
-            simulation.print(
-                ".reactions",
+            self.handle.write(
                 f"{simulation.current_step},{rx};"
                 + ";".join(
                     [
@@ -80,7 +80,7 @@ class ReactionReporter(Reporter):
                         + ",".join([f"{atom}" for atom in frag.atoms])
                         for frag in frags
                     ]
-                ),
+                ) + "\n",
             )
         self.reactions += len(reactions)
 
@@ -88,7 +88,7 @@ class ReactionReporter(Reporter):
         return f"reactions: {self.reactions}"
 
     @staticmethod
-    def read_reactions(path) -> list[tuple[int, str, list[list[int]]]]:
+    def read_reactions(path) -> list[tuple[int, str, list[tuple[str, int, list[int]]]]]:
         """.reactions format reader suited for test_detection.py
 
         Returns a list of simulation steps, reaction names and list of reactant atom lists
@@ -104,8 +104,12 @@ class ReactionReporter(Reporter):
                 elems = line.split(";")
                 frame, rx = elems[0].split(",")
                 # list of atoms
-                frags = [
-                    [int(atom) for atom in elem.split(",")[2:]] for elem in elems[1:]
-                ]
+                frags = []
+                for elem in elems[1:]:
+                    tokens = elem.split(",")
+                    # name, frag_id, atoms
+                    frags.append((
+                        tokens[0], int(tokens[1]), [int(tok) for tok in tokens[2:]]
+                    ))
                 reactions.append((int(frame), rx, frags))
         return reactions

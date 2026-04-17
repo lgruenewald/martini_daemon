@@ -1,8 +1,9 @@
 import os
 
-from ..__formats import write_checkpoint
+from ..__formats import write_checkpoint, Checkpoint, read_checkpoint
 from ..__reporter import Reporter
 from ..__simulation import Simulation
+from .reaction_reporter import ReactionReporter
 
 
 class CheckpointReporter(Reporter):
@@ -84,8 +85,41 @@ class CheckpointReporter(Reporter):
 
 
 class CheckpointLoader(Simulation):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self, chk_path: str, *args, **kwargs) -> None:
+        """
+        Load a checkpoint from chk_path.
+
+        Pass additional arguments as you would to Simulation().
+        """
+        chk = read_checkpoint(chk_path)
+        sim_name = chk.sim_name
+        reactions = None
+        if chk.reactions_so_far > 0:
+            rx_path = sim_name + ".reactions"
+            assert os.path.exists(rx_path), (
+                f"{rx_path} does not exist, but reactions need to be replayed."
+            )
+            reactions = ReactionReporter.read_reactions(rx_path)
+        assert "checkpoint" not in kwargs, "Use chk_path, not checkpoint."
+        super().__init__(*args, checkpoint=chk, **kwargs)
+        # REPLAY
+        if reactions is not None:
+            for step, rx_name, frags in reactions:
+                if self.current_step < step:
+                    break
+                frag_ids = [
+                    frag_id
+                    for (name, frag_id, atoms) in frags
+                ]
+                # verification
+                frag_objs = [
+                    self.top.frag_list.get_fragment(frag_id)
+                    for frag_id in frag_ids
+                ]
+                for (name, frag_id, atoms), frag_obj in zip(frags, frag_objs):
+                    assert name == frag_obj.name
+                    assert frag_id == frag_obj.frag_id
+                    assert all(a == b for a, b in zip(atoms, frag_obj.atoms))
+                self.top.modification([(rx_name, frag_ids)])
 
 
-# TODO - check if .chk is provided, warn if there are reactions in the .chk but not continue_sim

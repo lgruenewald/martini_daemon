@@ -16,13 +16,13 @@ class ReactionEnergyReporter(Reporter):
         self.ext = ext
 
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
+        self.path = simulation.request_path(".rxener", copy=continue_sim)
+        truncate = continue_sim and os.path.exists(self.path)
+        self.handle = open(self.path, "r+" if truncate else "w")  # noqa: SIM115
 
-        self.handle = open(simulation.request_path(".ener", copy=continue_sim), "r+")
-
-        if continue_sim:
+        if truncate:
             truncate_energies(self.handle, simulation)
         else:
-            self.handle.seek(0, os.SEEK_END)
             write_energies("", self.handle, simulation, True)
 
     def __write_pos(self, title, sim: Simulation):

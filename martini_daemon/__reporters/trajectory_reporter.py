@@ -1,6 +1,7 @@
 from ..__formats import TrajectoryWriter
 from ..__reporter import Reporter
 from ..__simulation import Simulation
+import os
 
 
 class TrajectoryReporter(Reporter):
@@ -12,11 +13,12 @@ class TrajectoryReporter(Reporter):
 
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
         self.path = simulation.request_path(self.__format)
+        append = continue_sim and os.path.exists(self.path)
         self.writer = TrajectoryWriter(
             self.path,
             backend=self.__backend,
-            append=continue_sim,
-            truncate=simulation.current_step,
+            append=append,
+            truncate=simulation.current_step if append else None,
         )
 
     def on_trajectory_frame(self, simulation: Simulation) -> None:

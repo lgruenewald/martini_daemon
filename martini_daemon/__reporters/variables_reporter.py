@@ -32,9 +32,10 @@ def truncate_energies(handle: TextIO, sim: Simulation):
     handle.seek(0, os.SEEK_SET)
     prev_pos = 0
     while (line := handle.readline()) != b"":
-        frame = int(line.decode("utf-8").split(",")[1])
-        if frame > sim.current_step:
-            break
+        if len(line) > 0 and line[0] != "#":
+            frame = int(line.split(",")[1])
+            if frame > sim.current_step:
+                break
         prev_pos = handle.tell()
     handle.truncate(prev_pos)
     handle.seek(0, os.SEEK_END)
@@ -42,9 +43,11 @@ def truncate_energies(handle: TextIO, sim: Simulation):
 
 class VariablesReporter(Reporter):
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool):
-        self.handle = open(simulation.request_path(".ener", copy=continue_sim), "r+")
+        self.path = simulation.request_path(".ener", copy=continue_sim)
+        truncate = os.path.exists(self.path)
+        self.handle = open(self.path, "r+" if truncate else "w")
 
-        if continue_sim:
+        if truncate:
             truncate_energies(self.handle, simulation)
         else:
             self.handle.seek(0, os.SEEK_END)

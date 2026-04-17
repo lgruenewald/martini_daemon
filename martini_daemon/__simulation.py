@@ -58,8 +58,7 @@ class Simulation:
         topology: str,
         geometry: str
         | None
-        | tuple[PeriodicBox, npt.NDArray[np.float64], npt.NDArray[np.float64] | None]
-        | Checkpoint,
+        | tuple[PeriodicBox, npt.NDArray[np.float64], npt.NDArray[np.float64] | None],
         md_steps: int,
         reporters: list[Reporter] | None = None,
         dm_frequency: int = 0,
@@ -73,7 +72,7 @@ class Simulation:
         platform: str | None | mm.Platform = None,
         context_parameters: None | dict[str, str] = None,
         nonbonded: Callable[[System], NonBonded] | type[NonBonded] | None = None,
-        continue_sim: bool = False,
+        checkpoint: Checkpoint | None = None
     ) -> None:
         """Create a simulation.
 
@@ -109,8 +108,9 @@ class Simulation:
         :param nonbonded: Nonbonded force to use, passed as a type or a function that returns the martini daemon Force
             when called with system as its argument. By default, the Martini compatible shifted Lennard-Jones
             and reaction-field electrostatics are used.
-        :param continue_sim: Whether this is a continuation of a previous simulation. Do not use manually! Use
-            ReactionReporter's replay method to continue simulations.
+        :param checkpoint: Whether this is a continuation of a previous simulation. Do not use manually! Use
+            CheckpointReporter's LoadCheckpoint() method to continue simulations, as the topology has to be obtained
+            by replaying all reactions.
 
         Note: You may want to take a look at the following attributes, which also contain methods for common simulation
         tasks:
@@ -123,11 +123,12 @@ class Simulation:
         self.total_steps: int = md_steps
         self.__sim_name = sim_name
         # metadata
-        if isinstance(geometry, Checkpoint):
-            self.trajectory_frame = geometry.trajectory_frame
-            self.reactions_so_far = geometry.reactions_so_far
-            self.current_step = geometry.current_step
-            self.time_ps = geometry.time_ps
+        continue_sim = checkpoint is not None
+        if continue_sim:
+            self.trajectory_frame = checkpoint.trajectory_frame
+            self.reactions_so_far = checkpoint.reactions_so_far
+            self.current_step = checkpoint.current_step
+            self.time_ps = checkpoint.time_ps
         else:
             self.trajectory_frame: int = 0
             self.reactions_so_far: int = 0
@@ -215,7 +216,6 @@ class Simulation:
             )
         except InvalidTopologyError:
             self.error("Fatal error during .top parsing.")
-            # don't print full traceback
             raise InvalidTopologyError from None
         nb = nonbonded(self.system)
         excl = nb.get_exclusion_helper()
@@ -248,16 +248,17 @@ class Simulation:
 
         self.__context: Context | None = None
         # build context
-        if geometry is not None:
-            if type(geometry) is str:
+        if geometry is not None or continue_sim:
+            if continue_sim:
+                box = checkpoint.box
+                start_pos = checkpoint.pos
+                start_vel = checkpoint.vel
+                self.info("Initial box, pos, vel received as a checkpoint.")
+            elif type(geometry) is str:
                 box, start_pos, start_vel = read_geometry(geometry)
                 self.info(
                     f"Read {len(start_pos)} atoms from {geometry}. Box: {box.to_lattice()}. Velocities read? {start_vel is not None}."
                 )
-            elif isinstance(geometry, Checkpoint):
-                box = geometry.box
-                start_pos = geometry.pos
-                start_vel = geometry.vel
             else:
                 box, start_pos, start_vel = geometry
                 self.info("Initial box, pos, vel provided as a tuple.")
@@ -325,7 +326,7 @@ class Simulation:
         self.log.write(
             " ".join(
                 [datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S,%f")[:-3], *args]
-            )
+            ) + "\n"
         )
 
     def warn(self, message: str) -> None:
@@ -426,8 +427,8 @@ class Simulation:
             self.__do_traj_frame()
             print()
         except Exception as e:
-            traceback.print_exc()
             self.error(f"!!! Unexpected Exception!!!\n{e}")
+            raise e from None
         finally:
             if finish:
                 self.finish()
