@@ -130,8 +130,10 @@ class Simulation:
             self.current_step = checkpoint.current_step
             self.time_ps = checkpoint.time_ps
         else:
+            # number of finished trajectory frames
             self.trajectory_frame: int = 0
             self.reactions_so_far: int = 0
+            # number of finished MD steps
             self.current_step: int = 0
             self.time_ps: float = 0.0
 

@@ -9,6 +9,8 @@ class FakeSimulation(Simulation):
     def __init__(self, base: str, reporters: list[Reporter], continue_sim: bool):
         # should keep current step inclusive
         self.current_step = 3000
+        self.trajectory_frame = 4
+        self.time_ps = 0.02 * 3000
         self.base = base
         self.reporters = reporters
         for r in reporters:

@@ -13,6 +13,7 @@ classifiers = []
 dependencies = [
   "numpy",
   "openmm",
+  "molly@git+https://git.sr.ht/~ma3ke/molly#egg=molly&subdirectory=bindings/python",
 ]
 dynamic = ["version"]
 
@@ -38,7 +39,6 @@ extend-select = [
 test = [
   "pytest",
   "mdtraj",
-  "molly@git+https://git.sr.ht/~ma3ke/molly#egg=molly&subdirectory=bindings/python",
 ]
 
 docs = [
@@ -51,10 +51,6 @@ dev = [
   "python-lsp-server",
   "ruff",
   "ty"
-]
-
-molly = [
-  "molly@git+https://git.sr.ht/~ma3ke/molly#egg=molly&subdirectory=bindings/python",
 ]
 
 trr = [

@@ -30,7 +30,7 @@ def test_read_write_trajectory(backend: str, rootdir: str) -> None:
         os.remove(tmp_path)
     n_frames = 1000
     n_atoms = 2000
-    # making sure it overflows int32!=
+    # making sure it overflows int32!
     steps_per_frame = 10000000
 
     box_size = 10.0
@@ -76,8 +76,8 @@ def test_truncate_append_trajectory(backend: str, rootdir: str) -> None:
 
     Will skip formats with missing optional dependencies.
     """
-    if backend != "xtc_molly":
-        pytest.skip("Not yet implemented.")  # TODO
+    if backend == "trr_mdtraj":
+        pytest.skip("TRR mdtraj does not support appending.")
     os.chdir(rootdir)
     format = "." + backend.split("_")[0]
     tmp_path = ".tmp" + format
@@ -88,6 +88,7 @@ def test_truncate_append_trajectory(backend: str, rootdir: str) -> None:
     truncate_at = 500
     n_atoms = 2000
     steps_per_frame = 10000000
+    ps_per_frame = 5.0
 
     box_size = 10.0
     pbc = PeriodicBox.cubic(box_size)
@@ -104,14 +105,18 @@ def test_truncate_append_trajectory(backend: str, rootdir: str) -> None:
 
     for i in range(n_frames):
         # making sure it overflows int32!
-        w.write_frame(i * steps_per_frame, i * 5.0, pbc, pos[i], vel[i])
+        w.write_frame(i * steps_per_frame, i * ps_per_frame, pbc, pos[i], vel[i])
 
     w.finish()
 
     # only keep the first 500 frames
     # last frame to keep
-    truncate_at_step = truncate_at * steps_per_frame - 1
-    w = TrajectoryWriter(tmp_path, backend, append=True, truncate=truncate_at_step)
+    truncate_at_step = truncate_at * steps_per_frame - 1 # non inclusive
+    truncate_at_time = truncate_at * ps_per_frame - 0.001
+    w = TrajectoryWriter(
+        tmp_path, backend, append=True,
+        truncate=(truncate_at - 1, truncate_at_step, truncate_at_time)
+    )
 
     # rewrite the others
     pos[truncate_at:] = np.random.rand(n_frames - truncate_at, n_atoms, 3) * box_size
@@ -120,7 +125,7 @@ def test_truncate_append_trajectory(backend: str, rootdir: str) -> None:
     )
 
     for i in range(truncate_at, n_frames):
-        w.write_frame(i * steps_per_frame, i * 5.0, pbc, pos[i], vel[i])
+        w.write_frame(i * steps_per_frame, i * ps_per_frame, pbc, pos[i], vel[i])
     w.finish()
 
     r = TrajectoryReader(tmp_path, backend)
@@ -129,7 +134,7 @@ def test_truncate_append_trajectory(backend: str, rootdir: str) -> None:
         assert f is not None
         (sim_step, sim_time, sim_pbc, sim_pos, sim_vel) = f
         assert sim_step == i * steps_per_frame
-        assert np.isclose(sim_time, 5.0 * i, atol=1e-3)
+        assert np.isclose(sim_time, ps_per_frame * i, atol=1e-3)
         assert np.allclose(sim_pbc.a, pbc.a, atol=1e-3)
         assert np.allclose(sim_pbc.b, pbc.b, atol=1e-3)
         assert np.allclose(sim_pbc.c, pbc.c, atol=1e-3)
