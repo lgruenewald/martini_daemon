@@ -18,7 +18,11 @@ class TrajectoryReporter(Reporter):
             self.path,
             backend=self.__backend,
             append=append,
-            truncate=simulation.current_step if append else None,
+            truncate=(
+                simulation.trajectory_frame,
+                simulation.current_step,
+                simulation.time_ps
+            ) if append else None,
         )
 
     def on_trajectory_frame(self, simulation: Simulation) -> None:

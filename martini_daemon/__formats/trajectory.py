@@ -2,16 +2,12 @@ from os.path import splitext
 
 import numpy as np
 import numpy.typing as npt
-from openmm.app.internal.xtc_utils import (  # ty: ignore[unresolved-import]
-    read_xtc,
-    xtc_write_frame,
-)
 
 from ..__rust import PeriodicBox
 
 
 def _to_int32(n: int) -> int:
-    """Put a value back into int32"""
+    """Put a value back into int32."""
     n = n % (np.iinfo(np.uint32).max + 1)
     if n > np.iinfo(np.int32).max:
         n -= np.iinfo(np.uint32).max + 1
@@ -19,6 +15,7 @@ def _to_int32(n: int) -> int:
 
 
 def _from_int32(n: int, last: int) -> int:
+    """Unroll a value from int32."""
     n = int(n)
     if n < 0:
         n += np.iinfo(np.uint32).max + 1
@@ -29,7 +26,6 @@ def _from_int32(n: int, last: int) -> int:
 
 class TrajectoryWriter:
     backends = [
-        "xtc_openmm_internal",
         "xtc_molly",
         "trr_mdtraj",
     ]
@@ -44,7 +40,7 @@ class TrajectoryWriter:
         path: str,
         backend: str | None = None,
         append: bool = False,
-        truncate: int | None = None,
+        truncate: tuple[int, int, float] | None = None,
     ) -> None:
         """Create a TrajectoryWriter object.
 
@@ -57,7 +53,9 @@ class TrajectoryWriter:
             for the default choices. Some backends may require self-explanatory optional dependencies.
             See pyproject.toml or the README in the repo for details.
         :param append: Whether to append to the trajectory or not.
-        :param truncate: If appending, the last simulation step to keep.
+        :param truncate: If appending, the last simulation step to keep,
+            as a tuple of trajectory frame, MD step, simulation time (ps).
+            Truncation behavior will depend on the format and what fields they store.
         """
         self.path = path
         if not append:
@@ -74,37 +72,37 @@ class TrajectoryWriter:
                 f"Unknown trajectory backend {self.backend}. Available Trajectory Writer backends: {', '.join(self.backends)}."
             )
         match self.backend:
-            case "xtc_openmm_internal":
-                # reopens the file every time I guess
-                assert append is False, "can't append with xtc_openmm_internal"
-                assert truncate is None, (
-                    "Can't truncate file using xtc_openmm_internal."
-                )
-                pass
             case "xtc_molly":
                 import molly
 
                 if append and truncate is not None:
+                    truncate_frame, truncate_step, truncate_time = truncate
                     reader = molly.XTCReader(path)
-                    last = 0
+                    last_step = 0
+                    last_time = 0.
                     last_tell = 0
-                    while last <= truncate:
+                    while last_step <= truncate_step:
                         last_tell = reader.tell()
                         f = reader.pop_frame()
-                        last = _from_int32(f.step, last)
+                        last_step = _from_int32(f.step, last_step)
+                        last_time = f.time
+                        # truncate based on both step and time
+                        if last_step > truncate_step:
+                            assert last_time > truncate_time, (
+                                f"Truncation to step {truncate_step} and time {truncate_time} (ps) failed,"
+                                + " the MD steps and time of the trajectory are incorrect."
+                            )
                     reader.close()
 
                     with open(path, "rb+") as f:
-                        # f.seek(last_tell)
                         f.truncate(last_tell)
-                        # assert f.tell() == last_tell
 
                 self.__writer_molly = molly.XTCWriter(path, append)
             case "trr_mdtraj":
                 import mdtraj.formats
 
-                assert truncate is None, "TODO"  # TODO
-                assert append is False, "TODO"  # TODO
+                if append:
+                    raise ValueError("Appending is not supported for .trr")
 
                 self.__writer_trr = mdtraj.formats.TRRTrajectoryFile(path, "w")
             case _:
@@ -130,22 +128,6 @@ class TrajectoryWriter:
             assert vel.shape == pos.shape
 
         match self.backend:
-            case "xtc_openmm_internal":
-                pos = np.array(pos, dtype=np.float32)
-                n_atoms = len(pos)
-                assert pos.shape == (n_atoms, 3)
-                box_numpy = np.array([box.a, box.b, box.c], dtype=np.float32)
-                assert box_numpy.shape == (3, 3)
-                if pos.dtype != np.float32:
-                    pos = np.array(pos, dtype=np.float32)
-                xtc_write_frame(
-                    self.path.encode("utf-8"),  # title as byte string
-                    pos,  # positions as float[:, :]
-                    box_numpy,  # box as float[:, :]
-                    time_ps,  # time in ps
-                    _to_int32(sim_step),
-                    #sim_step,
-                )
             case "xtc_molly":
                 import molly
 
@@ -187,7 +169,6 @@ class TrajectoryWriter:
 
 class TrajectoryReader:
     backends = [
-        "xtc_openmm_internal",
         "xtc_molly",
         "trr_mdtraj",
     ]
@@ -221,13 +202,6 @@ class TrajectoryReader:
             )
         self.backend = backend
         match self.backend:
-            case "xtc_openmm_internal":
-                self.__pos, self.__box, self.__time, self.__step = read_xtc(
-                    path.encode("utf-8")  # must be bytestring
-                )
-                self.__n_frames = self.__pos.shape[2]
-                self.__c_frame = 0
-                self.__last_step = 0
             case "xtc_molly":
                 import molly
 
@@ -250,24 +224,6 @@ class TrajectoryReader:
             and the velocities in nm/ps if format supports it, or None if not. None if all frames were read.
         """
         match self.backend:
-            case "xtc_openmm_internal":
-                if self.__c_frame >= self.__n_frames:
-                    return None
-                self.__c_frame += 1
-                step = _from_int32(self.__step[self.__c_frame - 1], self.__last_step)
-                self.__last_step = step
-
-                return (
-                    step,
-                    self.__time[self.__c_frame - 1],
-                    PeriodicBox(
-                        self.__box[:, 0, self.__c_frame - 1],
-                        self.__box[:, 1, self.__c_frame - 1],
-                        self.__box[:, 2, self.__c_frame - 1],
-                    ),
-                    self.__pos[:, :, self.__c_frame - 1],
-                    None,
-                )
             case "xtc_molly":
                 assert self.__reader_molly is not None
                 self.__reader_molly.read_frame()
@@ -313,8 +269,6 @@ class TrajectoryReader:
     def finish(self) -> None:
         """Close any open file handles, depending on the backend."""
         match self.backend:
-            case "xtc_openmm_internal":
-                pass
             case "xtc_molly":
                 self.__reader_molly.close()
             case "trr_mdtraj":
