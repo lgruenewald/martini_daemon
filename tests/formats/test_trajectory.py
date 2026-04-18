@@ -31,8 +31,7 @@ def test_read_write_trajectory(backend: str, rootdir: str) -> None:
     n_frames = 1000
     n_atoms = 2000
     # making sure it overflows int32!=
-    # steps_per_frame = 10000000
-    steps_per_frame = 100
+    steps_per_frame = 10000000
 
     box_size = 10.0
     pbc = PeriodicBox.cubic(box_size)
@@ -88,8 +87,7 @@ def test_truncate_append_trajectory(backend: str, rootdir: str) -> None:
     n_frames = 1000
     truncate_at = 500
     n_atoms = 2000
-    # steps_per_frame = 10000000
-    steps_per_frame = 100
+    steps_per_frame = 10000000
 
     box_size = 10.0
     pbc = PeriodicBox.cubic(box_size)

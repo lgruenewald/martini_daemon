@@ -35,7 +35,7 @@ class TrajectoryWriter:
     ]
 
     default_backends = {
-        ".xtc": "xtc_openmm_internal",
+        ".xtc": "xtc_molly",
         ".trr": "trr_mdtraj",
     }
 
@@ -88,7 +88,7 @@ class TrajectoryWriter:
                     reader = molly.XTCReader(path)
                     last = 0
                     last_tell = 0
-                    while last < truncate:
+                    while last <= truncate:
                         last_tell = reader.tell()
                         f = reader.pop_frame()
                         last = _from_int32(f.step, last)
@@ -143,8 +143,8 @@ class TrajectoryWriter:
                     pos,  # positions as float[:, :]
                     box_numpy,  # box as float[:, :]
                     time_ps,  # time in ps
-                    # _to_int32(sim_step),
-                    sim_step,
+                    _to_int32(sim_step),
+                    #sim_step,
                 )
             case "xtc_molly":
                 import molly
@@ -193,7 +193,7 @@ class TrajectoryReader:
     ]
 
     default_backends = {
-        ".xtc": "xtc_openmm_internal",
+        ".xtc": "xtc_molly",
         ".trr": "trr_mdtraj",
     }
 

@@ -1,4 +1,5 @@
-from martini_daemon import Simulation, Reporter, FragCountReporter, VariablesReporter, ReactionReporter, ReactionEnergyReporter
+from martini_daemon import Simulation, Reporter, FragCountReporter, VariablesReporter, ReactionReporter, \
+    ReactionEnergyReporter, TrajectoryReporter
 from typing import Type
 import pytest
 import os
@@ -16,10 +17,14 @@ class FakeSimulation(Simulation):
     def request_path(self, suffix: str, copy: bool = False) -> str:
         return self.base + suffix
 
-def compare(a: str, b: str) -> None:
-    with open(a, "r") as f:
+    def finish(self) -> None:
+        for r in self.reporters:
+            r.on_simulation_finish(self)
+
+def compare(a: str, b: str, mode: str) -> None:
+    with open(a, mode) as f:
         a_content = f.read()
-    with open(b, "r") as f:
+    with open(b, mode) as f:
         b_content = f.read()
     assert a_content.strip() == b_content.strip()
 
@@ -29,19 +34,21 @@ def rootdir(request: pytest.FixtureRequest) -> str:
     return os.path.dirname(request.path)
 
 formats = [
-    (".frags", FragCountReporter),
-    (".ener", VariablesReporter),
-    (".reactions", ReactionReporter),
-    (".rxener", ReactionEnergyReporter)
+    (".frags", FragCountReporter, "r"),
+    (".ener", VariablesReporter, "r"),
+    (".reactions", ReactionReporter, "r"),
+    (".rxener", ReactionEnergyReporter, "r"),
+    (".xtc", TrajectoryReporter, "rb"),
 ]
 
 @pytest.mark.parametrize("format_", formats)
 def test_truncation(rootdir: str, format_: tuple[str, Type[Reporter]]) -> None:
-    extension, reporter = format_
+    extension, reporter, mode = format_
     os.chdir(rootdir)
     os.chdir("to_truncate")
     shutil.copy(f"full{extension}", f"partial{extension}")
 
-    FakeSimulation("partial", [reporter()], continue_sim=True)
-    compare(f"partial{extension}", f"reference{extension}")
+    sim = FakeSimulation("partial", [reporter()], continue_sim=True)
+    sim.finish()
+    compare(f"partial{extension}", f"reference{extension}", mode)
     os.remove(f"partial{extension}")

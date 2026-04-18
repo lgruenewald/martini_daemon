@@ -6,6 +6,9 @@
 # exclude all xyz and xtc trajectory files
 *.xyz
 *.xtc
+# except truncation tests
+!full.xtc
+!reference.xtc
 # exclude out files
 out*
 whole*

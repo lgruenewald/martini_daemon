@@ -14,7 +14,7 @@ sim = Simulation(
     md_steps=1000000,
     reporters=[
         ToptrajReporter(),
-        TrajectoryReporter(".h5"),
+        TrajectoryReporter(".xtc"),
         ReactionReporter(),
         FragCountReporter(),
     ],
