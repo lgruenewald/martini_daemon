@@ -19,8 +19,8 @@ class Context:
         system: System,
         integrator: mm.Integrator,
         default_box: PeriodicBox,
-        platform: mm.Platform | None = None,
-        params: dict[str, str] | None = None,
+        platform: mm.Platform = None,
+        params: dict[str, str] = None,
     ):
         """Context object. Created by Simulation automatically, based on the provided `.top` and geometry file.
 
@@ -31,16 +31,9 @@ class Context:
         :param params: OpenMM Parameters linked with this context.
         """
         system._set_default_pbc(default_box)
-        if platform is None:
-            self.__context = mm.Context(system.get_openmm_system(), integrator)
-        elif params is None:
-            self.__context = mm.Context(
-                system.get_openmm_system(), integrator, platform
-            )
-        else:
-            self.__context = mm.Context(
-                system.get_openmm_system(), integrator, platform, params
-            )
+        self.__context = mm.Context(
+            system.get_openmm_system(), integrator, platform, params
+        )
         self.system = system
         self.__integrator: mm.Integrator = integrator
         system._bind_context(self)

@@ -103,8 +103,9 @@ class Simulation:
         :param include_dirs: Additional include directories for #include directives in .top files. By default it tries
             to detect the gromacs installation and add an entry to the "top" subfolder inside it.
         :param defines: Additional defines to pass to the .top parser.
-        :param platform: Which OpenMM platform to use.
-        :param context_parameters: Additional options to pass to the platform.
+        :param platform: Which OpenMM platform to use. If None, the fastest available platform is used.
+        :param context_parameters: Additional options to pass to the platform. See https://docs.openmm.org/latest/userguide/library/04_platform_specifics.html
+            for details.
         :param nonbonded: Nonbonded force to use, passed as a type or a function that returns the martini daemon Force
             when called with system as its argument. By default, the Martini compatible shifted Lennard-Jones
             and reaction-field electrostatics are used.
@@ -162,8 +163,22 @@ class Simulation:
         )  # ps
         self.dm_frequency: int = dm_frequency
         self.traj_frequency: int = traj_frequency
+        if platform is None:
+            fastest = 1.
+            fastest_name = "Reference"
+            for i in range(mm.Platform.getNumPlatforms()):
+                p = mm.Platform.getPlatform(i)
+                if p.getSpeed() > fastest:
+                    fastest = p.getSpeed()
+                    fastest_name = p.getName()
+            platform = fastest_name
+
         if type(platform) is str:
             platform = mm.Platform.getPlatformByName(platform)
+
+        if context_parameters is None:
+            context_parameters = {}
+
         if include_dirs is None:
             include_dirs = (
                 (
@@ -186,6 +201,7 @@ class Simulation:
         self.log = open(self.request_path(".log", copy=continue_sim), "a")
         self.info(f"Martini Daemon {version('martini_daemon')} log file")
         self.info("Build version:", build_version())
+        assert isinstance(platform, mm.Platform)
         self.info(
             "Parameters:",
             topology,
@@ -194,7 +210,7 @@ class Simulation:
             f"dm_freq: {self.dm_frequency}",
             f"traj_freq: {self.traj_frequency}",
             f"sim_name: {self.__sim_name}",
-            f"platform: {platform}",
+            f"platform: {platform.getName()}",
             f"context_parameters: {context_parameters}",
             f"defines: {defines}",
             f"include_dirs: {include_dirs}",
@@ -266,7 +282,8 @@ class Simulation:
                 self.info("Initial box, pos, vel provided as a tuple.")
 
             self.info("Building context")
-            assert platform is None or isinstance(platform, mm.Platform)
+            assert isinstance(platform, mm.Platform)
+            assert isinstance(context_parameters, dict)
             self.__context = Context(
                 self.system, self.integrator, box, platform, context_parameters
             )
@@ -283,21 +300,6 @@ class Simulation:
             r.on_simulation_start(self, continue_sim)
 
     # File handles and loggers
-    @staticmethod
-    def __backup_try(path: str, copy: bool = False) -> None:
-        parent, filename = os.path.split(path)
-        if os.path.isfile(path):
-            bkup_num = 0
-            bkup_path = path
-            while os.path.isfile(bkup_path):
-                bkup_num += 1
-                bkup_path = os.path.join(parent, f"#{filename}.{bkup_num}#")
-            if copy:
-                os.rename(path, bkup_path)
-            else:
-                shutil.copy(path, bkup_path)
-            print(f"Backed up {path} to {bkup_path}")
-
     def request_path(self, suffix: str, copy: bool = False) -> str:
         """Request a writable path for an output file. Back up the file if it already exists.
 
@@ -306,7 +308,20 @@ class Simulation:
             Generally, only pass True, if you intend to append to the contents.
         """
         path = self.__sim_name + suffix
-        self.__backup_try(path, copy=copy)
+
+        parent, filename = os.path.split(path)
+        if os.path.isfile(path):
+            bkup_num = 0
+            bkup_path = path
+            while os.path.isfile(bkup_path):
+                bkup_num += 1
+                bkup_path = os.path.join(parent, f"#{filename}.{bkup_num}#")
+            if copy:
+                shutil.copy(path, bkup_path)
+            else:
+                os.rename(path, bkup_path)
+            print(f"Backed up {path} to {bkup_path}")
+
         return path
 
     def finish(self) -> None:

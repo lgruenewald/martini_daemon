@@ -97,7 +97,7 @@ class TrajectoryWriter:
                     with open(path, "rb+") as f:
                         f.truncate(last_tell)
 
-                self.__writer_molly = molly.XTCWriter(path, append)
+                self.__writer_molly = molly.XTCWriter(path, append=append)
             case "trr_mdtraj":
                 import mdtraj.formats
 

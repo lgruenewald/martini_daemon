@@ -56,9 +56,6 @@ below, which should be adjustable to meet various needs.
        ),
        mm.CMMotionRemover()
      ],
-     # It's recommended to use CUDA with nvidia GPUs for optimal performance
-     # see the available platforms by running python3 -m openmm.testInstallation
-     platform="CUDA"
    )
    # minimize energy first, saving the minimized coordinates to min.gro
    eq.minimize_energy(out="min.gro")

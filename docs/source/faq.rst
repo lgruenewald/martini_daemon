@@ -22,6 +22,8 @@ Specifying the GPU and CPU cores to use
 ---------------------------------------
 
 Pass ``context_parameters={"DeviceIndex": "0"}`` to the constructor of ``Simulation`` to choose GPU 0.
+If passing context parameters, it is also recommended to specify the platform (e.g. ``platform=CUDA``) when
+constructing ``Simulation``.
 
 Selecting CPU cores for the simulation can be done with the ``taskset`` command. For example,
 ``taskset -c 0-63:2 python3 run.py`` will limit run.py to even numbered cores 0 to 62.

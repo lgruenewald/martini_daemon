@@ -13,7 +13,7 @@ def write_frame(handle: TextIO, sim: Simulation) -> None:
     for frag_id in sim.top.frag_list.get_all_frag_ids():
         frag = sim.top.frag_list.get_fragment(frag_id)
         assert frag.frag_id == frag_id
-        handle.write(f"{frag.name},{frag_id};{','.join(frag.atoms)}\n")
+        handle.write(f"{frag.name},{frag_id};{','.join(map(str, frag.atoms))}\n")
     handle.write("End Frame\n\n")
 
 
@@ -36,8 +36,8 @@ class FragmentsDump(Reporter):
         n = simulation.system.num_atoms()
         assert n > 0
         if not continue_sim:
-            simulation.print(".sstar", "Format: Fragment List Dump")
-            simulation.print(".sstar", "# Written by Martini Daemon FragmentsDump")
+            self.handle.write("# Format: Fragment List Dump\n")
+            self.handle.write("# Written by Martini Daemon FragmentsDump\n")
         write_frame(self.handle, simulation)
 
     def on_simulation_finish(self, simulation) -> None:

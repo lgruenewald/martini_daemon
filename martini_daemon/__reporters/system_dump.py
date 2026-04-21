@@ -59,8 +59,8 @@ class SystemDump(Reporter):
         n = simulation.system.num_atoms()
         assert n > 0
         if not continue_sim:
-            simulation.print(".sstar", "Format: SStar Dump")
-            simulation.print(".sstar", "# Written by Martini Daemon SystemDump")
+            self.handle.write(".sstar", "Format: SStar Dump")
+            self.handle.write(".sstar", "# Written by Martini Daemon SystemDump")
         write_frame(self.handle, simulation)
 
     def on_simulation_finish(self, simulation) -> None:

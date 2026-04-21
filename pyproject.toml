@@ -13,7 +13,7 @@ classifiers = []
 dependencies = [
   "numpy",
   "openmm",
-  "molly@git+https://git.sr.ht/~ma3ke/molly#egg=molly&subdirectory=bindings/python",
+  "molly@git+https://github.com/aster31/molly#egg=molly&subdirectory=bindings/python",
 ]
 dynamic = ["version"]
 
