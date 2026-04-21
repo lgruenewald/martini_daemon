@@ -155,8 +155,6 @@ class TrajectoryWriter:
     def finish(self) -> None:
         """Close any open file handles, depending on the backend."""
         match self.backend:
-            case "xtc_openmm_internal":
-                pass
             case "xtc_molly":
                 assert self.__writer_molly is not None
                 self.__writer_molly.close()
@@ -178,7 +176,7 @@ class TrajectoryReader:
         ".trr": "trr_mdtraj",
     }
 
-    default_backends = {".xtc": "xtc_openmm_internal"}
+    default_backends = {".xtc": "xtc_molly"}
 
     def __init__(self, path: str, backend: str | None = None) -> None:
         """Create a TrajectoryReader object.
