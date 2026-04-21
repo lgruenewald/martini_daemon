@@ -72,7 +72,10 @@ class Graph:
                     f"Interaction {filter_str} must have at least "
                     f"two atom members. Only found {atoms}."
                 )
+            num_special = 0
             for atom in atoms:
+                if self.atoms[self.atom_name_to_index[atom]][3] != GraphAtomType.NORMAL:
+                    num_special += 1
                 if nodes.get(atom) is None:
                     raise ParseException(
                         f"Interaction {filter_str} for atoms {atoms} "
@@ -81,6 +84,13 @@ class Graph:
                 for other_atom in atoms:
                     if atom != other_atom:
                         nodes[atom].add(other_atom)
+            if num_special > 1:
+                # TODO test
+                raise ParseException(
+                    f"Interaction {filter_str} for atoms {atoms} "
+                    + f"references more than one optional or forbidden atoms. "
+                    + "Grouping forbidden/optional atoms is not supported."
+                )
 
         # if there is more than 1 atom, they all must be connected to at least
         # one other atom with an interaction

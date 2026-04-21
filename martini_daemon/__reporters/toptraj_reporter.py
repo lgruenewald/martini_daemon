@@ -3,7 +3,7 @@ from ..__reporter import Reporter
 from ..__simulation import Simulation
 
 
-class ToptrajReporter(Reporter):
+class TopTrajReporter(Reporter):
     def __init__(self):
         self.writer: TopTrajWriter | None = None
 

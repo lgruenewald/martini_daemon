@@ -17,33 +17,42 @@ class CheckpointReporter(Reporter):
         Warning! Read the following notes before using.
 
         * The best solution to checkpoints, with an acceptable performance, granularity over frequencies
-            and a proper format for storing topologies, including user-defined forces is still under consideration.
+          and a proper format for storing topologies, including user-defined forces is still under consideration.
+
         * Currently, the checkpoints are written every trajectory frame and only store atom positions, velocities,
-            simulation frame and time.
+          simulation frame and time.
+
         * Reporter output files will be truncated to the appropriate frame at which the checkpoint was taken.
-            A backup copy is made before truncation. After this, reporters will append their output to the truncated
-            output files.
+          A backup copy is made before truncation. After this, reporters will append their output to the truncated
+          output files.
+
         * The simulation topology is recovered based on re-parsing the .top file, and replaying all reactions based on
-            the output of ReactionReporter. If you intend to continue simulations with reactions, you MUST also have
-            ReactionReporter included in the list of reporters.
+          the output of ReactionReporter. If you intend to continue simulations with reactions, you MUST also have
+          ReactionReporter included in the list of reporters.
+
         * Only the checkpoint files are atomic!
-            First the old checkpoints are renamed to increment the number in their name.
-            The newest .chk file is only renamed to have the extension .chk if it is complete, otherwise it is .chk_tmp.
-            Other reporters output may not be atomic. To increase the chances of having good trajectory outputs
-            in case of sudden power failure, the CheckpointReporter should be the last reporter provided to
-            Simulation, so the new checkpoint is only written if all other reporters finish writing a trajectory frame.
-            These checkpoints are on a best-effort basis, they should be only used as a last resort.
-            Ideally, the user should also first verify the state of the trajectories before continuing a simulation,
-            and make manual backups.
+
+        First the old checkpoints are renamed to increment the number in their name.
+        The newest .chk file is only renamed to have the extension .chk if it is complete, otherwise it is .chk_tmp.
+        Other reporters output may not be atomic. To increase the chances of having good trajectory outputs
+        in case of sudden power failure, the CheckpointReporter should be the last reporter provided to
+        Simulation, so the new checkpoint is only written if all other reporters finish writing a trajectory frame.
+        These checkpoints are on a best-effort basis, they should be only used as a last resort.
+        Ideally, the user should also first verify the state of the trajectories before continuing a simulation,
+        and make manual backups.
+
         * Simulation settings provided to the checkpoint loading function must be identical to the arguments
-            to the original Simulation() constructor.
+          to the original Simulation() constructor.
+
         * Reloading is not deterministic. Random state for e.g. coupling schemes involving randomness will be lost.
+
         * The format of checkpoint files can change between minor versions without warning. Only load checkpoints
-            with the same version as they were written with. Thanks to a magic number at the beginning of the file,
-            loading a checkpoint file with the wrong version should raise an appropriate error to the user.
+          with the same version as they were written with. Thanks to a magic number at the beginning of the file,
+          loading a checkpoint file with the wrong version should raise an appropriate error to the user.
 
         :param n_checkpoints: Number of checkpoint files to keep at a time. '.chk' is the newest,
             '.chk2' the one before, with increasing numbers representing older checkpoint files.
+
         """
         self.n_checkpoints = n_checkpoints
         self.paths: list[str] = []

@@ -4,7 +4,7 @@ from martini_daemon import (
     FragCountReporter,
     ReactionReporter,
     Simulation,
-    ToptrajReporter,
+    TopTrajReporter,
     TrajectoryReporter,
     VariablesReporter,
 )
@@ -20,7 +20,7 @@ for rep in range(3):
             FragCountReporter(),
             TrajectoryReporter(),
             VariablesReporter(),
-            ToptrajReporter(),
+            TopTrajReporter(),
         ],
         md_steps=1000000,
         dm_frequency=100,

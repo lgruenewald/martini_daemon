@@ -6,7 +6,7 @@ from martini_daemon import (
     FragCountReporter,
     ReactionReporter,
     Simulation,
-    ToptrajReporter,
+    TopTrajReporter,
     TrajectoryReporter,
     VariablesReporter,
 )
@@ -15,7 +15,7 @@ sim = Simulation(
     "system.top",
     "system.gro",
     reporters=[
-        ToptrajReporter(),
+        TopTrajReporter(),
         VariablesReporter(),
         TrajectoryReporter(),
         ReactionReporter(),

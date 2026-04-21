@@ -10,7 +10,7 @@ import time
 
 from martini_daemon import (
     Simulation,
-    ToptrajReporter,
+    TopTrajReporter,
     TrajectoryReporter,
     extract_timings_from_log,
 )
@@ -35,7 +35,7 @@ for inp in inputs:
         "../inputs/" + inp,
         "../inputs/" + inp.replace(".top", ".gro"),
         10000,
-        [TrajectoryReporter(), ToptrajReporter()],
+        [TrajectoryReporter(), TopTrajReporter()],
         25,
         25,
         defines={"REACT": "1"},

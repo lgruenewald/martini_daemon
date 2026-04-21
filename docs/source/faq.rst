@@ -2,19 +2,21 @@
 Frequently Asked Questions
 ==========================
 
-NaN exceptions
---------------
+How much of Martini / .top files is implemented
+-----------------------------------------------
 
-Also see https://github.com/openmm/openmm/wiki/Frequently-Asked-Questions#nan.
+More than other OpenMM implementations of ``.top`` parsing to date, but not fully everything!
 
-If this happened right after a reaction,
-the following things can be done:
+Example things missing:
 
-* Check if the distance and angle reaction conditions are sufficiently strict.
-    * When forming a bond, it may be necessary to only allow a reaction to happen if the pre-reaction geometry is not
-    too far from the equilibrium bond length.
-    * Similar reaction conditions may be needed for angles.
-* If this fails, try :doc:`/autoapi/martini_daemon/LocalMinimizer`, it may help in some cases.
+* nrexcl > 1 (not used in Martini)
+* LJ fudge in ``[defaults]`` (not present in Martini's force field itp)
+* ``[bondtypes]``, ``[angletypes]``, ``[dihedraltypes]``, ``[constrainttypes]`` (uncommon in Martini)
+* Tabulated bonds (might be used rarely)
+* Things you would define in an ``.mdp`` need defining in terms of OpenMM objects (e.g. coupling, PME), which might
+  need some extra work in some cases.
+
+An easy method to check if your system is supported is to try it, and see if the energy and forces are correct.
 
 Specifying the GPU and CPU cores to use
 ---------------------------------------
@@ -69,3 +71,96 @@ Additional note: if a ``.gro`` file is not specified, Martini Daemon will still 
 but it will not initialize a context. The system returned by ``get_openmm_system()`` will then not
 have the default PBC vectors set to the PBC described in the ``.gro`` file. You will have to do that
 yourself in that case.
+
+Periodic Boundary Conditions
+----------------------------
+
+The OpenMM FAQ describes how OpenMM handles periodic boundary conditions
+at https://github.com/openmm/openmm/wiki/Frequently-Asked-Questions.
+This is not quite true for Martini Daemon simulations. This is how
+Martini Daemon handles the periodic boundary condition:
+
+* Internally, OpenMM lets things “flow” out of the periodic box, but this is not a problem, the thin wrapper on top of
+  OpenMM hides this detail.
+
+    * When a new bond is formed during a reaction, it cannot be guaranteed that the fragments that form that bond
+      are in the same copy of the periodic box.
+      Bonds, angles, etc. all have the usesPeriodicBoundaryCondition set to True, so this is not a problem.
+
+    * :doc:`/autoapi/martini_daemon/Context` has methods get_position, which puts the particles back into a single
+      copy of the periodic box, before returning the positions. This is the method that the Trajectory reporter
+      also uses, so trajectories will also have positions within a single copy of the periodic box.
+
+    * Constraints and virtual sites are not PBC aware in OpenMM. This is handled by Martini Daemon by making these
+      constructs whole first. This is implemented in :doc:`/autoapi/martini_daemon/Context` method set_positions,
+      so this is well encapsulated. Therefore, input geometries with constraints or virtual sites broken across the
+      periodic box are supported. Constraints and virtual sites, however, are not allowed
+      to be modified during reactions.
+
+
+Limitations
+-----------
+
+* The number of particles cannot change during reactions.
+
+    * If a reaction preserves each bead, it is trivial to keep the old position and velocity, and possibly just do
+      a minimization. New beads would need positions and velocities to be defined, which adds complexity.
+
+    * Existing output formats, such as ``.xtc``, and analysis libraries
+      are ill-suited for a variable amount of particles, adding more burden to re-create those tools.
+
+    * While adding new particles is more likely in a coarse grained setting, it still is not a common requirement,
+      due to the conservation of mass.
+
+    * This limitation can be bypassed with some creativity, such as converting to/from solvent molecules,
+      or converting to a non-interacting bead with no interactions with anything, effectively changing the number
+      of beads of interest.
+
+* Constraints and virtual sites cannot be created or removed during reactions.
+
+    * Would need a new layer of bookkeeping that was not implemented yet, due to internal indices of them changing
+      each time one is removed.
+
+    * Constraints and virtual sites are usually used in Martini for strong interactions, such as ring structures,
+      which are unlikely to be changed in reactions, so this was not a priority yet.
+
+* Center of mass virtual sites will not change their parameters if the mass of its constructing particles changes
+  during a reaction. Center of mass virtual sites that are constructed from other virtual sites (with mass 0) are
+  also not supported.
+
+
+Duplicate exclusion error
+-------------------------
+
+OpenMM does not allow the addition of multiple exclusions between two particles. Here is how Martini Daemon handles
+this, and when you will get a duplicate exclusion error.
+
+* Exclusions are of course generated also for bonds, based on the nrexcl entry in ``[moleculetype]``.
+
+* When starting a simulation for the first time, if multiple exclusions are specified in the ``[moleculetype]``
+  directive, only one will be added between any pair of particles.
+
+* When a reaction template is executed, which instructs Martini Daemon to create new exclusions, only one new
+  exclusion will be added to any pair of atoms which have exclusions defined for them in a reaction template.
+
+* If a reaction template instructs two particles to be excluded, that are already excluded, Martini Daemon will
+  not stop it, and OpenMM will raise a duplicate exclusion error. Since this represents an operation which can
+  be seen as a common bug in reaction templates (adding a new bond between two beads already bonded), this is
+  currently left as is, until a better design is created.
+
+NaN exceptions
+--------------
+
+Also see https://github.com/openmm/openmm/wiki/Frequently-Asked-Questions#nan.
+
+If this happened right after a reaction,
+the following things can be done:
+
+* Check if the distance and angle reaction conditions are sufficiently strict.
+
+    * When forming a bond, it may be necessary to only allow a reaction to happen if the pre-reaction geometry is not
+      too far from the equilibrium bond length.
+
+    * Similar reaction conditions may be needed for angles.
+
+* If this fails, try :doc:`/autoapi/martini_daemon/LocalMinimizer`, it may help in some cases.

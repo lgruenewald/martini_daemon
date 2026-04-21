@@ -3,7 +3,7 @@
 from martini_daemon import (
     ReactionReporter,
     Simulation,
-    ToptrajReporter,
+    TopTrajReporter,
     TrajectoryReporter,
     VariablesReporter,
 )
@@ -13,7 +13,7 @@ sim = Simulation(
     geometry="system.gro",
     sim_name="out",
     reporters=[
-        ToptrajReporter(),
+        TopTrajReporter(),
         VariablesReporter(),
         TrajectoryReporter(),
         ReactionReporter(),

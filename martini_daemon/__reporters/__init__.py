@@ -14,6 +14,7 @@ from .local_minimizer import (
 from .reaction_energy_reporter import ReactionEnergyReporter as ReactionEnergyReporter
 from .reaction_reporter import ReactionReporter as ReactionReporter
 from .system_dump import SystemDump as SystemDump
-from .toptraj_reporter import ToptrajReporter as ToptrajReporter
+from .toptraj_reporter import TopTrajReporter as ToptrajReporter
 from .trajectory_reporter import TrajectoryReporter as TrajectoryReporter
 from .variables_reporter import VariablesReporter as VariablesReporter
+from .fragments_dump import FragmentsDump as FragmentsDump

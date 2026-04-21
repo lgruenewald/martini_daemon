@@ -135,4 +135,9 @@ impl FragList {
         // there usually aren't that many fragments per atom, so this isn't so bad
         self.defrag_list[atom_index].clone()
     }
+
+    /// Get a copy of all frag IDs for debug purposes.
+    pub fn get_all_frag_ids(&self) -> Vec<usize> {
+        self.frag_list.keys().map(|key| *key).collect()
+    }
 }

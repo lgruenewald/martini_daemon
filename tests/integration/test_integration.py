@@ -12,7 +12,7 @@ from martini_daemon import (
     ReactionEnergyReporter,
     ReactionReporter,
     Simulation,
-    ToptrajReporter,
+    TopTrajReporter,
     TrajectoryReporter,
     VariablesReporter,
 )
@@ -39,7 +39,7 @@ def test_integration(x: str, rootdir: str) -> None:
         5000,
         [
             TrajectoryReporter(),
-            ToptrajReporter(),
+            TopTrajReporter(),
             LocalMinimizer(
                 minimizer=LocalGradientDescent(
                     initial_step_size_nm=0.1, etol=0.0001, smoothing_factor=0.1

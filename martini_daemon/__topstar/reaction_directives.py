@@ -223,6 +223,7 @@ def _parse_angle_conditions(
     # inverting ranges - list of disallowed places
     res = []
 
+    # TODO fuzz the sh*t out of this
     # disallow 0 to first allowed range
     if not wrap and ranges[0][0] > 0.0:
         res.append((0.0, ranges[0][0]))
