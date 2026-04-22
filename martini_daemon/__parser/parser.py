@@ -448,7 +448,9 @@ class Parser:
                                 )
                             key = token1.content
                             # now we can actually use an empty line, as long as it is in the dict #ifdef supports it
-                            value = token_list[2].content if len(token_list) >= 3 else ""
+                            value = (
+                                token_list[2].content if len(token_list) >= 3 else ""
+                            )
                             self.__defines[key] = value
                         case "#undef":
                             if token1 is None or len(token_list) != 2:

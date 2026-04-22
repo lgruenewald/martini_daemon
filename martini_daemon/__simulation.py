@@ -4,7 +4,6 @@ import math
 import os
 import shutil
 import sys
-import traceback
 from collections.abc import Callable
 from datetime import datetime
 from importlib.metadata import version
@@ -72,14 +71,14 @@ class Simulation:
         platform: str | None | mm.Platform = None,
         context_parameters: None | dict[str, str] = None,
         nonbonded: Callable[[System], NonBonded] | type[NonBonded] | None = None,
-        checkpoint: Checkpoint | None = None
+        checkpoint: Checkpoint | None = None,
     ) -> None:
         """Create a simulation.
 
         * Provides a friendly interface for reporters requesting output files. Contains default values for Martini simulations.
         * Holds simulation metadata, such as current step, simulation name.
         * Owns all reporters and the log file handle.
-        * Is passed around to all reporters to provide the required metadata for reporting.
+        * Is passed around to all reporters to provide the required data for reporting.
         * Is the required glue between all components, also only uses the public interface of different components.
         * Provides access to the system, context, topstar instance to all reporters and the user.
 
@@ -164,7 +163,7 @@ class Simulation:
         self.dm_frequency: int = dm_frequency
         self.traj_frequency: int = traj_frequency
         if platform is None:
-            fastest = 1.
+            fastest = 1.0
             fastest_name = "Reference"
             for i in range(mm.Platform.getNumPlatforms()):
                 p = mm.Platform.getPlatform(i)
@@ -329,7 +328,7 @@ class Simulation:
 
         Runs finish on all reporters. Reporters should close their own file handles.
 
-        Called by simulate(), or should be called by the user manually otherwise.
+        Should be called by the user manually.
         """
         if self.__finished:
             return
@@ -343,7 +342,8 @@ class Simulation:
         self.log.write(
             " ".join(
                 [datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S,%f")[:-3], *args]
-            ) + "\n"
+            )
+            + "\n"
         )
 
     def warn(self, message: str) -> None:
@@ -409,17 +409,13 @@ class Simulation:
             vel,
         )
 
-    def simulate(self, finish: bool = True) -> None:
+    def simulate(self) -> None:
         """Run the simulation.
 
-        Performs the remaining steps (self.total_steps - self.current_step),
-        and then calls self.finish() if finish is True.
+        Performs the remaining steps (self.total_steps - self.current_step) with the appropriate D/M and trajectory
+        frequencies.
 
-        Will perform Detection/Modification and Trajectory writing according to their frequencies specified in
-        the constructor for Simulation. Catches uncaught exceptions and logs them,
-        and finishes the simulation prematurely if one occurs.
-
-        :param finish: whether to close all output files. If False, must call finish() manually.
+        Catches uncaught exceptions and logs them.
         """
         remaining = self.total_steps - self.current_step
         sim_ps = self.total_steps * self.dt_ps
@@ -446,9 +442,6 @@ class Simulation:
         except Exception as e:
             self.error(f"!!! Unexpected Exception!!!\n{e}")
             raise e from None
-        finally:
-            if finish:
-                self.finish()
 
     def __do_traj_frame(self) -> None:
         """Write a frame to all trajectory files."""

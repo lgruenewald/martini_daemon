@@ -1,6 +1,5 @@
 import re
 from typing import Any, TextIO
-import os
 
 from ..__core import BondedForce
 from ..__reporter import Reporter
@@ -55,7 +54,9 @@ class SystemDump(Reporter):
         pass
 
     def on_simulation_start(self, simulation, continue_sim: bool):
-        self.handle = open(simulation.request_path(".system_dump", copy=continue_sim), "a")
+        self.handle = open(
+            simulation.request_path(".system_dump", copy=continue_sim), "a"
+        )
         n = simulation.system.num_atoms()
         assert n > 0
         if not continue_sim:

@@ -79,7 +79,7 @@ class TrajectoryWriter:
                     truncate_frame, truncate_step, truncate_time = truncate
                     reader = molly.XTCReader(path)
                     last_step = 0
-                    last_time = 0.
+                    last_time = 0.0
                     last_tell = 0
                     while last_step <= truncate_step:
                         last_tell = reader.tell()

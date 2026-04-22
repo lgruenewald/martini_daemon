@@ -6,10 +6,18 @@ import os
 import numpy as np
 import pytest
 
-from martini_daemon import Simulation, CheckpointReporter, CheckpointLoader, ReactionReporter, SystemDump, PeriodicBox
+from martini_daemon import (
+    CheckpointLoader,
+    CheckpointReporter,
+    PeriodicBox,
+    ReactionReporter,
+    Simulation,
+    SystemDump,
+)
 
 e_tol = 1e-5  # energy relative tolerance
 f_tol = 2e-4  # force relative tolerance
+
 
 # == CONFIG ==
 @pytest.fixture
@@ -22,10 +30,16 @@ tests = [
     "update_redefine",
 ]
 
-def load_checkpoint(checkpoint: str, top: str, gro: str) -> tuple[float, np.ndarray, PeriodicBox, np.ndarray, np.ndarray]:
+
+def load_checkpoint(
+    checkpoint: str, top: str, gro: str
+) -> tuple[float, np.ndarray, PeriodicBox, np.ndarray, np.ndarray]:
     """Load a checkpoint and return the energy and forces"""
     sim = CheckpointLoader(
-        checkpoint, top, gro, 0,
+        checkpoint,
+        top,
+        gro,
+        0,
         platform="Reference",
     )
     # manually dump
@@ -42,11 +56,10 @@ def load_checkpoint(checkpoint: str, top: str, gro: str) -> tuple[float, np.ndar
     sim.finish()
     return pe, forces, box, pos, vel
 
+
 def get_chk(top: str, gro: str) -> tuple[str, PeriodicBox, np.ndarray, np.ndarray]:
     """Get a simulation checkpoint based on a single modification frame, based on top and gro."""
-    sim = Simulation(
-        top, gro, 0, reporters=[CheckpointReporter(), ReactionReporter()]
-    )
+    sim = Simulation(top, gro, 0, reporters=[CheckpointReporter(), ReactionReporter()])
     sim.step(0, traj=False, dm=True)
     sim.current_step = 1
     sim.step(0, traj=True, dm=False)
@@ -54,6 +67,7 @@ def get_chk(top: str, gro: str) -> tuple[str, PeriodicBox, np.ndarray, np.ndarra
     vel = sim.context.get_velocities()
     sim.finish()
     return "out.chk", box, pos, vel
+
 
 def run_gromacs(x: str) -> tuple[float, np.ndarray]:
     """Get GROMACS energy and force for the system in the current directory."""
@@ -106,5 +120,3 @@ def test_replay(x: str, rootdir: str) -> None:
         os.remove(filename)
     os.remove("energy.xvg")
     os.remove("forces.xvg")
-
-

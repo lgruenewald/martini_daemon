@@ -40,7 +40,6 @@ class ReactionReporter(Reporter):
         """
         self.reactions = 0
 
-
     def on_simulation_start(self, simulation, continue_sim: bool):
         self.path = simulation.request_path(".reactions", copy=continue_sim)
         truncate = continue_sim and os.path.exists(self.path)
@@ -80,7 +79,8 @@ class ReactionReporter(Reporter):
                         + ",".join([f"{atom}" for atom in frag.atoms])
                         for frag in frags
                     ]
-                ) + "\n",
+                )
+                + "\n",
             )
         self.reactions += len(reactions)
 
@@ -108,8 +108,8 @@ class ReactionReporter(Reporter):
                 for elem in elems[1:]:
                     tokens = elem.split(",")
                     # name, frag_id, atoms
-                    frags.append((
-                        tokens[0], int(tokens[1]), [int(tok) for tok in tokens[2:]]
-                    ))
+                    frags.append(
+                        (tokens[0], int(tokens[1]), [int(tok) for tok in tokens[2:]])
+                    )
                 reactions.append((int(frame), rx, frags))
         return reactions

@@ -1,6 +1,6 @@
 import os
 
-from ..__formats import write_checkpoint, Checkpoint, read_checkpoint
+from ..__formats import read_checkpoint, write_checkpoint
 from ..__reporter import Reporter
 from ..__simulation import Simulation
 from .reaction_reporter import ReactionReporter
@@ -102,8 +102,7 @@ class CheckpointReporter(Reporter):
 
 class CheckpointLoader(Simulation):
     def __init__(self, chk_path: str, *args, **kwargs) -> None:
-        """
-        Load a checkpoint from chk_path.
+        """Load a checkpoint from chk_path.
 
         Pass additional arguments as you would to Simulation().
         """
@@ -123,19 +122,13 @@ class CheckpointLoader(Simulation):
             for step, rx_name, frags in reactions:
                 if self.current_step < step:
                     break
-                frag_ids = [
-                    frag_id
-                    for (name, frag_id, atoms) in frags
-                ]
+                frag_ids = [frag_id for (name, frag_id, atoms) in frags]
                 # verification
                 frag_objs = [
-                    self.top.frag_list.get_fragment(frag_id)
-                    for frag_id in frag_ids
+                    self.top.frag_list.get_fragment(frag_id) for frag_id in frag_ids
                 ]
                 for (name, frag_id, atoms), frag_obj in zip(frags, frag_objs):
                     assert name == frag_obj.name
                     assert frag_id == frag_obj.frag_id
                     assert all(a == b for a, b in zip(atoms, frag_obj.atoms))
                 self.top.modification([(rx_name, frag_ids)])
-
-

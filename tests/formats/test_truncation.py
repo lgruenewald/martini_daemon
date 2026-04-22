@@ -1,9 +1,18 @@
-from martini_daemon import Simulation, Reporter, FragCountReporter, VariablesReporter, ReactionReporter, \
-    ReactionEnergyReporter, TrajectoryReporter
-from typing import Type
-import pytest
 import os
 import shutil
+
+import pytest
+
+from martini_daemon import (
+    FragCountReporter,
+    ReactionEnergyReporter,
+    ReactionReporter,
+    Reporter,
+    Simulation,
+    TrajectoryReporter,
+    VariablesReporter,
+)
+
 
 class FakeSimulation(Simulation):
     def __init__(self, base: str, reporters: list[Reporter], continue_sim: bool):
@@ -23,6 +32,7 @@ class FakeSimulation(Simulation):
         for r in self.reporters:
             r.on_simulation_finish(self)
 
+
 def compare(a: str, b: str, mode: str) -> None:
     with open(a, mode) as f:
         a_content = f.read()
@@ -30,10 +40,12 @@ def compare(a: str, b: str, mode: str) -> None:
         b_content = f.read()
     assert a_content.strip() == b_content.strip()
 
+
 @pytest.fixture
 def rootdir(request: pytest.FixtureRequest) -> str:
     """Fixture to get root directory."""
     return os.path.dirname(request.path)
+
 
 formats = [
     (".frags", FragCountReporter, "r"),
@@ -43,8 +55,9 @@ formats = [
     (".xtc", TrajectoryReporter, "rb"),
 ]
 
+
 @pytest.mark.parametrize("format_", formats)
-def test_truncation(rootdir: str, format_: tuple[str, Type[Reporter]]) -> None:
+def test_truncation(rootdir: str, format_: tuple[str, type[Reporter]]) -> None:
     extension, reporter, mode = format_
     os.chdir(rootdir)
     os.chdir("to_truncate")

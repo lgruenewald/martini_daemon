@@ -111,11 +111,13 @@ def test_truncate_append_trajectory(backend: str, rootdir: str) -> None:
 
     # only keep the first 500 frames
     # last frame to keep
-    truncate_at_step = truncate_at * steps_per_frame - 1 # non inclusive
+    truncate_at_step = truncate_at * steps_per_frame - 1  # non inclusive
     truncate_at_time = truncate_at * ps_per_frame - 0.001
     w = TrajectoryWriter(
-        tmp_path, backend, append=True,
-        truncate=(truncate_at - 1, truncate_at_step, truncate_at_time)
+        tmp_path,
+        backend,
+        append=True,
+        truncate=(truncate_at - 1, truncate_at_step, truncate_at_time),
     )
 
     # rewrite the others

@@ -1,9 +1,5 @@
+from typing import TextIO
 
-import re
-from typing import Any, TextIO
-import os
-
-from ..__core import BondedForce
 from ..__reporter import Reporter
 from ..__simulation import Simulation
 
@@ -32,7 +28,9 @@ class FragmentsDump(Reporter):
         pass
 
     def on_simulation_start(self, simulation, continue_sim: bool):
-        self.handle = open(simulation.request_path(".fragments_dump", copy=continue_sim), "a")
+        self.handle = open(
+            simulation.request_path(".fragments_dump", copy=continue_sim), "a"
+        )
         n = simulation.system.num_atoms()
         assert n > 0
         if not continue_sim:

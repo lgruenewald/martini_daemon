@@ -4,65 +4,68 @@ User Guide
 Introduction to run scripts
 ---------------------------
 
-Simulations in Martini Daemon are ran using python run scripts. These
-contain calls to Martini Daemon’s API, specifying simulation parameters
-and input files. A simple equilibration run script is provided
-below, which should be adjustable to meet various needs.
+Simulations in Martini Daemon are ran using python run scripts. These contain calls to Martini Daemon’s API,
+specifying simulation parameters and input files. A simple run script is provided
+below, which can be adjusted to meet various needs.
 
 ::
 
    #!/usr/bin/env python3
 
-   from martini_daemon import Simulation, VariablesReporter, XTCReporter
+   from martini_daemon import Simulation, VariablesReporter, TrajectoryReporter, ReactionReporter, TopTrajReporter
    import openmm as mm
 
-   eq = Simulation(
-     # path to Gromacs Topology
-     top_path="system.top",
-     # path to Starting geometry
-     geom_path="system.gro",
-     # output filenames will be prefixed with this name
-     sim_name="eq",
-     # total MD steps to take
-     md_steps=400000,
-     # how often to write to the .xtc
-     traj_frequency=5000,
-     # no reactions during equilibration
-     dm_frequency=0,
-     # report thermodynamic variables, other reporters go here too...
-     reporters=[
-       # each reporter typically writes its own file with its own specific extension
-       VariablesReporter(),
-       XTCReporter(),
-     ],
-     # integrator+temperature coupling in one
-     integrator=mm.LangevinMiddleIntegrator(
-       # temperature
-       298 * mm.unit.kelvin,
-       # collision frequency
-       1.0 / mm.unit.picosecond,
-       # timestep
-       0.02 * mm.unit.picosecond
-     ),
-     # coupling
-     coupling=[
-       mm.MonteCarloBarostat(
-         # desired pressure
-         1.0 * mm.unit.bar,
-         # reference temperature
-         298 * mm.unit.kelvin
+   sim = Simulation(
+       # path to Gromacs Topology
+       top_path="system.top",
+       # path to Starting geometry
+       geom_path="system.gro",
+       # output filenames will be prefixed with this name
+       sim_name="out",
+       # total MD steps to take
+       md_steps=400000,
+       # how often to write to the .xtc
+       traj_frequency=5000,
+       # how often to run the detection/modification algorithm
+       dm_frequency=250,
+       # report thermodynamic variables, other reporters go here too...
+       reporters=[
+           # each reporter typically writes its own file with its own specific extension
+           VariablesReporter(),
+           TrajectoryReporter(),
+           ReactionReporter(),
+           TopTrajReporter()
+       ],
+       # integrator+temperature coupling in one
+       integrator=mm.LangevinMiddleIntegrator(
+           # temperature
+           298 * mm.unit.kelvin,
+           # collision frequency
+           1.0 / mm.unit.picosecond,
+           # timestep
+           0.02 * mm.unit.picosecond
        ),
-       mm.CMMotionRemover()
-     ],
+       # coupling
+       coupling=[
+           mm.MonteCarloBarostat(
+               # desired pressure
+               1.0 * mm.unit.bar,
+               # reference temperature
+               298 * mm.unit.kelvin
+           ),
+           mm.CMMotionRemover()
+       ],
    )
    # minimize energy first, saving the minimized coordinates to min.gro
-   eq.minimize_energy(out="min.gro")
+   sim.minimize_energy(out="min.gro")
    # generate velocities at 298 K
-   eq.generate_velocities(298)
+   sim.generate_velocities(298)
    # run equilibration
-   eq.simulate()
+   sim.simulate()
    # write final coordinates, velocities and box to a .gro file
-   eq.save_geometry("eq.gro")
+   sim.save_geometry("out.gro")
+   # close output files
+   sim.finish()
 
 See :doc:`/autoapi/martini_daemon/Simulation` for the whole list of available arguments, attributes and methods.
 
@@ -71,11 +74,12 @@ Including reactions
 
 A rough workflow for adding a reaction consists of several steps.
 
-1. The desired reactions should be broken down to a mechanism.
-2. For each mechanistic step, the reactant and product molecules should be parametrized in Martini.
+1. The desired reaction should be broken down to a mechanism of elementary steps.
+2. For each mechanistic step, the Martini topologies of the reactant and product molecules should be obtained.
 3. The difference between the two should be written down as a list of new interactions, as well as old interactions to break.
-4. A graph for the reactant should be constructed.
-5. A reaction template should be defined.
+4. A graph for the reactant should be constructed. This lets Martini Daemon recognize which atoms together form a
+   reactive functional group -- **a fragment**.
+5. A reaction template should be defined. This consists of reaction conditions and topology modifications.
 
 This User Guide focuses on steps 4 and 5. The end result of these steps should be an ``.rx`` file, containing both
 reactant definitions and reaction templates. These files should be included using ``#include`` into a ``.top`` file,
@@ -90,13 +94,13 @@ Martini Daemon's parser implements a large subset of them that is relevant for M
 Some things to note about the preprocessor implementation:
 
 * ``#define`` replacements are supported, but they currently cannot change the number of tokens, they always map
-    one token to one token, even if they are empty. ``#define`` replacements can be chained.
+  one token to one token, even if they are empty. ``#define`` replacements can be chained.
 * ``#ifdef`` and ``#ifndef`` are supported, but the closing ``#endif`` must be in the same file as the opening
-    ``#ifdef``.
+  ``#ifdef``.
 * ``""`` and ``<>`` is implemented identically for ``#include``, both search locally and in the include path currently.
 * If no include path is specified, Martini Daemon will try to auto-detect a GROMACS installation, and include its
-    force field directory.
-* Each file can only be ``#include``ed maximum once. An error is raised otherwise.
+  force field directory.
+* Each file can only be included using ``#include`` maximum once. An error is raised otherwise.
 * Not supported: preprocessor macros, ``#if``.
 
 A naming convention for Martini-Daemon specific parts of topologies, is to put them in a file with the extension
@@ -111,32 +115,33 @@ The define ``DAEMON`` is always defined for Martini Daemon, so ``.rx`` files sho
     #endif
 
 This ensures, that the same ``.top`` file can be used with GROMACS and Martini Daemon without modification.
-Alternatively, if reactions should be toggled on/off in separate simulation, a different define, such as REACT
-can be used. Such defines can be passed in the defines parameter of :doc:`/autoapi/martini_daemon/Simulation`.
-
 
 Creating reactant graphs
 ------------------------
 
-The graph matching algorithm provides a powerful method to create
-a "contract" which defines a reactant in a flexible manner.
-Each graph match will be added to a list of active known reactants (also called
-**fragments**). Graphs specify a list of beads to match for, including their
-names and types. Graphs also specify interactions to match for, which connect
-the beads. These interactions can be generic, such as ``bond``, or specific,
-such as ``harmonic_bond`` or ``morse_bond``. All graph beads should be connected
-to each-other with such interactions.
-The basic syntax for defining graphs is done using the ``[graph]`` directive. Each line within this directive
-starts with a keyword, and then parameters that follow. All graphs must be given a name, using the ``name`` keyword.
-Atoms should be defined with the ``atom`` keyword, followed by the atom name, the atom name filter, and the atom
-type filter.
+The graph matching algorithm provides a flexible way to define reactants in a flexible manner.
+Each successful graph match will construct a **fragment**, which represent a grouping of beads that can react
+according to reaction templates. The list of fragments at each point of the simulation is a list of known
+reactants in the system.
 
-Let us consider a simple example,
-where a bead representing an alcohol, called ROH with type SP3 is matched. Another bead is included.
-This bead will be used for angle conditions and angle forces. Its graph node name will be tail,
-with a name match pattern that matches any atom name starting with C and any type.
-A generic bond interaction is matched, so they can be connected using any of the available bond types without
-needing to update the graph.
+The graphs specified in input files contain descriptions of a list of beads to match, as well as the interactions
+that connect them. Beads are matched according to name and type filters.
+The matched interactions can be generic, such as ``bond``, or specific, such as ``harmonic_bond`` or ``morse_bond``.
+All beads should be connected to each-other with such interactions.
+
+The basic syntax for defining graphs is done using the ``[graph]`` directive.
+Lines within this directive start with a keyword, followed by keyword-specific parameters.
+All graphs must be given a name using the ``name`` keyword.
+Beads to be matched should be defined with the ``atom`` keyword,
+followed by the graph node name, the name filter, and the type filter.
+The graph node name is the name that will be used to refer to that bead in ``.rx`` input files.
+
+Below is a simple example, where a bead representing an alcohol, called ROH with type SP3 is matched.
+Another bead is included. This bead will be used for angle conditions and angle forces.
+Its graph node name will be tail, with a name match pattern that matches any bead name starting with C and any type.
+A generic bond interaction is matched. Given this graph example, Martini Daemon would then find all beads with names
+ROH, types SP3, that are bonded to any bead with a name starting with C and any type. This bond can be any of the
+bond types in ``[bonds]``, or a constraint.
 
 ::
 
@@ -146,115 +151,39 @@ needing to update the graph.
     atom tail C* *
     bond oh tail
 
-If this graph is specified, Martini Daemon will find all beads with the name ROH, type SP3, that are bonded to any
-bead whose name starts with C, and it will collect all the matches in the fragment list.
 The graph matching algorithm will keep an always up to date list of all graph matches for the detection algorithm.
 This means, that once the **contract** specified by the graph description above is broken, the corresponding
-fragment is removed. This is done by matching all atoms at the start of the simulation,
-and then re-calculating matches for atoms who participate in reactions, as well as their "neighbors", under
+fragment is removed. This is done by matching all beads at the start of the simulation,
+and then re-calculating matches for beads that participate in reactions, as well as their "neighbors", under
 the assumption that only reactions change the topology of the system, and only topology changes can invalidate
 graphs.
 
-Interaction filters with more than two atoms are also supported. Angles or dihedrals can be matched as well.
+Interaction filters with more than two beads are also supported. Angles or dihedrals can be matched as well.
 Interaction filters such as ``angle oh bead2 bead3`` are valid. This specific one will match any angle consisting
 of the three specified beads, in any order.
 
+Graph matches are considered valid only if all specified beads and interactions are matched. If a single
+bead or interaction is missing, the graph match is considered invalid. Every bead, as well as every interaction can
+only be matched once.
 
-.. admonition:: Interaction filter names
-    :class: dropdown
-
-    - ``bond``: any bond listed here
-    - ``harmonic_bond``: bond type 1 and 6
-    - ``g96_bond``: bond type 2
-    - ``morse_bond``: bond type 3
-    - ``cubic_bond``: bond type 4
-    - ``connection``: bond type 5
-    - ``fene_bond``: bond type 7
-    - ``distance_restraint``: bond type 10
-    - ``constraint``: constraint type 1 and 2
-    - ``angle``: any angle listed here
-    - ``harmonic_angle``: angle type 1
-    - ``g96_angle``: angle type 2
-    - ``cross_bond_bond``: angle type 3
-    - ``cross_bond_angle``: angle type 4
-    - ``urey_bradley``: angle type 5
-    - ``quartic_angle``: angle type 6
-    - ``linear_angle``: angle type 9
-    - ``restricted_angle``: angle type 10
-    - ``dihedral``: any dihedral listed here
-    - ``proper_dihedral``: dihedral type 1, 4 and 9
-    - ``improper_dihedral``: dihedral type 2
-    - ``rb_torsion``: dihedral type 3
-    - ``fourier_dihedral``: dihedral type 5
-    - ``restricted_dihedral``: dihedral type 10
-    - ``combined_bending_torsion``: dihedral type 11
-    - ``virtual_site``, ``vsite``: any virtual site, matches the virtual site as well as constructing atoms
-    - ``vsite1``: virtual_sites1 type 1
-    - ``vsite2``: virtual_sites2 type 1
-    - ``2fd``: virtual_sites2 type 2
-    - ``vsite3``: virtual_sites3 type 1
-    - ``3fd``: virtual_sites3 type 2
-    - ``3fad``: virtual_sites3 type 3
-    - ``3out``: virtual_sites3 type 4
-    - ``4fdn``: virtual_sites4 type 2
-    - ``com``, ``center_of_mass``: virtual_sitesn type 2
-    - ``weighted_average``: virtual_sitesn type 1 and 3
-    - ``pair``: only matches pairs
-    - ``cmap``: only matches cmap
-    - ``exclusion``: only matches exclusions
-
-Important! Graph matches are considered valid only if all atoms and interactions specified are matched. If a single
-atom or interaction is missing, the graph match is considered invalid. Every interaction can only be matched once.
-This can lead to complications when making complex graphs that try to match multiple interactions that include
-more than two atoms, all with the same filter. While in some cases they may be technically possible,
-such graphs are advised against, and are not supported.
-
-In All-Atom models, reactive functional groups can be easily identified based on elements only
-(``-OH``, ``-NH2``, ``-COOH``). This lends itself to well-defined reactant graph definitions without further complexity.
-With Coarse Grained models, such as Martini, entire functional groups often correspond to a single specific bead.
-The information of the true identity of the functional group remains with whoever is familiar with the model,
-rather than it being implicit in the atom types alone. This is why atom names are matched as well, rather than
-atom types only. Some degree of dynamic matching is still possible, using ``*`` and other patterns.
-It remains up the user to specify graphs that are general enough, for ease of use, but strict enough,
-so they match only what was intended.
-
-.. admonition:: ``[graph]`` directive syntax
-    :class: dropdown
-
-    All lines in this directive should start with a keyword, followed by parameters. The following keywords
-    are supported:
-
-    - ``name graph_name`` - specify the graph name
-    - ``atom graph_node_name name_filter type_filter`` - mandatory atoms
-    - ``atom? graph_node_name name_filter type_filter`` - optional atoms
-    - ``atom! graph_node_name name_filter type_filter`` - forbidden atoms
-    - ``equivalent name1 name2 ...`` - specify a group of atoms, which when
-      exchanged, do not represent a different graph match
-    - ``<interaction_name> name1 name2 ...`` - specify a group of atoms,
-      which are connected by the interaction filter. See section about
-      interaction filters for valid filters.
-
-    Graph Node Names can contain ASCII letters, numbers and underscores.
-
-    Name and type filters can contain the following substrings:
-
-    * alphanumeric characters and underscores will match specific strings
-    * ``*`` for any strings (including empty strings)
-    * ``?`` for any single character
-    * ``{123}`` braces will match one of the characters included within them.
-
+Note, that there is currently no backtracking in the interaction matching (there is backtracking in node matching).
+This only poses a problem when there is multiple interactions that can match the same interaction, such as
+a simultaneous ``bond a b`` and ``harmonic_bond a b``, for a molecule that has a harmonic bond and a different
+bond between ``a`` and ``b``. It is possible, that ``bond a b`` matches the harmonic bond, leading to no valid
+graph matches, since the harmonic bond filter is unfilled. A good rule of thumb is connect the same group of beads
+only with distinct filters.
 
 An important property of the graph matching algorithm, that it tries to be exhaustive. It will consider all
 possible matches, and add them all to the list of fragments. Two matches are considered identical if for each
-matched graph atom, the same atom index within the system is matched. For our example, this means, that if there
+matched graph node, the same bead index within the system is matched. For our example, this means, that if there
 are two different beads bonded to the alcohol bead, with names that start with C, two different matches can be obtained.
 Both matches, by default, will be added to the fragment list as viable reactants that fulfill the contract specified
 in the graph description. If this is undesirable, it is important to make graphs that do not have such ambiguity.
 There are multiple strategies for this:
 
-* Use stricter name and type filters than in this example. If possible, change the names of the atoms in the .itp
+* Use stricter name and type filters than in this example. If possible, change the names of the beads in the .itp
   if they represent fundamentally different beads.
-* Include other atoms in the graph that can be used to disambiguate.
+* Include other beads in the graph that can be used to disambiguate.
 * Add connections (bond type 5) to the molecule, and match them using the ``connection`` filter.
   This type of bond does not add any force to it, it is used only as a unit of topological information.
   Of course, this also means, that visualizations might draw a bond between the two particles, which may be
@@ -278,7 +207,7 @@ Consider this modified example:
 
 The keyword ``equivalent`` is used to tell the graph matching algorithm, that the beads tail and tail2 are,
 for all purposes, equivalent. The only change this keyword introduces is to the graph matching algorithm itself.
-On exchanging the two atom indices, the algorithm will not consider it a new match. Without the equivalent keyword,
+On exchanging the two bead indices, the algorithm will not consider it a new match. Without the equivalent keyword,
 two matches would be found, with tail and tail2 exchanged, and both would be separately added to the fragment list.
 Auto-detection of equivalence is currently not possible, because when the graphs are defined,
 it is unknown how reaction templates use them, so this must be specified and verified manually.
@@ -293,50 +222,50 @@ implicitly in Martini Daemon, by specifying a graph that no longer matches after
 Here is a list of general strategies for achieving this:
 
 * In reactions that remove bonds, this can be automatically achieved by specifying a required bond between the two
-  bonded atoms.
-* In reactions that change atom names or types, this can also automatically be achieved with atom name and type filters,
+  bonded beads.
+* In reactions that change bead names or types, this can also automatically be achieved with bead name and type filters,
   if they no longer match after the reaction.
-* In other cases, a powerful tool can be the inclusion of forbidden atoms in graph specifications. The rest of this
+* In other cases, a powerful tool can be the inclusion of forbidden beads in graph specifications. The rest of this
   subsection will give an introduction to them.
 
-Forbidden atoms are specified similarly to regular atoms, but they start with the `atom!` keyword. These atoms
-function identically to regular atoms, with one difference. With only regular atoms, a graph match is complete if
-all atoms and interactions were matched. If a forbidden atom is included, the interactions to the forbidden atom
-only specify how to find it. If such a forbidden atom is matched, the graph match is considered invalid. If such a
-forbidden atom could not be matched, the graph match remains valid. This is enabled by the eagerness of the
+Forbidden beads are specified similarly to regular beads, but they start with the `atom!` keyword. These beads
+function identically to regular beads, with one difference. With only regular beads, a graph match is complete if
+all beads and interactions were matched. If a forbidden beads is included, the interactions to the forbidden bead
+only specify how to find it. If such a forbidden bead is matched, the graph match is considered invalid. If such a
+forbidden bead could not be matched, the graph match remains valid. This is enabled by the eagerness of the
 graph matching algorithm. The graph matching algorithm only considers whether a partial match is valid or not, once no
-more atoms can be added to it based on the filters.
+more beads can be added to it based on the filters.
 
-Note, that there is no way to group forbidden atoms together -- that is, rules such as "it is forbidden to have a
+Note, that there is no way to group forbidden beads together -- that is, rules such as "it is forbidden to have a
 bead of this name and type, that is bonded to this other bead with this name and type" are not possible. Another
-way to think about this restriction is that forbidden atoms can only represent a "one deep" layer around the normal
-atoms. This is important, as this means, that a graph can only become forbidden if a change occurred to its direct
+way to think about this restriction is that forbidden beads can only represent a "one deep" layer around the normal
+beads. This is important, as this means, that a graph can only become forbidden if a change occurred to its direct
 neighbors. This means, that graphs only need to be recalculated if their direct neighbors change. In order to
-prevent users from attempting to group forbidden atoms, there is an error message raised if there is an interaction
-filter connecting a forbidden atom to another forbidden atom.
+prevent users from attempting to group forbidden beads, there is an error message raised if there is an interaction
+filter connecting a forbidden bead to another forbidden bead.
 
-Note, forbidden atoms can show up as a ``-1`` in some reporter outputs, since they are represented with a -1
+Note, forbidden beads can show up as a ``-1`` in some reporter outputs, since they are represented with a -1
 internally in the fragment list.
 
-Optional atoms
+Optional beads
 --------------
 
-Optional atoms allow for some extra complexity in some cases. They function similarly to forbidden atoms,
+Optional beads allow for some extra complexity in some cases. They function similarly to forbidden beads,
 with the difference that the graph is valid regardless of whether they are there or not.
 
-General rules for optional atoms:
+General rules for optional beads:
 
-* Optional atoms are defined with the ``atom?`` keyword, followed by graph node name, name filter, type filter.
-* Missing optional atoms show up as ``-1`` in some reporter outputs, as they are represented with a -1 internally.
-* If a reaction condition references a missing optional atom, the condition is ignored.
-* If a modification template entry references a missing optional atom, the whole entry is ignored.
+* Optional beads are defined with the ``atom?`` keyword, followed by graph node name, name filter, type filter.
+* Missing optional beads show up as ``-1`` in some reporter outputs, as they are represented with a -1 internally.
+* If a reaction condition references a missing optional bead, the condition is ignored.
+* If a modification template entry references a missing optional bead, the whole entry is ignored.
   An exception to this is ``[update]``, as the semantics of that specifically make more sense that way.
-* Due to the eagerness of the graph matching algorithm, if an optional atom can be matched, only the graph match
-  that includes the optional atom is added to the fragment list.
-* Optional atoms cannot be "grouped", that is interaction filters within the graph can only contain at most one
-  optional atom per interaction filter. They also cannot be grouped with forbidden atoms. This facilitates
+* Due to the eagerness of the graph matching algorithm, if an optional bead can be matched, only the graph match
+  that includes the optional bead is added to the fragment list.
+* Optional beads cannot be "grouped", that is interaction filters within the graph can only contain at most one
+  optional bead per interaction filter. They also cannot be grouped with forbidden beads. This facilitates
   graph recalculation on direct neighbor change only.
-* Due to neighbor recalculation, if an existing fragment with a missing optional atom suddenly has an optional atom
+* Due to neighbor recalculation, if an existing fragment with a missing optional bead suddenly has an optional bead
   available to it, it will be recalculated to include it.
 
 Debugging graphs
@@ -345,6 +274,76 @@ Debugging graphs
 The reporter :doc:`/autoapi/martini_daemon/FragmentsDump` is specifically designed to facilitate debugging
 the graph matching algorithm, by printing the list of matched fragments every time there was any recalculation
 of graph matches.
+
+Graph syntax reference
+----------------------
+
+All lines in this directive should start with a keyword, followed by parameters. Below is a list of valid keywords.
+
+- ``name graph_name`` - specify the graph name
+
+- ``atom graph_node_name name_filter type_filter`` - mandatory beads
+- ``atom? graph_node_name name_filter type_filter`` - optional beads
+- ``atom! graph_node_name name_filter type_filter`` - forbidden beads
+
+Graph Node Names can contain ASCII letters, numbers and underscores.
+
+Name and type filters can contain the following substrings:
+
+* alphanumeric characters and underscores will match specific strings
+* ``*`` for any strings (including empty strings)
+* ``?`` for any single character
+* ``{123}`` braces will match one of the characters included within them.
+
+- ``equivalent graph_node_name1 graph_node_name2 ...`` - specify a group of beads, which when
+  exchanged, do not represent a different graph match
+
+- ``<interaction_name> graph_node_name1 graph_node_name2 ...`` - specify a group of beads,
+  which are connected by the interaction filter. See section about
+  interaction filters for valid filters.
+
+The valid interaction filters are given below. Note, that User-defined forces can also be matched. This list is for
+the built-in forces only.
+
+- ``bond``: any bond listed here
+- ``harmonic_bond``: bond type 1 and 6
+- ``g96_bond``: bond type 2
+- ``morse_bond``: bond type 3
+- ``cubic_bond``: bond type 4
+- ``connection``: bond type 5
+- ``fene_bond``: bond type 7
+- ``distance_restraint``: bond type 10
+- ``constraint``: constraint type 1 and 2
+- ``angle``: any angle listed here
+- ``harmonic_angle``: angle type 1
+- ``g96_angle``: angle type 2
+- ``cross_bond_bond``: angle type 3
+- ``cross_bond_angle``: angle type 4
+- ``urey_bradley``: angle type 5
+- ``quartic_angle``: angle type 6
+- ``linear_angle``: angle type 9
+- ``restricted_angle``: angle type 10
+- ``dihedral``: any dihedral listed here
+- ``proper_dihedral``: dihedral type 1, 4 and 9
+- ``improper_dihedral``: dihedral type 2
+- ``rb_torsion``: dihedral type 3
+- ``fourier_dihedral``: dihedral type 5
+- ``restricted_dihedral``: dihedral type 10
+- ``combined_bending_torsion``: dihedral type 11
+- ``virtual_site``, ``vsite``: any virtual site, matches the virtual site as well as constructing beads
+- ``vsite1``: virtual_sites1 type 1
+- ``vsite2``: virtual_sites2 type 1
+- ``2fd``: virtual_sites2 type 2
+- ``vsite3``: virtual_sites3 type 1
+- ``3fd``: virtual_sites3 type 2
+- ``3fad``: virtual_sites3 type 3
+- ``3out``: virtual_sites3 type 4
+- ``4fdn``: virtual_sites4 type 2
+- ``com``, ``center_of_mass``: virtual_sitesn type 2
+- ``weighted_average``: virtual_sitesn type 1 and 3
+- ``pair``: only matches pairs
+- ``cmap``: only matches cmap
+- ``exclusion``: only matches exclusions
 
 Reaction templates
 ------------------
@@ -355,47 +354,45 @@ Reaction templates define:
 * Reaction conditions for the reaction algorithm,
 * Topology modifications to perform.
 
-All reaction templates should start with the ``[reaction]`` directive, containing the reaction name.
+All reaction templates should start with the ``[reaction]`` directive.
+This directive must contain a single line, specifying a unique reaction name.
 Reaction names must not conflict with existing molecule type names, or other reaction names.
+Reaction names should only contain alphanumeric characters and underscores.
 
 ::
 
    [reaction]
    example_reaction
 
-.. admonition:: ``[reaction]`` directive syntax
-    :class: dropdown
 
-    * This directive must contain a single line, specifying a unique reaction name.
-    * Reaction names should only contain alphanumeric characters and underscores.
 
 
 The list of reactants should be given as a list of graph names in the ``[reactants]``directive.
+This directive must come first after each ``[reaction]`` directive. This directive is mandatory for each reaction.
+It must contain a single line, with space separated graph names.
 The fragments in the fragment list with this name will be considered during the detection algorithm.
-Up to three reactants are supported.
+Up to three reactants are supported. All reactant graphs must be defined before in the input file.
 
 ::
 
    [reactants]
    alc alc
 
-.. admonition:: ``[reactants]`` directive syntax
-    :class: dropdown
+Reaction conditions
+-------------------
 
-    * This directive must come first after each ``[reaction]`` directive.
-    * This directive is mandatory for each reaction.
-    * It must contain a single line, with space separated graph names.
-    * All reactant graphs must be defined before in the input file.
+Reaction conditions are specified in the ``[conditions]`` directive.
+This directive must come after the ``[reactants]`` directive. This directive is mandatory for each reaction.
+Each line in this directive specifies a single condition, starting with a keyword, followed by parameters.
 
+Graph nodes in these conditions are specified using the ``reactant_index:graph_node_name`` syntax. Reactant index
+should be a 1-based index of the reactant whose bead is being referenced. Graph node name should be the name
+as specified by the second token in lines with the ``atom`` keyword. The reactant index and node name must be
+separated by a colon, with no whitespace between. Referencing optional atoms is possible.
+If an optional atom is missing from the graph, that condition is ignored. Referencing forbidden atoms is not allowed,
+as they are never present in any fragment.
 
-Afterwards, reaction conditions should be specified.
-
-In reaction conditions and topology modifications, individual atoms of the reactant graphs can be referenced.
-This is done by referencing the (1 based) index of the reactant, followed by the graph node name within that graph.
-This indexing has to happen in a single token, so they are separated by a colon and no whitespace.
-
-An example set of conditions can be found below. Each of the listed conditions must be
-fulfilled in order to accept a reaction.
+An example set of conditions can be found below.
 
 ::
 
@@ -408,92 +405,93 @@ fulfilled in order to accept a reaction.
    p 0.5
 
 
-.. admonition:: ``[conditions]`` directive syntax
-    :class: dropdown
 
-    * This directive must come after the ``[reactants]`` directive.
-    * This directive is mandatory for each reaction.
-    * Each line in this directive specifies a single condition, starting with a keyword, followed by parameters.
+The possible reaction conditions are:
 
-    The possible reaction conditions are:
+* ``r_max bead1 bead2 distance``
+    * reactions above the maximum distance (in nm) will be rejected
+* ``r_min bead1 bead2 distance``
+    * reactions below the minimum distance (in nm) will be rejected
+* ``angle bead1 bead2 bead3 min to max or min2 to max2``
+    * Only angles between min and max are allowed.
+    * Min and max should be in degrees, and must be between 0 and 180 (inclusive).
+    * Multiple allowed ranges can be specified using the ``or`` keyword between them.
+    * If multiple ranges are specified, they cannot overlap.
+    * For a set of beads, only one ``angle`` condition is allowed. All ranges for these beads must be specified on
+      a single line.
+* ``dihedral bead1 bead2 bead3 bead4 min to max (or min2 to max2)``
+    * Identical syntax to angles, but for dihedrals.
+    * Any values can be used. They will be put back in the -180 to 180 range by the parser.
+    * If the larger value comes first, it will be assumed that it should "wrap" around the period, that is specifying
+      170 to -170 will mean that anything "after" 170 and "before" -170 is allowed. This allows 170 to 180 and
+      -180 to -170 in practice.
+* ``p probability``
+    * adds a random probability of accepting the reaction, which is evaluated after all other checks
+      have been met. Should be between 0 and 1.
 
-    * ``r_max atom1 atom2 distance``
-        * reactions above the maximum distance (in nm) will be rejected
-    * ``r_min atom1 atom2 distance``
-        * reactions below the minimum distance (in nm) will be rejected
-    * ``angle atom1 atom2 atom3 min to max or min2 to max2``
-        * Only angles between min and max are allowed.
-        * Min and max should be in degrees, and must be between 0 and 180 (inclusive).
-        * Multiple allowed ranges can be specified using the ``or`` keyword between them.
-        * If multiple ranges are specified, they cannot overlap.
-        * For a set of atoms, only one ``angle`` condition is allowed. All ranges for these atoms must be specified on
-          a single line.
-    * ``dihedral atom1 atom2 atom3 atom4 min to max (or min2 to max2)``
-        * Identical syntax to angles, but for dihedrals.
-        * Any values can be used. They will be put back in the -180 to 180 range by the parser.
-        * If the larger value comes first, it will be assumed that it should "wrap" around the period, that is specifying
-          170 to -170 will mean that anything "after" 170 and "before" -170 is allowed. This allows 170 to 180 and
-          -180 to -170 in practice.
-    * ``p probability``
-        * adds a random probability of accepting the reaction, which is evaluated after all other checks
-          have been met. Should be between 0 and 1.
+A maximum distance condition is required to "connect" all reactants, if there are multiple.
 
-    Atoms in these conditions are specified using the ``reactant_index:graph_atom_name`` syntax. Reactant index
-    should be a 1-based index of the reactant whose atom is being referenced. Graph atom name should be the name
-    of the atom in the graph, as specified by the second token in lines with the ``atom`` keyword. The two must be
-    separated by a colon, with no whitespace between. Referencing optional atoms is possible.
-    If an optional atom is missing from the graph, that condition is ignored. Referencing forbidden atoms is not allowed,
-    as they are never present in any fragment (since they are only used to create conditions for graph matching).
+Each condition is evaluated separately. A single failing condition will reject the reaction.
 
-    A maximum distance condition is required to "connect" all reactants, if there are multiple.
-
-    Each condition is evaluated separately. A single failing condition will reject the reaction.
-
-    Note, that a reaction can also be rejected for other reasons. Overlapping (that is they share an atom) fragments
-    cannot react. During the modification algorithm, if one reaction invalidates the fragment of another reaction,
-    the other reaction will also be rejected.
+Note, that a reaction can also be rejected for other reasons. Overlapping (that is they share a bead) fragments
+cannot react. During the modification algorithm, if one reaction invalidates the fragment of another reaction,
+the other reaction will also be rejected.
 
 The following aspects should be considered when making reaction conditions:
 
-* If forming a bond, generally there should be a maximum distance requirement for the given pair of atoms.
+* If forming a bond, generally there should be a maximum distance requirement for the given pair of beads.
 
-    * Forming a bond far away from the equilibrium bond length may result in a too high potential energy right after
-      the reaction, or may result in other molecules still being "sandwiched" between the two reactants.
+* Forming a bond far away from the equilibrium bond length may result in a too high potential energy right after
+  the reaction, or may result in other molecules still being "sandwiched" between the two reactants.
 
-* If removing a bond, it can be useful to have a minimum distance requirement for the given pair of atoms.
+* If removing a bond, it can be useful to have a minimum distance requirement for the given pair of beads.
 
 * If forming an angle, sometimes it is necessary to have an angle condition.
 
 * Sometimes, to get the right product geometry, distance, angle or dihedral reaction conditions are needed.
 
-    * Some multi-functional molecules may self-react in undesirable ways if such conditions are too broad.
-
-* Geometry conditions reduce reaction rates. Generally angle conditions have a larger impact than distance conditions,
-  while dihedral conditions have an even larger impact.
+* Some multi-functional molecules may self-react in undesirable ways if such conditions are too broad.
 
 * When multiple reactants are specified, a maximum distance
   must be present to "connect" them. This is because the detection algorithm constructs a KdTree of all fragment
   locations in space, which is used to accelerate it. Without a maximum distance condition, all combinations
   of reactants would need to be considered. This distance can be the same distance used for forming the bond.
 
-* When tuning the reaction rates, be aware that:
+Reaction rates
+--------------
 
-    * Not only reaction rates relative to other reactions have an effect, but also relative to all processes happening
-      in the simulation, including diffusion.
+When tuning the reaction rates, be aware that:
 
-    * Different geometry conditions will result in different reaction rates. It may be useful to set reaction conditions
-      at geometries that are somewhat higher in the potential energy surface, emulating a sort of "activation energy".
+* Not only reaction rates relative to other reactions have an effect on the simulation results,
+  but also relative to all processes happening in the simulation, including diffusion.
 
-    * If using the probability reaction condition, the same reaction probability may result in different rates based on
-      the other conditions, as the probability is only applied "on top" of any other conditions.
+* Different geometry conditions will result in different reaction rates. It may be useful to set reaction conditions
+  at geometries that are somewhat higher in the potential energy surface, emulating a sort of "activation energy".
 
-Finally, the list of changes to topology during a reaction should be specified. Currently, this is a quite manual
+* Strict geometry conditions reduce reaction rates.
+  Generally angle conditions have a larger impact than distance conditions,
+  while dihedral conditions have an even larger impact.
+
+* If using the probability reaction condition, the same reaction probability may result in different rates based on
+  the other conditions, as the probability is only applied "on top" of any other conditions. A lower probability
+  reaction can still be faster, depending on the concentration and geometry conditions.
+
+Modification templates
+----------------------
+
+The list of changes to topology during a reaction should be specified. Currently, this is a manual
 process. Users should first write down the difference between the reactant and product topologies, in terms of
-atom properties changed, old interactions broken and new interactions formed. Updating existing interactions is
+bead types changed, old interactions broken and new interactions formed. Updating existing interactions is
 not possible, they have to be broken and re-created.
 
-The directives that are valid in ``[moleculetype]`` are generally valid to use inside reaction templates. With the
-notable difference in how atoms are referenced.
+The directives that are valid in ``[moleculetype]`` are generally valid to use in ``[reaction]`` directives.
+
+The important differences are:
+
+* Beads are indexed using the ``reactant_index:graph_node_name`` syntax, identically to reaction conditions.
+* Interactions referencing missing optional beads will be skipped.
+* Adding virtual sites and constraints is not supported.
+* The ``[atoms]`` directive is not supported. See ``[redefine]`` below on how to change bead properties.
 
 
 ::
@@ -505,24 +503,16 @@ notable difference in how atoms are referenced.
    1:tail 1:oh 2:oh 1 85 100
    2:tail 2:oh 1:oh 1 85 100
 
-.. admonition:: Interactions in modification templates
-    :class: dropdown
+Redefine
+--------
 
-    Directives that add bonds, angles, dihedrals and similar interactions within ``[moleculetype]``
-    are also supported within reaction conditions.
+Bead properties can be changed using the ``[redefine]`` directive.
+Each line in the redefine directive starts with specifying which bead to change, specified using the
+``reactant_index:graph_node_name`` syntax.
+The rest of the line contains pairs of keywords followed by the new value are expected.
+The keywords ``name``, ``type``, ``charge`` and ``mass`` are supported.
 
-    The important differences are:
-
-    * Atoms are indexed using the ``reactant_index:graph_atom_name`` syntax, identically to reaction conditions.
-    * Interactions referencing missing optional atoms will be skipped.
-    * Adding virtual sites and constraints is not supported.
-    * The ``[atoms]`` directive is not supported. See ``[redefine]`` below on how to change atom properties.
-
-
-Atom properties can be changed using the ``[redefine]`` directive. In each line of this directive,
-a keyword specifies what is changed, followed by the new value.
-
-Warning! changing the type alone will not affect the charge or mass! Even if the default charge/mass of the original
+Changing the type alone will not affect the charge or mass! Even if the default charge/mass of the original
 type was used. Mass and charge need to be explicitly changed, if changing them is desired.
 
 ::
@@ -531,84 +521,45 @@ type was used. Mass and charge need to be explicitly changed, if changing them i
    1:reactive name BRD type SN1
    2:reactive name BRD type SN1
 
-.. admonition:: ``[redefine]`` syntax
-    :class: dropdown
-
-    * Each line in the redefine directive starts with specifying which atom to change, specified using the
-      ``reactant_index:graph_atom_name`` syntax.
-    * The rest of the line contains pairs of keywords followed by the new value are expected.
-    * The keywords ``name``, ``type``, ``charge`` and ``mass`` are supported.
-
+Break and Update
+----------------
 
 Existing interactions can be removed too, using the ``[break]`` and ``[update]`` directives.
-Each line in these directives contains a list of atoms, in which the interactions should be broken
-according to the rules of the directives.
+Each line in these directives contains a list of beads, in which the interactions should be broken
+according to the rules of the directives. Each of these lines describes a **break group** or **update group**.
 
 ::
 
-   ; for a different reaction containing two atoms, left and right
+   ; for a different reaction, let's say the reactant contains two bonded beads, left and right
    [break]
    1:left 1:right
 
-The break directive completely disconnects the molecule between two specified atoms. The bonds, angles, dihedrals,
-exclusions that contain both atoms will all be removed.
+During the modification algorithm, each break and update group is executed one by one. They choose interactions
+that include those beads and remove them. The difference lies in the rules which govern the choice of these
+interactions:
 
-The update directive has the same form as the break directive, but is more careful. It only breaks interactions
-that only contains the specified atoms. So, a update directive with only two atoms specified will break the bond and
-exclusion, but not angles or dihedrals that contain them and other atoms as well.
+* **break** groups remove interactions which contain **all** beads in the group,
+* **update** groups remove interactions which contain **only** beads from the group.
 
-.. admonition:: ``[break]`` and ``[update]`` details
-    :class: dropdown
+The naming is based on their intended use case:
 
-    Two directives are available for breaking interactions, the ``[break]`` and ``[update]``. Both share syntax,
-    they both contain lines with a list of whitespace separated atoms, picked using the ``reactant_index:graph_atom_name``
-    syntax. Each line specifies a new break group or update group respectively.
+* break is intended to be used to completely disconnect a set of particles (usually a set of 2). All bonds, angles,
+  dihedrals will be broken. Note, that it doesn't traverse the whole interaction graph, so the two sides of
+  the molecule can still remain connected through other beads not included in the break group.
+* update is intended to be used to change interactions between a set of beads. If two beads are specified, it will
+  only break the various bonds and exclusions between them, not the angles or dihedrals that also include other
+  beads. This way, new bonds can be added to replace the old ones.
 
-    During the modification algorithm, each break and update group is executed one by one. They choose interactions
-    that include those atoms and remove them. The difference lies in the rules which govern the choice of these
-    interactions:
+Optional beads are supported. A missing optional bead will:
 
-    * **break** groups remove interactions which contain **all** atoms in the group,
-    * **update** groups remove interactions which contain **only** atoms from the group.
+* Disable the break group, as no interaction will contain beads that are not there.
+* Still allow the remaining beads to be processed as an update group.
 
-    The naming is based on their intended use case:
 
-    * break is intended to be used to completely disconnect a set of particles (usually a set of 2). All bonds, angles,
-      dihedrals will be broken. Note, that it doesn't traverse the whole interaction graph, so the two sides of
-      the molecule can still remain connected through other atoms not included in the break group.
-    * update is intended to be used to change interactions between a set of atoms. If two atoms are specified, it will
-      only break the various bonds and exclusions between them, not the angles or dihedrals that also include other
-      atoms. This way, new bonds can be added to replace the old ones.
+Debuggin reaction templates
+---------------------------
 
-    Optional atoms are supported. A missing optional atom will:
-
-    * Disable the break group, as no interaction will contain atoms that are not there.
-    * Still allow the remaining atoms to be processed as an update group.
-
-An additional feature within Martini Daemon is energy minimization after a reaction. Sometimes, changing the non-bonded
-parameters can help with this. The ``[soft_core]`` directive can be used within reaction templates to temporarily
-turn on soft-core potentials during the energy minimization phase.
-
-Each line within this directive specifies the atom ``reactant_index:graph_atom_name``, the soft core lambda
-and alpha parameters.
-
-It is recommended to use soft core if NaN exceptions happen when an exclusion is removed during a reaction,
-and local minimization alone does not help. A lambda parameter between 0.5 (softest) and 1.0 (no soft core whatsoever)
-can be used. An alpha parameter of 0.5 is recommended (though in principle, slightly larger alpha also makes
-the soft core softer, assuming lambda is not 1.0). The soft core formula is inspired by the soft core interactions
-in GROMACS used for free-energy interactions
-(https://manual.gromacs.org/current/reference-manual/functions/free-energy-interactions.html#soft-core-interactions-beutler-et-al).
-
-Example:
-
-::
-
-    [soft_core]
-    2:1 0.85 0.5
-    2:5 0.85 0.5
-    1:1 0.85 0.5
-
-Lastly, reaction templates should be tested. It’s recommended to run reactive simulations with the
+Reaction templates should be tested. It’s recommended to run reactive simulations with the
 :doc:`/autoapi/martini_daemon/ReactionReporter`, as it reports each reaction, along with the frame it happens,
 the internal fragment ID of reactants, and a list of atoms within the fragment.
 For simple setups, the modification templates can be debugged using :doc:`/autoapi/martini_daemon/SystemDump`. It is
@@ -671,9 +622,72 @@ This can be accessed from the run script, or from callbacks in custom Reporters.
 Checkpoint system
 -----------------
 
-TODO
+Martini Daemon includes a Checkpoint system, based around the :doc:`/autoapi/martini_daemon/CheckpointReporter`.
+This reporter writes Martini Daemon specific ``.chk`` files, which contain (some of) the simulation state.
+Checkpoints currently should be viewed as subject to change, as they currently only store particle positions and
+velocities, the periodic box, and some simulation metadata. The topology is restored by loading the original ``.top``
+file, and *replaying* all reactions that happened, based on the output of
+:doc:`/autoapi/martini_daemon/ReactionReporter`.
+
+When continuing simulations, the previous state of reporter output
+files will be backed up, but writing will continue by appending to existing files. If there is extra output in the
+output files since the checkpoint was made, the output files are truncated to provide a continuous output file.
+
+Loading checkpoints should happen using :doc:`/autoapi/martini_daemon/CheckpointLoader`. The first argument to the
+constructor should be the path to the checkpoint file. All other arguments will be forwarded to the constructor
+of :doc:`/autoapi/martini_daemon/Simulation`, and should be identical to how the simulation ran before the
+checkpoint was made.
 
 Energy minimization after reactions
 -----------------------------------
 
-TODO
+Topology changes after reactions usually create a sharp increase in potential energy and forces in the system.
+This is usually mitigated by the temperature coupling scheme, but in some cases this is not enough. In certain cases,
+numerical instability can lead to crashes related to this. Martini Daemon features a `/autoapi/martini_daemon/LocalMinimizer`,
+designed to perform a short energy minimization only on the reacting beads and their immediate surroundings.
+There are a few options exposed, which can be used to tweak this process:
+
+* The choice of minimizer and its properties. Currently only `/autoapi/martini_daemon/LocalGradientDescent` is available.
+* The (maximum) number of steps to perform.
+* The choice of which beads are *movable* during the minimization.
+    * By default, reacting beads and their immediate neighbors are movable.
+    * A radius (in nanometers) can be specified.
+    * The bond graph can be recursively traversed to mark the entire molecule that reacts movable.
+* Constraints can be temporarily replaced with stiff harmonic bonds.
+
+Below is an example with all these options specified.
+
+::
+
+    LocalMinimizer(
+        LocalGradientDescent(
+            initial_step_size_nm=0.01,
+            etol=0.001,
+            smoothing_factor=0.1
+        ),
+        minimization_steps=500,
+        r_movable=1.,
+        whole_molecule=True,
+        harmonic_constraints=True,
+    )
+
+Additionally, the ``[soft_core]`` directive can also be used within reaction templates to temporarily
+turn on soft-core potentials during the energy minimization phase.
+Each line within this directive specifies the beads ``reactant_index:graph_node_name``, the soft core lambda
+and alpha parameters.
+
+It is recommended to use soft core if NaN exceptions happen when an exclusion is removed during a reaction,
+and local minimization alone does not help. A lambda parameter between 0.5 (softest) and 1.0 (no soft core whatsoever)
+can be used. An alpha parameter of 0.5 is recommended (though in principle, slightly larger alpha also makes
+the soft core softer, assuming lambda is not 1.0). The soft core formula is inspired by the soft core interactions
+in GROMACS used for free-energy interactions
+(https://manual.gromacs.org/current/reference-manual/functions/free-energy-interactions.html#soft-core-interactions-beutler-et-al).
+
+Example:
+
+::
+
+    [soft_core]
+    2:1 0.85 0.5
+    2:5 0.85 0.5
+    1:1 0.85 0.5

@@ -88,7 +88,7 @@ class Graph:
                 # TODO test
                 raise ParseException(
                     f"Interaction {filter_str} for atoms {atoms} "
-                    + f"references more than one optional or forbidden atoms. "
+                    + "references more than one optional or forbidden atoms. "
                     + "Grouping forbidden/optional atoms is not supported."
                 )
 

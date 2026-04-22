@@ -3,9 +3,9 @@ from .checkpoint_reporter import (
 )
 from .checkpoint_reporter import (
     CheckpointReporter as CheckpointReporter,
-    CheckpointLoader as CheckpointLoader,
 )
 from .frag_count_reporter import FragCountReporter as FragCountReporter
+from .fragments_dump import FragmentsDump as FragmentsDump
 from .local_minimizer import (
     LocalGradientDescent as LocalGradientDescent,
 )
@@ -18,4 +18,3 @@ from .system_dump import SystemDump as SystemDump
 from .toptraj_reporter import TopTrajReporter as TopTrajReporter
 from .trajectory_reporter import TrajectoryReporter as TrajectoryReporter
 from .variables_reporter import VariablesReporter as VariablesReporter
-from .fragments_dump import FragmentsDump as FragmentsDump

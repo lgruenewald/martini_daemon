@@ -45,7 +45,6 @@ docs = [
   "sphinx",
   "sphinx-autoapi",
   "sphinx-rtd-theme",
-  "sphinx-togglebutton",
   "myst-parser"
 ]
 

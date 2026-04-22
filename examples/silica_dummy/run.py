@@ -2,11 +2,11 @@
 
 from martini_daemon import (
     FragCountReporter,
+    FragmentsDump,
     ReactionReporter,
     Simulation,
     TopTrajReporter,
     TrajectoryReporter,
-    FragmentsDump
 )
 
 sim = Simulation(
@@ -18,7 +18,7 @@ sim = Simulation(
         TrajectoryReporter(".xtc"),
         ReactionReporter(),
         FragCountReporter(),
-        FragmentsDump()
+        FragmentsDump(),
     ],
     dm_frequency=100,
     traj_frequency=1000,

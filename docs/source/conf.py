@@ -13,13 +13,15 @@ author = ""
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ["sphinx.ext.autodoc", "autoapi.extension", "sphinx_rtd_theme", "myst_parser", "sphinx_togglebutton"]
+extensions = [
+    "sphinx.ext.autodoc",
+    "autoapi.extension",
+    "sphinx_rtd_theme",
+    "myst_parser",
+]
 
 html_theme = "sphinx_rtd_theme"
 
-html_css_files = [
-    "custom.css",
-]
 
 templates_path = ["_templates"]
 exclude_patterns = []

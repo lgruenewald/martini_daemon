@@ -30,7 +30,9 @@ tests = [
 ]
 
 
-def get_sim(top: str, gro: str) -> list[tuple[int, str, list[tuple[str, int, list[int]]]]]:
+def get_sim(
+    top: str, gro: str
+) -> list[tuple[int, str, list[tuple[str, int, list[int]]]]]:
     """Run a single frame detection algorithm and return the reactions."""
     rep = ReactionReporter()
     sim = Simulation(top, gro, 0, reporters=[rep])

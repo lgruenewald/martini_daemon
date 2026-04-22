@@ -1,7 +1,8 @@
+import os
+
 from ..__formats import TrajectoryWriter
 from ..__reporter import Reporter
 from ..__simulation import Simulation
-import os
 
 
 class TrajectoryReporter(Reporter):
@@ -21,8 +22,10 @@ class TrajectoryReporter(Reporter):
             truncate=(
                 simulation.trajectory_frame,
                 simulation.current_step,
-                simulation.time_ps
-            ) if append else None,
+                simulation.time_ps,
+            )
+            if append
+            else None,
         )
 
     def on_trajectory_frame(self, simulation: Simulation) -> None:
