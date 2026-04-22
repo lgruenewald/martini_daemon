@@ -243,11 +243,11 @@ impl PeriodicBox {
     /// Return whether the shortest path between two points crosses the periodic boundary condition,
     /// in a translation invariant manner.
     pub fn crosses_box(&self, v1: [f64; 3], v2: [f64; 3]) -> bool {
-        (self.distance_squared(v1, v2) - (DVec3::from(v1)-DVec3::from(v2)).length_squared()).abs() > f64::EPSILON
+        (self.distance_squared(v1, v2) - (DVec3::from(v1)-DVec3::from(v2)).length_squared()).abs() > 10e-8
     }
 
 
-    /// Get the distance between two points in peridoic space, squared.
+    /// Get the distance between two points in periodic space, squared.
     pub fn distance_squared(&self, v1: [f64; 3], v2: [f64; 3]) -> f64 {
         DVec3::from(self.diff(v1, v2)).length_squared()
     }

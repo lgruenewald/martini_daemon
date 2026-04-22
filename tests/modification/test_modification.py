@@ -37,7 +37,7 @@ def get_sim(top: str, gro: str) -> str:
     )
     sim.step(0, traj=True, dm=True)
     sim.finish()
-    return "out.sstar"
+    return "out.system_dump"
 
 
 def compare(dump_new: str, dump_reference: str) -> None:
@@ -80,7 +80,7 @@ def test_modification(x: str, rootdir: str) -> None:
 
     # meat of the test
     dump_new = get_sim("system.top", "system.gro")
-    dump_reference = "reference.sstar"
+    dump_reference = "reference.system_dump"
     compare(dump_new, dump_reference)
 
     # cleanup

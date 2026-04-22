@@ -8,7 +8,6 @@
    tutorial
    user_guide
    faq
-   reference
    toptraj
    extending
 

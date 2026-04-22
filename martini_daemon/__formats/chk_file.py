@@ -79,7 +79,7 @@ def read_checkpoint(path: str) -> Checkpoint:
             crc = crc32(res, crc)
             return res
 
-        magic = "<Q", read_and_crc(8)
+        magic = read_and_crc(8)
         if magic != MAGIC:
             raise ValueError(
                 f"MAGIC number mismatch, {path} is not a valid .chk file, or is from a different version."
@@ -90,14 +90,14 @@ def read_checkpoint(path: str) -> Checkpoint:
         current_step, trajectory_frame, reactions_so_far, time_ps, n_atoms = (
             struct.unpack("<QQQdQ", read_and_crc(5 * 8))
         )
-        box_np = np.frombuffer(read_and_crc(8 * 9), dtype=np.float64).reshape(3, 3)
+        box_np = np.frombuffer(read_and_crc(8 * 9), dtype=np.float64).reshape(3, 3).copy()
         box = PeriodicBox(box_np[0], box_np[1], box_np[2])
         pos = np.frombuffer(read_and_crc(8 * 3 * n_atoms), dtype=np.float64).reshape(
             n_atoms, 3
-        )
+        ).copy()
         vel = np.frombuffer(read_and_crc(8 * 3 * n_atoms), dtype=np.float64).reshape(
             n_atoms, 3
-        )
+        ).copy()
 
         ref_crc = struct.unpack("<I", f.read(8))[0]
         if crc != ref_crc:

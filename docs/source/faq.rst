@@ -2,8 +2,8 @@
 Frequently Asked Questions
 ==========================
 
-How much of Martini / .top files is implemented
------------------------------------------------
+Which Martini .top files are supported
+--------------------------------------
 
 More than other OpenMM implementations of ``.top`` parsing to date, but not fully everything!
 
@@ -22,7 +22,7 @@ Specifying the GPU and CPU cores to use
 ---------------------------------------
 
 Pass ``context_parameters={"DeviceIndex": "0"}`` to the constructor of ``Simulation`` to choose GPU 0.
-If passing context parameters, it is also recommended to specify the platform (e.g. ``platform=CUDA``) when
+If passing context parameters, it is also recommended to specify the platform (e.g. ``platform="CUDA"``) when
 constructing ``Simulation``.
 
 Selecting CPU cores for the simulation can be done with the ``taskset`` command. For example,

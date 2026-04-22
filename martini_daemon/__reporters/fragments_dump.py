@@ -23,7 +23,7 @@ class FragmentsDump(Reporter):
 
         The purpose of this reporter is to facilitate debugging graph matching.
 
-        Uses the file extension ``.all_fragments``.
+        Uses the file extension ``.fragments_dump``.
         Due to the debug-oriented nature of this format,
         no commitments are made to keep this format forward or backward compatible.
         Due to the debug-oriented nature of this format, it will not be truncated when continuing simulations
@@ -32,11 +32,10 @@ class FragmentsDump(Reporter):
         pass
 
     def on_simulation_start(self, simulation, continue_sim: bool):
-        self.handle = open(simulation.request_path(".all_fragments", copy=continue_sim), "a")
+        self.handle = open(simulation.request_path(".fragments_dump", copy=continue_sim), "a")
         n = simulation.system.num_atoms()
         assert n > 0
         if not continue_sim:
-            self.handle.write("# Format: Fragment List Dump\n")
             self.handle.write("# Written by Martini Daemon FragmentsDump\n")
         write_frame(self.handle, simulation)
 

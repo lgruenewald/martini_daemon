@@ -7,6 +7,9 @@ from .reaction_reporter import ReactionReporter
 
 
 class CheckpointReporter(Reporter):
+    def on_simulation_finish(self, simulation) -> None:
+        pass
+
     def __init__(self, n_checkpoints: int = 3) -> None:
         """Create a Checkpoint Reporter.
 
@@ -60,22 +63,25 @@ class CheckpointReporter(Reporter):
 
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
         self.paths = [
-            simulation.request_path(f".chk{i + 1 if i > 0 else ''}", copy=True)
+            simulation.request_path(f".chk{i + 1 if i > 0 else ''}", copy=continue_sim)
             for i in range(self.n_checkpoints + 1)
         ]
         self.tmp_path: str = simulation.request_path(".chk_tmp")
 
-    def on_trajectory(self, sim: Simulation) -> None:
+    def on_trajectory_frame(self, sim: Simulation) -> None:
         # increment the number on checkpoint files
         for i in range(self.n_checkpoints, 0, -1):
             # if n=3, will count down as 3, 2, 1
-            os.rename(self.paths[i - 1], self.paths[i])
+            if os.path.exists(self.paths[i - 1]):
+                os.rename(self.paths[i - 1], self.paths[i])
 
         # make the new checkpoint
         pos, box = sim.context.get_positions()
         vel = sim.context.get_velocities()
         write_checkpoint(
             self.tmp_path,
+            # hacky, but simulation does not expose sim name otherwise so reporters are forced to use request_path
+            self.tmp_path.removesuffix(".chk_tmp"),
             sim.current_step,
             sim.trajectory_frame,
             sim.reactions_so_far,
@@ -90,7 +96,8 @@ class CheckpointReporter(Reporter):
         os.rename(self.tmp_path, self.paths[0])
 
         # delete the oldest checkpoint only as a final step
-        os.remove(self.paths[-1])
+        if os.path.exists(self.paths[-1]):
+            os.remove(self.paths[-1])
 
 
 class CheckpointLoader(Simulation):

@@ -30,7 +30,7 @@ tests = [
 ]
 
 
-def get_sim(top: str, gro: str) -> list[tuple[int, str, list[list[int]]]]:
+def get_sim(top: str, gro: str) -> list[tuple[int, str, list[tuple[str, int, list[int]]]]]:
     """Run a single frame detection algorithm and return the reactions."""
     rep = ReactionReporter()
     sim = Simulation(top, gro, 0, reporters=[rep])
@@ -52,7 +52,7 @@ def compare(
         # output them
         assert r1 == r2, f"Name differs. {dump}"
         assert len(frags1) == len(frags2), "second len check" + dump
-        for atoms1, atoms2 in zip(frags1, frags2):
+        for (_, _, atoms1), (_, _, atoms2) in zip(frags1, frags2):
             assert len(atoms1) == len(atoms2), "third len check" + dump
             for atom1, atom2 in zip(atoms1, atoms2):
                 assert atom1 == atom2, f"Atom differs. {dump}"

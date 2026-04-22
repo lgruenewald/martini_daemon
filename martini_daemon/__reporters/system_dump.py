@@ -46,7 +46,7 @@ class SystemDump(Reporter):
         * to facilitate debugging reactions,
         * it is also used in the modification algorithm unit tests.
 
-        Uses the file extension ``.sstar``.
+        Uses the file extension ``.system_dump``.
         Due to the debug-oriented nature of this format,
         no commitments are made to keep this format forward or backward compatible.
         Due to the debug-oriented nature of this format, it will not be truncated when continuing simulations
@@ -55,12 +55,11 @@ class SystemDump(Reporter):
         pass
 
     def on_simulation_start(self, simulation, continue_sim: bool):
-        self.handle = open(simulation.request_path(".sstar", copy=continue_sim), "a")
+        self.handle = open(simulation.request_path(".system_dump", copy=continue_sim), "a")
         n = simulation.system.num_atoms()
         assert n > 0
         if not continue_sim:
-            self.handle.write(".sstar", "Format: SStar Dump")
-            self.handle.write(".sstar", "# Written by Martini Daemon SystemDump")
+            self.handle.write("# Written by Martini Daemon SystemDump\n")
         write_frame(self.handle, simulation)
 
     def on_simulation_finish(self, simulation) -> None:

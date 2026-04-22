@@ -122,8 +122,10 @@ The dimer was parametrized as:
 
 The additional bond, angles and dihedrals connecting the two monomer units are indicated with comments.
 
-Defining reactants
-------------------
+Creating reactant graphs
+------------------------
+
+
 
 Defining reaction templates
 ---------------------------
