@@ -32,6 +32,7 @@ tests = [
 def get_topology(path: str) -> TopStar:
     """Return a TopStar instance from a topology file."""
     sim = Simulation(path, None, 0, [])
+    sim.finish()
     return sim.top
 
 

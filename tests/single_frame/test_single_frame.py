@@ -123,6 +123,7 @@ class TestSingleFrame:
             assert r_diff < r_tol, (
                 f"Constraint/VSite position moved by {r_diff} nm (particle {i})."
             )
+        sim.finish()
 
     def compare_daemon_gmx(self) -> None:
         """Compare Martini Daemon and GROMACS energies and forces."""
@@ -138,6 +139,7 @@ class TestSingleFrame:
                 forces[i * 3] = 0.0
                 forces[i * 3 + 1] = 0.0
                 forces[i * 3 + 2] = 0.0
+        sim.finish()
 
         if energy != 0.0:
             e_diff = math.fabs(self.gmx_energy / energy - 1)

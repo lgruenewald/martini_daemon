@@ -63,6 +63,7 @@ def test_integration(x: str, rootdir: str) -> None:
     sim.context.minimize_energy()
     sim.context.generate_velocities(298)
     sim.simulate()
+    sim.finish()
 
     for filename in glob.glob("./out*"):
         os.remove(filename)
