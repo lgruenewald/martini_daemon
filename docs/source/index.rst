@@ -5,7 +5,6 @@
    :maxdepth: 2
    :caption: Contents
 
-   tutorial
    user_guide
    faq
    toptraj

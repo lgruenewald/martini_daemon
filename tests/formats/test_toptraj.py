@@ -25,21 +25,20 @@ def rootdir(request: pytest.FixtureRequest) -> str:
 def test_toptraj_writer(rootdir: str) -> None:
     """Write a .toptraj file with random data and read it back to compare."""
     os.chdir(rootdir)
-    tmp_file = ".out.toptraj"
-    w = TopTrajWriter(tmp_file, "example title", [("a", 1), ("b", 2), ("c", 3)])
 
     print("generating data")
     # generate data
     n_frames = 100
     frames = [{} for _ in range(n_frames)]
 
+    n_atoms = 5000
+    res_names = [get_random_name() for _ in range(n_atoms)]
+    res_ids = list(np.random.randint(1, high=n_atoms, size=n_atoms))
+
     for frame_num, frame in enumerate(frames):
-        n_atoms = np.random.randint(2000, 3000)
         frame["n_atoms"] = n_atoms
         frame["names"] = [get_random_name() for _ in range(n_atoms)]
         frame["types"] = [get_random_name() for _ in range(n_atoms)]
-        frame["res_names"] = [get_random_name() for _ in range(n_atoms)]
-        frame["res_ids"] = np.random.randint(1, high=n_atoms, size=n_atoms)
         frame["charges"] = np.random.rand(n_atoms) * 2.0 - 1.0
         frame["masses"] = np.random.rand(n_atoms) * 50.0
         n_bonds = np.random.randint(1000, 5000)
@@ -53,6 +52,12 @@ def test_toptraj_writer(rootdir: str) -> None:
         # and write it to file
 
     print("writing it to file")
+    tmp_file = ".out.toptraj"
+    w = TopTrajWriter(
+        tmp_file, "example title", [("a", 1, 1), ("b", 2, 1), ("c", n_atoms - 3, 1)],
+        res_names, res_ids,
+    )
+
     for frame_num, frame in enumerate(frames):
         w.new_frame(
             frame_num,
@@ -62,8 +67,6 @@ def test_toptraj_writer(rootdir: str) -> None:
         )
         w.write_frame_atoms(
             frame["names"],
-            frame["res_names"],
-            frame["res_ids"],
             frame["types"],
             frame["charges"],
             frame["masses"],
@@ -75,9 +78,9 @@ def test_toptraj_writer(rootdir: str) -> None:
     print("reading from file and verifying")
     r = TopTrajReader(tmp_file)
     assert r.title == b"example title"
-    assert r.initial_molecules[0] == (b"a", 1)
-    assert r.initial_molecules[1] == (b"b", 2)
-    assert r.initial_molecules[2] == (b"c", 3)
+    assert r.initial_molecules[0] == (b"a", 1, 1)
+    assert r.initial_molecules[1] == (b"b", 2, 1)
+    assert r.initial_molecules[2] == (b"c", n_atoms - 3, 1)
 
     for i, frame in enumerate(frames):
         f = r.read_frame()
@@ -88,11 +91,11 @@ def test_toptraj_writer(rootdir: str) -> None:
         assert f.n_atoms == frame["n_atoms"]
         for j in range(f.n_atoms):
             assert f.names[j] == frame["names"][j].encode("utf-8")
-            assert f.res_names[j] == frame["res_names"][j].encode("utf-8")
+            assert f.res_names[j] == res_names[j].encode("utf-8")
             assert f.atom_types[j] == frame["types"][j].encode("utf-8")
             assert isclose(f.charges[j], frame["charges"][j], rel_tol=1e-5)
             assert isclose(f.masses[j], frame["masses"][j], rel_tol=1e-5)
-            assert f.res_ids[j] == frame["res_ids"][j]
+            assert f.res_ids[j] == res_ids[j]
         assert len(f.bonds) == len(frame["bonds"].to_list())
         # Note: if this fails in the future, consider if the order (i, j) and (j, i) is not inverted
         # currently there is a fixed order in to_list, which the writer also calls, so a simple equality is fine

@@ -9,10 +9,16 @@ from martini_daemon import (
     ReactionReporter,
     Reporter,
     Simulation,
+    TopTrajReporter,
     TrajectoryReporter,
     VariablesReporter,
+    System
 )
 
+class FakeSystem(System):
+    def __init__(self) -> None:
+        super().__init__()
+        self.additional_data["title"] = "placeholder"
 
 class FakeSimulation(Simulation):
     def __init__(self, base: str, reporters: list[Reporter], continue_sim: bool):
@@ -22,6 +28,7 @@ class FakeSimulation(Simulation):
         self.time_ps = 0.02 * 3000
         self.base = base
         self.reporters = reporters
+        self.system = FakeSystem()
         for r in reporters:
             r.on_simulation_start(self, continue_sim)
 
@@ -53,11 +60,13 @@ formats = [
     (".reactions", ReactionReporter, "r"),
     (".rxener", ReactionEnergyReporter, "r"),
     (".xtc", TrajectoryReporter, "rb"),
+    (".toptraj", TopTrajReporter, "rb"),
 ]
 
 
 @pytest.mark.parametrize("format_", formats)
-def test_truncation(rootdir: str, format_: tuple[str, type[Reporter]]) -> None:
+def test_truncation(rootdir: str, format_: tuple[str, type[Reporter], str]) -> None:
+    """Truncate a source file, compare with reference."""
     extension, reporter, mode = format_
     os.chdir(rootdir)
     os.chdir("to_truncate")

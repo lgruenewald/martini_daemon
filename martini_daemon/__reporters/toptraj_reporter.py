@@ -8,14 +8,20 @@ class TopTrajReporter(Reporter):
         self.writer: TopTrajWriter | None = None
 
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool):
-        if continue_sim:
-            raise NotImplementedError()  # TODO
         title = simulation.system.additional_data.get("title")
         assert type(title) is str
+        init_mols = []
+        for name, n in simulation.system.initial_molecules:
+            n_atoms_per = len(simulation.system.molecule_types[name].atoms)
+            init_mols.append((name, n, n_atoms_per))
         self.writer = TopTrajWriter(
             simulation.request_path(".toptraj"),
             title,
-            simulation.system.initial_molecules,
+            init_mols,
+            simulation.system.get_res_names(),
+            simulation.system.get_res_ids(),
+            append=continue_sim,
+            truncate=simulation.current_step
         )
 
     def on_trajectory_frame(self, simulation):
@@ -28,8 +34,6 @@ class TopTrajReporter(Reporter):
         )
         self.writer.write_frame_atoms(
             simulation.system.get_atom_names(),
-            simulation.system.get_res_names(),
-            simulation.system.get_res_ids(),
             simulation.system.get_types(),
             simulation.system.get_charges(),
             simulation.system.get_masses(),

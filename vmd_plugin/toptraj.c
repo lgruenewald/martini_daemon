@@ -5,307 +5,32 @@
 TODO:
 - selections other than all atoms
 - deleting frames
+- deleting traces
 - everything here is prototype quality, fix that
     - use the Obj interface instead of string for tcl
     - non orthogonal pbc
-    - some stuff really needs to be refactored into sub-functions instead of copy pasted around
-    - improve error handling
 */
 
 #define PKG_NAME "toptraj"
 #define VERSION "0.1"
 
-#include <math.h>
 #include <assert.h>
+#include <fcntl.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <tcl.h>
 #include <tclDecls.h>
 #include <zconf.h>
 #include <zlib.h>
 
-/* Streaming compressed file reader */
-typedef struct
-{
-    // error handling
-    bool is_err;
-    char *error_msg; // always static string
-
-    FILE *file;
-
-    char *header;
-    struct z_stream_s stream;
-
-    size_t chunk_size;
-    Bytef *chunk_in;
-    Bytef *chunk_out;
-
-    // within chunk_out, where are we at
-    size_t read_out;
-
-    // whether there is any compressed file or avail_in left.
-    // NOT WHETHER THERE IS ANY DECOMPRESSED OUTPUT LEFT.
-    bool stream_over;
-
-    // current value of crc
-    uLong crc;
-} CompressedReader;
-
-
-/// reads as much of the file into chunk as possible into the chunk
-/// if stream.avail_in > 0, copies the leftovers first
-/// sets stream.next_in and stream.avail_in
-static void read_file_into_chunk(CompressedReader *reader) {
-    if (reader->stream.avail_in > 0) {
-        memmove(
-            reader->chunk_in,
-            reader->stream.next_in,
-            reader->stream.avail_in
-        );
-    }
-    const size_t read_from_file = reader->chunk_size - reader->stream.avail_in;
-    const size_t read = fread(&reader->chunk_in[reader->stream.avail_in], 1, read_from_file, reader->file);
-    reader->stream.next_in = reader->chunk_in;
-    reader->stream.avail_in += read;
-
-    
-    if (reader->stream.avail_in == 0) {
-        reader->stream_over = true;
-    }
-}
-
-/// consumes as much of avail_in as possible, writing it to chunk_out
-/// must only be called once all of chunk_out has been fully read (read_out must be == size-stream.avail_out).
-static void decompress_into_chunk(CompressedReader *reader) {
-    assert(
-        reader->read_out == reader->chunk_size - reader->stream.avail_out
-    );
-    reader->stream.avail_out = reader->chunk_size;
-    reader->stream.next_out = reader->chunk_out;
-    reader->read_out = 0;
-    const int ret = inflate(&reader->stream, Z_SYNC_FLUSH);
-    switch (ret) {
-        case Z_NEED_DICT:
-        case Z_DATA_ERROR:
-        case Z_STREAM_ERROR:
-            inflateEnd(&reader->stream);
-            reader->is_err = true;
-            reader->error_msg = "Couldn't decompress. Incomplete or corrupt zlib compressed data.";
-            return;
-        case Z_MEM_ERROR:
-            inflateEnd(&reader->stream);
-            reader->is_err = true;
-            reader->error_msg = "Couldn't allocate memory.";
-            return;
-        default:;
-    }
-}
-
-/// will read n compressed bytes, and error if it is unable to do so.
-static char *read_bytes(CompressedReader *reader, const size_t n) {
-    char *res = malloc(n+1);
-    res[n] = 0;
-    for (size_t i = 0; i < n; i++) {
-        if (reader->read_out == reader->chunk_size - reader->stream.avail_out) {
-            // we ran out of chunk_out
-            if (reader->stream_over)
-            {
-                reader->is_err = true;
-                reader->error_msg = "Stream ended prematurely.";
-                return res;
-            }
-            read_file_into_chunk(reader);
-            decompress_into_chunk(reader);
-        }
-
-        res[i] = (char)reader->chunk_out[reader->read_out];
-        reader->read_out++;
-    }
-    if (reader->stream_over)
-    {
-        inflateEnd(&reader->stream);
-    }
-    reader->crc = crc32(reader->crc, (Bytef *)res, n);
-    return res;
-}
-
-// is there any more decompressed output
-static bool is_over(CompressedReader *reader) {
-    // all is still "available" to decompress -> nothing was decompressed
-    read_file_into_chunk(reader);
-    return reader->stream_over && (reader->read_out == reader->chunk_size - reader->stream.avail_out);
-}
-
-
-// names based on the python "struct" codes
-static CompressedReader *new_compressed_reader(const char *path) {
-    CompressedReader *res = (CompressedReader *)calloc(sizeof(CompressedReader), 1);
-    res->is_err = false;
-    res->stream_over = false;
-    FILE *file = fopen(path, "rb");
-    if (file == NULL) {
-        res->is_err = true;
-        res->error_msg = "File not found.";
-        return res;
-    }
-    res->file = file;
-    res->crc = crc32(0L, Z_NULL, 0);
-
-    const size_t uncompressed_header_size = 8;
-    res->header = calloc(uncompressed_header_size, sizeof(char));
-    if (fread(res->header, 1, uncompressed_header_size, file) < uncompressed_header_size) {
-        res->is_err = true;
-        res->error_msg = "File too short, can't read header.";
-        return res;
-    }
-    res->crc = crc32(res->crc, (Bytef *)res->header, uncompressed_header_size);
-
-    res->chunk_size = 1 << 20; // 1 MB
-    res->chunk_in = (Bytef *)malloc(res->chunk_size);
-    res->chunk_out = (Bytef *)malloc(res->chunk_size);
-
-    res->stream.zalloc = Z_NULL;
-    res->stream.zfree = Z_NULL;
-    res->stream.opaque = Z_NULL;
-    res->stream.avail_in = 0;
-    res->stream.next_in = NULL;
-    res->stream.avail_out = res->chunk_size;
-    res->stream.next_out = res->chunk_out;
-
-    read_file_into_chunk(res);
-
-    if (inflateInit(&res->stream) != Z_OK) {
-        res->is_err = true;
-        res->error_msg = "Couldn't initialize zlib stream.";
-        return res;
-    }
-
-    decompress_into_chunk(res);
-
-    return res;
-}
-
-static void free_compressed_reader(CompressedReader *reader) {
-    if (reader->chunk_out != NULL)
-        free(reader->chunk_out);
-    if (reader->chunk_in != NULL)
-        free(reader->chunk_in);
-    if (reader->file != NULL) {
-        fclose(reader->file);
-        reader->file = NULL;
-    }
-}
-
-static char *read_s(CompressedReader *reader) {
-    char *n_bytes_buf = read_bytes(reader, 1);
-    const unsigned char n_bytes = *n_bytes_buf;
-    free(n_bytes_buf);
-
-    char *res = read_bytes(reader, n_bytes);
-    return res;
-}
-static size_t read_Q(CompressedReader *reader) {
-    char *n_bytes_buf = read_bytes(reader, 8);
-    // we assume little endian machine
-    const size_t res = *(size_t *)n_bytes_buf;
-    free(n_bytes_buf);
-    return res;
-}
-static uint32_t read_I(CompressedReader *reader) {
-    char *n_bytes_buf = read_bytes(reader, 4);
-    // we assume little endian machine
-    const uint32_t res = *(uint32_t *)n_bytes_buf;
-    free(n_bytes_buf);
-    return res;
-}
-static float read_f(CompressedReader *reader) {
-    char *n_bytes_buf = read_bytes(reader, 4);
-    // we assume little endian machine
-    const float res = *(float *)n_bytes_buf;
-    free(n_bytes_buf);
-    return res;
-}
-static double read_d(CompressedReader *reader) {
-    char *n_bytes_buf = read_bytes(reader, 8);
-    // we assume little endian machine
-    const double res = *(double *)n_bytes_buf;
-    free(n_bytes_buf);
-    return res;
-}
-static char *read_Is(CompressedReader *reader, const size_t n) {
-    size_t cap = n * 8;
-    size_t len = 0;
-    char *res = malloc(cap+1);
-    for (size_t i = 0; i < n; i++) {
-        const uint32_t I = read_I(reader);
-        int extra = snprintf(&res[len], cap-len, "%u ", I);
-        assert(extra >= 0);
-        while (len + extra > cap)
-        {
-            cap *= 2;
-            res = realloc(res, cap+1);
-            assert(res != NULL);
-        }
-        extra = snprintf(&res[len], cap-len, "%u ", I);
-        assert(extra >= 0);
-        assert(len + extra <= cap);
-        len += extra;
-    }
-    res = realloc(res, len+1);
-    assert(res != NULL);
-    res[len] = 0;
-    return res;
-}
-static char *read_fs(CompressedReader *reader, const size_t n) {
-    size_t cap = n * 8;
-    size_t len = 0;
-    char *res = malloc(cap+1);
-    for (size_t i = 0; i < n; i++) {
-        const float f = read_f(reader);
-        int extra = snprintf(&res[len], cap-len, "%.1f ", f);
-        assert(extra >= 0);
-        while (len + extra > cap)
-        {
-            cap *= 2;
-            res = realloc(res, cap+1);
-            assert(res != NULL);
-        }
-        extra = snprintf(&res[len], cap-len, "%.1f ", f);
-        assert(extra >= 0);
-        assert(len + extra <= cap);
-        len += extra;
-    }
-    res = realloc(res, len+1);
-    assert(res != NULL);
-    res[len] = 0;
-    return res;
-}
-static char *read_ss(CompressedReader *reader, const size_t n) {
-    size_t cap = n * 8;
-    size_t len = 0;
-    char *res = malloc(cap+1);
-    for (size_t i = 0; i < n; i++) {
-        char *s = read_s(reader);
-        const size_t extra = strlen(s);
-        while (len + extra + 1 > cap)
-        {
-            cap *= 2;
-            res = realloc(res, cap+1);
-            assert(res != NULL);
-        }
-        memcpy(&res[len], s, extra);
-        res[len+extra] = ' ';
-        len += extra + 1;
-        free(s);
-    }
-    res = realloc(res, len+1);
-    assert(res != NULL);
-    res[len] = 0;
-    return res;
-}
+/* TYPES */
 
 typedef struct bond {
     uint32_t bi;
@@ -317,6 +42,172 @@ typedef struct vec3 {
     float y;
     float z;
 } Vec3;
+
+typedef struct chunk {
+    size_t index;
+    size_t len;
+    char *content;
+} Chunk;
+
+typedef struct {
+    bool is_err;
+    char *error_msg;
+
+    // metadata of how it was made
+    char *path;
+    int molid;
+    int remove_pbc_crossing;
+
+    // read from VMD trajectory
+    size_t n_atoms;
+
+    // data loaded into memory
+    // mmap'd file
+    int fd;
+    size_t fsize;
+    char *content;
+
+    // per simulation data
+    char *resnames;
+    char *resids;
+
+    // per frame data
+    // number of frames loaded
+    size_t n_frames;
+    // current capacity of frames
+    size_t cap_frames;
+    // pointer to the start of frames on disk, into the mmap'd file
+    char **frames;
+} TopTrajData;
+
+/// Decompress the buffer in, write decompressed to out.
+static void decompress(
+    TopTrajData *data,
+    char *in, size_t in_len,
+    char *out, size_t out_len,
+    uint32_t crc32_expected
+) {
+    struct z_stream_s stream;
+    stream.zalloc = Z_NULL;
+    stream.zfree = Z_NULL;
+    stream.opaque = Z_NULL;
+    assert(in_len < INT32_MAX);
+    assert(out_len < INT32_MAX);
+    stream.avail_in = in_len;
+    stream.avail_out = out_len;
+    stream.next_in = (Bytef *)in;
+    stream.next_out = (Bytef *)out;
+
+    if (inflateInit(&stream) != Z_OK) {
+        data->error_msg = "Couldn't initialize zlib stream.";
+        data->is_err = true;
+        return;
+    }
+    
+    for (;;) {
+        const int ret = inflate(&stream, Z_NO_FLUSH);
+        switch (ret) {
+            case Z_NEED_DICT:
+            case Z_DATA_ERROR:
+            case Z_STREAM_ERROR:
+                data->error_msg = "Couldn't decompress. Incomplete or corrupt zlib compressed data.";
+                data->is_err = true;
+                goto finish;
+            case Z_MEM_ERROR:
+                data->error_msg = "Couldn't allocate memory.";
+                data->is_err = true;
+                goto finish;
+            case Z_STREAM_END:
+                goto finish;
+            default:;
+        }
+    }
+
+    finish:
+
+    inflateEnd(&stream);
+
+    if (data->is_err) {
+        return;
+    }
+
+    uint32_t crc32_disk = crc32(0, (Bytef *)out, out_len);
+    if (crc32_expected != crc32_disk) {
+        data->error_msg = "CRC32 Mismatch. Toptraj file is corrupt.";
+        data->is_err = true;
+        return;
+    }
+}
+
+static uint64_t parse_Q(Chunk *chunk) {
+    uint64_t res;
+    // assume little endian machine
+    memcpy(&res, &chunk->content[chunk->index], 8);
+    chunk->index += 8;
+    return res;
+}
+
+static uint32_t parse_I(Chunk *chunk) {
+    uint32_t res;
+    // assume little endian machine
+    memcpy(&res, &chunk->content[chunk->index], 4);
+    chunk->index += 4;
+    return res;
+}
+
+static float parse_f(Chunk *chunk) {
+    float res;
+    memcpy(&res, &chunk->content[chunk->index], 4);
+    chunk->index += 4;
+    return res;
+}
+
+static double parse_d(Chunk *chunk) {
+    double res;
+    memcpy(&res, &chunk->content[chunk->index], 8);
+    chunk->index += 8;
+    return res;
+}
+
+static char *read_s(Chunk *chunk) {
+    const uint8_t size = chunk->content[chunk->index];
+    const char *res = &chunk->content[chunk->index+1];
+    chunk->index += 1 + size;
+    char *s = malloc(size + 1);
+    memcpy(s, res, size);
+    s[size] = 0;
+    return s;
+}
+
+#define READ_X(fname, f, type, fmt) \
+static char *fname(Chunk *chunk, size_t n, long lim) { \
+    type nums[n]; \
+    size_t len = 0; \
+    for (size_t i = 0; i < n; i++) { \
+        nums[i] = f(chunk); \
+        if (lim <= 0 || i < lim) len += snprintf(NULL, 0, fmt, nums[i]); \
+    } \
+    char *res = malloc(len + 1); \
+    size_t c = 0; \
+    for (size_t i = 0; i < n; i++) { \
+        if (lim <= 0 || i < lim) c += sprintf(&res[c], fmt, nums[i]); \
+    } \
+    assert(c == len); \
+    assert(res[len] == 0); \
+    FREE \
+    return res; \
+}
+
+#define FREE
+READ_X(read_Is, parse_I, uint32_t, "%u ")
+READ_X(read_fs, parse_f, float, "%.1f ")
+#undef FREE
+#define FREE \
+for (size_t i = 0; i < n; i++) { \
+    free(nums[i]); \
+}
+READ_X(read_ss, read_s, char *, "%s ")
+#undef FREE
 
 static bool sorted_list_insert(Bond *sorted_bonds, size_t *sorted_len, Bond b) {
     // find where to insert
@@ -358,8 +249,8 @@ static bool sorted_list_insert(Bond *sorted_bonds, size_t *sorted_len, Bond b) {
     
 }
 
-static char *read_bonds(CompressedReader *reader, size_t n_atoms, int pbc, Vec3 box, Vec3 *coords) {
-    const size_t n_bonds = read_Q(reader);
+static char *read_bonds(Chunk *chunk, size_t n_atoms, long lim, int pbc, Vec3 box, Vec3 *coords) {
+    const size_t n_bonds = parse_Q(chunk);
 
     // sorted list of bonds
     size_t sorted_len = 0;
@@ -367,10 +258,15 @@ static char *read_bonds(CompressedReader *reader, size_t n_atoms, int pbc, Vec3 
     
     for (size_t i = 0; i < n_bonds; i++)
     {
-        Bond b = { read_I(reader), read_I(reader) };
+        Bond b = { parse_I(chunk), parse_I(chunk) };
         if (b.bi == b.bj) {
             // self bonding
             // forbidden by the file format, but we silently ignore it
+            continue;
+        }
+        if (b.bi >= n_atoms || b.bj >= n_atoms || (lim > 0 && (b.bi >= lim || b.bj >= lim))) {
+            // one of the forming atoms is out of range
+            // e.g. if solvent is removed from the trajectory
             continue;
         }
         if (pbc) {
@@ -444,84 +340,88 @@ static char *read_bonds(CompressedReader *reader, size_t n_atoms, int pbc, Vec3 
     return res;
 }
 
-static bool read_crc(CompressedReader *reader) {
-    const uint32_t reference = reader->crc;
-    const uint32_t crc = read_I(reader);
-    reader->crc = crc32(0L, Z_NULL, 0);;
-    return crc == reference;
+static Chunk *read_chunk(TopTrajData *data, Chunk *main) {
+    /// Decompress a single chunk and return its contents.
+    
+    if (main->index >= main->len) {
+        return NULL;
+    }
+
+    if (main->index + 24 >= main->len) {
+        data->error_msg = "Corrupt .toptraj, leftover bytes found.";
+        data->is_err = true;
+        return NULL;
+    }
+    
+    size_t len_comp = parse_Q(main);
+    size_t len_decomp = parse_Q(main);
+    char *content = malloc(len_decomp);
+    char *comp = &main->content[main->index];
+    main->index += len_comp;
+    uint32_t crc32 = parse_I(main);
+    
+    decompress(
+        data,
+        comp, len_comp,
+        content, len_decomp,
+        crc32
+    );
+
+    Chunk *chunk = (Chunk *)calloc(sizeof(Chunk), 1);
+    chunk->content = content;
+    chunk->len = len_decomp;
+    chunk->index = 0;
+
+    return chunk;
 }
 
-/* Global state */
-// sadly required, as the traces have to be reading information from somewhere
+static void skip_chunk(TopTrajData *data, Chunk *main) {
+    if (main->index >= main->len) {
+        return;
+    }
 
-typedef struct {
-    uint32_t frame_number;
-    uint32_t n_atoms;
-    size_t sim_step;
-    double sim_time_ns;
-    // these are stored as tcl lists, in their string representation
-    char *names;
-    char *resnames;
-    char *resids;
-    char *types;
-    char *charges;
-    char *masses;
-    char *bonds;
-} TopTrajFrame;
+    if (main->index + 24 >= main->len) {
+        data->error_msg = "Corrupt .toptraj, leftover bytes found.";
+        data->is_err = true;
+        return;
+    }
+    
+    size_t len_comp = parse_Q(main);
+    parse_Q(main); //len_decomp
 
-typedef struct {
-    bool is_err;
-    char *error_msg;
+    main->index += len_comp;
+    parse_I(main); //crc32
+}
 
-    // metadata of how it was made
-    char *path;
-    int molid;
-    int remove_pbc_crossing;
-    // data loaded into memory
-    // per simulation data
-
-    // per frame data
-    // number of frames loaded
-    size_t n_frames;
-    // current capacity of frames
-    size_t cap_frames;
-    TopTrajFrame **frames;
-} TopTrajData;
-
-static void free_frame(TopTrajFrame *frame) {
-    free(frame->names);
-    free(frame->resnames);
-    free(frame->resids);
-    free(frame->types);
-    free(frame->charges);
-    free(frame->masses);
-    free(frame->bonds);
-    free(frame);
+static void free_chunk(Chunk *chunk) {
+    free(chunk->content);
+    free(chunk);
 }
 
 static void free_toptraj(TopTrajData *data) {
-    for (size_t i = 0; i < data->n_frames; i++) {
-        free_frame(data->frames[i]);
-    }
     if (data->frames != NULL) {
         free(data->frames);
     }
     if (data->path != NULL) {
         free(data->path);
     }
+    if (data->content != NULL) {
+        munmap(data->content, data->fsize);
+    }
+    if (data->resids != NULL) {
+        free(data->resids);
+    }
+    if (data->resnames != NULL) {
+        free(data->resnames);
+    }
     free(data);
-}
-
-static char *clone_str(const char *src) {
-    char *res = malloc(strlen(src) + 1);
-    strcpy(res, src);
-    return res;
 }
 
 static TopTrajData *load_toptraj(Tcl_Interp *interp, const char *path, int molid, int pbc) {
     /// Reads .toptraj file at path and loads it into a dynamically allocated
     /// object, which it returns.
     /// While doing so, prints a progress bar on STDOUT.
+    /// 
     /// Prints error message to STDERR and returns NULL if there is any error.
     TopTrajData *res = (TopTrajData *)calloc(sizeof(TopTrajData), 1);
     res->is_err = false;
@@ -529,174 +429,124 @@ static TopTrajData *load_toptraj(Tcl_Interp *interp, const char *path, int molid
     res->molid = molid;
     res->remove_pbc_crossing = pbc;
     // clone path, as we do not own it
-    res->path = malloc(strlen(path) + 1);
+    res->path = strdup(path);
 
-    strcpy(res->path, path);
+    res->fd = open(path, O_RDONLY);
+    struct stat sb;
+    fstat(res->fd, &sb);
+    res->fsize = sb.st_size;
+    res->content = mmap(
+        NULL, res->fsize, PROT_READ, MAP_SHARED, res->fd, 0
+    );
+    if (res->content == MAP_FAILED) {
+        res->is_err = true;
+        res->error_msg = "Mapping the file into memory failed.";
+        return res;
+    }
+
+    Chunk main;
+    main.content = res->content;
+    main.len = res->fsize;
+    main.index = 0;
 
 #define CHECK_ERR \
-if (reader->is_err) { \
-    res->is_err = true; \
-    res->error_msg = reader->error_msg; \
-    free_compressed_reader(reader); \
+if (res->is_err) { \
     return res; \
 }
-    CompressedReader *reader = new_compressed_reader(path); CHECK_ERR
     // 1.0 magic number
-    if (strncmp(reader->header, "\xc0TOPTR\x01\0", 8) == 0) {
+    if (strncmp(main.content, "\xc0TOPTR\x01\0", 8) == 0) {
         printf("TopTraj file version is 1.0\n");
+        main.index += 8;
 
-        char *name = read_s(reader); CHECK_ERR
+        // SIM NAME
+        Chunk *header = read_chunk(res, &main);
+
+        if (res->is_err) {
+            return res;
+        }
+
+        // INITIAL MOLECULES
+        char *name = read_s(header);
         printf("Simulation name: %s\n", name);
-        const uint32_t n_initial_molecules = read_I(reader); CHECK_ERR
+        const uint32_t n_initial_molecules = parse_I(header);
         printf("Number of initial molecule types: %u\n", n_initial_molecules);
 
         for (uint32_t i = 0; i < n_initial_molecules; i++)
         {
-            char *molname = read_s(reader);
-            const uint32_t molcount = read_I(reader);
+            char *molname = read_s(header);
+            const uint32_t molcount = parse_I(header);
+            const uint32_t atoms_per_mol = parse_I(header);
             printf("Mol name: %s\n", molname);
             printf("Mol count: %u\n", molcount);
+            printf("Atoms per mol: %u\n", atoms_per_mol);
         }
 
-        if (!read_crc(reader)) {
-            free_compressed_reader(reader);
-            res->is_err = true;
-            res->error_msg = "CRC mismatch in header! .toptraj file is likely corrupt.";
-            return res;
-        }
+        int tcl_res;
 
-        res->cap_frames = 1000;
-        res->frames = calloc(sizeof(TopTrajFrame), res->cap_frames);
-        res->n_frames = 0;
-
+        // RESNAME, RESID
         char *atomselect = NULL;
-        if (pbc) {
-            char molid[64];
-            snprintf(molid, 64, "%i", res->molid);
-            int res = Tcl_VarEval(interp, "atomselect ", molid, " all", NULL);
-            if (res != TCL_OK) {
-                printf("TOPTRAJ FATAL: failed at atomselect: %s\n", Tcl_GetStringResult(interp));
-            }
-            atomselect = clone_str(Tcl_GetStringResult(interp));
+        char molid[64];
+        snprintf(molid, 64, "%i", res->molid);
+        tcl_res = Tcl_VarEval(interp, "atomselect ", molid, " all", NULL);
+        if (tcl_res != TCL_OK) {
+            printf("TOPTRAJ FATAL: failed at atomselect.\n");
         }
+        atomselect = strdup(Tcl_GetStringResult(interp));
+        tcl_res = Tcl_VarEval(interp, atomselect, " num", NULL);
+        if (tcl_res != TCL_OK) {
+            printf("TOPTRAJ FATAL: failed at num.\n");
+        }
+        long sel_atoms = atol(Tcl_GetStringResult(interp));
+
+        uint32_t n_atoms = parse_I(header);
+        res->resnames = read_ss(header, n_atoms, sel_atoms);
+        res->resids = read_Is(header, n_atoms, sel_atoms);
+
+
+        tcl_res = Tcl_VarEval(interp, atomselect, " set resname {", res->resnames, "}", NULL);
+        if (tcl_res != TCL_OK) {
+            printf("TOPTRAJ FATAL: failed at set resname.\n");
+        }
+        tcl_res = Tcl_VarEval(interp, atomselect, " set resid {", res->resids, "}", NULL);
+        if (tcl_res != TCL_OK) {
+            printf("TOPTRAJ FATAL: failed at set resid.\n");
+        }
+        tcl_res = Tcl_VarEval(interp, atomselect, " delete", NULL);
+        if (tcl_res != TCL_OK) {
+            printf("TOPTRAJ FATAL: failed at sel delete.\n");
+        }
+
+        free_chunk(header);
+
+        // SKIP OVER ALL FRAMES BUT SAVE OFFSETS
+        res->cap_frames = 1000;
+        res->frames = calloc(sizeof(char *), res->cap_frames);
+        res->n_frames = 0;
 
         size_t frame_index = 0;
         printf("\n");
-        while (!is_over(reader)) {
-            TopTrajFrame *frame = calloc(sizeof(TopTrajFrame), 1);
-            frame->frame_number = read_I(reader);
-            if (frame->frame_number != frame_index) {
-                // probably junk at the end of the file from a sim that
-                // was cancelled
-                printf("\nFrame %lu wrong frame index, stopping.", frame_index + 1);
-                free(frame);
-                break;
-            }
-            frame->n_atoms = read_I(reader);
-            frame->sim_step = read_Q(reader);
-            frame->sim_time_ns = read_d(reader);
 
-            frame->names = read_ss(reader, frame->n_atoms);
-            frame->resnames = read_ss(reader, frame->n_atoms);
-            frame->resids = read_Is(reader, frame->n_atoms);
-            frame->types = read_ss(reader, frame->n_atoms);
-            frame->charges = read_fs(reader, frame->n_atoms);
-            frame->masses = read_fs(reader, frame->n_atoms);
-
-            Vec3 *coords = NULL;
-            Vec3 box = {0., 0., 0.};
-            // if ignoring bonds that cross pbc, read out the coords
-            if (pbc) {
-                char frame_str[64];
-                snprintf(frame_str, 64, "%lu", frame_index);
-                char molid[64];
-                snprintf(molid, 64, "%i", res->molid);
-                int res = Tcl_VarEval(interp, atomselect, " frame ", frame_str, NULL);
-                if (res != TCL_OK) {
-                    printf("TOPTRAJ FATAL: failed at frame: %s\n", Tcl_GetStringResult(interp));
-                }
-                res = Tcl_VarEval(interp, atomselect, " num", NULL);
-                if (res != TCL_OK) {
-                    printf("TOPTRAJ FATAL: failed at num: %s\n", Tcl_GetStringResult(interp));
-                }
-                long n_atoms = atol(Tcl_GetStringResult(interp));
-                if (n_atoms != frame->n_atoms) {
-                    printf("TOPTRAJ FATAL: n_atoms mismatch. Selection has %li, while .toptraj has %u\n", n_atoms, frame->n_atoms);
-                }
-                res = Tcl_VarEval(interp, atomselect, " get x", NULL);
-                if (res != TCL_OK) {
-                    printf("TOPTRAJ FATAL: failed at get x: %s\n", Tcl_GetStringResult(interp));
-                }
-                char *xs = clone_str(Tcl_GetStringResult(interp));
-                res = Tcl_VarEval(interp, atomselect, " get y", NULL);
-                if (res != TCL_OK) {
-                    printf("TOPTRAJ FATAL: failed at get y: %s\n", Tcl_GetStringResult(interp));
-                }
-                char *ys = clone_str(Tcl_GetStringResult(interp));
-                res = Tcl_VarEval(interp, atomselect, " get z", NULL);
-                if (res != TCL_OK) {
-                    printf("TOPTRAJ FATAL: failed at get z: %s\n", Tcl_GetStringResult(interp));
-                }
-                char *zs = clone_str(Tcl_GetStringResult(interp));
-
-                coords = calloc(sizeof(Vec3), frame->n_atoms);
-                char *xp = xs;
-                char *yp = ys;
-                char *zp = zs;
-                for (size_t j = 0; j < frame->n_atoms; j++) {
-                    // strtof autoskips whitespace
-                    Vec3 v = {
-                        strtof(xp, &xp),
-                        strtof(yp, &yp),
-                        strtof(zp, &zp)
-                    };
-                    coords[j] = v;
-                }
-
-                res = Tcl_VarEval(interp, "molinfo ", molid, " get {a b c}", NULL);
-                if (res != TCL_OK) {
-                    printf("TOPTRAJ FATAL: failed at get pbc: %s\n", Tcl_GetStringResult(interp));
-                }
-                char *bs = clone_str(Tcl_GetStringResult(interp));
-                char *bp = bs;
-                box.x = strtof(bp, &bp);
-                box.y = strtof(bp, &bp);
-                box.z = strtof(bp, &bp);
-                free(bs);
-                free(xs);
-                free(ys);
-                free(zs);
-            }
-            
-            frame->bonds = read_bonds(reader, frame->n_atoms, pbc, box, coords);
-            if (!read_crc(reader)) {
-                free_frame(frame);
-                printf("Frame %lu CRC mismatch, stopping.", frame_index + 1);
-                break;
-            }
-            printf("\rFrame read successfully: %lu", frame_index + 1);
+        while (main.index < main.len) {
+            res->frames[frame_index] = &main.content[main.index];
+            skip_chunk(res, &main);
             frame_index++;
-            res->frames[res->n_frames] = frame;
+            printf("Loaded frame %lu\r", frame_index);
             res->n_frames++;
             if (res->n_frames >= res->cap_frames)
             {
                 res->cap_frames *= 2;
-                res->frames = realloc(res->frames, sizeof(TopTrajFrame) * res->cap_frames);
+                res->frames = realloc(res->frames, sizeof(char *) * res->cap_frames);
                 assert(res->frames != NULL);
             }
-
         }
         printf("\nRead %lu frames.\n", frame_index);
 
-        free_compressed_reader(reader);
-        return res;
-
     } else {
-        free_compressed_reader(reader);
         res->is_err = true;
         res->error_msg = "File is not a valid toptraj file, or the version is unknown.";
-        return res;
     }
+
+    return res;
 }
 
 
@@ -714,9 +564,20 @@ static char *on_frame_change(
     char molid[64];
     snprintf(molid, 64, "%i", toptraj->molid);
 
+
+#define FREE
 #define CHECK_RES(x) \
     if (res != TCL_OK) {\
+        FREE \
         printf("TOPTRAJ FATAL: Trace failed at " x ": %s\n", Tcl_GetStringResult(interp)); \
+        return NULL; \
+    }
+#define CHECK_TR \
+    if (toptraj->is_err) { \
+        printf("%s\n", toptraj->error_msg); \
+        toptraj->is_err = false; \
+        toptraj->error_msg = NULL; \
+        FREE \
         return NULL; \
     }
 
@@ -728,45 +589,139 @@ static char *on_frame_change(
         return NULL;
     }
 
-    char frame[64];
-    snprintf(frame, 64, "%li", c_frame);
+    char frame_str[64];
+    snprintf(frame_str, 64, "%li", c_frame);
 
     // ATOMSELECT
-    res = Tcl_VarEval(interp, "atomselect ", molid, " all frame ", frame, NULL);
+    res = Tcl_VarEval(interp, "atomselect ", molid, " all frame ", frame_str, NULL);
     CHECK_RES("atomselect")
 
-    const char *sel = Tcl_GetStringResult(interp);
-
-    // N_ATOMS
+    const char *sel = strdup(Tcl_GetStringResult(interp));
+#undef FREE
+#define FREE free(sel);
+    // NUMBER OF ATOMS IN SEL
     res = Tcl_VarEval(interp, sel, " num", NULL);
-    CHECK_RES("n_atoms")
-    int64_t n_atoms = atol(Tcl_GetStringResult(interp));
-    if (n_atoms != toptraj->frames[c_frame]->n_atoms) {
-        printf("TOPTRAJ FATAL: number of atoms does not match .toptraj.\n");
-        return NULL;
+    CHECK_RES("failed at num")
+    long sel_atoms = atol(Tcl_GetStringResult(interp));
+
+    // DECOMPRESS FRAME DATA
+    Chunk main;
+    main.content = toptraj->frames[c_frame];
+    main.index = 0;
+    main.len = toptraj->fsize - (main.content - toptraj->content);
+
+#undef FREE
+#define FREE \
+    if (chunk != NULL) free_chunk(chunk); \
+    if (names != NULL) free(names); \
+    if (types != NULL) free(types); \
+    if (charges != NULL) free(charges); \
+    if (masses != NULL) free(masses); \
+    if (bonds != NULL) free(bonds); \
+    free(sel);
+
+
+    Chunk *chunk = read_chunk(toptraj, &main);
+    char *names = NULL;
+    char *types = NULL;
+    char *charges = NULL;
+    char *masses = NULL;
+    char *bonds = NULL;
+    CHECK_TR
+
+    uint32_t frame_number = parse_I(chunk);
+    CHECK_TR
+    uint32_t n_atoms = parse_I(chunk);
+    CHECK_TR
+    size_t sim_step = parse_Q(chunk);
+    CHECK_TR
+    double sim_time_ns = parse_d(chunk);
+    CHECK_TR
+
+    names = read_ss(chunk, n_atoms, sel_atoms);
+    CHECK_TR
+    types = read_ss(chunk, n_atoms, sel_atoms);
+    CHECK_TR
+    charges = read_fs(chunk, n_atoms, sel_atoms);
+    CHECK_TR
+    masses = read_fs(chunk, n_atoms, sel_atoms);
+    CHECK_TR
+
+    // REMOVE PBC BONDS IF NEEDED
+    Vec3 *coords = NULL;
+    Vec3 box = {0., 0., 0.};
+    // if ignoring bonds that cross pbc, read out the coords
+    if (toptraj->remove_pbc_crossing) {
+        res = Tcl_VarEval(interp, sel, " get x", NULL);
+        if (res != TCL_OK) {
+            printf("TOPTRAJ FATAL: failed at get x: %s\n", Tcl_GetStringResult(interp));
+        }
+        char *xs = strdup(Tcl_GetStringResult(interp));
+        res = Tcl_VarEval(interp, sel, " get y", NULL);
+        if (res != TCL_OK) {
+            printf("TOPTRAJ FATAL: failed at get y: %s\n", Tcl_GetStringResult(interp));
+        }
+        char *ys = strdup(Tcl_GetStringResult(interp));
+        res = Tcl_VarEval(interp, sel, " get z", NULL);
+        if (res != TCL_OK) {
+            printf("TOPTRAJ FATAL: failed at get z: %s\n", Tcl_GetStringResult(interp));
+        }
+        char *zs = strdup(Tcl_GetStringResult(interp));
+
+        coords = calloc(sizeof(Vec3), n_atoms);
+        char *xp = xs;
+        char *yp = ys;
+        char *zp = zs;
+        for (size_t j = 0; j < n_atoms; j++) {
+            // strtof autoskips whitespace
+            Vec3 v = {
+                strtof(xp, &xp),
+                strtof(yp, &yp),
+                strtof(zp, &zp)
+            };
+            coords[j] = v;
+        }
+
+        res = Tcl_VarEval(interp, "molinfo ", molid, " get {a b c}", NULL);
+        if (res != TCL_OK) {
+            printf("TOPTRAJ FATAL: failed at get pbc: %s\n", Tcl_GetStringResult(interp));
+        }
+        char *bs = strdup(Tcl_GetStringResult(interp));
+        char *bp = bs;
+        box.x = strtof(bp, &bp);
+        box.y = strtof(bp, &bp);
+        box.z = strtof(bp, &bp);
+        free(bs);
+        free(xs);
+        free(ys);
+        free(zs);
     }
+    // READ BONDS
+            
+    bonds = read_bonds(
+        chunk, n_atoms, sel_atoms,
+        toptraj->remove_pbc_crossing, box, coords
+    );
 
     // SET ATOM PROPERTIES
 
-    res = Tcl_VarEval(interp, sel, " set name {", toptraj->frames[c_frame]->names, "}", NULL);
+    res = Tcl_VarEval(interp, sel, " set name {", names, "}", NULL);
     CHECK_RES("set name")
-    res = Tcl_VarEval(interp, sel, " set resname {", toptraj->frames[c_frame]->resnames, "}", NULL);
-    CHECK_RES("set resname")
-    res = Tcl_VarEval(interp, sel, " set resid {", toptraj->frames[c_frame]->resids, "}", NULL);
-    CHECK_RES("set resid")
-    res = Tcl_VarEval(interp, sel, " set type {", toptraj->frames[c_frame]->types, "}", NULL);
+    res = Tcl_VarEval(interp, sel, " set type {", types, "}", NULL);
     CHECK_RES("set type")
-    res = Tcl_VarEval(interp, sel, " set charge {", toptraj->frames[c_frame]->charges, "}", NULL);
+    res = Tcl_VarEval(interp, sel, " set charge {", charges, "}", NULL);
     CHECK_RES("set charge")
-    res = Tcl_VarEval(interp, sel, " set mass {", toptraj->frames[c_frame]->masses, "}", NULL);
+    res = Tcl_VarEval(interp, sel, " set mass {", masses, "}", NULL);
     CHECK_RES("set mass")
 
     // SETBONDS
-    res = Tcl_VarEval(interp, sel, " setbonds ", toptraj->frames[c_frame]->bonds, NULL);
+    res = Tcl_VarEval(interp, sel, " setbonds ", bonds, NULL);
     CHECK_RES("setbonds")
 
     res = Tcl_VarEval(interp, sel, " delete", NULL);
     CHECK_RES("delete")
+
+    FREE
 
     return NULL;
 }

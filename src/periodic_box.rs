@@ -1,8 +1,8 @@
-use std::collections::HashSet;
+use kdtree::{ErrorKind, KdTree, distance::squared_euclidean};
+use numpy::{Ix2, PyReadonlyArray2, PyReadwriteArray, PyUntypedArrayMethods};
 use pyo3::prelude::*;
-use numpy::{PyReadwriteArray, Ix2, PyUntypedArrayMethods, PyReadonlyArray2};
-use kdtree::{KdTree, distance::squared_euclidean, ErrorKind};
 use pyo3_stub_gen::{derive::gen_stub_pyclass, derive::gen_stub_pymethods};
+use std::collections::HashSet;
 
 use glam::DVec3;
 use pyo3::exceptions::PyValueError;
@@ -13,6 +13,9 @@ pub struct PeriodicBox {
     a: DVec3,
     b: DVec3,
     c: DVec3,
+    a_inv: DVec3,
+    b_inv: DVec3,
+    c_inv: DVec3,
 }
 
 /// All constructors of PeriodicBox should call this!
@@ -21,13 +24,20 @@ pub struct PeriodicBox {
 /// easier/faster to write for ourselves as well!
 fn sanitize(pbc: &PeriodicBox) -> PyResult<()> {
     if pbc.a.y != 0. || pbc.a.z != 0. || pbc.b.z != 0. {
-        return Err(PyValueError::new_err("a.y, a.z and b.z of periodic boxes must be 0."));
+        return Err(PyValueError::new_err(
+            "a.y, a.z and b.z of periodic boxes must be 0.",
+        ));
     }
     if pbc.a.x <= 0. || pbc.b.y <= 0. || pbc.c.z <= 0. {
-        return Err(PyValueError::new_err("a.x, b.y and c.z of periodic boxes must be positive."));
+        return Err(PyValueError::new_err(
+            "a.x, b.y and c.z of periodic boxes must be positive.",
+        ));
     }
-    if pbc.b.x.abs() * 2. > pbc.a.x || pbc.c.x.abs() * 2. > pbc.a.x || pbc.c.y.abs() * 2. > pbc.b.y {
-        return Err(PyValueError::new_err("b.x, c.x must be smaller in magnitude than a.x/2. Likewise c.y must be smaller in magnitude than b.y/2."))
+    if pbc.b.x.abs() * 2. > pbc.a.x || pbc.c.x.abs() * 2. > pbc.a.x || pbc.c.y.abs() * 2. > pbc.b.y
+    {
+        return Err(PyValueError::new_err(
+            "b.x, c.x must be smaller in magnitude than a.x/2. Likewise c.y must be smaller in magnitude than b.y/2.",
+        ));
     }
 
     Ok(())
@@ -47,7 +57,14 @@ impl PeriodicBox {
     /// This is validated, and will raise a PyValueError if these conditions are not met.
     #[new]
     pub fn new(a: [f64; 3], b: [f64; 3], c: [f64; 3]) -> PyResult<Self> {
-        let pbc = Self { a: a.into(), b: b.into(), c: c.into() };
+        let pbc = Self {
+            a: a.into(),
+            b: b.into(),
+            c: c.into(),
+            a_inv: DVec3::from(a).recip(),
+            b_inv: DVec3::from(b).recip(),
+            c_inv: DVec3::from(c).recip(),
+        };
         sanitize(&pbc)?;
         Ok(pbc)
     }
@@ -55,85 +72,96 @@ impl PeriodicBox {
     /// Create a PeriodicBox based on unit cell description, as found in Gro files.
     #[pyo3(signature = (ax, by, cz, ay=None, az=None, bx=None, bz=None, cx=None, cy=None))]
     #[staticmethod]
-    pub fn from_gro(ax: f64, by: f64, cz: f64, ay: Option<f64>, az: Option<f64>, bx: Option<f64>, bz: Option<f64>, cx: Option<f64>, cy: Option<f64>) -> PyResult<Self> {
-        let pbc = Self {
-            a: [ax, ay.unwrap_or(0.), az.unwrap_or(0.)].into(),
-            b: [bx.unwrap_or(0.), by, bz.unwrap_or(0.)].into(),
-            c: [cx.unwrap_or(0.), cy.unwrap_or(0.), cz].into()
-        };
-        sanitize(&pbc)?;
-        Ok(pbc)
+    pub fn from_gro(
+        ax: f64,
+        by: f64,
+        cz: f64,
+        ay: Option<f64>,
+        az: Option<f64>,
+        bx: Option<f64>,
+        bz: Option<f64>,
+        cx: Option<f64>,
+        cy: Option<f64>,
+    ) -> PyResult<Self> {
+        PeriodicBox::new(
+            [ax, ay.unwrap_or(0.), az.unwrap_or(0.)],
+            [bx.unwrap_or(0.), by, bz.unwrap_or(0.)],
+            [cx.unwrap_or(0.), cy.unwrap_or(0.), cz],
+        )
     }
-
 
     /// Represent this PeriodicBox as a string, in the .gro file format.
     pub fn to_gro(&self) -> String {
         if self.b.x == 0. && self.c.x == 0. && self.c.y == 0. {
-            format!(
-                "{} {} {}", self.a.x, self.b.y, self.c.z
-            )
+            format!("{} {} {}", self.a.x, self.b.y, self.c.z)
         } else {
             format!(
-                "{} {} {} {} {} {} {} {} {}", self.a.x, self.b.y, self.c.z, self.a.y, self.a.z, self.b.x, self.b.z, self.c.x, self.c.y
+                "{} {} {} {} {} {} {} {} {}",
+                self.a.x,
+                self.b.y,
+                self.c.z,
+                self.a.y,
+                self.a.z,
+                self.b.x,
+                self.b.z,
+                self.c.x,
+                self.c.y
             )
         }
     }
 
-
     /// Create a triclinic PeriodicBox based on unit cell vector components.
     #[staticmethod]
     pub fn triclinic(ax: f64, bx: f64, by: f64, cx: f64, cy: f64, cz: f64) -> PyResult<Self> {
-        let pbc = Self {
-            a: [ax, 0., 0.].into(),
-            b: [bx, by, 0.].into(),
-            c: [cx, cy, cz].into()
-        };
-        sanitize(&pbc)?;
-        Ok(pbc)
+        PeriodicBox::new([ax, 0., 0.], [bx, by, 0.], [cx, cy, cz])
     }
 
     /// Represent this PeriodicBox as a string, in the extended .xyz format Lattice parameter.
     pub fn to_lattice(&self) -> String {
         format!(
-            "{} {} {} {} {} {} {} {} {}", self.a.x, self.a.y, self.a.z, self.b.x, self.b.y, self.b.z, self.c.x, self.c.y, self.c.z
+            "{} {} {} {} {} {} {} {} {}",
+            self.a.x,
+            self.a.y,
+            self.a.z,
+            self.b.x,
+            self.b.y,
+            self.b.z,
+            self.c.x,
+            self.c.y,
+            self.c.z
         )
     }
 
     /// Create a cubic PeriodicBox based on a unit cell length.
     #[staticmethod]
     pub fn cubic(d: f64) -> PyResult<Self> {
-        if d <= 0. {
-            return Err(PyValueError::new_err("d must be positive."));
-        }
-        Ok(Self {
-            a: [d, 0., 0.].into(),
-            b: [0., d, 0.].into(),
-            c: [0., 0., d].into()
-        })
+        PeriodicBox::new([d, 0., 0.], [0., d, 0.], [0., 0., d])
     }
 
     /// Create an orthogonal PeriodicBox based on unit cell lengths.
     #[staticmethod]
     pub fn orthogonal(x: f64, y: f64, z: f64) -> PyResult<Self> {
-        if x <= 0. || y <= 0. || z <= 0. {
-            return Err(PyValueError::new_err("x, y, z must be positive."));
-        }
-        Ok(Self {
-            a: [x, 0., 0.].into(),
-            b: [0., y, 0.].into(),
-            c: [0., 0., z].into()
-        })
+        PeriodicBox::new([x, 0., 0.], [0., y, 0.], [0., 0., z])
     }
     /// Move atom within the same copy of the PBC.
     ///
     /// Note: moves it within the box 0,0,0 to a.x,b.y,c.z, not the box a,b,c.
     pub fn move_within(&self, v: [f64; 3]) -> [f64; 3] {
-        (
-            DVec3::from(v)
+        /*
+        (DVec3::from(v)
             - (v[0] / self.a.x).floor() * self.a
             - (v[1] / self.b.y).floor() * self.b
-            - (v[2] / self.c.z).floor() * self.c
-        ).into()
+            - (v[2] / self.c.z).floor() * self.c)
+            .into()
+        */
+        let mut pos = DVec3::from(v);
+        let scale3 = (pos.z * self.c_inv.z).floor();
+        pos -= scale3 * self.c;
+        let scale2 = (pos.y * self.b_inv.y).floor();
+        pos -= scale2 * self.b;
+        let scale1 = (pos.x * self.a_inv.x).floor();
+        pos -= scale1 * self.a;
+        pos.into()
     }
 
     /// Translate v by periodic box vectors so it is the closest possible to reference in non-periodic space.
@@ -143,8 +171,12 @@ impl PeriodicBox {
 
     /// Move_within but for 2D numpy arrays of positions of shape (n, 3).
     pub fn move_all_within(&self, mut array: PyReadwriteArray<f64, Ix2>) -> PyResult<()> {
-        if let [_, inner] = array.shape() && *inner != 3 {
-            return Err(PyValueError::new_err(format!("Invalid dimensions, expected Nx3, got (N, {inner})")))
+        if let [_, inner] = array.shape()
+            && *inner != 3
+        {
+            return Err(PyValueError::new_err(format!(
+                "Invalid dimensions, expected Nx3, got (N, {inner})"
+            )));
         }
 
         for v in array.as_slice_mut()?.chunks_mut(3) {
@@ -155,11 +187,20 @@ impl PeriodicBox {
     }
 
     /// Given a set of reference atoms, get which atoms are within a distance to any of the reference atoms.
-    pub fn which_atoms_within_distance(&self, positions: PyReadonlyArray2<f64>, reference: HashSet<usize>, r: f64) -> PyResult<HashSet<usize>> {
+    pub fn which_atoms_within_distance(
+        &self,
+        positions: PyReadonlyArray2<f64>,
+        reference: HashSet<usize>,
+        r: f64,
+    ) -> PyResult<HashSet<usize>> {
         let mut res: HashSet<usize> = HashSet::new();
         let r2 = r * r;
-        if let [_, inner] = positions.shape() && *inner != 3 {
-            return Err(PyValueError::new_err(format!("Invalid dimensions, expected Nx3, got (N, {inner})")))
+        if let [_, inner] = positions.shape()
+            && *inner != 3
+        {
+            return Err(PyValueError::new_err(format!(
+                "Invalid dimensions, expected Nx3, got (N, {inner})"
+            )));
         }
         let mut tree = KdTree::new(3);
         for atom in reference {
@@ -177,7 +218,11 @@ impl PeriodicBox {
             }
         }
         for i in 0..positions.shape()[0] {
-            match tree.nearest(&positions.get_item(i)?.extract::<[f64; 3]>()?, 1, &squared_euclidean) {
+            match tree.nearest(
+                &positions.get_item(i)?.extract::<[f64; 3]>()?,
+                1,
+                &squared_euclidean,
+            ) {
                 Ok(v) => {
                     for (dist, _) in v {
                         if dist < r2 {
@@ -187,10 +232,16 @@ impl PeriodicBox {
                 }
                 Err(e) => {
                     return match e {
-                        ErrorKind::WrongDimension => Err(PyValueError::new_err("Internal error: wrong dimension.")),
-                        ErrorKind::NonFiniteCoordinate => Err(PyValueError::new_err("Supplied positions contain a non-finite value.")),
-                        ErrorKind::ZeroCapacity => Err(PyValueError::new_err("Internal error: zero capacity."))
-                    }
+                        ErrorKind::WrongDimension => {
+                            Err(PyValueError::new_err("Internal error: wrong dimension."))
+                        }
+                        ErrorKind::NonFiniteCoordinate => Err(PyValueError::new_err(
+                            "Supplied positions contain a non-finite value.",
+                        )),
+                        ErrorKind::ZeroCapacity => {
+                            Err(PyValueError::new_err("Internal error: zero capacity."))
+                        }
+                    };
                 }
             }
         }
@@ -214,15 +265,12 @@ impl PeriodicBox {
 
     /// Get the lengths of the three unit cell vectors.
     pub fn cell_lengths(&self) -> [f64; 3] {
-        [
-            self.a.x,
-            self.b.length(),
-            self.c.length()
-        ]
+        [self.a.x, self.b.length(), self.c.length()]
     }
 
     /// Get the difference between two points in periodic space.
     pub fn diff(&self, v1: [f64; 3], v2: [f64; 3]) -> [f64; 3] {
+        /*
         let v1 = DVec3::from(self.move_within(v1));
         let v2: DVec3 = DVec3::from(self.move_within(v2));
         let diff = v1 - v2;
@@ -238,14 +286,25 @@ impl PeriodicBox {
             }
         }
         best.into()
+        */
+        let v1 = DVec3::from(v1);
+        let v2 = DVec3::from(v2);
+        let mut diff = v1 - v2;
+        let scale3 = (diff.z * self.c_inv.z + 0.5).floor();
+        diff -= scale3 * self.c;
+        let scale2 = (diff.y * self.b_inv.y + 0.5).floor();
+        diff -= scale2 * self.b;
+        let scale1 = (diff.x * self.a_inv.x + 0.5).floor();
+        diff -= scale1 * self.a;
+        diff.into()
     }
 
     /// Return whether the shortest path between two points crosses the periodic boundary condition,
     /// in a translation invariant manner.
     pub fn crosses_box(&self, v1: [f64; 3], v2: [f64; 3]) -> bool {
-        (self.distance_squared(v1, v2) - (DVec3::from(v1)-DVec3::from(v2)).length_squared()).abs() > 10e-8
+        (self.distance_squared(v1, v2) - (DVec3::from(v1) - DVec3::from(v2)).length_squared()).abs()
+            > 10e-8
     }
-
 
     /// Get the distance between two points in periodic space, squared.
     pub fn distance_squared(&self, v1: [f64; 3], v2: [f64; 3]) -> f64 {
@@ -273,10 +332,16 @@ impl PeriodicBox {
     ///
     /// Returned in order of alpha (b, c), beta (a, c), gamma (a, b).
     pub fn cell_angles(&self) -> [f64; 3] {
-        let alpha = (self.b.dot(self.c) / self.b.length() / self.c.length()).clamp(-1.0, 1.0).acos();
-        let beta = (self.a.dot(self.c) / self.a.length() / self.c.length()).clamp(-1.0, 1.0).acos();
-        let gamma = (self.a.dot(self.b) / self.a.length() / self.b.length()).clamp(-1.0, 1.0).acos();
-        [ alpha, beta, gamma ]
+        let alpha = (self.b.dot(self.c) / self.b.length() / self.c.length())
+            .clamp(-1.0, 1.0)
+            .acos();
+        let beta = (self.a.dot(self.c) / self.a.length() / self.c.length())
+            .clamp(-1.0, 1.0)
+            .acos();
+        let gamma = (self.a.dot(self.b) / self.a.length() / self.b.length())
+            .clamp(-1.0, 1.0)
+            .acos();
+        [alpha, beta, gamma]
     }
 
     /// Get the dihedral angle between four points in periodic space, in radians.
@@ -316,12 +381,12 @@ impl PeriodicBox {
         // two components can have a y
         // conservative behavior - we add the maximum deviation from orthogonal boxes to cutoff
         let y_cutoff = cutoff + self.c.y.abs();
-        if self.b.y + y_cutoff < y || y < - y_cutoff {
+        if self.b.y + y_cutoff < y || y < -y_cutoff {
             return false;
         }
         // three components can have an x
         let x_cutoff = cutoff + self.c.x.abs() + self.b.x.abs();
-        if self.a.x + x_cutoff < x || x < - x_cutoff {
+        if self.a.x + x_cutoff < x || x < -x_cutoff {
             return false;
         }
         true
