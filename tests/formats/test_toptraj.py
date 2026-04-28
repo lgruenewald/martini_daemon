@@ -53,55 +53,54 @@ def test_toptraj_writer(rootdir: str) -> None:
 
     print("writing it to file")
     tmp_file = ".out.toptraj"
-    w = TopTrajWriter(
+    with TopTrajWriter(
         tmp_file, "example title", [("a", 1, 1), ("b", 2, 1), ("c", n_atoms - 3, 1)],
         res_names, res_ids,
-    )
+    ) as w:
 
-    for frame_num, frame in enumerate(frames):
-        w.new_frame(
-            frame_num,
-            frame_num * 5000,
-            frame_num * 0.1,
-            frame["n_atoms"],
-        )
-        w.write_frame_atoms(
-            frame["names"],
-            frame["types"],
-            frame["charges"],
-            frame["masses"],
-        )
-        w.write_frame_bonds(frame["bonds"])
-        w.write_frame()
-    w.finish()
+        for frame_num, frame in enumerate(frames):
+            w.new_frame(
+                frame_num,
+                frame_num * 5000,
+                frame_num * 0.1,
+                frame["n_atoms"],
+            )
+            w.write_frame_atoms(
+                frame["names"],
+                frame["types"],
+                frame["charges"],
+                frame["masses"],
+            )
+            w.write_frame_bonds(frame["bonds"])
+            w.write_frame()
 
     print("reading from file and verifying")
-    r = TopTrajReader(tmp_file)
-    assert r.title == b"example title"
-    assert r.initial_molecules[0] == (b"a", 1, 1)
-    assert r.initial_molecules[1] == (b"b", 2, 1)
-    assert r.initial_molecules[2] == (b"c", n_atoms - 3, 1)
+    with TopTrajReader(tmp_file) as r:
+        assert r.title == b"example title"
+        assert r.initial_molecules[0] == (b"a", 1, 1)
+        assert r.initial_molecules[1] == (b"b", 2, 1)
+        assert r.initial_molecules[2] == (b"c", n_atoms - 3, 1)
 
-    for i, frame in enumerate(frames):
-        f = r.read_frame()
-        assert f is not None
-        assert f.sim_step == i * 5000
-        assert f.frame_index == i
-        assert isclose(f.sim_time, i * 0.1, rel_tol=1e-5)
-        assert f.n_atoms == frame["n_atoms"]
-        for j in range(f.n_atoms):
-            assert f.names[j] == frame["names"][j].encode("utf-8")
-            assert f.res_names[j] == res_names[j].encode("utf-8")
-            assert f.atom_types[j] == frame["types"][j].encode("utf-8")
-            assert isclose(f.charges[j], frame["charges"][j], rel_tol=1e-5)
-            assert isclose(f.masses[j], frame["masses"][j], rel_tol=1e-5)
-            assert f.res_ids[j] == res_ids[j]
-        assert len(f.bonds) == len(frame["bonds"].to_list())
-        # Note: if this fails in the future, consider if the order (i, j) and (j, i) is not inverted
-        # currently there is a fixed order in to_list, which the writer also calls, so a simple equality is fine
-        assert len(set(f.bonds) - set(frame["bonds"].to_list())) == 0
-        assert len(set(frame["bonds"].to_list()) - set(f.bonds)) == 0
+        for i, frame in enumerate(frames):
+            f = r.read_frame()
+            assert f is not None
+            assert f.sim_step == i * 5000
+            assert f.frame_index == i
+            assert isclose(f.sim_time, i * 0.1, rel_tol=1e-5)
+            assert f.n_atoms == frame["n_atoms"]
+            for j in range(f.n_atoms):
+                assert f.names[j] == frame["names"][j].encode("utf-8")
+                assert f.res_names[j] == res_names[j].encode("utf-8")
+                assert f.atom_types[j] == frame["types"][j].encode("utf-8")
+                assert isclose(f.charges[j], frame["charges"][j], rel_tol=1e-5)
+                assert isclose(f.masses[j], frame["masses"][j], rel_tol=1e-5)
+                assert f.res_ids[j] == res_ids[j]
+            assert len(f.bonds) == len(frame["bonds"].to_list())
+            # Note: if this fails in the future, consider if the order (i, j) and (j, i) is not inverted
+            # currently there is a fixed order in to_list, which the writer also calls, so a simple equality is fine
+            assert len(set(f.bonds) - set(frame["bonds"].to_list())) == 0
+            assert len(set(frame["bonds"].to_list()) - set(f.bonds)) == 0
 
-    assert r.read_frame() is None
+        assert r.read_frame() is None
 
     os.remove(tmp_file)

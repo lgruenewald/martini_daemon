@@ -33,7 +33,7 @@ def test_integration(x: str, rootdir: str) -> None:
     os.chdir(rootdir)
     os.chdir(x)
 
-    sim = Simulation(
+    with Simulation(
         "system.top",
         "system.gro",
         5000,
@@ -59,11 +59,10 @@ def test_integration(x: str, rootdir: str) -> None:
         250,
         1000,
         sim_name="out",
-    )
-    sim.context.minimize_energy()
-    sim.context.generate_velocities(298)
-    sim.simulate()
-    sim.finish()
+    ) as sim:
+        sim.context.minimize_energy()
+        sim.context.generate_velocities(298)
+        sim.simulate()
 
     for filename in glob.glob("./out*"):
         os.remove(filename)

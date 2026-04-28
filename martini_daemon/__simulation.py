@@ -1,5 +1,7 @@
 """Friendly Simulation API."""
 
+from __future__ import annotations
+
 import math
 import os
 import shutil
@@ -297,6 +299,12 @@ class Simulation:
 
         for r in self.__reporters:
             r.on_simulation_start(self, continue_sim)
+
+    def __enter__(self) -> Simulation:
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
+        self.finish()
 
     # File handles and loggers
     def request_path(self, suffix: str, copy: bool = False) -> str:

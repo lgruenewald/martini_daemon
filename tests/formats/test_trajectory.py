@@ -51,21 +51,20 @@ def test_read_write_trajectory(backend: str, rootdir: str) -> None:
 
     w.finish()
 
-    r = TrajectoryReader(tmp_path, backend)
-    for i in range(n_frames):
-        f = r.read_frame()
-        assert f is not None
-        (sim_step, sim_time, sim_pbc, sim_pos, sim_vel) = f
-        assert sim_step == i * steps_per_frame
-        assert np.isclose(sim_time, 5.0 * i, atol=1e-3)
-        assert np.allclose(sim_pbc.a, pbc.a, atol=1e-3)
-        assert np.allclose(sim_pbc.b, pbc.b, atol=1e-3)
-        assert np.allclose(sim_pbc.c, pbc.c, atol=1e-3)
-        assert np.allclose(pos[i], sim_pos, atol=1e-3)
-        if sim_vel is not None:
-            assert np.allclose(vel[i], sim_vel, atol=1e-3)
-    assert r.read_frame() is None
-    r.finish()
+    with TrajectoryReader(tmp_path, backend) as r:
+        for i in range(n_frames):
+            f = r.read_frame()
+            assert f is not None
+            (sim_step, sim_time, sim_pbc, sim_pos, sim_vel) = f
+            assert sim_step == i * steps_per_frame
+            assert np.isclose(sim_time, 5.0 * i, atol=1e-3)
+            assert np.allclose(sim_pbc.a, pbc.a, atol=1e-3)
+            assert np.allclose(sim_pbc.b, pbc.b, atol=1e-3)
+            assert np.allclose(sim_pbc.c, pbc.c, atol=1e-3)
+            assert np.allclose(pos[i], sim_pos, atol=1e-3)
+            if sim_vel is not None:
+                assert np.allclose(vel[i], sim_vel, atol=1e-3)
+        assert r.read_frame() is None
 
     os.remove(tmp_path)
 

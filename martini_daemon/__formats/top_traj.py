@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import struct
 import zlib
 from collections.abc import Collection
@@ -174,6 +176,13 @@ class TopTrajWriter:
             # reopen for appending
             self.__handle.close()
             self.__handle = open(path, "ab")
+
+    def __enter__(self) -> TopTrajWriter:
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
+        self.finish()
+
 
     def new_frame(
         self, frame_num: int, sim_step: int, time_ps: float, n_atoms: int
@@ -383,6 +392,13 @@ class TopTrajReader:
         del header
         self.frame = 0
 
+    def __enter__(self) -> TopTrajReader:
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
+        self.finish()
+
+
     def __read_chunk(self) -> bytes | None:
         chunk_len_bytes = self.__handle.read(8)
         if len(chunk_len_bytes) == 0:
@@ -466,3 +482,6 @@ class TopTrajReader:
             masses,
             bonds,
         )
+
+    def finish(self):
+        self.__handle.close()

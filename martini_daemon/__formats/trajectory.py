@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from os.path import splitext
 
 import numpy as np
@@ -108,6 +110,12 @@ class TrajectoryWriter:
             case _:
                 assert False
 
+    def __enter__(self) -> TrajectoryWriter:
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
+        self.finish()
+
     def write_frame(
         self,
         sim_step: int,
@@ -176,8 +184,6 @@ class TrajectoryReader:
         ".trr": "trr_mdtraj",
     }
 
-    default_backends = {".xtc": "xtc_molly"}
-
     def __init__(self, path: str, backend: str | None = None) -> None:
         """Create a TrajectoryReader object.
 
@@ -212,6 +218,13 @@ class TrajectoryReader:
                 self.__reader_trr = mdtraj.formats.TRRTrajectoryFile(path, "r")
             case _:
                 assert False
+
+    def __enter__(self) -> TrajectoryReader:
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
+        self.finish()
+
 
     def read_frame(
         self,
