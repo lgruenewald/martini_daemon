@@ -105,6 +105,8 @@ class TopTrajWriter:
         :param title: The simulation title to write to the file.
         :param initial_molecules: A list of tuples (name, count), corresponding to molecule names and counts at the
             start of the simulation.
+        :param append: Whether to append to an existing file.
+        :param truncate: If appending, the last MD step to keep.
         """
 
         self.__buffer = bytearray()

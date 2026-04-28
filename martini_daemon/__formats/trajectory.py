@@ -42,7 +42,7 @@ class TrajectoryWriter:
         path: str,
         backend: str | None = None,
         append: bool = False,
-        truncate: tuple[int, int, float] | None = None,
+        keep_n_frames: int | None = None,
     ) -> None:
         """Create a TrajectoryWriter object.
 
@@ -55,13 +55,13 @@ class TrajectoryWriter:
             for the default choices. Some backends may require self-explanatory optional dependencies.
             See pyproject.toml or the README in the repo for details.
         :param append: Whether to append to the trajectory or not.
-        :param truncate: If appending, the last simulation step to keep,
-            as a tuple of trajectory frame, MD step, simulation time (ps).
-            Truncation behavior will depend on the format and what fields they store.
+        :param keep_n_frames: If appending, the number of frames to keep. Since formats have variable quality in what
+            metadata they have, the number of frames to keep is the most portable choice across various trajectory
+            formats.
         """
         self.path = path
         if not append:
-            assert truncate is None, "Truncate is only valid if append is True."
+            assert keep_n_frames is None, "Truncate is only valid if append is True."
         if backend is None:
             _, ext = splitext(path)
             self.backend = self.default_backends.get(ext)
@@ -77,23 +77,11 @@ class TrajectoryWriter:
             case "xtc_molly":
                 import molly
 
-                if append and truncate is not None:
-                    truncate_frame, truncate_step, truncate_time = truncate
+                if append and keep_n_frames is not None:
                     reader = molly.XTCReader(path)
-                    last_step = 0
-                    last_time = 0.0
                     last_tell = 0
-                    while last_step <= truncate_step:
-                        last_tell = reader.tell()
-                        f = reader.pop_frame()
-                        last_step = _from_int32(f.step, last_step)
-                        last_time = f.time
-                        # truncate based on both step and time
-                        if last_step > truncate_step:
-                            assert last_time > truncate_time, (
-                                f"Truncation to step {truncate_step} and time {truncate_time} (ps) failed,"
-                                + " the MD steps and time of the trajectory are incorrect."
-                            )
+                    for _ in range(keep_n_frames):
+                        last_tell = reader.skip_frame()
                     reader.close()
 
                     with open(path, "rb+") as f:

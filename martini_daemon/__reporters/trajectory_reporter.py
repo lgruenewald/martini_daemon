@@ -19,13 +19,10 @@ class TrajectoryReporter(Reporter):
             self.path,
             backend=self.__backend,
             append=append,
-            truncate=(
-                simulation.trajectory_frame,
-                simulation.current_step,
-                simulation.time_ps,
-            )
-            if append
-            else None,
+            # formats have varying metadata on sim time / step, so truncate based on the # of frames written before
+            # sim.trajectory_frame is the number of frames that were finished writing
+            # (or during trajectory frame also the index of the frame currently being written)
+            keep_n_frames=simulation.trajectory_frame if append else None,
         )
 
     def on_trajectory_frame(self, simulation: Simulation) -> None:
