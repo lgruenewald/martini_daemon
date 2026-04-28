@@ -33,7 +33,9 @@ class Reporter(ABC):
         pass
 
     def on_trajectory_frame(self, simulation) -> None:
-        """Called every traj_frequency frames. There is a single per simulation traj_frequency because that's a simple
+        """Called every traj_frequency frames.
+
+        There is a single per simulation traj_frequency because that's a simple
         way of getting multiple output types with nicely aligned time frames.
         """
         pass
@@ -48,7 +50,11 @@ class Reporter(ABC):
     def on_reaction(
         self, simulation, reactions: list[tuple[str, list[Fragment]]]
     ) -> None:
-        """Called after the modification algorithm runs. Reactions is the list of reactions that were applied."""
+        """Called after the modification algorithm runs.
+
+        :param simulation: Simulation object.
+        :param reactions: List of reactions that were applied, as tuples of reaction name and references to reacting fragments.
+        """
         pass
 
     def post_reaction(self, simulation) -> None:
