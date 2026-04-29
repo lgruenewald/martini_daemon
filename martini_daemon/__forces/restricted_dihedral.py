@@ -7,8 +7,9 @@ from ..__parser import register_dihedral_type
 @register_dihedral_type(type_=10, args=["degree", "float"])
 @register_available_force
 class RestrictedDihedral(BondedForce):
+    @classmethod
     def _add_to_force(
-        self, force: mm.Force, members: list[int], params: list[float]
+        cls, force: mm.Force, members: list[int], params: list[float]
     ) -> None:
         assert isinstance(force, mm.CustomTorsionForce)
         force.addTorsion(*members, params)
@@ -27,11 +28,13 @@ class RestrictedDihedral(BondedForce):
     def get_name(cls) -> str:
         return "restricted_dihedral"
 
-    def _set_force_obj(self):
-        self.force = mm.CustomTorsionForce(
+    def _set_force_obj(self) -> mm.Force:
+        force = mm.CustomTorsionForce(
             "0.5*k*((cos(theta)-cos(theta0))^2)/((sin(theta))^2)"
         )
-        self.force.addPerTorsionParameter("theta0")
-        self.force.addPerTorsionParameter("k")
+        force.addPerTorsionParameter("theta0")
+        force.addPerTorsionParameter("k")
+
+        return force
 
     filters = {"dihedral"}

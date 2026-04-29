@@ -130,6 +130,13 @@ Limitations
   during a reaction. Center of mass virtual sites that are constructed from other virtual sites (with mass 0) are
   also not supported.
 
+* Pairs, CMAPs will not change parameters automatically if the type of constructing particles changes.
+  This can be done manually by removing and re-adding it.
+
+* The charge and mass of beads, if implied from atom type, will not automatically change if the type changes.
+  This should be done manually, if it is desired.
+
+* Position restraints are implemented, however they might only work well for orthogonal boxes that do not shrink/grow.
 
 Duplicate exclusion error
 -------------------------

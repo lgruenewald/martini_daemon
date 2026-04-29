@@ -19,13 +19,14 @@ def wrap_coupling(mm_force: mm.Force) -> type[Force]:
             return True
 
         def delta_degrees_of_freedom(self) -> int:
-            return 0 if type(self.force) is not mm.CMMotionRemover else 3
+            return 3 if isinstance(self._force, mm.CMMotionRemover) else 0
 
-        def _set_force_obj(self) -> None:
+        def _set_force_obj(self) -> mm.Force:
             nonlocal used, mm_force
             assert not used, "wrapped couplings can be only set once"
-            self.force = mm_force
             used = True
+
+            return mm_force
 
         def _destroy(self) -> None:
             assert False, "wrapped couplings cannot be destroyed or reconstructed."

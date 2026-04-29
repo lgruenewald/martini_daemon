@@ -27,7 +27,7 @@ def rootdir(request: pytest.FixtureRequest) -> str:
 
 
 tests = [
-    "update_redefine",
+    "update_redefine", "update_redefine_exclusion"
 ]
 
 

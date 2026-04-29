@@ -205,8 +205,8 @@ class Simulation:
         assert isinstance(platform, mm.Platform)
         self.info(
             "Parameters:",
-            topology,
-            geometry,
+            f"topology: {topology}",
+            f"geometry: {geometry}",
             f"steps: {self.total_steps}",
             f"dm_freq: {self.dm_frequency}",
             f"traj_freq: {self.traj_frequency}",

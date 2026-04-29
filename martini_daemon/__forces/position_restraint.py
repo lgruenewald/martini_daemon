@@ -31,18 +31,21 @@ class PositionRestraintDirective(InteractionDirective):
 
 @register_available_force
 class PositionRestraint(BondedForce):
+    @classmethod
     def _add_to_force(
-        self, force: mm.Force, members: list[int], params: list[float]
+        cls, force: mm.Force, members: list[int], params: list[float]
     ) -> None:
+        assert isinstance(force, mm.CustomExternalForce)
+        assert len(members) == 1
+        i = members[0]
+        force.addParticle(i, params)
+
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
         assert len(members) == 1
         i = members[0]
         kx, ky, kz = params
         x0, y0, z0 = self.system.additional_data["respos"][i]
-        assert isinstance(force, mm.CustomExternalForce)
-        force.addParticle(i, (kx, ky, kz, x0, y0, z0))
-
-    def _parse(self, members: list[int], params: list[float]) -> list[float]:
-        return params
+        return [kx, ky, kz, x0, y0, z0]
 
     @staticmethod
     def uses_pbc() -> bool:
@@ -55,17 +58,19 @@ class PositionRestraint(BondedForce):
     def get_name(cls) -> str:
         return "posres"
 
-    def _set_force_obj(self) -> None:
-        # TODO this only works for 90 degree angles
-        self.force = mm.CustomExternalForce(
+    def _set_force_obj(self) -> mm.Force:
+        # FIXME: this only works for 90 degree angles and when it doesn't grow/shrink
+        force = mm.CustomExternalForce(
             "0.5*(fx+fy+fz);"
             "fx=kx*periodicdistance(x,0,0,x0,0,0)^2;"
             "fy=ky*periodicdistance(0,y,0,0,y0,0)^2;"
             "fz=kz*periodicdistance(0,0,z,0,0,z0)^2;"
         )
-        self.force.addPerParticleParameter("kx")
-        self.force.addPerParticleParameter("ky")
-        self.force.addPerParticleParameter("kz")
-        self.force.addPerParticleParameter("x0")
-        self.force.addPerParticleParameter("y0")
-        self.force.addPerParticleParameter("z0")
+        force.addPerParticleParameter("kx")
+        force.addPerParticleParameter("ky")
+        force.addPerParticleParameter("kz")
+        force.addPerParticleParameter("x0")
+        force.addPerParticleParameter("y0")
+        force.addPerParticleParameter("z0")
+
+        return force

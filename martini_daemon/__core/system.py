@@ -180,7 +180,7 @@ class System:
         Informs all forces to let them automatically update it.
         """
         self.__types[atom_id] = new_type
-        self.__flag_atom_change(atom_id)
+        self.__flag_atom_change(atom_id, False)
 
     def get_charge(self, atom_id: int) -> float:
         """Gets the (partial) charge of atom_id."""

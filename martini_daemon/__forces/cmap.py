@@ -108,21 +108,22 @@ class CMAPDirective(InteractionDirective):
 
 @register_available_force
 class Cmap(BondedForce):
+    @classmethod
     def _add_to_force(
-        self, force: mm.Force, members: list[int], params: list[float]
+        cls, force: mm.Force, members: list[int], params: list[float]
     ) -> None:
+        idx_i, idx_j, idx_k, idx_l, idx_m = members
+        assert isinstance(force, mm.CMAPTorsionForce)
+        force.addTorsion(int(params[0]), idx_i, idx_j, idx_k, idx_l, idx_j, idx_k, idx_l, idx_m)
+
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
         assert len(params) == 0
         types = tuple(self.system.get_type(member) for member in members)
         cmap = self.system.additional_data["cmap_types"].get(types)
+        assert type(cmap) is int
         if cmap is None:
             raise ValueError(f"Unknown CMAP type for {types}.")
-
-        idx_i, idx_j, idx_k, idx_l, idx_m = members
-        assert isinstance(force, mm.CMAPTorsionForce)
-        force.addTorsion(cmap, idx_i, idx_j, idx_k, idx_l, idx_j, idx_k, idx_l, idx_m)
-
-    def _parse(self, members: list[int], params: list[float]) -> list[float]:
-        return params
+        return [cmap]
 
     @staticmethod
     def uses_pbc() -> bool:
@@ -135,10 +136,9 @@ class Cmap(BondedForce):
     def get_name(cls) -> str:
         return "cmap"
 
-    def _set_force_obj(self):
-        self.force = mm.CMAPTorsionForce()
+    def _set_force_obj(self) -> mm.Force:
+        force = mm.CMAPTorsionForce()
         for index, (size, cmap) in enumerate(self.system.additional_data["cmap_maps"]):
-            i = self.force.addMap(size, cmap)
+            i = force.addMap(size, cmap)
             assert i == index
-
-    # TODO flag atom type change, same as in pairs
+        return force

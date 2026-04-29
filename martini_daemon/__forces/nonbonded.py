@@ -47,32 +47,32 @@ class NonBonded(Force):
         return self.__exclusions
 
     def flag_atom_change(self, atom_id: int, change_charge: bool = False) -> None:
-        if self.force is None:
+        if self._force is None:
             return
         type_ = self.__atom_types[self.system.get_type(atom_id)]
         charge = self.system.get_charge(atom_id)
         sc_lam, sc_alpha = self.system.get_sc(atom_id)
-        assert isinstance(self.force, mm.CustomNonbondedForce)
-        self.force.setParticleParameters(atom_id, [type_, charge, sc_lam, sc_alpha])
+        assert isinstance(self._force, mm.CustomNonbondedForce)
+        self._force.setParticleParameters(atom_id, [type_, charge, sc_lam, sc_alpha])
         self.system.flag_reinitialize()
 
     def flag_atom_add(self):
         self._destroy()
 
     def add_exclusion(self, i: int, j: int) -> None:
-        if self.force is not None:
-            assert isinstance(self.force, mm.CustomNonbondedForce)
-            self.force.addExclusion(i, j)
+        if self._force is not None:
+            assert isinstance(self._force, mm.CustomNonbondedForce)
+            self._force.addExclusion(i, j)
             self.system.flag_reinitialize()
 
     def flag_remove_exclusion(self) -> None:
         self._destroy()
 
-    def _set_force_obj(self):
+    def _set_force_obj(self) -> mm.Force:
         if self.__exclusions is None:
             raise AssertionError("Must call get_exclusion_helper() first!")
         assert isinstance(self.__exclusions, ExclusionHelper)
-        self.force = mm.CustomNonbondedForce(
+        force = mm.CustomNonbondedForce(
             "(LJ - corr + ES);"
             "LJ = (1 - sc_lambda1) * (C12 / rA^2 - C6 / rA) + sc_lambda1 * (C12 / rB^2 - C6 / rB);"
             "rA = (sc_alpha1 * sigma(type1, type2)^6 * sc_lambda1 + r^6);"
@@ -87,12 +87,12 @@ class NonBonded(Force):
             "f = 138.935458;"
             f"rcut = {self.cutoff_nm};"
         )
-        self.force.addPerParticleParameter("type")
-        self.force.addPerParticleParameter("q")
-        self.force.addPerParticleParameter("sc_lambda")
-        self.force.addPerParticleParameter("sc_alpha")
-        self.force.setNonbondedMethod(mm.CustomNonbondedForce.CutoffPeriodic)
-        self.force.setCutoffDistance(self.cutoff_nm)
+        force.addPerParticleParameter("type")
+        force.addPerParticleParameter("q")
+        force.addPerParticleParameter("sc_lambda")
+        force.addPerParticleParameter("sc_alpha")
+        force.setNonbondedMethod(mm.CustomNonbondedForce.CutoffPeriodic)
+        force.setCutoffDistance(self.cutoff_nm)
 
         for i, (type_name, _) in enumerate(self.system.iterate_atom_types()):
             if self.__atom_types.get(type_name) is not None:
@@ -106,10 +106,10 @@ class NonBonded(Force):
             type_ = self.__atom_types[self.system.get_type(atom_id)]
             charge = self.system.get_charge(atom_id)
             sc_lam, sc_alpha = self.system.get_sc(atom_id)
-            self.force.addParticle([type_, charge, sc_lam, sc_alpha])
+            force.addParticle([type_, charge, sc_lam, sc_alpha])
 
         for _, (members, _) in self.__exclusions.iterate_bonds():
-            self.force.addExclusion(*members)
+            force.addExclusion(*members)
 
         # add LJ parameters to the system
         sigmas = []
@@ -126,10 +126,11 @@ class NonBonded(Force):
                 )
                 sigmas.append(sigma)
                 epsilons.append(epsilon)
-        self.force.addTabulatedFunction("sigma", mm.Discrete2DFunction(n, n, sigmas))
-        self.force.addTabulatedFunction(
+        force.addTabulatedFunction("sigma", mm.Discrete2DFunction(n, n, sigmas))
+        force.addTabulatedFunction(
             "epsilon", mm.Discrete2DFunction(n, n, epsilons)
         )
+        return force
 
 
 class ExclusionHelper(BondedForce):
@@ -143,14 +144,25 @@ class ExclusionHelper(BondedForce):
     https://manual.gromacs.org/documentation/current/reference-manual/functions/nonbonded-interactions.html
     """
 
+    @classmethod
     def _add_to_force(
-        self, force: mm.Force, members: list[int], params: list[float]
+        cls, force: mm.Force, members: list[int], params: list[float]
     ) -> None:
         assert isinstance(force, mm.CustomBondForce)
-        self.es_self_correction_add(force, *members)
+        i, j = members
+        q_prod, = params
+        if q_prod != 0.0:
+            force.addBond(i, j, [q_prod])
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
-        return params
+        i, j = members
+        assert i != j
+        assert len(params) == 0
+        # NOTE: self.entries is updated in flag_atom_change
+        # this is only called once per exclusion added, not every time the OpenMM force is reconstructed
+        q1 = self.system.get_charge(i)
+        q2 = self.system.get_charge(j)
+        return [q1 * q2]
 
     @staticmethod
     def uses_pbc() -> bool:
@@ -161,10 +173,10 @@ class ExclusionHelper(BondedForce):
 
     def should_build(self) -> bool:
         # should build also when there is no exclusions, so that self corrections work
-        return self.force is None
+        return self._force is None
 
-    def _set_force_obj(self) -> None:
-        self.force = mm.CustomBondForce(
+    def _set_force_obj(self) -> mm.Force:
+        force = mm.CustomBondForce(
             f"step(rcut-r) * ES;"
             f"ES = f*q_product/epsilon_r * (krf * r^2 - crf);"
             f"crf = 1 / rcut + krf * rcut^2;"
@@ -173,14 +185,15 @@ class ExclusionHelper(BondedForce):
             f"f = 138.935458;"
             f"rcut={self.cutoff_nm};"
         )
-        self.force.addPerBondParameter("q_product")
+        force.addPerBondParameter("q_product")
 
         # trigger rebuild! if a charge changes
         for i in range(self.system.num_atoms()):
             charge = self.system.get_charge(i)
             if charge != 0:
                 # self term in reaction field correction
-                self.es_self_correction_add(self.force, i, i)
+                force.addBond(i, i, [0.5 * charge * charge])
+        return force
 
     @classmethod
     def get_name(cls) -> str:
@@ -192,19 +205,10 @@ class ExclusionHelper(BondedForce):
         self.epsilon_r = system.additional_data.get("epsilon_r")
         self.cutoff_nm = system.additional_data.get("cutoff")
 
-    def es_self_correction_add(self, force: mm.CustomBondForce, i, j):
-        q1 = self.system.get_charge(i)
-        q2 = self.system.get_charge(j)
-        q_prod = q1 * q2
-        if i == j:
-            q_prod *= 0.5
-        if q_prod != 0:
-            force.addBond(i, j, [q_prod])
 
     def _add_bond(self, members: list[int], params: list[float]) -> int:
-        res = super()._add_bond(members, params)
         self.__nb.add_exclusion(*members)
-        return res
+        return super()._add_bond(members, params)
 
     def _remove_bond(self, bond_id: int) -> None:
         super()._remove_bond(bond_id)
@@ -215,4 +219,14 @@ class ExclusionHelper(BondedForce):
 
     def flag_atom_change(self, atom_id: int, change_charge: bool = False) -> None:
         if change_charge:
+            for _, (members, params) in self.iterate_bonds():
+                # ignore my own warning and mutate self.__entries through iterate_bonds
+                # FIXME: hack
+                if atom_id in members:
+                    i, j = members
+                    q1 = self.system.get_charge(i)
+                    q2 = self.system.get_charge(j)
+                    params[0] = q1 * q2
+            # but we reconstruct so it's fine
+            # "self-exclusion" is processed in _set_force_obj
             self._destroy()

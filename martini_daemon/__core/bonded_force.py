@@ -43,18 +43,24 @@ class BondedForce(Force, metaclass=ABCMeta):
         Only override if you know what you're doing.
         """
         super()._prepare_force_obj()
-        assert self.force is not None
+        assert self._force is not None
         if self.uses_pbc():
             # uses_pbc is used for exactly this...
-            self.force.setUsesPeriodicBoundaryConditions(True)  # ty: ignore[unresolved-attribute]
+            self._force.setUsesPeriodicBoundaryConditions(True)  # ty: ignore[unresolved-attribute]
         for members, params in self.__entries.values():
-            self._add_to_force(self.force, members, params)
+            self._add_to_force(self._force, members, params)
 
+    @classmethod
     @abstractmethod
     def _add_to_force(
-        self, force: mm.Force, members: list[int], params: list[float]
+        cls, force: mm.Force, members: list[int], params: list[float]
     ) -> None:
-        """The force defined by members and params should add the entry to force.
+        """Add an intereaction to the OpenMM force.
+
+        This is called lazily and may be called multiple times each time the force is re-constructed.
+        Therefore, it should not have side effects. Put side effects in _parse.
+
+        The force defined by members and params should add the entry to force.
 
         Protected because only this class should call this.
         """
@@ -66,11 +72,15 @@ class BondedForce(Force, metaclass=ABCMeta):
         By default, this happens if there are any entries and there is no force.
         To trigger a rebuild, you generally therefore want to call _destroy().
         """
-        return len(self.__entries) > 0 and self.force is None
+        return len(self.__entries) > 0 and self._force is None
 
     @abstractmethod
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
-        """Given a list of members and parameters (as unwrapped = minimal pre-parsing), parse the params to how they
+        """Parse parameters.
+
+        This is called eagerly when the bond is added to the force, and only once.
+
+        Given a list of members and parameters (as unwrapped = minimal pre-parsing), parse the params to how they
         should be stored in entries and passed to _add_to_force.
 
         Protected because only this class should call this, but children must override it.
@@ -101,8 +111,8 @@ class BondedForce(Force, metaclass=ABCMeta):
         """
         params = self._parse(members, params)
         self.__entries[self.__next_entry_id] = (members, params)
-        if self.force is not None:
-            self._add_to_force(self.force, members, params)
+        if self._force is not None:
+            self._add_to_force(self._force, members, params)
             self.system.flag_reinitialize()
         self.__next_entry_id += 1
         return self.__next_entry_id - 1
@@ -110,7 +120,7 @@ class BondedForce(Force, metaclass=ABCMeta):
     def _remove_bond(self, bond_id: int) -> None:
         """Protected because only System should call this."""
         del self.__entries[bond_id]
-        if self.force is not None:
+        if self._force is not None:
             self._destroy()
 
     def iterate_bonds(self) -> Iterable[tuple[int, tuple[list[int], list[float]]]]:

@@ -7,8 +7,9 @@ from ..__parser import register_angle_type
 @register_angle_type(type_=1, args=["degree", "float"])
 @register_available_force
 class HarmonicAngle(BondedForce):
+    @classmethod
     def _add_to_force(
-        self, force: mm.Force, members: list[int], params: list[float]
+        cls, force: mm.Force, members: list[int], params: list[float]
     ) -> None:
         assert isinstance(force, mm.HarmonicAngleForce)
         force.addAngle(*members, *params)
@@ -27,7 +28,7 @@ class HarmonicAngle(BondedForce):
     def get_name(cls) -> str:
         return "harmonic_angle"
 
-    def _set_force_obj(self):
-        self.force = mm.HarmonicAngleForce()
+    def _set_force_obj(self) -> mm.Force:
+        return mm.HarmonicAngleForce()
 
     filters = {"angle"}

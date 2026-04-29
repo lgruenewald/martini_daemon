@@ -7,8 +7,9 @@ from ..__parser import register_angle_type
 @register_angle_type(type_=2, args=["degree", "float"])
 @register_available_force
 class G96Angle(BondedForce):
+    @classmethod
     def _add_to_force(
-        self, force: mm.Force, members: list[int], params: list[float]
+        cls, force: mm.Force, members: list[int], params: list[float]
     ) -> None:
         assert isinstance(force, mm.CustomAngleForce)
         force.addAngle(*members, params)
@@ -27,9 +28,10 @@ class G96Angle(BondedForce):
     def get_name(cls) -> str:
         return "g96_angle"
 
-    def _set_force_obj(self):
-        self.force = mm.CustomAngleForce("0.5 * k * (cos(theta) - cos(theta0))^2")
-        self.force.addPerAngleParameter("theta0")
-        self.force.addPerAngleParameter("k")
+    def _set_force_obj(self) -> mm.Force:
+        force = mm.CustomAngleForce("0.5 * k * (cos(theta) - cos(theta0))^2")
+        force.addPerAngleParameter("theta0")
+        force.addPerAngleParameter("k")
+        return force
 
     filters = {"angle"}

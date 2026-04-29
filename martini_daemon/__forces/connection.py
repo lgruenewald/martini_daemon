@@ -10,11 +10,12 @@ class Connection(BondedForce):
     def build(self, must=False) -> None:
         pass
 
-    def _set_force_obj(self) -> None:
-        pass
+    def _set_force_obj(self) -> mm.Force:
+        assert False
 
+    @classmethod
     def _add_to_force(
-        self, force: mm.Force, members: list[int], params: list[float]
+        cls, force: mm.Force, members: list[int], params: list[float]
     ) -> None:
         pass
 

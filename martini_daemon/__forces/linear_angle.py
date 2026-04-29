@@ -7,8 +7,9 @@ from ..__parser import register_angle_type
 @register_angle_type(type_=9, args=["float", "float"])
 @register_available_force
 class LinearAngle(BondedForce):
+    @classmethod
     def _add_to_force(
-        self, force: mm.Force, members: list[int], params: list[float]
+        cls, force: mm.Force, members: list[int], params: list[float]
     ) -> None:
         assert isinstance(force, mm.CustomCompoundBondForce)
         force.addBond(members, params)
@@ -27,8 +28,8 @@ class LinearAngle(BondedForce):
     def get_name(cls) -> str:
         return "linear_angle"
 
-    def _set_force_obj(self):
-        self.force = mm.CustomCompoundBondForce(
+    def _set_force_obj(self) -> mm.Force:
+        force = mm.CustomCompoundBondForce(
             3,  # 3 particles per compund bond force
             "0.5*k*distj2; "
             "distj2=(xj-x2)^2+(yj-y2)^2+(zj-z2)^2; "
@@ -36,7 +37,9 @@ class LinearAngle(BondedForce):
             "yj=a*y1+(1-a)*y3; "
             "zj=a*z1+(1-a)*z3;",
         )
-        self.force.addPerBondParameter("a")
-        self.force.addPerBondParameter("k")
+        force.addPerBondParameter("a")
+        force.addPerBondParameter("k")
+
+        return force
 
     filters = {"angle"}

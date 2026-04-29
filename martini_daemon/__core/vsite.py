@@ -62,12 +62,13 @@ class VirtualSite(BondedForce, metaclass=ABCMeta):
         """Overridden by this class to throw errors, as removing virtual sites during simulations is not supported."""
         raise ValueError("Virtual sites can't be destoryed.")
 
-    def _set_force_obj(self) -> None:
+    def _set_force_obj(self) -> mm.Force:
         """Unreachable function for virtual sites."""
         assert False  # unreachable
 
+    @classmethod
     def _add_to_force(
-        self, force: mm.Force, members: list[int], params: list[float]
+        cls, force: mm.Force, members: list[int], params: list[float]
     ) -> None:
         """Unreachable function for virtual sites."""
         assert False  # unreachable

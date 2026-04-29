@@ -35,7 +35,7 @@ class Constraint(BondedForce):
 
     filters = {"bond"}
 
-    def _set_force_obj(self) -> None:
+    def _set_force_obj(self) -> mm.Force:
         assert False
 
     def remove(self, i):
@@ -44,8 +44,9 @@ class Constraint(BondedForce):
     def should_build(self) -> bool:
         assert False
 
+    @classmethod
     def _add_to_force(
-        self, force: mm.Force, members: list[int], params: list[float]
+        cls, force: mm.Force, members: list[int], params: list[float]
     ) -> None:
         assert False
 

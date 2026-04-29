@@ -7,8 +7,9 @@ from ..__parser import register_angle_type
 @register_angle_type(type_=4, args=["float", "float", "float", "float"])
 @register_available_force
 class CrossBondAngle(BondedForce):
+    @classmethod
     def _add_to_force(
-        self, force: mm.Force, members: list[int], params: list[float]
+        cls, force: mm.Force, members: list[int], params: list[float]
     ) -> None:
         assert isinstance(force, mm.CustomCompoundBondForce)
         force.addBond(members, params)
@@ -27,14 +28,15 @@ class CrossBondAngle(BondedForce):
     def get_name(cls) -> str:
         return "cross_bond_angle"
 
-    def _set_force_obj(self):
-        self.force = mm.CustomCompoundBondForce(
+    def _set_force_obj(self) -> mm.Force:
+        force = mm.CustomCompoundBondForce(
             3,  # 3 particles per compund bond force
             "k*(distance(p1,p3)-r3)*(distance(p1,p2)-r1+distance(p3,p2)-r2)",
         )
-        self.force.addPerBondParameter("r1")
-        self.force.addPerBondParameter("r2")
-        self.force.addPerBondParameter("r3")
-        self.force.addPerBondParameter("k")
+        force.addPerBondParameter("r1")
+        force.addPerBondParameter("r2")
+        force.addPerBondParameter("r3")
+        force.addPerBondParameter("k")
+        return force
 
     filters = {"angle"}

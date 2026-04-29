@@ -112,8 +112,9 @@ get custom bond, angle or dihedral types. Note: this part of the API is newer an
     @register_bond_type(type_=6, args=["float", "float"], is_excl=False)
     @register_available_force
     class HarmonicBond(BondedForce):
+        @classmethod
         def _add_to_force(
-            self, force: mm.Force, members: list[int], params: list[float]
+            cls, force: mm.Force, members: list[int], params: list[float]
         ) -> None:
             assert isinstance(force, mm.HarmonicBondForce)
             force.addBond(*members, *params)
@@ -128,8 +129,8 @@ get custom bond, angle or dihedral types. Note: this part of the API is newer an
         def delta_degrees_of_freedom(self) -> int:
             return 0
 
-        def _set_force_obj(self) -> None:
-            self.force = mm.HarmonicBondForce()
+        def _set_force_obj(self) -> mm.Force:
+            return mm.HarmonicBondForce()
 
         filters = {"bond"}
 
@@ -164,7 +165,8 @@ that must be overridden:
 
 * ``delta_degrees_of_freedom`` should return if the addition of this force changes the number of degrees of freedom in the system (usually 0).
 
-* ``_set_force_obj`` should set self.force to the OpenMM force object.
+* ``_set_force_obj`` should return the OpenMM force object. This is also called lazily. It may read things out
+  from self.system.
 
 * ``filters`` should be a set of filters other than the name, which can be used to reference it. Generally, filters
   such as ``bond``, ``angle`` or ``dihedral`` should be specified, as well as other aliases that a force may be

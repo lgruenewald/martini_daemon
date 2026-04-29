@@ -10,11 +10,11 @@ class Force(metaclass=ABCMeta):
 
         Note the following invariant:
 
-        - self.force should be not None if and only if it represents the most up-to-date state
+        - self._force should be not None if and only if it represents the most up-to-date state
             of the system and is present in the OpenMM system.
             When it becomes outdated it should be removed from System and self.force
             should be set to None.
-        - if self.force is None, self._set_force_obj() will be called if
+        - if self._force is None, self._set_force_obj() will be called if
             self.should_build() returns True, before the energies/forces are read out.
             self._set_force_obj() is called by build(), which is in turn called
             by System automatically.
@@ -37,7 +37,7 @@ class Force(metaclass=ABCMeta):
             self.system is set to system. Classes that inherit this class can safely import System, and can safely
             assume that self.system is always a Martini Daemon system.
         """
-        self.force: mm.Force | None = None
+        self._force: mm.Force | None = None
         self.system = system
 
     def build(self, must: bool = False) -> None:
@@ -50,10 +50,10 @@ class Force(metaclass=ABCMeta):
             Don't call with must=True if you don't know what you're doing.
         """
         if must or self.should_build():
-            self._set_force_obj()
-            assert self.force is not None
-            self._prepare_force_obj()
-            self.system._add_mm_force(self.force)
+            self._force = self._set_force_obj()
+            if self._force is not None:
+                self._prepare_force_obj()
+                self.system._add_mm_force(self._force)
 
     def _destroy(self) -> None:
         """Will destroy the OpenMM force and remove it from the OpenMM system.
@@ -62,9 +62,9 @@ class Force(metaclass=ABCMeta):
 
         Protected because it should only be called by methods in this class and its children.
         """
-        if self.force is not None:
-            self.system._remove_mm_force(self.force)
-            self.force = None
+        if self._force is not None:
+            self.system._remove_mm_force(self._force)
+            self._force = None
 
     def _prepare_force_obj(self) -> None:
         """Prepares the OpenMM force object before it is added to System,
@@ -73,8 +73,8 @@ class Force(metaclass=ABCMeta):
         The default impl sets the name to the result of self.get_name(),
         which should be done, as System may rely on this.
         """
-        assert self.force is not None
-        self.force.setName(self.get_name())
+        assert self._force is not None
+        self._force.setName(self.get_name())
 
     def should_build(self) -> bool:
         """Returns whether the force should be built when appropriate.
@@ -85,7 +85,7 @@ class Force(metaclass=ABCMeta):
 
         May be used by bonded forces e.g. to indicate whether there is anything added to it.
         """
-        return self.force is None
+        return self._force is None
 
     @classmethod
     @abstractmethod
@@ -103,9 +103,14 @@ class Force(metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    def _set_force_obj(self) -> None:
-        """Define self.force, set it to an OpenMM force object. This will get added to the OpenMM System by the
+    def _set_force_obj(self) -> mm.Force:
+        """Create the OpenMM force object.
+
+        Define an OpenMM force object and return it. This will get added to the OpenMM System by the
         martini_daemon.System that owns this Force.
+
+        This is called lazily, and may be called multiple times, therefore it should not have any other side effects
+        than returning a force. It may read things from self.system though.
 
         Protected because it should only be called by this class.
         """

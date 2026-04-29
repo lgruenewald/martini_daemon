@@ -7,8 +7,9 @@ from ..__parser import register_bond_type
 @register_bond_type(type_=4, args=["float", "float", "float"], is_excl=True)
 @register_available_force
 class CubicBond(BondedForce):
+    @classmethod
     def _add_to_force(
-        self, force: mm.Force, members: list[int], params: list[float]
+        cls, force: mm.Force, members: list[int], params: list[float]
     ) -> None:
         assert isinstance(force, mm.CustomBondForce)
         force.addBond(*members, params)
@@ -23,11 +24,12 @@ class CubicBond(BondedForce):
     def delta_degrees_of_freedom(self) -> int:
         return 0
 
-    def _set_force_obj(self) -> None:
-        self.force = mm.CustomBondForce("kb * (r - b)^2 + kb * kcub * (r - b)^3")
-        self.force.addPerBondParameter("b")  # equilibrium length
-        self.force.addPerBondParameter("kb")  # force constant
-        self.force.addPerBondParameter("kcub")  # cubic force constant
+    def _set_force_obj(self) -> mm.Force:
+        force = mm.CustomBondForce("kb * (r - b)^2 + kb * kcub * (r - b)^3")
+        force.addPerBondParameter("b")  # equilibrium length
+        force.addPerBondParameter("kb")  # force constant
+        force.addPerBondParameter("kcub")  # cubic force constant
+        return force
 
     @classmethod
     def get_name(cls) -> str:

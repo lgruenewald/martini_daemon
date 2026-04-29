@@ -8,8 +8,9 @@ from ..__parser import register_bond_type
 @register_bond_type(type_=6, args=["float", "float"], is_excl=False)
 @register_available_force
 class HarmonicBond(BondedForce):
+    @classmethod
     def _add_to_force(
-        self, force: mm.Force, members: list[int], params: list[float]
+        cls, force: mm.Force, members: list[int], params: list[float]
     ) -> None:
         assert isinstance(force, mm.HarmonicBondForce)
         force.addBond(*members, *params)
@@ -24,8 +25,8 @@ class HarmonicBond(BondedForce):
     def delta_degrees_of_freedom(self) -> int:
         return 0
 
-    def _set_force_obj(self) -> None:
-        self.force = mm.HarmonicBondForce()
+    def _set_force_obj(self) -> mm.Force:
+        return mm.HarmonicBondForce()
 
     filters = {"bond"}
 

@@ -9,8 +9,9 @@ from ..__parser import register_angle_type
 )
 @register_available_force
 class QuarticAngle(BondedForce):
+    @classmethod
     def _add_to_force(
-        self, force: mm.Force, members: list[int], params: list[float]
+        cls, force: mm.Force, members: list[int], params: list[float]
     ) -> None:
         assert isinstance(force, mm.CustomAngleForce)
         force.addAngle(*members, params)
@@ -29,19 +30,21 @@ class QuarticAngle(BondedForce):
     def get_name(cls) -> str:
         return "quartic_angle"
 
-    def _set_force_obj(self):
-        self.force = mm.CustomAngleForce(
+    def _set_force_obj(self) -> mm.Force:
+        force = mm.CustomAngleForce(
             "c0+"
             "c1*(theta-theta0)+"
             "c2*(theta-theta0)^2+"
             "c3*(theta-theta0)^3+"
             "c4*(theta-theta0)^4"
         )
-        self.force.addPerAngleParameter("theta0")
-        self.force.addPerAngleParameter("c0")
-        self.force.addPerAngleParameter("c1")
-        self.force.addPerAngleParameter("c2")
-        self.force.addPerAngleParameter("c3")
-        self.force.addPerAngleParameter("c4")
+        force.addPerAngleParameter("theta0")
+        force.addPerAngleParameter("c0")
+        force.addPerAngleParameter("c1")
+        force.addPerAngleParameter("c2")
+        force.addPerAngleParameter("c3")
+        force.addPerAngleParameter("c4")
+
+        return force
 
     filters = {"angle"}

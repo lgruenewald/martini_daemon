@@ -78,14 +78,14 @@ class Pairs(BondedForce):
         super().__init__(system)
         self.epsilon_r = system.additional_data["epsilon_r"]
 
+    @classmethod
     def _add_to_force(
-        self, force: mm.Force, members: list[int], params: list[float]
+        cls, force: mm.Force, members: list[int], params: list[float]
     ) -> None:
         assert isinstance(force, mm.CustomBondForce)
         force.addBond(*members, params)
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
-        # TODO what if charge/type changes during sim
         q1 = self.system.get_charge(members[0])
         q2 = self.system.get_charge(members[1])
         q_prod = q1 * q2
@@ -121,20 +121,16 @@ class Pairs(BondedForce):
     def get_name(cls) -> str:
         return "pair"
 
-    def _set_force_obj(self):
-        self.force = mm.CustomBondForce(
+    def _set_force_obj(self) -> mm.Force:
+        force = mm.CustomBondForce(
             "LJ + ES;"
             "LJ = (C12 / r^12 - C6 / r^6);"
             "ES = f*qprod/epsilon_r/r;"
             f"epsilon_r = {self.epsilon_r};"
             "f = 138.935458;"
         )
-        self.force.addPerBondParameter("qprod")
-        self.force.addPerBondParameter("C6")
-        self.force.addPerBondParameter("C12")
+        force.addPerBondParameter("qprod")
+        force.addPerBondParameter("C6")
+        force.addPerBondParameter("C12")
 
-    def flag_atom_change(self, atom_id: int, change_charge: bool = False) -> None:
-        # TODO
-        # 1. update entries
-        # 2. if force is not None, update force
-        raise NotImplementedError
+        return force
