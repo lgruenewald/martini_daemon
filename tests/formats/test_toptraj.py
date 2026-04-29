@@ -82,6 +82,10 @@ def test_toptraj_writer(rootdir: str) -> None:
         assert r.initial_molecules[2] == (b"c", n_atoms - 3, 1)
 
         for i, frame in enumerate(frames):
+            if i % 5 == 0:
+                # also test skipping frames
+                r.skip_frame()
+                continue
             f = r.read_frame()
             assert f is not None
             assert f.sim_step == i * 5000

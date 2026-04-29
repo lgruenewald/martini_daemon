@@ -400,6 +400,20 @@ class TopTrajReader:
     def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
         self.finish()
 
+    def skip_frame(self) -> None:
+        """Skip a single frame.
+
+        Note: if already at the end, will silently do nothing.
+        """
+        chunk_len_bytes = self.__handle.read(8)
+        if len(chunk_len_bytes) == 0:
+            return
+        chunk_len, = struct.unpack("<Q", chunk_len_bytes)
+        self.__handle.seek(8 + chunk_len + 4, SEEK_CUR)
+
+    def tell(self) -> int:
+        """Return the current position in the file."""
+        return self.__handle.tell()
 
     def __read_chunk(self) -> bytes | None:
         chunk_len_bytes = self.__handle.read(8)

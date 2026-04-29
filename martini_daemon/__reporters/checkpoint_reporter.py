@@ -10,7 +10,7 @@ class CheckpointReporter(Reporter):
     def on_simulation_finish(self, simulation) -> None:
         pass
 
-    def __init__(self, n_checkpoints: int = 3) -> None:
+    def __init__(self, interval: int = 0, n_checkpoints: int = 3) -> None:
         """Create a Checkpoint Reporter.
 
         The Checkpoint Reporter will write checkpoint files, allowing for continuable simulations in case of
@@ -53,6 +53,8 @@ class CheckpointReporter(Reporter):
           with the same version as they were written with. Thanks to a magic number at the beginning of the file,
           loading a checkpoint file with the wrong version should raise an appropriate error to the user.
 
+        :param interval: Lower bound on the number of MD steps to wait between checkpoints. Will only make checkpoints
+            during trajectory frames if the number of frames since last checkpoint is larger than this.
         :param n_checkpoints: Number of checkpoint files to keep at a time. '.chk' is the newest,
             '.chk2' the one before, with increasing numbers representing older checkpoint files.
 
@@ -60,6 +62,8 @@ class CheckpointReporter(Reporter):
         self.n_checkpoints = n_checkpoints
         self.paths: list[str] = []
         self.tmp_path: str = ""
+        self.interval = interval
+        self.__last_chk = 0
 
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
         self.paths = [
@@ -67,8 +71,14 @@ class CheckpointReporter(Reporter):
             for i in range(self.n_checkpoints + 1)
         ]
         self.tmp_path: str = simulation.request_path(".chk_tmp")
+        # no chk at the start
+        self.__last_chk = simulation.current_step
 
     def on_trajectory_frame(self, sim: Simulation) -> None:
+        if sim.current_step < self.__last_chk + self.interval:
+            # interval condition not fulfilled yet
+            return
+        self.__last_chk = sim.current_step
         # increment the number on checkpoint files
         for i in range(self.n_checkpoints, 0, -1):
             # if n=3, will count down as 3, 2, 1
