@@ -143,25 +143,26 @@ impl PeriodicBox {
     pub fn orthogonal(x: f64, y: f64, z: f64) -> PyResult<Self> {
         PeriodicBox::new([x, 0., 0.], [0., y, 0.], [0., 0., z])
     }
-    /// Move atom within the same copy of the PBC.
+    /// Move atom within the box 0,0,0 to a.x, b.y, c.z.
     ///
-    /// Note: moves it within the box 0,0,0 to a.x,b.y,c.z, not the box a,b,c.
+    /// Note: not the box formed by unit cell vectors a, b, c.
     pub fn move_within(&self, v: [f64; 3]) -> [f64; 3] {
-        /*
-        (DVec3::from(v)
-            - (v[0] / self.a.x).floor() * self.a
-            - (v[1] / self.b.y).floor() * self.b
-            - (v[2] / self.c.z).floor() * self.c)
-            .into()
-        */
-        let mut pos = DVec3::from(v);
-        let scale3 = (pos.z * self.c_inv.z).floor();
-        pos -= scale3 * self.c;
-        let scale2 = (pos.y * self.b_inv.y).floor();
-        pos -= scale2 * self.b;
-        let scale1 = (pos.x * self.a_inv.x).floor();
-        pos -= scale1 * self.a;
-        pos.into()
+        let mut res = DVec3::from(v);
+        // need to mutate 3 separate times as self.c and self.b mutate the y and x variables too
+        res -= (res.z * self.c_inv.z).floor() * self.c;
+        res -= (res.y * self.b_inv.y).floor() * self.b;
+        res -= (res.x * self.a_inv.x).floor() * self.a;
+        res.into()
+    }
+
+    /// Give the copy of point v closest to 0, 0, 0.
+    pub fn move_near_origin(&self, v: [f64; 3]) -> [f64; 3] {
+        let mut res = DVec3::from(v);
+        // need to mutate 3 separate times as self.c and self.b mutate the y and x variables too
+        res -= (res.z * self.c_inv.z).round() * self.c;
+        res -= (res.y * self.b_inv.y).round() * self.b;
+        res -= (res.x * self.a_inv.x).round() * self.a;
+        res.into()
     }
 
     /// Translate v by periodic box vectors so it is the closest possible to reference in non-periodic space.
@@ -219,7 +220,7 @@ impl PeriodicBox {
         }
         for i in 0..positions.shape()[0] {
             match tree.nearest(
-                &positions.get_item(i)?.extract::<[f64; 3]>()?,
+                &self.move_within(positions.get_item(i)?.extract::<[f64; 3]>()?),
                 1,
                 &squared_euclidean,
             ) {
@@ -270,33 +271,38 @@ impl PeriodicBox {
 
     /// Get the difference between two points in periodic space.
     pub fn diff(&self, v1: [f64; 3], v2: [f64; 3]) -> [f64; 3] {
-        /*
-        let v1 = DVec3::from(self.move_within(v1));
-        let v2: DVec3 = DVec3::from(self.move_within(v2));
-        let diff = v1 - v2;
+        let v1 = DVec3::from(v1);
+        let v2: DVec3 = DVec3::from(v2);
+        let diff = DVec3::from(self.move_near_origin((v1-v2).into()));
         let mut best = diff.clone();
+        let mut best_dist = best.length_squared();
         for i in -1..=1 {
             for j in -1..=1 {
                 for k in -1..=1 {
                     let c = diff - (i as f64) * self.a - (j as f64) * self.b - (k as f64) * self.c;
-                    if c.length_squared() < best.length_squared() {
+                    let dist = c.length_squared();
+                    if dist < best_dist {
                         best = c;
+                        best_dist = dist;
                     }
                 }
             }
         }
         best.into()
-        */
+
+        /*
+        // OpenMM implementation that might be faster but not correct in some edge cases where dist > 1/2 box
         let v1 = DVec3::from(v1);
         let v2 = DVec3::from(v2);
         let mut diff = v1 - v2;
-        let scale3 = (diff.z * self.c_inv.z + 0.5).floor();
+        let scale3 = (diff.z * self.c_inv.z).round();
         diff -= scale3 * self.c;
-        let scale2 = (diff.y * self.b_inv.y + 0.5).floor();
+        let scale2 = (diff.y * self.b_inv.y).round();
         diff -= scale2 * self.b;
-        let scale1 = (diff.x * self.a_inv.x + 0.5).floor();
+        let scale1 = (diff.x * self.a_inv.x).round();
         diff -= scale1 * self.a;
         diff.into()
+         */
     }
 
     /// Return whether the shortest path between two points crosses the periodic boundary condition,
@@ -363,7 +369,7 @@ impl PeriodicBox {
 
     /// Returns whether a position is close to the "central" copy of the periodic box.
     ///
-    /// This can be cbacuse:
+    /// This can be because:
     /// - inside the "central" copy of the pbc
     /// - within a cutoff distance of the pbc
     ///
