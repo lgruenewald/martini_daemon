@@ -15,7 +15,7 @@ below, which can be adjusted to meet various needs.
    from martini_daemon import Simulation, VariablesReporter, TrajectoryReporter, ReactionReporter, TopTrajReporter
    import openmm as mm
 
-   sim = Simulation(
+   with Simulation(
        # path to Gromacs Topology
        top_path="system.top",
        # path to Starting geometry
@@ -55,19 +55,24 @@ below, which can be adjusted to meet various needs.
            ),
            mm.CMMotionRemover()
        ],
-   )
-   # minimize energy first, saving the minimized coordinates to min.gro
-   sim.minimize_energy(out="min.gro")
-   # generate velocities at 298 K
-   sim.generate_velocities(298)
-   # run equilibration
-   sim.simulate()
-   # write final coordinates, velocities and box to a .gro file
-   sim.save_geometry("out.gro")
-   # close output files
-   sim.finish()
+   ) as sim:
+       # minimize energy first, saving the minimized coordinates to min.gro
+       sim.context.minimize_energy()
+       sim.save_geometry("min.gro")
+       # generate velocities at 298 K
+       sim.context.generate_velocities(298)
+       # run simulation for md_steps
+       sim.simulate()
+       # write final coordinates, velocities and box to a .gro file
+       sim.save_geometry("out.gro")
 
-See :doc:`/autoapi/martini_daemon/Simulation` for the whole list of available arguments, attributes and methods.
+See :doc:`/autoapi/martini_daemon/Simulation` for all available arguments, attributes and methods.
+
+Output files are written by Reporters. These reporters will own output handles. These are closed automatically
+if using the ``with Simulation(...) as sim:`` syntax, or manually by calling ``Simulation.finish()``.
+All output file paths are prefixed with the value passed to the argument ``sim_name``.
+By default, no final or post-minimization geometry is written. The script should include ``sim.save_geometry(...)``
+calls if this is desired.
 
 Including reactions
 -------------------

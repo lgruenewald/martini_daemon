@@ -1,19 +1,19 @@
 Extending Martini Daemon
 ========================
 
-Martini Daemon can be extended in multiple ways, from simplest to hardest:
+Martini Daemon is intended to be extensible. Extending is possible in multiple ways:
 
 * Creating new reporters,
 * Creating new bond, angle, etc. types,
 * Changing the NonBonded force,
-* Adding new directives.
+* Adding new directives to the ``.top`` parser.
 
 Creating new reporters
 ----------------------
 
 New reporters should inherit the ``Reporter`` class and override various of its methods. Each of the overridden
 methods implements a callback that is called by ``Simulation`` at certain points during Martini Daemon simulations.
-:doc:`/martini_daemon/autodoc/Reporter` can be checked for an up-to-date list of possible callbacks. In this section,
+:doc:`/autoapi/martini_daemon/Reporter` can be checked for an up-to-date list of possible callbacks. In this section,
 a specific example will be shown, along with explanations. This example will be CustomReporter, which will call
 methods of an imaginary CustomWriter class. This imaginary class is used to hide the complexity of file format
 writers, and to focus on interfacing with Martini Daemon.
@@ -99,7 +99,8 @@ during this method. The simulation object is still available to query, should so
 Creating new interactions
 -------------------------
 
-For this section, the implementation of Harmonic Bond in Martini Daemon is explained.
+For this section, the implementation of Harmonic Bond in Martini Daemon is explained. It can be modified to
+get custom bond, angle or dihedral types. Note: this part of the API is newer and still up to change.
 
 ::
 
@@ -136,7 +137,7 @@ For this section, the implementation of Harmonic Bond in Martini Daemon is expla
         def get_name(cls) -> str:
             return "harmonic_bond"
 
-Custom bonded interactions should inherit :doc:`/martini_daemon/autoapi/BondedForce`. There is a number of methods
+Custom bonded interactions should inherit :doc:`/autoapi/martini_daemon/BondedForce`. There is a number of methods
 that must be overridden:
 
 * ``register_bond_type`` is a decorator defined for the ``[bonds]`` directive. It binds a specific bond type number to
@@ -174,9 +175,32 @@ that must be overridden:
 Changing the NonBonded force
 ----------------------------
 
-TODO
+In broad terms :doc:`/autoapi/martini_daemon/NonBonded`  (found in the repo at ``/martini_daemon/__forces/nonbonded.py``)
+works as such:
+
+* The base NonBonded force is a shifted LJ and reaction field electrostatic, with a cutoff. Additionally, it has soft core
+  parameters, that can be "toggled on" by changing the values away from the default.
+* The parsed nonbonded params directive result from parsing the ``.top`` is put into ``system.additional_data["nb_types"]``.
+  This is read by ``NonBonded`` into a Discrete 2D table of OpenMM.
+* ``ExclusionHelper`` handles storing exclusions, as well as adding reaction field corrections to the energy.
+
+There is no proper API to only change the NonBonded function. Nevertheless, it can be changed.
+
+* Make a subclass of NonBonded that overrides everything. Copy the implementation and edit it.
+* Pass the modified class as the argument ``nonbonded`` to Simulation.
 
 Adding new directives
 ---------------------
 
-TODO
+In broad terms:
+
+* Custom directives should inherit the :doc:`/autoapi/martini_daemon/Directive` class.
+* Custom directives need to be registered using ``@register_directive``.
+* Each directive can specify which other directive should its parent be. The root :doc:`/autoapi/martini_daemon/GromacsTopFile`
+  is a likely candidate. The parent directive instance is available under the ``parent`` argument passed to the constructor.
+* Each occurrence of a directive during parsing will lead to the instantiation of the registered Directive subclass.
+* Temporary state can exist within ``self``.
+* The output of parsing is modelled by mutating ``parent``, or its fields (e.g. ``system``).
+* A good place to put per-simulation data is ``system.additional_data``, which is a dictionary that stores things
+  the core of Martini Daemon need not be aware of, but all the different moving components can still access and mutate
+  it. Its lifetime is the current simulation.
