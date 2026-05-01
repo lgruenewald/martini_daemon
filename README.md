@@ -18,8 +18,8 @@ This is achieved by combining multiple components in one repo / one python packa
 - It's recommended to explicitly [install the right version of OpenMM](https://docs.openmm.org/latest/userguide/application/01_getting_started.html#installing-openmm) with support for your GPU.
    - e.g. `pip install openmm[cuda12]` or `pip install openmm[hip7]`
    - (optional) after installing, verify which platforms are available with `python -m openmm.testInstallation`
-- (Within the virtual environment) install maturin (`pip install maturin` or `uv tool install maturin`).
-- Install to the virtual environment using `maturin develop -r`.
+- pip: Install using `pip install -e .`
+- uv: Install maturin using `uv tool install maturin` and then run `maturin develop -r`
 
 # Optional dependencies
 
@@ -54,21 +54,25 @@ pip install .[test]
 maturin develop
 # run the python tests
 pytest .
-# run the rust tests (for this command, deactivate conda environments if using conda/mamba)
-cargo test
 ```
 
 The python tests can be found in the `tests` folder in the repo, containing the following types of tests:
 - `parser` - Tests the .top parser basics.
-- `single_frame` - Single point energy and force calculation tests, that verify that Martini is implemented correctly by comparing it to GROMACS energies.
+- `single_frame` - Single point energy and force calculation tests,
+  that verify that Martini is implemented correctly by comparing it to GROMACS energies.
+  Inspired by the setup that validates [martini_openmm](https://github.com/maccallumlab/martini_openmm) against GROMACS.
 - `graph` - Tests for the graph matching algorithm.
 - `detection` - Tests for the detection algorithm.
 - `modification` - Tests for the modification algorithm.
-- `integration` - Runs a short reactive simulation with various reporters. Does not automatically verify output at the moment, doing that is the job of the other tests.
+- `integration` - Runs a short reactive simulation with various reporters.
+  Does not automatically verify output at the moment, doing that is the job of the other tests.
+- `formats` - Runs tests for geometry, trajectory and topology trajectory formats.
+- `replay` - Test checkpoint loading, replaying reactions and comparing subsequent energies against GROMACS.
+- `test_periodic_box` - Fuzz the PeriodicBox implementation against mdtraj.
+- `test_bond_graph` - Test the class `BondGraph`, which features things, such as pbc whole.
 
-The rust tests can be found in `src` at the end of a few of the submodules. Other submodules are tested as part of the python tests.
-
-Currently, there are no skipped or stochastic tests, all tests should pass.
+Currently, there are no tests that fail stochastically, all tests should pass.
+If a test does not pass, please open an Issue.
 
 Some single_frame tests have looser tolerances, this is documented at the top of `tests/single_frame/test_single_frame.py`.
 

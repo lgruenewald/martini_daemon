@@ -549,7 +549,7 @@ class System:
         By default, 3*N, but some forces, such as virtual sites, constraints, or center of mass motion removal
         will decrease it.
         """
-        return self.num_atoms() - sum(
+        return self.num_atoms() * 3 - sum(
             f.delta_degrees_of_freedom() for f in self.__forces.values()
         )
 

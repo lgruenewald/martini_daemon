@@ -448,8 +448,8 @@ class Simulation:
             self.__do_traj_frame()
             print()
         except Exception as e:
-            self.error(f"!!! Unexpected Exception!!!\n{e}")
-            raise e from None
+            self.error(f"Unexpected Exception: {e}")
+            raise e
 
     def __do_traj_frame(self) -> None:
         """Write a frame to all trajectory files."""

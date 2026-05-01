@@ -27,7 +27,8 @@ def rootdir(request: pytest.FixtureRequest) -> str:
 
 
 tests = [
-    "update_redefine", "update_redefine_exclusion"
+    "update_redefine", "update_redefine_exclusion",
+    "change_to_U"
 ]
 
 
@@ -118,5 +119,5 @@ def test_replay(x: str, rootdir: str) -> None:
         os.remove(filename)
     for filename in glob.glob("./#*"):
         os.remove(filename)
-    os.remove("energy.xvg")
-    os.remove("forces.xvg")
+    #os.remove("energy.xvg")
+    #os.remove("forces.xvg")
