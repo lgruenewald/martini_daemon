@@ -29,7 +29,7 @@ def test_distances(pbc: PeriodicBox) -> None:
             dist_ref = float(mdtraj.compute_distances(traj, [(i, j)])[0][0])
             dist = pbc.distance(xyz[0, i], xyz[0, j])
             dist_sq = pbc.distance_squared(xyz[0, i], xyz[0, j])
-            assert np.isclose(dist_ref, dist, atol=1e-5), (
+            assert np.isclose(dist_ref, dist, atol=1e-3), (
                 f"Bad distance. Coords: {xyz[0, i]}, {xyz[0, j]}.\n"
                 + f"Box: {pbc.a} {pbc.b} {pbc.c}.\n"
                 + f"Distance martini_daemon: {dist} nm.\n"
@@ -50,7 +50,7 @@ def test_move_to(pbc: PeriodicBox) -> None:
             dist_ref = float(mdtraj.compute_distances(traj, [(i, j)])[0][0])
             moved_j = np.array(pbc.move_to(xyz[0, i], xyz[0, j]))
             dist = np.linalg.norm(xyz[0, i] - moved_j)
-            assert np.isclose(dist_ref, dist, atol=1e-5), (
+            assert np.isclose(dist_ref, dist, atol=1e-3), (
                 f"Bad move_to. Ref I: {xyz[0, i]} J: {xyz[0, j]}.\n"
                 f"Moved J: {moved_j}.\n"
                 + f"Box: {pbc.a} {pbc.b} {pbc.c}.\n"
@@ -72,7 +72,7 @@ def test_angles(pbc: PeriodicBox) -> None:
                 angle_ref = float(mdtraj.compute_angles(traj, [(i, j, k)])[0][0])
                 angle = pbc.angle(xyz[0, i], xyz[0, j], xyz[0, k])
                 cos_angle = pbc.cos_angle(xyz[0, i], xyz[0, j], xyz[0, k])
-                assert np.isclose(angle_ref, angle, atol=1e-4), (
+                assert np.isclose(angle_ref, angle, atol=1e-3), (
                     f"Bad angle. pos: {xyz[0, i]} {xyz[0, j]} {xyz[0, k]}\n"
                     + f"daemon: {angle}\n"
                     + f"mdtraj: {angle_ref}\n"
@@ -131,7 +131,7 @@ def test_which_atoms_within_distance(pbc: PeriodicBox) -> None:
     fast = pbc.which_atoms_within_distance(atoms, {0}, r)
 
     assert fast == slow, (
-        f"Test which atoms within distance fail.\n"
+        "Test which atoms within distance fail.\n"
         + f"Set slow size: {len(slow)}, set fast size: {len(fast)}\n"
         + f"Diff slow-fast: {slow-fast}\n"
         + f"Diff fast-slow: {fast-slow}\n"

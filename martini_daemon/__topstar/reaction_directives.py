@@ -254,7 +254,7 @@ class ConditionsDirective(Directive):
             for a, b, c, d, e, f, g, h, _, _ in last_reaction.dihedral_limits
         }
 
-        possible_keys = {"r_max", "r_min", "angle", "dihedral", "rate", "probability", "p"}
+        possible_keys = {"r_max", "r_min", "angle", "dihedral", "probability", "p"}
         if key not in possible_keys:
             close_matches = difflib.get_close_matches(key, possible_keys, 1)
             raise TokenParseException(

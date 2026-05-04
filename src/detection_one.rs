@@ -159,22 +159,5 @@ pub fn detection_one<'py>(
         }
     }
 
-    // is reaction rate controlled using a rate constant
-    if let Some(rate) = rx.rate {
-        let Some(obs_rate) = rx.observed_rate else {
-            // warmup for this reaction
-            return false;
-        };
-        if rx.total_reaction_count < 3 {
-            // arbitrary small number to get at least an order of magnitude estimate for
-            // the frequency of reactions
-            return false;
-        }
-        if obs_rate > rate {
-            // too fast! slow down a bit until the smoothing estimates the rate to be below
-            return false;
-        }
-    }
-
     true
 }

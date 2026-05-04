@@ -374,7 +374,7 @@ class TopTrajReader:
         i = 1 + title_len
         (n_init,) = struct.unpack("<I", header[i : i + 4])
         i += 4
-        self.initial_molecules = []
+        self.initial_molecules: list[tuple[bytes, int, int]] = []
         for _ in range(n_init):
             name_len = header[i]
             i += 1

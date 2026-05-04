@@ -27,16 +27,8 @@ pub struct DetectionTemplate {
         f64,
         f64,
     )>,
-    // desired maximum rate as specified in the input file, in rate constant units
-    #[pyo3(get, set)]
-    pub rate: Option<f64>,
-    // smoothed observed rate in the same units as the rate constant, so already divided/multiplied by concentration(s)
-    #[pyo3(get, set)]
-    pub observed_rate: Option<f64>,
     #[pyo3(get, set)]
     pub probability: f64,
-    #[pyo3(get, set)]
-    pub total_reaction_count: usize
 }
 
 #[gen_stub_pymethods]
@@ -51,10 +43,7 @@ impl DetectionTemplate {
             distance_min: Vec::new(),
             angle_limits: Vec::new(),
             dihedral_limits: Vec::new(),
-            rate: None,
-            observed_rate: None,
             probability: 1.,
-            total_reaction_count: 0
         }
     }
 

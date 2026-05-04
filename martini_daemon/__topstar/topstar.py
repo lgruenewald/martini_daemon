@@ -66,20 +66,6 @@ class TopStar:
 
             self.frag_list.add_fragment(m.graph.name, frag_atoms)
 
-    def update_rates(
-        self,
-        reactions: list[tuple[str, list[int]]],
-        counts: dict[str, int],
-        volume: float,
-    ) -> None:
-        """Update "observed rate" in detection templates.
-
-        Based on the reactions happening and current reactant concentrations (specified using counts and volume).
-        """
-        # TODO
-        # note we only have post-rate adjusted rates
-        pass
-
     def detection(
         self, pbc: PeriodicBox, pos: npt.NDArray[np.float64]
     ) -> list[tuple[str, list[int]]]:
