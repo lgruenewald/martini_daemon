@@ -35,4 +35,4 @@ class TrajectoryReporter(Reporter):
 
     def on_simulation_finish(self, simulation: Simulation) -> None:
         assert self.writer is not None
-        self.writer.finish()
+        self.writer.close()

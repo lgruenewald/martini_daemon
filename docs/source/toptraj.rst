@@ -18,18 +18,115 @@ The following Python classes can be used to interact with this format:
 * :doc:`/autoapi/martini_daemon/TopTrajWriter`
 * :doc:`/autoapi/martini_daemon/TopTrajReader`
 
-Martini Daemon CLI
-------------------
+The remaining of this page focuses on common analysis procedures that can be made possible for reactive simulations
+based on this format.
 
-TODO
+Making trajectories whole
+-------------------------
 
-Analysis
---------
+:doc:`/autoapi/martini_daemon/BondGraph` has a method ``make_whole``, which can be utilized to make trajectories
+with dynamic bonds whole. Below is a quick script utilizing Martini Daemon's helper classes to make ``out.xtc`` whole
+based on ``out.toptraj``, writing ``whole.xtc``, printing progress to stdout. Do note, that ``BondGraph`` requires
+its argument to be float64, while ``pos`` will be a dtype based on the backend (``float32`` for the default
+``molly_xtc``).
 
-TODO
+::
 
-VMD plugin
-----------
+    #!/usr/bin/env python3
+
+    from martini_daemon import TopTrajReader, BondGraph, TrajectoryReader, TrajectoryWriter
+    import sys
+    import numpy as np
+
+    inp = "out"
+    oup = "whole"
+
+    r = TopTrajReader(f"{inp}.toptraj")
+
+    bonds = []
+
+    print()
+    i = 0
+    while (f := r.read_frame()):
+        i += 1
+        bonds.append(f.bonds)
+        sys.stdout.write(f"\033[2K\rReading bonds: {i}")
+    print()
+
+    n_frames = len(bonds)
+    n_atoms = len(r.res_names)
+
+    r.close()
+
+    r = TrajectoryReader(f"{inp}.xtc")
+    w = TrajectoryWriter(f"{oup}.xtc")
+
+    for i in range(n_frames):
+        sys.stdout.write(f"\033[2K\rMaking whole frame: {i+1}/{n_frames+1}")
+        frame = r.read_frame()
+        assert frame is not None
+        step, time, pbc, pos, _ = frame
+        pos = np.array(pos, dtype=np.float64)
+
+        graph = BondGraph(n_atoms)
+        for a, b in bonds[i]:
+            graph.add_bond(a, b)
+        graph.make_whole(pbc, pos)
+
+        w.write_frame(
+            step, time, pbc, pos
+        )
+
+    r.close()
+    w.close()
+
+Topology analysis
+-----------------
+
+Many analysis methods may be reliant on the bond network as well, such as oligomer or polymer topologies (chains, loops,
+cycles). If it is possible to map the reactive parts of the simulation to "monomers", which are bonded if they have
+bonds connected, here is a simple template for mapping the bead-bead bond network to monomer-monomer.
+Note, that by doing so, there can be more than one bond between a pair of monomers,
+so do verify whether this behavior is correct. By default, in the .toptraj format, duplicate bonds are removed.
+
+::
+
+    #!/usr/bin/env python3
+    from martini_daemon import TopTrajReader
+    import networkx as nx
+    import numpy as np
+
+    def read_monomer_graph(bond_frames: list[list[tuple[int, int]]], mapping: np.ndarray):
+        """Map a list of bead-bead bonds to monomer-monomer bonds."""
+        # input data and uninitialized result
+        # make a mapping atom -> monomer
+        monomer_frames = []
+        for frame in bond_frames:
+            # bonds that are between different monomers
+            monomer_frames.append(
+                np.array([
+                    (mapping[p1], mapping[p2])
+                    for p1, p2 in frame
+                    if mapping[p1] != mapping[p2]
+                ], dtype=np.uint32)
+            )
+        return monomer_frames
+
+
+    atom_per_monomer = 5
+    n_monomer = 100
+    n_atoms = n_monomer * atom_per_monomer
+
+    mapping = np.arange(n_atoms, dtype=np.int32) // atom_per_monomer
+
+    r = TopTrajReader("out.toptraj")
+
+    bonds = []
+
+    while (f := r.read_frame()):
+        bonds.append(read_monomer_graph(f.bonds, mapping))
+
+    n_frames = len(bonds)
 
 .. include:: ../../vmd_plugin/README.md
     :parser: myst_parser.sphinx_

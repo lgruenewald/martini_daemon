@@ -49,7 +49,7 @@ def test_read_write_trajectory(backend: str, rootdir: str) -> None:
     for i in range(n_frames):
         w.write_frame(i * steps_per_frame, i * 5.0, pbc, pos[i], vel[i])
 
-    w.finish()
+    w.close()
 
     with TrajectoryReader(tmp_path, backend) as r:
         for i in range(n_frames):
@@ -106,7 +106,7 @@ def test_truncate_append_trajectory(backend: str, rootdir: str) -> None:
         # making sure it overflows int32!
         w.write_frame(i * steps_per_frame, i * ps_per_frame, pbc, pos[i], vel[i])
 
-    w.finish()
+    w.close()
 
     # only keep the first 500 frames
     # last frame to keep
@@ -125,7 +125,7 @@ def test_truncate_append_trajectory(backend: str, rootdir: str) -> None:
 
     for i in range(truncate_at, n_frames):
         w.write_frame(i * steps_per_frame, i * ps_per_frame, pbc, pos[i], vel[i])
-    w.finish()
+    w.close()
 
     r = TrajectoryReader(tmp_path, backend)
     for i in range(n_frames):
@@ -141,6 +141,6 @@ def test_truncate_append_trajectory(backend: str, rootdir: str) -> None:
         if sim_vel is not None:
             assert np.allclose(vel[i], sim_vel, atol=1e-3)
     assert r.read_frame() is None
-    r.finish()
+    r.close()
 
     os.remove(tmp_path)

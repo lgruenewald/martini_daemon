@@ -345,6 +345,10 @@ class Simulation:
             r.on_simulation_finish(self)
         self.log.close()
 
+    def close(self) -> None:
+        """Alias for finish()."""
+        self.finish()
+
     def info(self, *args: str) -> None:
         """Write a message to log."""
         self.log.write(

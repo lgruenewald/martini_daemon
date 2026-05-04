@@ -102,7 +102,7 @@ class TrajectoryWriter:
         return self
 
     def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
-        self.finish()
+        self.close()
 
     def write_frame(
         self,
@@ -148,7 +148,7 @@ class TrajectoryWriter:
             case _:
                 assert False
 
-    def finish(self) -> None:
+    def close(self) -> None:
         """Close any open file handles, depending on the backend."""
         match self.backend:
             case "xtc_molly":
@@ -185,8 +185,8 @@ class TrajectoryReader:
         self.path = path
         if backend is None:
             _, ext = splitext(path)
-            self.backend = self.default_backends.get(ext)
-            if self.backend is None:
+            backend = self.default_backends.get(ext)
+            if backend is None:
                 raise ValueError(f"Unknown trajectory file format {ext} for {path}.")
         if backend not in self.backends:
             raise ValueError(
@@ -211,7 +211,7 @@ class TrajectoryReader:
         return self
 
     def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
-        self.finish()
+        self.close()
 
 
     def read_frame(
@@ -265,7 +265,7 @@ class TrajectoryReader:
             case _:
                 assert False
 
-    def finish(self) -> None:
+    def close(self) -> None:
         """Close any open file handles, depending on the backend."""
         match self.backend:
             case "xtc_molly":

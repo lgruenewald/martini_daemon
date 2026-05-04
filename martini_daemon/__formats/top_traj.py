@@ -398,7 +398,7 @@ class TopTrajReader:
         return self
 
     def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
-        self.finish()
+        self.close()
 
     def skip_frame(self) -> None:
         """Skip a single frame.
@@ -499,5 +499,5 @@ class TopTrajReader:
             bonds,
         )
 
-    def finish(self):
+    def close(self):
         self.__handle.close()
