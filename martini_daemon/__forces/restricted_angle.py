@@ -29,9 +29,7 @@ class RestrictedAngle(BondedForce):
         return "restricted_angle"
 
     def _set_force_obj(self) -> mm.Force:
-        force = mm.CustomAngleForce(
-            "0.5*k*(cos(theta)-cos(theta0))^2/sin(theta)^2"
-        )
+        force = mm.CustomAngleForce("0.5*k*(cos(theta)-cos(theta0))^2/sin(theta)^2")
         force.addPerAngleParameter("theta0")
         force.addPerAngleParameter("k")
 

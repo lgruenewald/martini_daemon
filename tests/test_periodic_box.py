@@ -101,7 +101,7 @@ def test_dihedrals(pbc: PeriodicBox) -> None:
 
 
 @pytest.mark.parametrize("pbc", boxes)
-def test_move_within(pbc:PeriodicBox) -> None:
+def test_move_within(pbc: PeriodicBox) -> None:
     """Test PeriodicBox.move_within()."""
     n_atoms = 100
     xyz = np.random.rand(n_atoms * 3).reshape((1, n_atoms, 3)) * 100.0 - 50.0
@@ -112,8 +112,6 @@ def test_move_within(pbc:PeriodicBox) -> None:
         assert 0 < within[0] < pbc.a[0]
         assert 0 < within[1] < pbc.b[1]
         assert 0 < within[2] < pbc.c[2]
-
-
 
 
 @pytest.mark.parametrize("pbc", boxes)
@@ -134,8 +132,8 @@ def test_which_atoms_within_distance(pbc: PeriodicBox) -> None:
     assert fast == slow, (
         "Test which atoms within distance fail.\n"
         + f"Set slow size: {len(slow)}, set fast size: {len(fast)}\n"
-        + f"Diff slow-fast: {slow-fast}\n"
-        + f"Diff fast-slow: {fast-slow}\n"
+        + f"Diff slow-fast: {slow - fast}\n"
+        + f"Diff fast-slow: {fast - slow}\n"
     )
 
 

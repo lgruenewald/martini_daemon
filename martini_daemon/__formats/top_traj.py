@@ -93,9 +93,14 @@ class TopTrajWriter:
     """
 
     def __init__(
-        self, path: str, title: str,
-        initial_molecules: list[tuple[str, int, int]], res_names: list[str], res_ids: list[int],
-        append: bool = False, truncate: None | int = None
+        self,
+        path: str,
+        title: str,
+        initial_molecules: list[tuple[str, int, int]],
+        res_names: list[str],
+        res_ids: list[int],
+        append: bool = False,
+        truncate: None | int = None,
     ) -> None:
         """Creates a Topology Trajectory writer.
 
@@ -123,17 +128,17 @@ class TopTrajWriter:
             title_bytes = title.encode("utf-8")
             title_len = min(255, len(title_bytes))
             n_initial = len(initial_molecules)
-            self.__write(struct.pack(f"<B{title_len}sI", title_len, title_bytes, n_initial))
+            self.__write(
+                struct.pack(f"<B{title_len}sI", title_len, title_bytes, n_initial)
+            )
             for name, count, atom_per_mol in initial_molecules:
                 name_bytes = name.encode("utf-8")
                 name_len = min(255, len(name_bytes))
-                self.__write(struct.pack(
-                    f"<B{name_len}sII",
-                    name_len,
-                    name_bytes,
-                    count,
-                    atom_per_mol
-                ))
+                self.__write(
+                    struct.pack(
+                        f"<B{name_len}sII", name_len, name_bytes, count, atom_per_mol
+                    )
+                )
 
             self.__write(struct.pack("<I", self.n_atoms))
             for name in res_names:
@@ -150,18 +155,20 @@ class TopTrajWriter:
             self.__handle = open(path, "rb+")  # noqa: SIM115
             magic_number = self.__handle.read(8)
             if magic_number != magic_1_0:
-                raise ValueError("Magic number mismatch. Can't append to a different file format.")
+                raise ValueError(
+                    "Magic number mismatch. Can't append to a different file format."
+                )
 
             # truncate if needed
             if truncate is not None:
                 # skip header
-                header_size, = struct.unpack("<Q", self.__handle.read(8))
+                (header_size,) = struct.unpack("<Q", self.__handle.read(8))
                 self.__handle.seek(8 + header_size + 4, SEEK_CUR)
 
                 # start reading frames
                 truncate_at = self.__handle.tell()
                 while chunk_header := self.__handle.read(8):
-                    chunk_size, = struct.unpack("<Q", chunk_header)
+                    (chunk_size,) = struct.unpack("<Q", chunk_header)
                     self.__handle.seek(8, SEEK_CUR)
                     content = zlib.decompress(self.__handle.read(chunk_size))
                     frame, n_atoms, sim_step, sim_time = struct.unpack(
@@ -184,7 +191,6 @@ class TopTrajWriter:
 
     def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
         self.finish()
-
 
     def new_frame(
         self, frame_num: int, sim_step: int, time_ps: float, n_atoms: int
@@ -382,15 +388,13 @@ class TopTrajReader:
         for _ in range(n_init):
             name_len = header[i]
             i += 1
-            (name,) = struct.unpack(
-                f"<{name_len}s", header[i : i + name_len]
-            )
+            (name,) = struct.unpack(f"<{name_len}s", header[i : i + name_len])
             i += name_len
             (n, n_atoms_per) = struct.unpack("<II", header[i : i + 8])
             i += 8
             self.initial_molecules.append((name, n, n_atoms_per))
 
-        n_atoms, = struct.unpack("<I", header[i : i + 4])
+        (n_atoms,) = struct.unpack("<I", header[i : i + 4])
         i += 4
         i, self.res_names = self.__read_strings(header, i, n_atoms)
         i, self.res_ids = self.__read_any(header, i, n_atoms, "<I", 4)
@@ -412,7 +416,7 @@ class TopTrajReader:
         chunk_len_bytes = self.__handle.read(8)
         if len(chunk_len_bytes) == 0:
             return
-        chunk_len, = struct.unpack("<Q", chunk_len_bytes)
+        (chunk_len,) = struct.unpack("<Q", chunk_len_bytes)
         self.__handle.seek(8 + chunk_len + 4, SEEK_CUR)
 
     def tell(self) -> int:
@@ -424,40 +428,42 @@ class TopTrajReader:
         if len(chunk_len_bytes) == 0:
             # EOF
             return None
-        assert len(chunk_len_bytes) == 8, f"File {self.path} is likely corrupt. Trailing bytes found."
-        chunk_len, = struct.unpack("<Q", chunk_len_bytes)
-        decompressed_len, = struct.unpack("<Q", self.__handle.read(8))
+        assert len(chunk_len_bytes) == 8, (
+            f"File {self.path} is likely corrupt. Trailing bytes found."
+        )
+        (chunk_len,) = struct.unpack("<Q", chunk_len_bytes)
+        (decompressed_len,) = struct.unpack("<Q", self.__handle.read(8))
         content = zlib.decompress(self.__handle.read(chunk_len))
         assert len(content) == decompressed_len, (
             f"File {self.path} appears to be corrupt. "
             + f"Decompressed length {len(content)} doesn't match {decompressed_len}."
         )
-        crc32, = struct.unpack("<I", self.__handle.read(4))
+        (crc32,) = struct.unpack("<I", self.__handle.read(4))
         if zlib.crc32(content) != crc32:
             raise ValueError(
                 f"File {self.path} appears to be corrupt. Chunk CRC32 {crc32} doesn't match {zlib.crc32(content)}."
             )
         return content
 
-    def __read_strings(self, content: bytes, i: int, n_atoms: int) -> tuple[int, list[bytes]]:
+    def __read_strings(
+        self, content: bytes, i: int, n_atoms: int
+    ) -> tuple[int, list[bytes]]:
         """Reads n pascal strings."""
         res = []
         for _ in range(n_atoms):
             len_ = content[i]
             i += 1
-            res.append(
-                struct.unpack(f"<{len_}s", content[i : i + len_])[0]
-            )
+            res.append(struct.unpack(f"<{len_}s", content[i : i + len_])[0])
             i += len_
         return i, res
 
-    def __read_any(self, content: bytes, i: int, n_atoms: int, byte_format: str, n_bytes: int) -> tuple[int, list[Any]]:
+    def __read_any(
+        self, content: bytes, i: int, n_atoms: int, byte_format: str, n_bytes: int
+    ) -> tuple[int, list[Any]]:
         """Reads n occurrences of the byte format specified."""
         res = []
         for _ in range(n_atoms):
-            res.append(
-                struct.unpack(byte_format, content[i : i + n_bytes])[0]
-            )
+            res.append(struct.unpack(byte_format, content[i : i + n_bytes])[0])
             i += n_bytes
         return i, res
 
@@ -471,9 +477,7 @@ class TopTrajReader:
             return None
 
         i = 0
-        frame, n_atoms, sim_step, sim_time = struct.unpack(
-            "<IIQd", content[i : i + 24]
-        )
+        frame, n_atoms, sim_step, sim_time = struct.unpack("<IIQd", content[i : i + 24])
         i += 24
         i, names = self.__read_strings(content, i, n_atoms)
         i, types = self.__read_strings(content, i, n_atoms)

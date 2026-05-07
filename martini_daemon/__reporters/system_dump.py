@@ -1,7 +1,8 @@
 import re
-from typing import Any, TextIO
+from typing import TextIO
 
 from ..__core import BondedForce
+from ..__rust import Fragment
 from ..__simulation import Reporter, Simulation
 
 
@@ -35,7 +36,9 @@ def write_frame(handle: TextIO, sim: Simulation) -> None:
 
 class SystemDump(Reporter):
     def __init__(self) -> None:
-        """Dumps all info from System, including all atom details and all interactions
+        """Create a SystemDump Reporter.
+
+        Dumps all info from System, including all atom details and all interactions
         in a human-readable plaintext file. Dumps it at the start of a simulation and
         when there is any reactions.
 
@@ -52,8 +55,8 @@ class SystemDump(Reporter):
         """
         pass
 
-    def on_simulation_start(self, simulation, continue_sim: bool) -> None:
-        self.handle = open(
+    def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
+        self.handle = open(  # noqa: SIM115
             simulation.request_path(".system_dump", continue_sim=continue_sim), "a"
         )
         n = simulation.system.num_atoms()
@@ -62,10 +65,12 @@ class SystemDump(Reporter):
             self.handle.write("# Written by Martini Daemon SystemDump\n")
         write_frame(self.handle, simulation)
 
-    def on_simulation_finish(self, simulation) -> None:
+    def on_simulation_finish(self, simulation: Simulation) -> None:
         self.handle.close()
 
-    def on_reaction(self, simulation, reactions) -> None:
+    def on_reaction(
+        self, simulation: Simulation, reactions: list[tuple[str, list[Fragment]]]
+    ) -> None:
         write_frame(self.handle, simulation)
 
     @classmethod
@@ -76,7 +81,7 @@ class SystemDump(Reporter):
         tuple[
             int,
             list[tuple[str, int, str, str, float, float, float, float]],
-            list[tuple[str, list[Any]]],
+            list[tuple[str, list[list[float]]]],
         ]
     ]:
         """.sstar dump reader.
@@ -95,7 +100,7 @@ class SystemDump(Reporter):
         * forces is a list of tuples of:
             * force name
             * interaction list, which is a list of tuples.
-                * these tuples contain members (int) and parameters (floats).
+                * these tuples contain members and parameters, with count specific to the interaction at hand (floats).
         """
         frames = []
         with open(path) as f:
@@ -104,7 +109,7 @@ class SystemDump(Reporter):
         prev_i = None
         i = 0
 
-        def advance():
+        def advance() -> str | None:
             # return the next non-comment, non-empty line in file, or None if we reached the end of file
             nonlocal i, prev_i
             prev_i = i
@@ -120,12 +125,15 @@ class SystemDump(Reporter):
             i = prev_i
             prev_i = None
 
-        def parse_atoms(atoms) -> None:
+        def parse_atoms(
+            atoms: list[tuple[str, int, str, str, float, float, float, float]],
+        ) -> None:
+
             while line := advance():
                 if line[0] != "(":
                     backtrack()
                     break
-                name, res_id, res_name, atom_type, charge, mass, *other = (
+                name, res_id, res_name, atom_type, charge, mass, sc_lam, sc_alpha = (
                     line.strip("()").replace(" ", "").split(",")
                 )
                 atoms.append(
@@ -136,11 +144,12 @@ class SystemDump(Reporter):
                         atom_type,
                         float(charge),
                         float(mass),
-                        *other,
+                        float(sc_lam),
+                        float(sc_alpha),
                     )
                 )
 
-        def parse_force(force) -> None:
+        def parse_force(force: list[list[float]]) -> None:
             while line := advance():
                 if line == "None":
                     continue
@@ -150,7 +159,7 @@ class SystemDump(Reporter):
                 elems = [float(x) for x in line.strip("()").replace(" ", "").split(",")]
                 force.append(elems)
 
-        def parse_forces(forces) -> None:
+        def parse_forces(forces: list[tuple[str, list[list[float]]]]) -> None:
             while line := advance():
                 if line[:6] != "Force:":
                     backtrack()
@@ -159,7 +168,7 @@ class SystemDump(Reporter):
                 forces.append((line[6:], force))
                 parse_force(force)
 
-        def parse_frame(line) -> None:
+        def parse_frame(line: str) -> None:
             nonlocal frames
             pat = re.compile("[0-9]+")
             num = pat.search(line)
@@ -169,8 +178,8 @@ class SystemDump(Reporter):
             frame = (int(line[num.start() : num.end()]), atoms, forces)
             frames.append(frame)
 
-            while line := advance():
-                match line:
+            while cline := advance():
+                match cline:
                     case "Atoms":
                         parse_atoms(atoms)
                     case "Forces":
@@ -178,7 +187,7 @@ class SystemDump(Reporter):
                     case "End Frame":
                         break
                     case _:
-                        assert False, f"Unexpected line: {line}"
+                        assert False, f"Unexpected line: {cline}"
 
         while cline := advance():
             if re.match(r"^==== Frame [0-9]+ ====$", cline):

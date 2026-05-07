@@ -30,7 +30,9 @@ from .__topstar import TopStar
 
 class Reporter(ABC):
     def pre_simulation_start(self, simulation: Simulation) -> None:
-        """Called just before the context is initialized.
+        """Set up reporting.
+
+        Called just before the context is initialized.
 
         Use on_simulation_start unless you really need to mutate simulation in a way that needs to happen
         before context initialization.
@@ -38,10 +40,11 @@ class Reporter(ABC):
 
     @abstractmethod
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
-        """Called once when Simulation is constructed. After the context is initialized.
+        """Set up reporting.
+
+        Called after the context is initialized.
 
         Must be implemented, as all output files that live through the whole simulations should be opened in this.
-
 
         :param simulation: Simulation object.
         :param continue_sim: If True, should append instead of overwrite. Warning! May need to truncate files to
@@ -53,14 +56,14 @@ class Reporter(ABC):
 
     @abstractmethod
     def on_simulation_finish(self, simulation: Simulation) -> None:
-        """Called once when simulation's finish() is called.
+        """Report once when simulation's finish() is called.
 
         Must be implemented, as handles owned by reporters must be closed in it.
         """
         pass
 
     def on_trajectory_frame(self, simulation: Simulation) -> None:
-        """Called every traj_frequency frames.
+        """Report every traj_frequency frames.
 
         There is a single per simulation traj_frequency because that's a simple
         way of getting multiple output types with nicely aligned time frames.
@@ -68,16 +71,16 @@ class Reporter(ABC):
         pass
 
     def interactive_line(self, simulation: Simulation) -> str | None:
-        """Should return its addition to the interactive status progress display."""
+        """Report to the interactive status progress display."""
         pass
 
-    def pre_modification(self, simulation) -> None:
-        """Called before the modification algorithm, but only if there may be any reactions happening."""
+    def pre_modification(self, simulation: Simulation) -> None:
+        """Report before the modification algorithm, but only if there may be any reactions happening."""
 
     def on_reaction(
         self, simulation: Simulation, reactions: list[tuple[str, list[Fragment]]]
     ) -> None:
-        """Called after the modification algorithm runs.
+        """Report after the modification algorithm runs.
 
         :param simulation: Simulation object.
         :param reactions: List of reactions that were applied, as tuples of reaction name and references to reacting fragments.
@@ -85,7 +88,7 @@ class Reporter(ABC):
         pass
 
     def post_reaction(self, simulation: Simulation) -> None:
-        """Called after all on_reaction reporters were resolved (some might apply minimization)."""
+        """Report after all on_reaction reporters were resolved (some might apply minimization)."""
         pass
 
 
@@ -267,7 +270,7 @@ class Simulation:
         if nonbonded is None:
             nonbonded = NonBonded
 
-        self.log = open(self.request_path(".log", continue_sim=self.continue_sim), "a") # noqa: SIM115
+        self.log = open(self.request_path(".log", continue_sim=self.continue_sim), "a")  # noqa: SIM115
         self.info(f"Martini Daemon {version('martini_daemon')} log file")
         self.info("Build version:", build_version())
         assert isinstance(platform, mm.Platform)
@@ -375,7 +378,10 @@ class Simulation:
         return self
 
     def __exit__(
-        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, exc_traceback: TracebackType | None
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
     ) -> None:
         """Call self.finish() to close output files."""
         self.finish()
@@ -518,7 +524,8 @@ class Simulation:
                         self.current_step % self.traj_frequency == 0
                         if self.traj_frequency > 0
                         else False
-                    ) and not skip_1,
+                    )
+                    and not skip_1,
                     dm=(
                         self.current_step % self.dm_frequency == 0
                         if self.dm_frequency > 0

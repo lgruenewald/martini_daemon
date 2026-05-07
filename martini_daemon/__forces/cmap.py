@@ -114,7 +114,9 @@ class Cmap(BondedForce):
     ) -> None:
         idx_i, idx_j, idx_k, idx_l, idx_m = members
         assert isinstance(force, mm.CMAPTorsionForce)
-        force.addTorsion(int(params[0]), idx_i, idx_j, idx_k, idx_l, idx_j, idx_k, idx_l, idx_m)
+        force.addTorsion(
+            int(params[0]), idx_i, idx_j, idx_k, idx_l, idx_j, idx_k, idx_l, idx_m
+        )
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         assert len(params) == 0

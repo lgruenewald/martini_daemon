@@ -67,7 +67,9 @@ class CheckpointReporter(Reporter):
 
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
         self.paths = [
-            simulation.request_path(f".chk{i + 1 if i > 0 else ''}", continue_sim=continue_sim)
+            simulation.request_path(
+                f".chk{i + 1 if i > 0 else ''}", continue_sim=continue_sim
+            )
             for i in range(self.n_checkpoints + 1)
         ]
         self.tmp_path: str = simulation.request_path(".chk_tmp")
@@ -135,7 +137,9 @@ class CheckpointLoader(Simulation):
                 if self.current_step < step:
                     break
                 frag_ids = [frag_id for (name, frag_id, atoms) in frags]
-                sys.stdout.write(f"\033[2K\rReplaying reactions: {step}/{self.current_step}: {rx_name} {frag_ids}")
+                sys.stdout.write(
+                    f"\033[2K\rReplaying reactions: {step}/{self.current_step}: {rx_name} {frag_ids}"
+                )
                 # verification
                 frag_objs = [
                     self.top.frag_list.get_fragment(frag_id) for frag_id in frag_ids
@@ -146,5 +150,7 @@ class CheckpointLoader(Simulation):
                     assert frag_id == frag_obj.frag_id
                     assert all(a == b for a, b in zip(atoms, frag_obj.atoms))
                 self.top.modification([(rx_name, frag_ids)])
-            sys.stdout.write(f"\033[2K\rReplaying reactions: done replaying {len(reactions)} reactions.")
+            sys.stdout.write(
+                f"\033[2K\rReplaying reactions: done replaying {len(reactions)} reactions."
+            )
         print()

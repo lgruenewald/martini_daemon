@@ -9,7 +9,7 @@ def write_frame(handle: TextIO, sim: Simulation) -> None:
         frag = sim.top.frag_list.get_fragment(frag_id)
         assert frag is not None
         assert frag.frag_id == frag_id
-        atoms: str = ','.join([str(x) for x in frag.atoms])
+        atoms: str = ",".join([str(x) for x in frag.atoms])
         handle.write(f"{frag.name},{frag_id};{atoms}\n")
     handle.write("End Frame\n\n")
 

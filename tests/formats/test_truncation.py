@@ -26,10 +26,13 @@ class FakeSystem(System):
         super().__init__()
         self.additional_data["title"] = "placeholder"
 
+
 class FakeSimulation(Simulation):
     """Fake simulation class for testing."""
 
-    def __init__(self, base: str, reporters: list[Reporter], continue_sim: bool) -> None:
+    def __init__(
+        self, base: str, reporters: list[Reporter], continue_sim: bool
+    ) -> None:
         """Create fake simulation."""
         # should keep current step inclusive
         self.current_step = 3000

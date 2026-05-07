@@ -56,7 +56,7 @@ def test_integration(x: str, rootdir: str) -> None:
             ReactionReporter(),
             FragCountReporter(),
             ReactionEnergyReporter(write_coords=True, ext=".xyz"),
-            CheckpointReporter(interval=2000, n_checkpoints=5)
+            CheckpointReporter(interval=2000, n_checkpoints=5),
         ],
         250,
         1000,

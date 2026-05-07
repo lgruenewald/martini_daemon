@@ -19,10 +19,8 @@ def truncate_reactions(handle: TextIO, current_step: int) -> None:
 
 
 class ReactionReporter(Reporter):
-    """A reporter that reports all reactions to <name>.reactions."""
-
     def __init__(self) -> None:
-        """A reporter that reports all reactions to <name>.reactions.
+        """Create a ReactionReporter to log reaction information to <name>.reactions.
 
         The created file has a text format, where every line is a reaction.
         First, the frame number and reaction name are separated by a comma,
@@ -38,7 +36,7 @@ class ReactionReporter(Reporter):
 
         """
 
-    def on_simulation_start(self, simulation, continue_sim: bool) -> None:
+    def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
         self.path = simulation.request_path(".reactions", continue_sim=continue_sim)
         truncate = continue_sim and os.path.exists(self.path)
         self.handle = open(self.path, "r+" if truncate else "w")  # noqa: SIM115
@@ -52,11 +50,11 @@ class ReactionReporter(Reporter):
                 + "reactantn_name,reactantn_id(res:resid1,...residn),atoms...;\n",
             )
 
-    def on_simulation_finish(self, simulation) -> None:
+    def on_simulation_finish(self, simulation: Simulation) -> None:
         self.handle.close()
 
     @classmethod
-    def __get_resids(cls, sim: Simulation, atoms):
+    def __get_resids(cls, sim: Simulation, atoms: list[int]) -> str:
         res = set()
         for atom in atoms:
             if atom != -1:
@@ -81,11 +79,13 @@ class ReactionReporter(Reporter):
                 + "\n",
             )
 
-    def interactive_line(self, simulation) -> str:
+    def interactive_line(self, simulation: Simulation) -> str:
         return f"reactions: {simulation.reactions_so_far}"
 
     @classmethod
-    def read_reactions(cls, path) -> list[tuple[int, str, list[tuple[str, int, list[int]]]]]:
+    def read_reactions(
+        cls, path: str
+    ) -> list[tuple[int, str, list[tuple[str, int, list[int]]]]]:
         """.reactions format reader suited for test_detection.py.
 
         Returns a list of simulation steps, reaction names and list of reactant atom lists

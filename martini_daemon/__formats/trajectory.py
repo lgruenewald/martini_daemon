@@ -214,7 +214,6 @@ class TrajectoryReader:
     def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
         self.close()
 
-
     def read_frame(
         self,
     ) -> None | tuple[int, float, PeriodicBox, np.ndarray, np.ndarray | None]:

@@ -4,7 +4,9 @@ from typing import TextIO
 from ..__simulation import Reporter, Simulation
 
 
-def write_energies(title, handle: TextIO, sim: Simulation, first=False) -> None:
+def write_energies(
+    title: str, handle: TextIO, sim: Simulation, first: bool = False
+) -> None:
     if first:
         handle.write(
             "# Entry type,Simulation step,N,Kinetic energy (kJ/mol),Potential energy (kJ/mol),"
@@ -45,7 +47,7 @@ class VariablesReporter(Reporter):
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
         self.path = simulation.request_path(".ener", continue_sim=continue_sim)
         truncate = os.path.exists(self.path)
-        self.handle = open(self.path, "r+" if truncate else "w")
+        self.handle = open(self.path, "r+" if truncate else "w")  # noqa: SIM115
 
         if truncate:
             truncate_energies(self.handle, simulation)

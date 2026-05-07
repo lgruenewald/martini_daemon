@@ -54,10 +54,12 @@ def test_toptraj_writer(rootdir: str) -> None:
     print("writing it to file")
     tmp_file = ".out.toptraj"
     with TopTrajWriter(
-        tmp_file, "example title", [("a", 1, 1), ("b", 2, 1), ("c", n_atoms - 3, 1)],
-        res_names, res_ids,
+        tmp_file,
+        "example title",
+        [("a", 1, 1), ("b", 2, 1), ("c", n_atoms - 3, 1)],
+        res_names,
+        res_ids,
     ) as w:
-
         for frame_num, frame in enumerate(frames):
             w.new_frame(
                 frame_num,

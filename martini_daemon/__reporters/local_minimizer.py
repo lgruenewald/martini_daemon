@@ -47,14 +47,14 @@ class LocalMinimizer(Reporter):
             self.minimizer.integrator
         )
 
-    def reset(self, shape) -> None:
-        self.minimizer.reset(shape)
+    def reset(self, shape: tuple[int, int]) -> None:
+        self.minimizer._reset(shape)
 
     def report(self, handle: TextIO, rem: int) -> None:
         """Write optimization progress to the file handle."""
         handle.write("==============================================\n")
         handle.write(f"remaining steps: {rem}\n")
-        handle.write(self.minimizer.report())
+        handle.write(self.minimizer._report())
         handle.write("\n==============================================\n")
 
     def on_reaction(self, simulation: Simulation, reactions) -> None:
@@ -90,7 +90,7 @@ class LocalMinimizer(Reporter):
             movable[atom, :] = 1.0
 
         simulation.info("atoms chosen")
-        self.minimizer.set_movable(movable)
+        self.minimizer._set_movable(movable)
         simulation.info("atoms set")
 
         gcd = math.gcd(self.report_every, 10) if self.report_every > 0 else 10
@@ -107,7 +107,7 @@ class LocalMinimizer(Reporter):
             remaining -= c_steps
             if self.report_every > 0 and remaining % self.report_every == 0:
                 self.report(handle, remaining)
-            if self.minimizer.is_converged():
+            if self.minimizer._has_converged():
                 simulation.info("minimizer converged")
                 break
 
@@ -126,7 +126,9 @@ class LocalMinimizer(Reporter):
 
 
 class LocalGradientDescent:
-    def __init__(self, initial_step_size_nm=0.1, etol=0.0, smoothing_factor=0.1) -> None:
+    def __init__(
+        self, initial_step_size_nm=0.1, etol=0.0, smoothing_factor=0.1
+    ) -> None:
         """Construct a (smoothed) gradient descent minimization integrator.
 
         :param initial_step_size_nm: Only matters at the start. An adaptive step size is used.
@@ -222,13 +224,16 @@ class LocalGradientDescent:
             )
             self.integrator.endBlock()
 
-    def set_movable(self, movable) -> None:
+    def _set_movable(self, movable: np.ndarray) -> None:
+        """Called by LocalMinimizer to pick the degrees of freedom that are movable."""
         self.integrator.setPerDofVariableByName("movable", movable)
 
-    def is_converged(self) -> bool:
+    def _has_converged(self) -> bool:
+        """Has the minimization converged."""
         return self.integrator.getGlobalVariableByName("converged") == 1
 
-    def reset(self, shape) -> None:
+    def _reset(self, shape: tuple[int, int]) -> None:
+        """Reset the integrator to its initial state."""
         for k, v in self.global_variables.items():
             self.integrator.setGlobalVariableByName(k, v)
 
@@ -237,7 +242,8 @@ class LocalGradientDescent:
             vals = np.zeros(shape)
             self.integrator.setPerDofVariableByName(k, vals)
 
-    def report(self) -> str:
+    def _report(self) -> str:
+        """Return a string that would be reported."""
         return (
             "\n".join(
                 f"{k}: {self.integrator.getGlobalVariableByName(k)}"

@@ -28,10 +28,10 @@ class TopTrajReporter(Reporter):
             simulation.system.get_res_names(),
             simulation.system.get_res_ids(),
             append=continue_sim,
-            truncate=simulation.current_step
+            truncate=simulation.current_step,
         )
 
-    def on_trajectory_frame(self, simulation) -> None:
+    def on_trajectory_frame(self, simulation: Simulation) -> None:
         assert self.writer is not None
         self.writer.new_frame(
             simulation.trajectory_frame,
@@ -50,6 +50,6 @@ class TopTrajReporter(Reporter):
         )
         self.writer.write_frame()
 
-    def on_simulation_finish(self, simulation) -> None:
+    def on_simulation_finish(self, simulation: Simulation) -> None:
         assert self.writer is not None
         self.writer.finish()

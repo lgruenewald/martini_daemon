@@ -127,9 +127,7 @@ class NonBonded(Force):
                 sigmas.append(sigma)
                 epsilons.append(epsilon)
         force.addTabulatedFunction("sigma", mm.Discrete2DFunction(n, n, sigmas))
-        force.addTabulatedFunction(
-            "epsilon", mm.Discrete2DFunction(n, n, epsilons)
-        )
+        force.addTabulatedFunction("epsilon", mm.Discrete2DFunction(n, n, epsilons))
         return force
 
 
@@ -150,7 +148,7 @@ class ExclusionHelper(BondedForce):
     ) -> None:
         assert isinstance(force, mm.CustomBondForce)
         i, j = members
-        q_prod, = params
+        (q_prod,) = params
         if q_prod != 0.0:
             force.addBond(i, j, [q_prod])
 
@@ -204,7 +202,6 @@ class ExclusionHelper(BondedForce):
         self.__nb = nb
         self.epsilon_r = system.additional_data.get("epsilon_r")
         self.cutoff_nm = system.additional_data.get("cutoff")
-
 
     def _add_bond(self, members: list[int], params: list[float]) -> int:
         self.__nb.add_exclusion(*members)

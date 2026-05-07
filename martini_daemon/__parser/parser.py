@@ -148,7 +148,13 @@ class Parser:
 
     @classmethod
     def __error_message_location(
-        cls, message: str, path: str, line_num: int, line: str | None, start=None, end=None
+        cls,
+        message: str,
+        path: str,
+        line_num: int,
+        line: str | None,
+        start=None,
+        end=None,
     ) -> None:
         """Prints an error message. Three modes available:
 
@@ -178,7 +184,9 @@ class Parser:
             )
 
     @classmethod
-    def __error_directive(cls, message: str, path: str, start: int, end: int | None) -> None:
+    def __error_directive(
+        cls, message: str, path: str, start: int, end: int | None
+    ) -> None:
         """Prints an error message. If end is not None, it will read the file and highlight the whole directive's
         text in yellow, with line numbers.
         """

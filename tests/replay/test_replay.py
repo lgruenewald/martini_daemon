@@ -26,10 +26,7 @@ def rootdir(request: pytest.FixtureRequest) -> str:
     return os.path.dirname(request.path)
 
 
-tests = [
-    "update_redefine", "update_redefine_exclusion",
-    "change_to_U"
-]
+tests = ["update_redefine", "update_redefine_exclusion", "change_to_U"]
 
 
 def load_checkpoint(
@@ -119,5 +116,5 @@ def test_replay(x: str, rootdir: str) -> None:
         os.remove(filename)
     for filename in glob.glob("./#*"):
         os.remove(filename)
-    #os.remove("energy.xvg")
-    #os.remove("forces.xvg")
+    # os.remove("energy.xvg")
+    # os.remove("forces.xvg")
