@@ -207,8 +207,11 @@ def _parse_angle_conditions(
         else:
             # if it's wrapping, pass
             if upper_bound < lower_bound:
-                ranges.append((upper_bound, pi))
-                ranges.append((-pi, lower_bound))
+                # -pi < upper_bound < lower_bound < pi
+                # ALLOW lower -> pi
+                # ALLOW -pi -> upper
+                ranges.append((-pi, upper_bound))
+                ranges.append((lower_bound, pi))
             else:
                 ranges.append((lower_bound, upper_bound))
 
@@ -223,7 +226,6 @@ def _parse_angle_conditions(
     # inverting ranges - list of disallowed places
     res = []
 
-    # TODO fuzz the sh*t out of this
     # disallow 0 to first allowed range
     if not wrap and ranges[0][0] > 0.0:
         res.append((0.0, ranges[0][0]))

@@ -85,7 +85,6 @@ class Graph:
                     if atom != other_atom:
                         nodes[atom].add(other_atom)
             if num_special > 1:
-                # TODO test
                 raise ParseException(
                     f"Interaction {filter_str} for atoms {atoms} "
                     + "references more than one optional or forbidden atoms. "
