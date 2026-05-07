@@ -71,7 +71,6 @@ The python tests can be found in the `tests` folder in the repo, containing the 
 - `test_periodic_box` - Fuzz the PeriodicBox implementation against mdtraj.
 - `test_bond_graph` - Test the class `BondGraph`, which features things, such as pbc whole.
 
-Currently, there are no tests that fail stochastically, all tests should pass.
 If a test does not pass, please open an Issue.
 
 Some single_frame tests have looser tolerances, this is documented at the top of `tests/single_frame/test_single_frame.py`.

@@ -32,7 +32,7 @@ class FakeSimulation(Simulation):
         for r in reporters:
             r.on_simulation_start(self, continue_sim)
 
-    def request_path(self, suffix: str, copy: bool = False) -> str:
+    def request_path(self, suffix: str, continue_sim: bool = False) -> str:
         return self.base + suffix
 
     def finish(self) -> None:

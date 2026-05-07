@@ -29,13 +29,14 @@ def test_distances(pbc: PeriodicBox) -> None:
             dist_ref = float(mdtraj.compute_distances(traj, [(i, j)])[0][0])
             dist = pbc.distance(xyz[0, i], xyz[0, j])
             dist_sq = pbc.distance_squared(xyz[0, i], xyz[0, j])
+            # 1e-3 because mdtraj is f32, and that's the precision of .gro/.xtc files anyway, so should be enough
             assert np.isclose(dist_ref, dist, atol=1e-3), (
                 f"Bad distance. Coords: {xyz[0, i]}, {xyz[0, j]}.\n"
                 + f"Box: {pbc.a} {pbc.b} {pbc.c}.\n"
                 + f"Distance martini_daemon: {dist} nm.\n"
                 + f"Distance mdtraj: {dist_ref} nm.\n"
             )
-            assert np.isclose(dist_ref**2, dist_sq, atol=1e-5)
+            assert np.isclose(dist_ref**2, dist_sq, atol=1e-3)
 
 
 @pytest.mark.parametrize("pbc", boxes)
