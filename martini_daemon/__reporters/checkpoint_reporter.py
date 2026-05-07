@@ -2,8 +2,7 @@ import os
 import sys
 
 from ..__formats import read_checkpoint, write_checkpoint
-from ..__reporter import Reporter
-from ..__simulation import Simulation
+from ..__simulation import Reporter, Simulation
 from .reaction_reporter import ReactionReporter
 
 
@@ -75,11 +74,11 @@ class CheckpointReporter(Reporter):
         # no chk at the start
         self.__last_chk = simulation.current_step
 
-    def on_trajectory_frame(self, sim: Simulation) -> None:
-        if sim.current_step < self.__last_chk + self.interval:
+    def on_trajectory_frame(self, simulation: Simulation) -> None:
+        if simulation.current_step < self.__last_chk + self.interval:
             # interval condition not fulfilled yet
             return
-        self.__last_chk = sim.current_step
+        self.__last_chk = simulation.current_step
         # increment the number on checkpoint files
         for i in range(self.n_checkpoints, 0, -1):
             # if n=3, will count down as 3, 2, 1
@@ -87,17 +86,17 @@ class CheckpointReporter(Reporter):
                 os.rename(self.paths[i - 1], self.paths[i])
 
         # make the new checkpoint
-        pos, box = sim.context.get_positions()
-        vel = sim.context.get_velocities()
+        pos, box = simulation.context.get_positions()
+        vel = simulation.context.get_velocities()
         write_checkpoint(
             self.tmp_path,
             # hacky, but simulation does not expose sim name otherwise so reporters are forced to use request_path
             self.tmp_path.removesuffix(".chk_tmp"),
-            sim.current_step,
+            simulation.current_step,
             # the index of current trajectory frame being written
-            sim.trajectory_frame,
-            sim.reactions_so_far,
-            sim.time_ps,
+            simulation.trajectory_frame,
+            simulation.reactions_so_far,
+            simulation.time_ps,
             len(pos),
             box,
             pos,
@@ -142,6 +141,7 @@ class CheckpointLoader(Simulation):
                     self.top.frag_list.get_fragment(frag_id) for frag_id in frag_ids
                 ]
                 for (name, frag_id, atoms), frag_obj in zip(frags, frag_objs):
+                    assert frag_obj is not None
                     assert name == frag_obj.name
                     assert frag_id == frag_obj.frag_id
                     assert all(a == b for a, b in zip(atoms, frag_obj.atoms))

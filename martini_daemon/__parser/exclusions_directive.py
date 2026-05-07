@@ -18,15 +18,15 @@ class ExclusionsDirective(Directive):
                 (i, self.parent.parse_index(tokens, k))
             )
 
-    def finish(self):
+    def finish(self) -> None:
         pass
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return False
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return False
 
     @classmethod

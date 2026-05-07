@@ -10,15 +10,15 @@ class SystemDirective(Directive):
     def line(self, tokens: TokenList) -> None:
         self.parent.system.additional_data["title"] = tokens.get_line()
 
-    def finish(self):
+    def finish(self) -> None:
         pass
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return True
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return True
 
     @classmethod

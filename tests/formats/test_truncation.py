@@ -1,3 +1,5 @@
+"""Test the truncation of output files by comparing reference with truncated output."""
+
 import os
 import shutil
 
@@ -9,19 +11,26 @@ from martini_daemon import (
     ReactionReporter,
     Reporter,
     Simulation,
+    System,
     TopTrajReporter,
     TrajectoryReporter,
     VariablesReporter,
-    System
 )
 
+
 class FakeSystem(System):
+    """Fake system class for testing."""
+
     def __init__(self) -> None:
+        """Fake system object."""
         super().__init__()
         self.additional_data["title"] = "placeholder"
 
 class FakeSimulation(Simulation):
-    def __init__(self, base: str, reporters: list[Reporter], continue_sim: bool):
+    """Fake simulation class for testing."""
+
+    def __init__(self, base: str, reporters: list[Reporter], continue_sim: bool) -> None:
+        """Create fake simulation."""
         # should keep current step inclusive
         self.current_step = 3000
         self.trajectory_frame = 4
@@ -33,14 +42,17 @@ class FakeSimulation(Simulation):
             r.on_simulation_start(self, continue_sim)
 
     def request_path(self, suffix: str, continue_sim: bool = False) -> str:
+        """Request path to output file with suffix."""
         return self.base + suffix
 
     def finish(self) -> None:
+        """Finish the fake simulation."""
         for r in self.reporters:
             r.on_simulation_finish(self)
 
 
 def compare(a: str, b: str, mode: str) -> None:
+    """Compare two files, opened with mode <mode>."""
     with open(a, mode) as f:
         a_content = f.read()
     with open(b, mode) as f:

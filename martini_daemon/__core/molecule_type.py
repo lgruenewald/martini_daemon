@@ -2,7 +2,7 @@ from typing import Any
 
 
 class MoleculeType:
-    def __init__(self):
+    def __init__(self) -> None:
         """A class that contains all the information that is in a moleculetype.
         Along with helpers to mutate system to add the required atoms for it
         to system, and then to instantiate the bonded interactions on top

@@ -22,6 +22,7 @@ class ReactionDirective(MoleculeTypeDirective):
 
         Instantiated by the parser.
         """
+        assert isinstance(parent, GromacsTopFile)
         super().__init__(parent, path, line_num)
         self.d_template = DetectionTemplate()
         self.molecule_type: ModificationTemplate = ModificationTemplate()

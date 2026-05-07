@@ -172,3 +172,24 @@ the following things can be done:
     * Similar reaction conditions may be needed for angles.
 
 * If this fails, try :doc:`/autoapi/martini_daemon/LocalMinimizer`, it may help in some cases.
+
+
+Indexing
+--------
+
+Different things are 0 and 1 indexed.
+
+* GROMACS file formats, such as itp or gro are 1 indexed
+* In .rx files, to mirror itp, reactants are 1 indexed
+* Error messages during parsing of itp files should be 1 indexed
+* Atom indices through the python API, and in Martini Daemon-specific output files are typically 0 indexed
+
+When are trajectory frames written
+----------------------------------
+
+* First frame before any MD steps were done, unless loading from a checkpoint
+* After each traj_frequency MD steps
+* At the end of simulations (no duplicate if it's exactly at traj_frequency)
+
+* Simulation.trajectory_frame represents the current frame index being written, if in a reporter currently writing
+  a frame. If a frame is not currently being written, it is the number of frames completed.

@@ -27,15 +27,15 @@ class PairTypes(Directive):
         epsilon = tokens.unwrap(4, "float")
         pair_types[(t1, t2)] = (sigma, epsilon)
 
-    def finish(self):
+    def finish(self) -> None:
         pass
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return False
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return False
 
     @classmethod
@@ -74,7 +74,7 @@ class PairsDirective(InteractionDirective):
 
 @register_available_force
 class Pairs(BondedForce):
-    def __init__(self, system):
+    def __init__(self, system) -> None:
         super().__init__(system)
         self.epsilon_r = system.additional_data["epsilon_r"]
 

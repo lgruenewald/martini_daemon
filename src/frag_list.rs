@@ -37,6 +37,9 @@ impl FragList {
 #[gen_stub_pymethods]
 #[pymethods]
 impl FragList {
+    /// Create a new FragList, for n_atoms total atoms.
+    ///
+    /// Will create an ordered hashmap for fragments, and a dense Vec for atom_id -> fragment relationships.
     #[new]
     pub fn new(n_atoms: usize) -> Self {
         let defrag_list = (0..n_atoms).map(|_| Vec::new()).collect();
@@ -48,6 +51,10 @@ impl FragList {
         }
     }
 
+    /// Add a fragment to frag list.
+    ///
+    /// Atom indices of -1 for missing optional and forbidden graph nodes.
+    /// Will also update the defrag list.
     pub fn add_fragment(
         &mut self,
         name: String,
@@ -81,6 +88,9 @@ impl FragList {
         id
     }
 
+    /// Get a fragment corresponding to frag_id of index.
+    ///
+    /// Returns None if not found.
     pub fn get_fragment(&mut self, index: usize) -> Option<Fragment> {
         let frag = self.frag_list.get(&index);
         match frag {
@@ -91,6 +101,9 @@ impl FragList {
         }
     }
 
+    /// Remove a fragment corresponding to frag_id of index.
+    ///
+    /// Returns whether a fragment of that frag_id was found.
     pub fn delete_fragment(&mut self, index: usize) -> bool {
         // frag list
         match self.frag_list.remove(&index) {
@@ -115,6 +128,9 @@ impl FragList {
         }
     }
 
+    /// Remove all fragments containing atoms.
+    ///
+    /// Called before recalculation of graphs for those atoms.
     pub fn delete_fragments_for_atoms(&mut self, atoms: Vec<usize>) {
         for atom in atoms {
             for frag_id in self.defrag_list[atom].clone() {
@@ -123,20 +139,30 @@ impl FragList {
         }
     }
 
+    /// Get the number of fragments.
+    ///
+    /// Note: do not iterate 0 to this number, as frag_ids are not continuous.
     pub fn num_fragments(&self) -> usize {
         self.frag_list.len()
     }
 
+    /// Get the number of fragments with a specific type.
+    ///
+    /// Always caches frag_counts, so should be fast.
     pub fn num_fragments_of_type(&self, name: &str) -> usize {
         self.frag_counts.get(name).map_or(0, |c| *c)
     }
 
+    /// Return all frag_ids for a specific atom.
+    ///
+    /// Note: Will allocate a new list, but these lists are usually short, so should not be expensive.
     pub fn frag_ids_for(&self, atom_index: usize) -> Vec<usize> {
-        // there usually aren't that many fragments per atom, so this isn't so bad
         self.defrag_list[atom_index].clone()
     }
 
     /// Get a copy of all frag IDs for debug purposes.
+    ///
+    /// Will make a copy, so should not be called often.
     pub fn get_all_frag_ids(&self) -> Vec<usize> {
         self.frag_list.keys().map(|key| *key).collect()
     }

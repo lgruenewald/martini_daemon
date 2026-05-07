@@ -12,15 +12,15 @@ class MoleculesDirective(Directive):
             (tokens.unwrap(0, "word"), tokens.unwrap(1, "int"))
         )
 
-    def finish(self):
+    def finish(self) -> None:
         pass
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return True
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return True
 
     @classmethod

@@ -10,13 +10,13 @@ from .token_list import TokenList, TokenParseException
 
 
 class ParseException(Exception):
-    def __init__(self, message: str):
+    def __init__(self, message: str) -> None:
         """Generic exception raised during parsing."""
         self.message = message
 
 
 class DirectiveException(Exception):
-    def __init__(self, message: str, path, start_line, end_line):
+    def __init__(self, message: str, path, start_line, end_line) -> None:
         """Exception raised during the finish() method of directives.
         ParseExceptions get re-raised as this type automatically.
         """
@@ -40,7 +40,7 @@ class Parser:
         path: str,
         include_dirs: list[str] | None = None,
         defines: dict[str, str] | None = None,
-    ):
+    ) -> None:
         """Generic Gromacs-style .ini format parser.
 
         See :doc:`/autoapi/martini_daemon/GromacsTopFile` for the parser specifically for GROMACS ``.top`` files,

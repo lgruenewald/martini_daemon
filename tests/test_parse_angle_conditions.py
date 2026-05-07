@@ -1,10 +1,14 @@
-from martini_daemon.__topstar.reaction_directives import _parse_angle_conditions
-from martini_daemon import TokenList, Token
+"""Test the internal function _parse_angle_conditions."""
 
-import re
 import math
+import re
 
-def test_parse_angle_conditions():
+from martini_daemon import Token, TokenList
+from martini_daemon.__topstar.reaction_directives import _parse_angle_conditions
+
+
+def test_parse_angle_conditions() -> None:
+    """Test the internal function _parse_angle_conditions."""
     lines = [
         (False, "1.0 to 50", [(0., 1.), (50, 180)]),
         (False, "8.0 to 140 or 150 to 156", [(0, 8), (140, 150), (156, 180)]),
@@ -14,10 +18,7 @@ def test_parse_angle_conditions():
 
     ]
     for wrap, line, exp in lines:
-        i = 0
-
         pat = re.compile(r'\[|]|"[^"]*"|<[^>]*>|[^ \t\n\r\f\v\[\]"<>]+')
-
 
         tokens = [
             Token(

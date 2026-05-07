@@ -6,6 +6,7 @@ import os
 import pytest
 
 from martini_daemon import (
+    CheckpointReporter,
     FragCountReporter,
     LocalGradientDescent,
     LocalMinimizer,
@@ -15,7 +16,6 @@ from martini_daemon import (
     TopTrajReporter,
     TrajectoryReporter,
     VariablesReporter,
-    CheckpointReporter
 )
 
 

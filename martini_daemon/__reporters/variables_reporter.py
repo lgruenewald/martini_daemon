@@ -1,11 +1,10 @@
 import os
 from typing import TextIO
 
-from ..__reporter import Reporter
-from ..__simulation import Simulation
+from ..__simulation import Reporter, Simulation
 
 
-def write_energies(title, handle: TextIO, sim: Simulation, first=False):
+def write_energies(title, handle: TextIO, sim: Simulation, first=False) -> None:
     if first:
         handle.write(
             "# Entry type,Simulation step,N,Kinetic energy (kJ/mol),Potential energy (kJ/mol),"
@@ -29,7 +28,7 @@ def write_energies(title, handle: TextIO, sim: Simulation, first=False):
     handle.flush()
 
 
-def truncate_energies(handle: TextIO, sim: Simulation):
+def truncate_energies(handle: TextIO, sim: Simulation) -> None:
     handle.seek(0, os.SEEK_SET)
     prev_pos = 0
     while len(line := handle.readline()) > 0:
@@ -43,7 +42,7 @@ def truncate_energies(handle: TextIO, sim: Simulation):
 
 
 class VariablesReporter(Reporter):
-    def on_simulation_start(self, simulation: Simulation, continue_sim: bool):
+    def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
         self.path = simulation.request_path(".ener", continue_sim=continue_sim)
         truncate = os.path.exists(self.path)
         self.handle = open(self.path, "r+" if truncate else "w")
@@ -54,8 +53,8 @@ class VariablesReporter(Reporter):
             self.handle.seek(0, os.SEEK_END)
             write_energies("", self.handle, simulation, True)
 
-    def on_simulation_finish(self, simulation) -> None:
+    def on_simulation_finish(self, simulation: Simulation) -> None:
         self.handle.close()
 
-    def on_trajectory_frame(self, simulation: Simulation):
+    def on_trajectory_frame(self, simulation: Simulation) -> None:
         write_energies("Trajectory frame", self.handle, simulation)

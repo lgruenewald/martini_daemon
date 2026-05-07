@@ -1,3 +1,5 @@
+from typing import NoReturn
+
 import openmm as mm
 
 from ..__core import BondedForce, register_available_force
@@ -38,7 +40,7 @@ class Constraint(BondedForce):
     def _set_force_obj(self) -> mm.Force:
         assert False
 
-    def remove(self, i):
+    def remove(self, i) -> NoReturn:
         raise Exception("Can't remove constraints")
 
     def should_build(self) -> bool:
@@ -50,5 +52,5 @@ class Constraint(BondedForce):
     ) -> None:
         assert False
 
-    def _destroy(self):
+    def _destroy(self) -> NoReturn:
         raise Exception("Can't destroy constraints.")

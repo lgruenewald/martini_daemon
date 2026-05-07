@@ -35,7 +35,7 @@ tests = [
 def load_checkpoint(
     checkpoint: str, top: str, gro: str
 ) -> tuple[float, np.ndarray, PeriodicBox, np.ndarray, np.ndarray]:
-    """Load a checkpoint and return the energy and forces"""
+    """Load a checkpoint and return the energy and forces."""
     sim = CheckpointLoader(
         checkpoint,
         top,

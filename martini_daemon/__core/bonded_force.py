@@ -9,7 +9,7 @@ from .force import Force
 
 
 class BondedForce(Force, metaclass=ABCMeta):
-    def __init__(self, system):
+    def __init__(self, system) -> None:
         """Parent class of all bonded forces.
 
         Manages the list of bonds (as a dict of bond_id -> members, params).
@@ -139,5 +139,5 @@ class BondedForce(Force, metaclass=ABCMeta):
         return members
 
     @classmethod
-    def is_coupling(cls):
+    def is_coupling(cls) -> bool:
         return False

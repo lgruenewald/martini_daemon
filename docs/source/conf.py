@@ -58,7 +58,7 @@ def skip_private(app, what, name, obj, skip, options):
     return skip
 
 
-def setup(sphinx):
+def setup(sphinx) -> None:
     sphinx.connect("autoapi-skip-member", skip_private)
 
 

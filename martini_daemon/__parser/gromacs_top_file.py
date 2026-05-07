@@ -30,7 +30,7 @@ class GromacsTopFile(Directive):
         path: str,
         include_dirs: list[str] | None = None,
         defines: dict[str, str] | None = None,
-    ):
+    ) -> None:
         """:param path: Path to the .top file.
         :param system: __core.System.
         :param include_dirs: List of directories to be searched if #include fails to find a file in the current dir.
@@ -68,7 +68,7 @@ class GromacsTopFile(Directive):
             tokens[0], "Data line encountered outside of any directive."
         )
 
-    def finish(self):
+    def finish(self) -> None:
         pass
 
     @classmethod

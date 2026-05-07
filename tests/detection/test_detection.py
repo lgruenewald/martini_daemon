@@ -42,8 +42,8 @@ def get_sim(
 
 
 def compare(
-    reactions: list[tuple[int, str, list[list[int]]]],
-    expected: list[tuple[int, str, list[list[int]]]],
+    reactions: list[tuple[int, str, list[tuple[str, int, list[int]]]]],
+    expected: list[tuple[int, str, list[tuple[str, int, list[int]]]]],
 ) -> None:
     """Compare expected and obtained reactions, raise errors if not the same."""
     dump = f"\nGot: {reactions}, expected: {expected}."

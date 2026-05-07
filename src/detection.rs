@@ -10,6 +10,8 @@ use crate::detection_one::detection_one;
 use crate::periodic_box::PeriodicBox;
 use crate::frag_list::FragList;
 
+/// Perform the detection algorithm.
+///
 /// Main entry point for the detection algorithm
 /// - takes T* components FragList and DetectionTemplateList, a pbc and the current positions.
 /// - builds a current frame neighbor list.

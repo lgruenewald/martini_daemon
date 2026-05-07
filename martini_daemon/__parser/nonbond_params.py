@@ -18,15 +18,15 @@ class NonbondParams(Directive):
             self.parent.system.additional_data["nb_types"] = nb_types
         nb_types[(type1, type2)] = (sigma, epsilon)
 
-    def finish(self):
+    def finish(self) -> None:
         pass
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return True
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return True
 
     @classmethod

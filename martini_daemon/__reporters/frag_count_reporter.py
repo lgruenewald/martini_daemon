@@ -1,7 +1,6 @@
 import os
 
-from ..__reporter import Reporter
-from ..__simulation import Simulation
+from ..__simulation import Reporter, Simulation
 
 
 class FragCountReporter(Reporter):
@@ -21,7 +20,7 @@ class FragCountReporter(Reporter):
             self.handle.truncate(tell)
             self.handle.seek(0, os.SEEK_END)
 
-    def on_trajectory_frame(self, simulation: Simulation):
+    def on_trajectory_frame(self, simulation: Simulation) -> None:
         self.handle.write(
             f"Step:{simulation.current_step},"
             + ",".join(

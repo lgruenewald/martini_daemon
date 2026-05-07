@@ -2,12 +2,11 @@ import os
 import re
 from typing import TextIO
 
-from ..__reporter import Reporter
 from ..__rust import Fragment
-from ..__simulation import Simulation
+from ..__simulation import Reporter, Simulation
 
 
-def truncate_reactions(handle: TextIO, current_step: int):
+def truncate_reactions(handle: TextIO, current_step: int) -> None:
     prev_pos = 0
     while len(line := handle.readline()) > 0:
         if len(line) > 0 and line[0] != "#":
@@ -20,16 +19,16 @@ def truncate_reactions(handle: TextIO, current_step: int):
 
 
 class ReactionReporter(Reporter):
-    """A reporter that reports all reactions to <name>.reactions"""
+    """A reporter that reports all reactions to <name>.reactions."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """A reporter that reports all reactions to <name>.reactions.
 
         The created file has a text format, where every line is a reaction.
         First, the frame number and reaction name are separated by a comma,
         then, each reactant is separated by a semicolon. Each reactant
         will have its frag name, internal frag id, and atom indices
-        (-1 for missing optional or forbidden atoms) printed.
+        (-1 for missing optional or forbidden atoms) printed. Atom indices are 0 indexed.
 
         The residue IDs involved are also included as a comma separated list, within parentheses, separately
         for each reactant.
@@ -39,7 +38,7 @@ class ReactionReporter(Reporter):
 
         """
 
-    def on_simulation_start(self, simulation, continue_sim: bool):
+    def on_simulation_start(self, simulation, continue_sim: bool) -> None:
         self.path = simulation.request_path(".reactions", continue_sim=continue_sim)
         truncate = continue_sim and os.path.exists(self.path)
         self.handle = open(self.path, "r+" if truncate else "w")  # noqa: SIM115
@@ -67,7 +66,7 @@ class ReactionReporter(Reporter):
     # need to be post, as the modification algorithm can reject some reactions
     def on_reaction(
         self, simulation: Simulation, reactions: list[tuple[str, list[Fragment]]]
-    ):
+    ) -> None:
         for rx, frags in reactions:
             self.handle.write(
                 f"{simulation.current_step},{rx};"
@@ -87,7 +86,7 @@ class ReactionReporter(Reporter):
 
     @classmethod
     def read_reactions(cls, path) -> list[tuple[int, str, list[tuple[str, int, list[int]]]]]:
-        """.reactions format reader suited for test_detection.py
+        """.reactions format reader suited for test_detection.py.
 
         Returns a list of simulation steps, reaction names and list of reactant atom lists
         """

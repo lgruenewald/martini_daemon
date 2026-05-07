@@ -1,8 +1,7 @@
 import os
 
 from ..__formats import TrajectoryWriter
-from ..__reporter import Reporter
-from ..__simulation import Simulation
+from ..__simulation import Reporter, Simulation
 
 
 class TrajectoryReporter(Reporter):

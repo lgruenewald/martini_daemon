@@ -1,12 +1,11 @@
 import os
 
-from ..__reporter import Reporter
-from ..__simulation import Simulation
+from ..__simulation import Reporter, Simulation
 from .variables_reporter import truncate_energies, write_energies
 
 
 class ReactionEnergyReporter(Reporter):
-    def __init__(self, write_coords=False, ext=".gro"):
+    def __init__(self, write_coords=False, ext=".gro") -> None:
         """Reporter that will write energies before and after a reaction.
 
         :param write_coords: if set to True, it will print .gro files pre and post minimization
@@ -25,16 +24,16 @@ class ReactionEnergyReporter(Reporter):
         else:
             write_energies("", self.handle, simulation, True)
 
-    def __write_pos(self, title, sim: Simulation):
+    def __write_pos(self, title, sim: Simulation) -> None:
         if self.write_coords:
             sim.save_geometry(sim.request_path(f"_{title}{sim.current_step}{self.ext}"))
 
-    def pre_modification(self, simulation: Simulation):
+    def pre_modification(self, simulation: Simulation) -> None:
         # minimizations happen in "on_reaction", this is guaranteed to be before it
         write_energies("pre-reaction", self.handle, simulation)
         self.__write_pos("premin", simulation)
 
-    def post_reaction(self, simulation):
+    def post_reaction(self, simulation) -> None:
         write_energies("post-minimization", self.handle, simulation)
         self.__write_pos("postmin", simulation)
 

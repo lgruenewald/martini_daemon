@@ -5,7 +5,7 @@ import openmm as mm
 
 
 class Force(metaclass=ABCMeta):
-    def __init__(self, system: Any):
+    def __init__(self, system: Any) -> None:
         """Parent metaclass for all forces in the system.
 
         Note the following invariant:

@@ -64,12 +64,13 @@ def try_match(frag: Fragment, name: str, parts: list[int]) -> bool:
 
 
 def print_error(
-    name: str, frags: list[Fragment], expected: list[tuple[str, list[int]]]
+    name: str, frags: list[Fragment | None], expected: list[tuple[str, list[int]]]
 ) -> None:
     """Print error message and details of frags and expected."""
     print(f"found frags for {name}:")
     # convert to 1 based indexing
     for frag in frags:
+        assert frag is not None
         atoms = [atom + 1 if atom >= 0 else atom for atom in frag.atoms]
         print(f"frag {frag.name} {atoms}")
     print("expected frags:")

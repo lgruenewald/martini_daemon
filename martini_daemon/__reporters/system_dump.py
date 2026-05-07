@@ -2,8 +2,7 @@ import re
 from typing import Any, TextIO
 
 from ..__core import BondedForce
-from ..__reporter import Reporter
-from ..__simulation import Simulation
+from ..__simulation import Reporter, Simulation
 
 
 def write_frame(handle: TextIO, sim: Simulation) -> None:
@@ -35,7 +34,7 @@ def write_frame(handle: TextIO, sim: Simulation) -> None:
 
 
 class SystemDump(Reporter):
-    def __init__(self):
+    def __init__(self) -> None:
         """Dumps all info from System, including all atom details and all interactions
         in a human-readable plaintext file. Dumps it at the start of a simulation and
         when there is any reactions.
@@ -53,7 +52,7 @@ class SystemDump(Reporter):
         """
         pass
 
-    def on_simulation_start(self, simulation, continue_sim: bool):
+    def on_simulation_start(self, simulation, continue_sim: bool) -> None:
         self.handle = open(
             simulation.request_path(".system_dump", continue_sim=continue_sim), "a"
         )
@@ -66,7 +65,7 @@ class SystemDump(Reporter):
     def on_simulation_finish(self, simulation) -> None:
         self.handle.close()
 
-    def on_reaction(self, simulation, reactions):
+    def on_reaction(self, simulation, reactions) -> None:
         write_frame(self.handle, simulation)
 
     @classmethod
@@ -80,7 +79,7 @@ class SystemDump(Reporter):
             list[tuple[str, list[Any]]],
         ]
     ]:
-        """.sstar dump reader
+        """.sstar dump reader.
 
         Returns a list of frames read.
 
@@ -115,13 +114,13 @@ class SystemDump(Reporter):
                     return lines[i - 1]
             return None
 
-        def backtrack():
+        def backtrack() -> None:
             nonlocal i, prev_i
             assert prev_i is not None
             i = prev_i
             prev_i = None
 
-        def parse_atoms(atoms):
+        def parse_atoms(atoms) -> None:
             while line := advance():
                 if line[0] != "(":
                     backtrack()
@@ -141,7 +140,7 @@ class SystemDump(Reporter):
                     )
                 )
 
-        def parse_force(force):
+        def parse_force(force) -> None:
             while line := advance():
                 if line == "None":
                     continue
@@ -151,7 +150,7 @@ class SystemDump(Reporter):
                 elems = [float(x) for x in line.strip("()").replace(" ", "").split(",")]
                 force.append(elems)
 
-        def parse_forces(forces):
+        def parse_forces(forces) -> None:
             while line := advance():
                 if line[:6] != "Force:":
                     backtrack()
@@ -160,7 +159,7 @@ class SystemDump(Reporter):
                 forces.append((line[6:], force))
                 parse_force(force)
 
-        def parse_frame(line):
+        def parse_frame(line) -> None:
             nonlocal frames
             pat = re.compile("[0-9]+")
             num = pat.search(line)

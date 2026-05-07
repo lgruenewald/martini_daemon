@@ -30,15 +30,15 @@ def write_checkpoint(
     crc = crc32(b"")
     with open(path, "wb") as f:
 
-        def write_and_crc(b: bytes):
+        def write_and_crc(b: bytes) -> None:
             nonlocal crc, f
             crc = crc32(b, crc)
             f.write(b)
 
         write_and_crc(MAGIC)
-        sim_name = sim_name.encode("utf-8")
-        write_and_crc(struct.pack("<I", len(sim_name)))
-        write_and_crc(sim_name)
+        sim_name_bytes = sim_name.encode("utf-8")
+        write_and_crc(struct.pack("<I", len(sim_name_bytes)))
+        write_and_crc(sim_name_bytes)
         write_and_crc(struct.pack("<Q", current_step))
         write_and_crc(struct.pack("<Q", trajectory_frame))
         write_and_crc(struct.pack("<Q", reactions_so_far))

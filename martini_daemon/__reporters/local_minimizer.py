@@ -4,8 +4,7 @@ from typing import TextIO
 import numpy as np
 import openmm as mm
 
-from ..__reporter import Reporter
-from ..__simulation import Simulation
+from ..__simulation import Reporter, Simulation
 
 
 class LocalMinimizer(Reporter):
@@ -23,7 +22,7 @@ class LocalMinimizer(Reporter):
         whole_molecule=True,
         harmonic_constraints=True,
         report_every=0,
-    ):
+    ) -> None:
         """Local Minimizer. Uses the Reporter API to locally minimize the energy after the modification algorithm runs.
 
         :param minimizer: The minimization algorithm choice. LocalGradientDescent is currently the only one.
@@ -42,13 +41,13 @@ class LocalMinimizer(Reporter):
         self.report_every = report_every
         self.integrator_index = None
 
-    def pre_simulation_start(self, simulation: Simulation):
+    def pre_simulation_start(self, simulation: Simulation) -> None:
         assert simulation.integrator is not None
         self.integrator_index = simulation.integrator.addIntegrator(
             self.minimizer.integrator
         )
 
-    def reset(self, shape):
+    def reset(self, shape) -> None:
         self.minimizer.reset(shape)
 
     def report(self, handle: TextIO, rem: int) -> None:
@@ -58,7 +57,7 @@ class LocalMinimizer(Reporter):
         handle.write(self.minimizer.report())
         handle.write("\n==============================================\n")
 
-    def on_reaction(self, simulation: Simulation, reactions):
+    def on_reaction(self, simulation: Simulation, reactions) -> None:
         # save velocities
         assert self.integrator_index is not None
         simulation.info("on_reaction Local Minimizer")
@@ -127,7 +126,7 @@ class LocalMinimizer(Reporter):
 
 
 class LocalGradientDescent:
-    def __init__(self, initial_step_size_nm=0.1, etol=0.0, smoothing_factor=0.1):
+    def __init__(self, initial_step_size_nm=0.1, etol=0.0, smoothing_factor=0.1) -> None:
         """Construct a (smoothed) gradient descent minimization integrator.
 
         :param initial_step_size_nm: Only matters at the start. An adaptive step size is used.
@@ -223,13 +222,13 @@ class LocalGradientDescent:
             )
             self.integrator.endBlock()
 
-    def set_movable(self, movable):
+    def set_movable(self, movable) -> None:
         self.integrator.setPerDofVariableByName("movable", movable)
 
     def is_converged(self) -> bool:
         return self.integrator.getGlobalVariableByName("converged") == 1
 
-    def reset(self, shape):
+    def reset(self, shape) -> None:
         for k, v in self.global_variables.items():
             self.integrator.setGlobalVariableByName(k, v)
 

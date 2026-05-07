@@ -6,10 +6,12 @@ import math
 import os
 import shutil
 import sys
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from datetime import datetime
 from importlib.metadata import version
 from time import time
+from types import TracebackType
 from typing import Any
 
 import numpy as np
@@ -22,9 +24,69 @@ from .__core import Context, System, wrap_coupling
 from .__forces import NonBonded
 from .__formats import Checkpoint, read_geometry, write_geometry
 from .__parser import GromacsTopFile, InvalidTopologyError
-from .__reporter import Reporter
 from .__rust import Fragment, PeriodicBox, build_version
 from .__topstar import TopStar
+
+
+class Reporter(ABC):
+    def pre_simulation_start(self, simulation: Simulation) -> None:
+        """Called just before the context is initialized.
+
+        Use on_simulation_start unless you really need to mutate simulation in a way that needs to happen
+        before context initialization.
+        """
+
+    @abstractmethod
+    def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
+        """Called once when Simulation is constructed. After the context is initialized.
+
+        Must be implemented, as all output files that live through the whole simulations should be opened in this.
+
+
+        :param simulation: Simulation object.
+        :param continue_sim: If True, should append instead of overwrite. Warning! May need to truncate files to
+        simulation.current_step first! Do not write headers twice! Prefer to raise NotImplementedError if truncating
+        is needed, but it is not implemented. Truncate to the MD step specified by simulation.current_step,
+        if possible, verify that the same truncation would be obtained by simulation.time_ps.
+        """
+        pass
+
+    @abstractmethod
+    def on_simulation_finish(self, simulation: Simulation) -> None:
+        """Called once when simulation's finish() is called.
+
+        Must be implemented, as handles owned by reporters must be closed in it.
+        """
+        pass
+
+    def on_trajectory_frame(self, simulation: Simulation) -> None:
+        """Called every traj_frequency frames.
+
+        There is a single per simulation traj_frequency because that's a simple
+        way of getting multiple output types with nicely aligned time frames.
+        """
+        pass
+
+    def interactive_line(self, simulation: Simulation) -> str | None:
+        """Should return its addition to the interactive status progress display."""
+        pass
+
+    def pre_modification(self, simulation) -> None:
+        """Called before the modification algorithm, but only if there may be any reactions happening."""
+
+    def on_reaction(
+        self, simulation: Simulation, reactions: list[tuple[str, list[Fragment]]]
+    ) -> None:
+        """Called after the modification algorithm runs.
+
+        :param simulation: Simulation object.
+        :param reactions: List of reactions that were applied, as tuples of reaction name and references to reacting fragments.
+        """
+        pass
+
+    def post_reaction(self, simulation: Simulation) -> None:
+        """Called after all on_reaction reporters were resolved (some might apply minimization)."""
+        pass
 
 
 def _format_time(total_seconds: float | int) -> str:
@@ -131,6 +193,7 @@ class Simulation:
         self.continue_sim = checkpoint is not None
         self.copy_on_continue = copy_on_continue
         if self.continue_sim:
+            assert checkpoint is not None
             # chk was written with one less completed frame in mind
             self.trajectory_frame = checkpoint.trajectory_frame + 1
             self.reactions_so_far = checkpoint.reactions_so_far
@@ -204,7 +267,7 @@ class Simulation:
         if nonbonded is None:
             nonbonded = NonBonded
 
-        self.log = open(self.request_path(".log", continue_sim=self.continue_sim), "a")
+        self.log = open(self.request_path(".log", continue_sim=self.continue_sim), "a") # noqa: SIM115
         self.info(f"Martini Daemon {version('martini_daemon')} log file")
         self.info("Build version:", build_version())
         assert isinstance(platform, mm.Platform)
@@ -274,6 +337,7 @@ class Simulation:
         # build context
         if geometry is not None or self.continue_sim:
             if self.continue_sim:
+                assert checkpoint is not None
                 box = checkpoint.box
                 start_pos = checkpoint.pos
                 start_vel = checkpoint.vel
@@ -284,6 +348,7 @@ class Simulation:
                     f"Read {len(start_pos)} atoms from {geometry}. Box: {box.to_lattice()}. Velocities read? {start_vel is not None}."
                 )
             else:
+                assert type(geometry) is tuple
                 box, start_pos, start_vel = geometry
                 self.info("Initial box, pos, vel provided as a tuple.")
 
@@ -306,9 +371,13 @@ class Simulation:
             r.on_simulation_start(self, self.continue_sim)
 
     def __enter__(self) -> Simulation:
+        """Enter a Context Manager for simulation."""
         return self
 
-    def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, exc_traceback: TracebackType | None
+    ) -> None:
+        """Call self.finish() to close output files."""
         self.finish()
 
     # File handles and loggers

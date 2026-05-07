@@ -12,15 +12,15 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
         super().__init__(parent, path, line_num)
 
     # default Directive boilerplate
-    def finish(self):
+    def finish(self) -> None:
         pass
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return False
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return False
 
     @classmethod

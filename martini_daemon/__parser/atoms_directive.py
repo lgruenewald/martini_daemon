@@ -27,15 +27,15 @@ class AtomsDirective(Directive):
             (type_, res_num, res_name, atom_name, charge, mass)
         )
 
-    def finish(self):
+    def finish(self) -> None:
         pass
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return False
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return False
 
     @classmethod

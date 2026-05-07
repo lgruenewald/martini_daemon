@@ -16,7 +16,7 @@ class ModificationTemplate(MoleculeType):
         self.remasses: list[tuple[int, float]] = []
         self.soft_core: list[tuple[int, float, float]] = []
 
-    def add_atoms_to_system(self, system: System) -> None:
+    def add_atoms_to_system(self, system: System) -> list[int]:
         """Add atoms to the system.
 
         Invalid to call for reactions, therefore it will raise an exception.

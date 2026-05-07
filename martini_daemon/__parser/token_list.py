@@ -5,9 +5,9 @@ from .token import Token
 
 
 class TokenParseException(Exception):
-    """Exception when .unwrap() fails"""
+    """Exception when .unwrap() fails."""
 
-    def __init__(self, token: Token, message: str):
+    def __init__(self, token: Token, message: str) -> None:
         self.token = token
         self.message = message
 
@@ -28,7 +28,7 @@ class TokenList:
 
     __DEFAULT = object()
 
-    def __init__(self, line: str, tokens: list[Token], defines: dict[str, str]):
+    def __init__(self, line: str, tokens: list[Token], defines: dict[str, str]) -> None:
         """Note that tokenization has to performed first before constructing TokenList. This is done by the Parser.
         This is because the Parser needs to process line continuations first.
 

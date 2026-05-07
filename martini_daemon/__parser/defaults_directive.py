@@ -20,15 +20,15 @@ class Defaults(Directive):
             )
         tokens.assert_no_more_than(2)
 
-    def finish(self):
+    def finish(self) -> None:
         pass
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return True
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return True
 
     @classmethod

@@ -16,7 +16,7 @@ class GraphAtomType(Enum):
 
 
 class Graph:
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str | None) -> None:
         """Create a Graph instance.
 
         The class constructed from [graph]/[frag] directives that contains all
@@ -38,7 +38,7 @@ class Graph:
         - atom_name_to_index - dict of str and int
 
         """
-        self.name: str = name
+        self.name: str | None = name
         self.atoms: list[tuple[str, str, str, GraphAtomType]] = []
         self.interactions: list[tuple[str, list[str]]] = []
         self.equivalents: list[set[str]] = []

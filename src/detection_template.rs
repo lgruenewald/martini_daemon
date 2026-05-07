@@ -35,6 +35,9 @@ pub struct DetectionTemplate {
 #[pymethods]
 impl DetectionTemplate {
     #[new]
+    /// Create a new empty detection template.
+    ///
+    /// Must be fully parsed before adding it to DetectionTemplateList.
     pub fn new() -> Self {
         Self {
             name: None,
@@ -47,6 +50,9 @@ impl DetectionTemplate {
         }
     }
 
+    /// Add a maximum distance condition.
+    ///
+    /// Entry should be: reactant idx, graph node idx, reactant idx, graph node idx, distance^2 (nm^2)
     pub fn add_distance_max(
         &mut self,
         entry: (usize, usize, usize, usize, f64),
@@ -54,6 +60,9 @@ impl DetectionTemplate {
         self.distance_max.push(entry);
     }
 
+    /// Add a minimum distance condition.
+    ///
+    /// Entry should be: reactant idx, graph node idx, reactant idx, graph node idx, distance^2 (nm^2)
     pub fn add_distance_min(
         &mut self,
         entry: (usize, usize, usize, usize, f64),
@@ -61,12 +70,21 @@ impl DetectionTemplate {
         self.distance_min.push(entry);
     }
 
+    /// Add a forbidden angle range.
+    ///
+    /// Entry should be: reactant idx, graph node (3x), minimum (cosine of angle), maximum (cosine of angle)
     pub fn add_angle_limit(
         &mut self,
         entry: (usize, usize, usize, usize, usize, usize, f64, f64),
     ) {
         self.angle_limits.push(entry);
     }
+
+    /// Add a forbidden dihedral range.
+    ///
+    /// Entry should be: reactant idx, graph node (4x), minimum (angle), maximum (angle).
+    ///
+    /// min < max must be true. both min and max must be between -pi and pi, in radians.
     pub fn add_dihedral_limit<'py>(
         &mut self,
         #[gen_stub(override_type(type_repr="tuple[int, int, int, int, int, int, int, int, float, float]"))]
@@ -86,12 +104,18 @@ impl DetectionTemplate {
         self.dihedral_limits.push(entry);
     }
 
+    /// Get a list of angle limits already present.
+    ///
+    /// Used during parsing.
     #[getter]
     #[gen_stub(override_return_type(type_repr="list[tuple[int, int, int, int, int, int, float, float]]"))]
     pub fn angle_limits(&self) -> Vec<(usize, usize, usize, usize, usize, usize, f64, f64)> {
         self.angle_limits.clone()
     }
 
+    /// Get a list of dihedral limits already present.
+    ///
+    /// Used during parsing.
     #[getter]
     #[gen_stub(override_return_type(type_repr="list[tuple[int, int, int, int, int, int, int, int, float, float]]"))]
     pub fn dihedral_limits(&self) -> Vec<(
@@ -109,7 +133,8 @@ impl DetectionTemplate {
         self.dihedral_limits.clone()
     }
 
-    /// Raises an exception if reaction is not valid.
+    /// Raise an exception if reaction is not valid.
+    ///
     /// Must be called when reaction is done parsing.
     pub fn complete(&self) -> Result<(), PyErr> {
         // 1. must have name and reactants

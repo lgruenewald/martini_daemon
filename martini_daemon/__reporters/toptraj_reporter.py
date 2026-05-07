@@ -1,13 +1,20 @@
 from ..__formats import TopTrajWriter
-from ..__reporter import Reporter
-from ..__simulation import Simulation
+from ..__simulation import Reporter, Simulation
 
 
 class TopTrajReporter(Reporter):
-    def __init__(self):
+    def __init__(self) -> None:
+        """Create a TopTrajReporter.
+
+        Will write a "topology trajectory" file to a file ending with `.toptraj`, written at each trajectory
+        frame of the simulation.
+
+        See :doc:`/toptraj`, :doc:`/autoapi/martini_daemon/TopTrajWriter`
+        and :doc:`/autoapi/martini_daemon/TopTrajReader` for more information about the format.
+        """
         self.writer: TopTrajWriter | None = None
 
-    def on_simulation_start(self, simulation: Simulation, continue_sim: bool):
+    def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
         title = simulation.system.additional_data.get("title")
         assert type(title) is str
         init_mols = []
@@ -24,7 +31,7 @@ class TopTrajReporter(Reporter):
             truncate=simulation.current_step
         )
 
-    def on_trajectory_frame(self, simulation):
+    def on_trajectory_frame(self, simulation) -> None:
         assert self.writer is not None
         self.writer.new_frame(
             simulation.trajectory_frame,
@@ -43,6 +50,6 @@ class TopTrajReporter(Reporter):
         )
         self.writer.write_frame()
 
-    def on_simulation_finish(self, simulation):
+    def on_simulation_finish(self, simulation) -> None:
         assert self.writer is not None
         self.writer.finish()

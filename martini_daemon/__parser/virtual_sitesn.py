@@ -90,7 +90,7 @@ class VirtualSitesN(InteractionDirective):
 
 
 def register_vsiten_type(type_: int, args: list[str]):
-    """Args are per constructing atom"""
+    """Args are per constructing atom."""
 
     def inner(class_):
         name = class_.get_name()

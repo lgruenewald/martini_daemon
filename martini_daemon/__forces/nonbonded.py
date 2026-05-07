@@ -20,7 +20,7 @@ class NonBonded(Force):
     """
 
     @classmethod
-    def is_coupling(cls):
+    def is_coupling(cls) -> bool:
         return False
 
     def delta_degrees_of_freedom(self) -> int:
@@ -30,7 +30,7 @@ class NonBonded(Force):
     def get_name(cls) -> str:
         return "nonbonded"
 
-    def __init__(self, system):
+    def __init__(self, system) -> None:
         super().__init__(system)
         self.epsilon_r = system.additional_data.get("epsilon_r")
         self.cutoff_nm = system.additional_data.get("cutoff")
@@ -56,7 +56,7 @@ class NonBonded(Force):
         self._force.setParticleParameters(atom_id, [type_, charge, sc_lam, sc_alpha])
         self.system.flag_reinitialize()
 
-    def flag_atom_add(self):
+    def flag_atom_add(self) -> None:
         self._destroy()
 
     def add_exclusion(self, i: int, j: int) -> None:
@@ -136,7 +136,7 @@ class NonBonded(Force):
 class ExclusionHelper(BondedForce):
     """The force behind the force name "exclusion". Instantiated by NonBonded.get_exclusion_helper().
     Added to the system by Simulation. Each NonBonded force implementation should provide its own.
-    Also handles the electrostatic self correction force
+    Also handles the electrostatic self correction force.
 
     Different to other BondedForce objects because it is partly managed by NonBonded / partly manages NonBonded.
 
@@ -199,7 +199,7 @@ class ExclusionHelper(BondedForce):
     def get_name(cls) -> str:
         return "exclusion"
 
-    def __init__(self, system, nb):
+    def __init__(self, system, nb) -> None:
         super().__init__(system)
         self.__nb = nb
         self.epsilon_r = system.additional_data.get("epsilon_r")
@@ -214,7 +214,7 @@ class ExclusionHelper(BondedForce):
         super()._remove_bond(bond_id)
         self.__nb.flag_remove_exclusion()
 
-    def flag_atom_add(self):
+    def flag_atom_add(self) -> None:
         self._destroy()
 
     def flag_atom_change(self, atom_id: int, change_charge: bool = False) -> None:

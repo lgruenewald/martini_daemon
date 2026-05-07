@@ -33,7 +33,7 @@ class Connection(BondedForce):
     def get_name(cls) -> str:
         return "connection"
 
-    def _destroy(self):
+    def _destroy(self) -> None:
         pass
 
     filters = {"bond"}

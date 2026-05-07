@@ -1,4 +1,4 @@
-"""Context inheriting openmm context"""
+"""Context inheriting openmm context."""
 
 import numpy as np
 import numpy.typing as npt
@@ -19,9 +19,9 @@ class Context:
         system: System,
         integrator: mm.Integrator,
         default_box: PeriodicBox,
-        platform: mm.Platform = None,
-        params: dict[str, str] = None,
-    ):
+        platform: mm.Platform,
+        params: dict[str, str],
+    ) -> None:
         """Context object. Created by Simulation automatically, based on the provided `.top` and geometry file.
 
         :param system: Martini Daemon system linked with this context.

@@ -63,7 +63,7 @@ class TopStar:
                     frag_atoms.append(-1)
                 else:
                     frag_atoms.append(val)
-
+            assert m.graph.name is not None
             self.frag_list.add_fragment(m.graph.name, frag_atoms)
 
     def detection(

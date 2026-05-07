@@ -7,7 +7,7 @@ from .bonded_force import BondedForce
 
 
 class VirtualSite(BondedForce, metaclass=ABCMeta):
-    def __init__(self, system: Any):
+    def __init__(self, system: Any) -> None:
         """Base class for virtual sites, based on BondedForce.
 
         :param system: Martini Daemon System object.

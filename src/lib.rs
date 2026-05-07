@@ -13,7 +13,9 @@ mod bond_graph;
 
 #[gen_stub_pyfunction]
 #[pyfunction]
-/// Returns the current version and git commit.
+/// Return the current version and git commit as a string.
+///
+/// The output gets embedded in logs.
 fn build_version() -> String {
     env!("BUILD_VERSION").to_string()
 }

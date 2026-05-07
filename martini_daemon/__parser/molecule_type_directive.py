@@ -21,18 +21,18 @@ class MoleculeTypeDirective(Directive):
             raise TokenParseException(tokens[1], "Only nr. excl. == 1 is supported.")
         tokens.assert_no_more_than(2)
 
-    def finish(self):
+    def finish(self) -> None:
         if self.molecule_type.name is None or self.molecule_type.nrexcl is None:
             raise ParseException("Molecule name and nr. excl. expected.")
         self.molecule_type.process_nrexcl()
         self.system.molecule_types[self.molecule_type.name] = self.molecule_type
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return False
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return False
 
     @classmethod

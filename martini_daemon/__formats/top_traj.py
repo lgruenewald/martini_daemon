@@ -108,7 +108,6 @@ class TopTrajWriter:
         :param append: Whether to append to an existing file.
         :param truncate: If appending, the last MD step to keep.
         """
-
         self.__buffer = bytearray()
         self.__last_frame = -1
         self.__frame = None
@@ -303,7 +302,7 @@ class TopTrajWriter:
         raw_bytes[bonds_len : bonds_len + 8] = struct.pack("<Q", n_bonds)
         self.__write(raw_bytes)
 
-    def write_frame(self):
+    def write_frame(self) -> None:
         """Finishes writing the current frame to disk.
 
         Must call register_frame_atoms and register_frame_bonds exactly once first.
@@ -313,7 +312,7 @@ class TopTrajWriter:
         self.__frame = None
         self.__flush()
 
-    def __write(self, raw_bytes: bytes) -> None:
+    def __write(self, raw_bytes: bytes | bytearray) -> None:
         """Writes raw bytes to internal buffer."""
         self.__buffer += raw_bytes
 
@@ -359,7 +358,7 @@ class TopTrajFrame:
 
 
 class TopTrajReader:
-    def __init__(self, path: str):
+    def __init__(self, path: str) -> None:
         """Create a ``.toptraj`` file reader."""
         self.path = path
         self.__handle = open(path, "rb")
@@ -369,6 +368,10 @@ class TopTrajReader:
         self.minor_version = 0
 
         header = self.__read_chunk()
+        if header is None:
+            raise ValueError(
+                "No header was found in .toptraj file, therefore it is likely corrupt."
+            )
 
         title_len = header[0]
         (self.title,) = struct.unpack(f"<{title_len}s", header[1 : 1 + title_len])
@@ -500,5 +503,5 @@ class TopTrajReader:
             bonds,
         )
 
-    def close(self):
+    def close(self) -> None:
         self.__handle.close()

@@ -13,7 +13,7 @@ from .molecule_type import MoleculeType
 class System:
     __available_forces: dict[str, type[BondedForce]] = {}
 
-    def __init__(self, options=None):
+    def __init__(self, options=None) -> None:
         """Martini Daemon System.
 
         * Contains all the topology information.
@@ -49,7 +49,7 @@ class System:
         self.initial_molecules: list[tuple[str, int]] = []
         self.additional_data: dict[str, Any] = options or {}
 
-    def __assert_no_context(self):
+    def __assert_no_context(self) -> None:
         if self.__context is not None:
             raise ValueError(
                 "This operation must be done before Context is initialized."
@@ -118,7 +118,7 @@ class System:
         self.__flag_atom_add()
         return len(self.__names) - 1
 
-    def new_residue(self):
+    def new_residue(self) -> None:
         """Bumps the current residue ID, used for adding new atoms to the system."""
         self.__last_resid += 1
 
@@ -362,7 +362,7 @@ class System:
         """
         self.__system.setDefaultPeriodicBoxVectors(box.a, box.b, box.c)
 
-    def _bind_context(self, context):
+    def _bind_context(self, context) -> None:
         """Should only be called by context.
 
         Protected, but only context should call it. Not a part of the public API, changing this is non-breaking.

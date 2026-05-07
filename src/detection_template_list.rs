@@ -20,6 +20,9 @@ pub struct DetectionTemplateList {
 #[pymethods]
 impl DetectionTemplateList {
     #[new]
+    /// Create a new detection template list.
+    ///
+    /// Will also store cached information for the detection template.
     pub fn new() -> Self {
         Self {
             reactions: OrderMap::new(),
@@ -29,6 +32,10 @@ impl DetectionTemplateList {
             largest_r_max: 0.0
         }
     }
+
+    /// Add a new detection template.
+    ///
+    /// Will build and cache additional information about it, so should be already in a fully parsed state.
     pub fn add_detection_template(&mut self, rx: Py<DetectionTemplate>, py: Python) -> PyResult<bool> {
         let rx_ref = rx.borrow(py);
 
@@ -99,6 +106,9 @@ impl DetectionTemplateList {
         Ok(true)
     }
 
+    /// Get a mutable copy of detection template.
+    ///
+    /// Returns None if no reaction exists with name.
     pub fn get_detection_template(
         &self,
         name: &str,
@@ -111,6 +121,9 @@ impl DetectionTemplateList {
         }
     }
 
+    /// Get a list of all reactions, by their name.
+    ///
+    /// Will make a copy.
     pub fn reaction_names(&self) -> Vec<String> {
         self.reactions.keys().map(|a| a.clone()).collect()
     }

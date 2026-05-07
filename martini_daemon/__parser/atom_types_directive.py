@@ -30,15 +30,15 @@ class AtomTypesDirective(Directive):
             )
         self.parent.system.add_atom_type(type, charge, mass)
 
-    def finish(self):
+    def finish(self) -> None:
         pass
 
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         return True
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         return False
 
     @classmethod
