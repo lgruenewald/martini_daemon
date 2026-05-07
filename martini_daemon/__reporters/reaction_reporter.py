@@ -9,7 +9,7 @@ from ..__simulation import Simulation
 
 def truncate_reactions(handle: TextIO, current_step: int):
     prev_pos = 0
-    while (line := handle.readline()) != b"":
+    while len(line := handle.readline()) > 0:
         if len(line) > 0 and line[0] != "#":
             frame = int(line.split(",")[0])
             if frame > current_step:
@@ -38,10 +38,9 @@ class ReactionReporter(Reporter):
         frame,reaction_name;reactant1_name,reactant1_id(res:resid1,...residn),atoms...;...reactantn_name(res:resid1,...residn),reactantn_id,atoms...
 
         """
-        self.reactions = 0
 
     def on_simulation_start(self, simulation, continue_sim: bool):
-        self.path = simulation.request_path(".reactions", copy=continue_sim)
+        self.path = simulation.request_path(".reactions", continue_sim=continue_sim)
         truncate = continue_sim and os.path.exists(self.path)
         self.handle = open(self.path, "r+" if truncate else "w")  # noqa: SIM115
 
@@ -82,10 +81,9 @@ class ReactionReporter(Reporter):
                 )
                 + "\n",
             )
-        self.reactions += len(reactions)
 
     def interactive_line(self, simulation) -> str:
-        return f"reactions: {self.reactions}"
+        return f"reactions: {simulation.reactions_so_far}"
 
     @staticmethod
     def read_reactions(path) -> list[tuple[int, str, list[tuple[str, int, list[int]]]]]:

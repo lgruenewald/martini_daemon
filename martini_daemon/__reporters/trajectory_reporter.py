@@ -13,7 +13,7 @@ class TrajectoryReporter(Reporter):
         self.writer: TrajectoryWriter | None = None
 
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
-        self.path = simulation.request_path(self.__format)
+        self.path = simulation.request_path(self.__format, continue_sim=continue_sim)
         append = continue_sim and os.path.exists(self.path)
         self.writer = TrajectoryWriter(
             self.path,

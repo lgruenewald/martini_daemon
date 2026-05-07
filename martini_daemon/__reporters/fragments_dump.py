@@ -29,7 +29,7 @@ class FragmentsDump(Reporter):
 
     def on_simulation_start(self, simulation, continue_sim: bool):
         self.handle = open(
-            simulation.request_path(".fragments_dump", copy=continue_sim), "a"
+            simulation.request_path(".fragments_dump", continue_sim=continue_sim), "a"
         )
         n = simulation.system.num_atoms()
         assert n > 0

@@ -114,9 +114,8 @@ Limitations
     * While adding new particles is more likely in a coarse grained setting, it still is not a common requirement,
       due to the conservation of mass.
 
-    * This limitation can be bypassed with some creativity, such as converting to/from solvent molecules,
-      or converting to a non-interacting bead with no interactions with anything, effectively changing the number
-      of beads of interest.
+    * This limitation can be bypassed with some creativity, such as converting to/from solvent molecules.
+      Note: Beads with no interaction with anything seem to not work as of now.
 
 * Constraints and virtual sites cannot be created or removed during reactions.
 

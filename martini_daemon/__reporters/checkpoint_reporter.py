@@ -1,4 +1,5 @@
 import os
+import sys
 
 from ..__formats import read_checkpoint, write_checkpoint
 from ..__reporter import Reporter
@@ -67,7 +68,7 @@ class CheckpointReporter(Reporter):
 
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
         self.paths = [
-            simulation.request_path(f".chk{i + 1 if i > 0 else ''}", copy=continue_sim)
+            simulation.request_path(f".chk{i + 1 if i > 0 else ''}", continue_sim=continue_sim)
             for i in range(self.n_checkpoints + 1)
         ]
         self.tmp_path: str = simulation.request_path(".chk_tmp")
@@ -93,6 +94,7 @@ class CheckpointReporter(Reporter):
             # hacky, but simulation does not expose sim name otherwise so reporters are forced to use request_path
             self.tmp_path.removesuffix(".chk_tmp"),
             sim.current_step,
+            # the index of current trajectory frame being written
             sim.trajectory_frame,
             sim.reactions_so_far,
             sim.time_ps,
@@ -111,12 +113,12 @@ class CheckpointReporter(Reporter):
 
 
 class CheckpointLoader(Simulation):
-    def __init__(self, chk_path: str, *args, **kwargs) -> None:
+    def __init__(self, checkpoint: str, *args, **kwargs) -> None:
         """Load a checkpoint from chk_path.
 
         Pass additional arguments as you would to Simulation().
         """
-        chk = read_checkpoint(chk_path)
+        chk = read_checkpoint(checkpoint)
         sim_name = chk.sim_name
         reactions = None
         if chk.reactions_so_far > 0:
@@ -128,11 +130,13 @@ class CheckpointLoader(Simulation):
         assert "checkpoint" not in kwargs, "Use chk_path, not checkpoint."
         super().__init__(*args, checkpoint=chk, **kwargs)
         # REPLAY
+        print()
         if reactions is not None:
             for step, rx_name, frags in reactions:
                 if self.current_step < step:
                     break
                 frag_ids = [frag_id for (name, frag_id, atoms) in frags]
+                sys.stdout.write(f"\033[2K\rReplaying reactions: {step}/{self.current_step}: {rx_name} {frag_ids}")
                 # verification
                 frag_objs = [
                     self.top.frag_list.get_fragment(frag_id) for frag_id in frag_ids
@@ -142,3 +146,5 @@ class CheckpointLoader(Simulation):
                     assert frag_id == frag_obj.frag_id
                     assert all(a == b for a, b in zip(atoms, frag_obj.atoms))
                 self.top.modification([(rx_name, frag_ids)])
+            sys.stdout.write(f"\033[2K\rReplaying reactions: done replaying {len(reactions)} reactions.")
+        print()

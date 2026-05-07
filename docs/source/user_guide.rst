@@ -643,6 +643,20 @@ constructor should be the path to the checkpoint file. All other arguments will 
 of :doc:`/autoapi/martini_daemon/Simulation`, and should be identical to how the simulation ran before the
 checkpoint was made.
 
+::
+
+    #!/usr/bin/env python3
+
+   from martini_daemon import Simulation, VariablesReporter, TrajectoryReporter, ReactionReporter, TopTrajReporter
+   import openmm as mm
+
+   with Simulation(
+       # path to Gromacs Topology
+       top_path="system.top",
+       # path to Starting geometry
+       geom_path="system.gro",
+
+
 Energy minimization after reactions
 -----------------------------------
 

@@ -73,6 +73,7 @@ class Simulation:
         platform: str | None | mm.Platform = None,
         context_parameters: None | dict[str, str] = None,
         nonbonded: Callable[[System], NonBonded] | type[NonBonded] | None = None,
+        copy_on_continue: bool = False,
         checkpoint: Checkpoint | None = None,
     ) -> None:
         """Create a simulation.
@@ -110,8 +111,10 @@ class Simulation:
         :param nonbonded: Nonbonded force to use, passed as a type or a function that returns the martini daemon Force
             when called with system as its argument. By default, the Martini compatible shifted Lennard-Jones
             and reaction-field electrostatics are used.
+        :param copy_on_continue: If True, it will back up files when loading from checkpoints. This may take a while
+            depending on I/O speed.
         :param checkpoint: Whether this is a continuation of a previous simulation. Do not use manually! Use
-            CheckpointReporter's LoadCheckpoint() method to continue simulations, as the topology has to be obtained
+            CheckpointLoader(checkpoint="out.chk", ...) to continue simulations, as the topology has to be obtained
             by replaying all reactions.
 
         Note: You may want to take a look at the following attributes, which also contain methods for common simulation
@@ -125,9 +128,11 @@ class Simulation:
         self.total_steps: int = md_steps
         self.__sim_name = sim_name
         # metadata
-        continue_sim = checkpoint is not None
-        if continue_sim:
-            self.trajectory_frame = checkpoint.trajectory_frame
+        self.continue_sim = checkpoint is not None
+        self.copy_on_continue = copy_on_continue
+        if self.continue_sim:
+            # chk was written with one less completed frame in mind
+            self.trajectory_frame = checkpoint.trajectory_frame + 1
             self.reactions_so_far = checkpoint.reactions_so_far
             self.current_step = checkpoint.current_step
             self.time_ps = checkpoint.time_ps
@@ -199,7 +204,7 @@ class Simulation:
         if nonbonded is None:
             nonbonded = NonBonded
 
-        self.log = open(self.request_path(".log", copy=continue_sim), "a")
+        self.log = open(self.request_path(".log", continue_sim=self.continue_sim), "a")
         self.info(f"Martini Daemon {version('martini_daemon')} log file")
         self.info("Build version:", build_version())
         assert isinstance(platform, mm.Platform)
@@ -267,8 +272,8 @@ class Simulation:
 
         self.__context: Context | None = None
         # build context
-        if geometry is not None or continue_sim:
-            if continue_sim:
+        if geometry is not None or self.continue_sim:
+            if self.continue_sim:
                 box = checkpoint.box
                 start_pos = checkpoint.pos
                 start_vel = checkpoint.vel
@@ -298,7 +303,7 @@ class Simulation:
         self.integrator = None
 
         for r in self.__reporters:
-            r.on_simulation_start(self, continue_sim)
+            r.on_simulation_start(self, self.continue_sim)
 
     def __enter__(self) -> Simulation:
         return self
@@ -307,23 +312,24 @@ class Simulation:
         self.finish()
 
     # File handles and loggers
-    def request_path(self, suffix: str, copy: bool = False) -> str:
+    def request_path(self, suffix: str, continue_sim: bool = False) -> str:
         """Request a writable path for an output file. Back up the file if it already exists.
 
         :param suffix: suffix to use. Usually a file extension, e.g. ".xtc".
-        :param copy: If True, it will make a copy of the original contents at the original path.
-            Generally, only pass True, if you intend to append to the contents.
+        :param continue_sim: If True, it will:
+            * not make a backup (default)
+            * make a copy if self.copy_on_continue is True
         """
         path = self.__sim_name + suffix
 
         parent, filename = os.path.split(path)
-        if os.path.isfile(path):
+        if os.path.isfile(path) and not (continue_sim and not self.copy_on_continue):
             bkup_num = 0
             bkup_path = path
             while os.path.isfile(bkup_path):
                 bkup_num += 1
                 bkup_path = os.path.join(parent, f"#{filename}.{bkup_num}#")
-            if copy:
+            if continue_sim:
                 shutil.copy(path, bkup_path)
             else:
                 os.rename(path, bkup_path)
@@ -434,6 +440,7 @@ class Simulation:
         print(f"Simulation of {remaining} steps ({_format_sim_time(sim_ps)})")
         gcd = math.gcd(self.traj_frequency, self.dm_frequency, remaining)
         print(f"D/M freq {self.dm_frequency} Traj freq {self.traj_frequency} gcd {gcd}")
+        skip_1 = self.continue_sim
         try:
             while self.current_step < self.total_steps:
                 self.step(
@@ -442,13 +449,14 @@ class Simulation:
                         self.current_step % self.traj_frequency == 0
                         if self.traj_frequency > 0
                         else False
-                    ),
+                    ) and not skip_1,
                     dm=(
                         self.current_step % self.dm_frequency == 0
                         if self.dm_frequency > 0
                         else False
                     ),
                 )
+                skip_1 = False
             self.__do_traj_frame()
             print()
         except Exception as e:

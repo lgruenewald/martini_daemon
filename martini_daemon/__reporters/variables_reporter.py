@@ -31,7 +31,7 @@ def write_energies(title, handle: TextIO, sim: Simulation, first=False):
 def truncate_energies(handle: TextIO, sim: Simulation):
     handle.seek(0, os.SEEK_SET)
     prev_pos = 0
-    while (line := handle.readline()) != b"":
+    while len(line := handle.readline()) > 0:
         if len(line) > 0 and line[0] != "#":
             frame = int(line.split(",")[1])
             if frame > sim.current_step:
@@ -43,7 +43,7 @@ def truncate_energies(handle: TextIO, sim: Simulation):
 
 class VariablesReporter(Reporter):
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool):
-        self.path = simulation.request_path(".ener", copy=continue_sim)
+        self.path = simulation.request_path(".ener", continue_sim=continue_sim)
         truncate = os.path.exists(self.path)
         self.handle = open(self.path, "r+" if truncate else "w")
 

@@ -112,6 +112,8 @@ class TopTrajWriter:
         self.__buffer = bytearray()
         self.__last_frame = -1
         self.__frame = None
+        self.n_atoms = len(res_names)
+        assert len(res_names) == len(res_ids)
 
         magic_1_0 = b"\xc0TOPTR\x01\x00"
 
@@ -133,9 +135,6 @@ class TopTrajWriter:
                     count,
                     atom_per_mol
                 ))
-
-            assert len(res_names) == len(res_ids)
-            self.n_atoms = len(res_names)
 
             self.__write(struct.pack("<I", self.n_atoms))
             for name in res_names:
@@ -169,10 +168,12 @@ class TopTrajWriter:
                     frame, n_atoms, sim_step, sim_time = struct.unpack(
                         "<IIQd", content[0:24]
                     )
+                    assert frame == self.__last_frame + 1
                     self.__handle.seek(4, SEEK_CUR)
                     if sim_step > truncate:
                         break
                     truncate_at = self.__handle.tell()
+                    self.__last_frame += 1
                 self.__handle.truncate(truncate_at)
 
             # reopen for appending

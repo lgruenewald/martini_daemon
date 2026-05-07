@@ -15,7 +15,7 @@ class TopTrajReporter(Reporter):
             n_atoms_per = len(simulation.system.molecule_types[name].atoms)
             init_mols.append((name, n, n_atoms_per))
         self.writer = TopTrajWriter(
-            simulation.request_path(".toptraj"),
+            simulation.request_path(".toptraj", continue_sim=continue_sim),
             title,
             init_mols,
             simulation.system.get_res_names(),

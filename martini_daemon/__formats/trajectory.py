@@ -80,8 +80,9 @@ class TrajectoryWriter:
                 if append and keep_n_frames is not None:
                     reader = molly.XTCReader(path)
                     last_tell = 0
-                    for _ in range(keep_n_frames):
+                    for i in range(keep_n_frames):
                         last_tell = reader.skip_frame()
+                    assert last_tell == reader.tell()
                     reader.close()
 
                     with open(path, "rb+") as f:

@@ -6,7 +6,7 @@ from ..__simulation import Simulation
 
 class FragCountReporter(Reporter):
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
-        self.path = simulation.request_path(".frags", copy=continue_sim)
+        self.path = simulation.request_path(".frags", continue_sim=continue_sim)
         truncate = continue_sim and os.path.exists(self.path)
         self.handle = open(self.path, "r+" if truncate else "w")  # noqa: SIM115
 
@@ -16,9 +16,9 @@ class FragCountReporter(Reporter):
             while (line := self.handle.readline()) != "":
                 c_step = int(line.split(",")[0].strip("Step:"))
                 if c_step > truncate_to:
-                    self.handle.truncate(tell)
                     break
                 tell = self.handle.tell()
+            self.handle.truncate(tell)
             self.handle.seek(0, os.SEEK_END)
 
     def on_trajectory_frame(self, simulation: Simulation):

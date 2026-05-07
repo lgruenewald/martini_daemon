@@ -16,7 +16,7 @@ class ReactionEnergyReporter(Reporter):
         self.ext = ext
 
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
-        self.path = simulation.request_path(".rxener", copy=continue_sim)
+        self.path = simulation.request_path(".rxener", continue_sim=continue_sim)
         truncate = continue_sim and os.path.exists(self.path)
         self.handle = open(self.path, "r+" if truncate else "w")  # noqa: SIM115
 
