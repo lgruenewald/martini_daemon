@@ -29,6 +29,7 @@ class FragCountReporter(Reporter):
             )
             + "\n"
         )
+        self.handle.flush()
 
     def on_simulation_finish(self, simulation) -> None:
         self.handle.close()

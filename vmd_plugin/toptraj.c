@@ -185,12 +185,12 @@ static char *fname(Chunk *chunk, size_t n, long lim) { \
     size_t len = 0; \
     for (size_t i = 0; i < n; i++) { \
         nums[i] = f(chunk); \
-        if (lim <= 0 || i < lim) len += snprintf(NULL, 0, fmt, nums[i]); \
+        if (lim <= 0 || i < (size_t)lim) len += snprintf(NULL, 0, fmt, nums[i]); \
     } \
     char *res = malloc(len + 1); \
     size_t c = 0; \
     for (size_t i = 0; i < n; i++) { \
-        if (lim <= 0 || i < lim) c += sprintf(&res[c], fmt, nums[i]); \
+        if (lim <= 0 || i < (size_t)lim) c += sprintf(&res[c], fmt, nums[i]); \
     } \
     assert(c == len); \
     assert(res[len] == 0); \
@@ -558,6 +558,10 @@ static char *on_frame_change(
     const char *name2,
     int flags
 ) {
+    // surpress unused warnings
+    (void)flags;
+    (void)name1;
+    (void)name2;
     TopTrajData *toptraj = (TopTrajData *)data;
 
     // GET CURRENT FRAME
@@ -584,7 +588,7 @@ static char *on_frame_change(
     int res = Tcl_VarEval(interp, "molinfo ", molid, " get frame", NULL);
     CHECK_RES("molinfo get frame")
     int64_t c_frame = atol(Tcl_GetStringResult(interp));
-    if (c_frame < 0 || c_frame > toptraj->n_frames) {
+    if (c_frame < 0 || (size_t)c_frame > toptraj->n_frames) {
         printf("TOPTRAJ FATAL: Frame %li is out of range for the loaded .toptraj.\n", c_frame);
         return NULL;
     }
@@ -596,7 +600,7 @@ static char *on_frame_change(
     res = Tcl_VarEval(interp, "atomselect ", molid, " all frame ", frame_str, NULL);
     CHECK_RES("atomselect")
 
-    const char *sel = strdup(Tcl_GetStringResult(interp));
+    char *sel = strdup(Tcl_GetStringResult(interp));
 #undef FREE
 #define FREE free(sel);
     // NUMBER OF ATOMS IN SEL
@@ -630,12 +634,15 @@ static char *on_frame_change(
     CHECK_TR
 
     uint32_t frame_number = parse_I(chunk);
+    (void)frame_number;
     CHECK_TR
     uint32_t n_atoms = parse_I(chunk);
     CHECK_TR
     size_t sim_step = parse_Q(chunk);
+    (void)sim_step;
     CHECK_TR
     double sim_time_ns = parse_d(chunk);
+    (void)sim_time_ns;
     CHECK_TR
 
     names = read_ss(chunk, n_atoms, sel_atoms);
@@ -775,23 +782,10 @@ static int load_toptraj_cmd(
     return TCL_OK;
 }
 
-static int unload_toptraj_cmd(
-    ClientData _data, // NULL
-    Tcl_Interp *interp,
-    int argc, char const *argv[]
-) {
-    (void)_data; // supress unused warning
-    Tcl_SetResult(interp, "Unimplemented", TCL_STATIC); // TODO
-    return TCL_ERROR;
-}
-
 int DLLEXPORT Toptraj_Init(Tcl_Interp *interp) {
     Tcl_PkgProvide(interp, PKG_NAME, VERSION);
     Tcl_CreateCommand(
         interp, "load_toptraj", load_toptraj_cmd, NULL, NULL
-    );
-    Tcl_CreateCommand(
-        interp, "unload_toptraj", unload_toptraj_cmd, NULL, NULL
     );
     return TCL_OK;
 }

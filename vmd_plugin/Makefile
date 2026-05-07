@@ -1,6 +1,6 @@
 CC = gcc
 TCL_VERSION := 8.6
-CFLAGS := -shared $(shell pkg-config --cflags "tcl$(TCL_VERSION)") -fPIC -g -O1 -Wall -Wextra
+CFLAGS := -shared $(shell pkg-config --cflags "tcl$(TCL_VERSION)") -fPIC -g -O1 -Wall -Wextra -Werror -Wpedantic
 LDFLAGS := $(shell pkg-config --libs "tcl$(TCL_VERSION)")
 LIB := toptraj.so
 

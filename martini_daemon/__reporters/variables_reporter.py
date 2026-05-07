@@ -26,6 +26,7 @@ def write_energies(title, handle: TextIO, sim: Simulation, first=False):
     handle.write(
         f"{title},{sim.current_step},{n},{ke},{pe},{te},{t},{box_x},{box_y},{box_z},{v}\n",
     )
+    handle.flush()
 
 
 def truncate_energies(handle: TextIO, sim: Simulation):
