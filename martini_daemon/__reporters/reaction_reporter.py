@@ -56,8 +56,8 @@ class ReactionReporter(Reporter):
     def on_simulation_finish(self, simulation) -> None:
         self.handle.close()
 
-    @staticmethod
-    def __get_resids(sim: Simulation, atoms):
+    @classmethod
+    def __get_resids(cls, sim: Simulation, atoms):
         res = set()
         for atom in atoms:
             if atom != -1:
@@ -85,8 +85,8 @@ class ReactionReporter(Reporter):
     def interactive_line(self, simulation) -> str:
         return f"reactions: {simulation.reactions_so_far}"
 
-    @staticmethod
-    def read_reactions(path) -> list[tuple[int, str, list[tuple[str, int, list[int]]]]]:
+    @classmethod
+    def read_reactions(cls, path) -> list[tuple[int, str, list[tuple[str, int, list[int]]]]]:
         """.reactions format reader suited for test_detection.py
 
         Returns a list of simulation steps, reaction names and list of reactant atom lists

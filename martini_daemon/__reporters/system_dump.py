@@ -69,8 +69,9 @@ class SystemDump(Reporter):
     def on_reaction(self, simulation, reactions):
         write_frame(self.handle, simulation)
 
-    @staticmethod
+    @classmethod
     def read_dump(
+        cls,
         path: str,
     ) -> list[
         tuple[

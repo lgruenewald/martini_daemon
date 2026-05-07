@@ -21,8 +21,8 @@ class Constraint(BondedForce):
             for index, (members, params) in self.iterate_bonds():
                 self.system._add_constraint(*members, *params)
 
-    @staticmethod
-    def uses_pbc() -> bool:
+    @classmethod
+    def uses_pbc(cls) -> bool:
         return False
 
     def delta_degrees_of_freedom(self) -> int:

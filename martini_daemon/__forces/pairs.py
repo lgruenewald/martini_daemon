@@ -110,8 +110,8 @@ class Pairs(BondedForce):
 
         return [q_prod, c6, c12]
 
-    @staticmethod
-    def uses_pbc() -> bool:
+    @classmethod
+    def uses_pbc(cls) -> bool:
         return True
 
     def delta_degrees_of_freedom(self) -> int:

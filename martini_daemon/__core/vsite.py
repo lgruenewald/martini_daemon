@@ -49,8 +49,8 @@ class VirtualSite(BondedForce, metaclass=ABCMeta):
             raise ValueError("Virtual sites cannot be added during the simulation.")
         return super()._add_bond(members, params)
 
-    @staticmethod
-    def uses_pbc() -> bool:
+    @classmethod
+    def uses_pbc(cls) -> bool:
         """Whether the force uses periodic boundary conditions. Returns false for all virtual sites."""
         return False
 

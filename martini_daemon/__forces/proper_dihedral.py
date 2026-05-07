@@ -20,8 +20,8 @@ class ProperDihedral(BondedForce):
         theta, force, mult = params
         return [mult, theta, force]
 
-    @staticmethod
-    def uses_pbc() -> bool:
+    @classmethod
+    def uses_pbc(cls) -> bool:
         return True
 
     def delta_degrees_of_freedom(self) -> int:

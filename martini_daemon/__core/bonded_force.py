@@ -93,9 +93,9 @@ class BondedForce(Force, metaclass=ABCMeta):
     # List of categories in which this bonded force should be included, including broad categories e.g. "bond"
     filters: set[str] = set()
 
-    @staticmethod
+    @classmethod
     @abstractmethod
-    def uses_pbc() -> bool:
+    def uses_pbc(cls) -> bool:
         """Should return False if and only if this interaction is unable to handle being its constituent atoms be
         in different instances of the periodic box.
 

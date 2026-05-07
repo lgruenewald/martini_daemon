@@ -164,8 +164,8 @@ class ExclusionHelper(BondedForce):
         q2 = self.system.get_charge(j)
         return [q1 * q2]
 
-    @staticmethod
-    def uses_pbc() -> bool:
+    @classmethod
+    def uses_pbc(cls) -> bool:
         return True
 
     def delta_degrees_of_freedom(self) -> int:

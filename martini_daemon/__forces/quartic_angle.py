@@ -19,8 +19,8 @@ class QuarticAngle(BondedForce):
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         return params
 
-    @staticmethod
-    def uses_pbc() -> bool:
+    @classmethod
+    def uses_pbc(cls) -> bool:
         return True
 
     def delta_degrees_of_freedom(self) -> int:

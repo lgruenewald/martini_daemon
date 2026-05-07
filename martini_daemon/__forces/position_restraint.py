@@ -47,8 +47,8 @@ class PositionRestraint(BondedForce):
         x0, y0, z0 = self.system.additional_data["respos"][i]
         return [kx, ky, kz, x0, y0, z0]
 
-    @staticmethod
-    def uses_pbc() -> bool:
+    @classmethod
+    def uses_pbc(cls) -> bool:
         return True
 
     def delta_degrees_of_freedom(self) -> int:
