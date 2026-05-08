@@ -17,7 +17,8 @@ class ModificationTemplate(MoleculeType):
         self.soft_core: list[tuple[int, float, float]] = []
 
     def add_atoms_to_system(self, system: System) -> list[int]:
-        """Add atoms to the system.
+        """
+        Add atoms to the system.
 
         Invalid to call for reactions, therefore it will raise an exception.
         """
@@ -27,7 +28,8 @@ class ModificationTemplate(MoleculeType):
         )
 
     def process_nrexcl(self) -> None:
-        """Process nr_excl for a reaction.
+        """
+        Process nr_excl for a reaction.
 
         Only self.nrexcl == 1 is allowed for modification templates.
         """

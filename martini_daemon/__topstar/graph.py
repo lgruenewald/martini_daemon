@@ -17,7 +17,8 @@ class GraphAtomType(Enum):
 
 class Graph:
     def __init__(self, name: str | None) -> None:
-        """Create a Graph instance.
+        """
+        Create a Graph instance.
 
         The class constructed from [graph]/[frag] directives that contains all
         the information the user provided about a graph.
@@ -45,7 +46,8 @@ class Graph:
         self.atom_name_to_index: dict[str, int] = {}
 
     def finish_init(self) -> None:
-        """Must be called after parsing the graph and before it's used.
+        """
+        Must be called after parsing the graph and before it's used.
 
         Validates graphs and errors on malformed graphs.
         Raises ParseExceptions.
@@ -126,7 +128,8 @@ class GraphMatch:
     next_inter: int
 
     def __init__(self, graph: Graph) -> None:
-        """Create a Helper class that represents a (partially) mapped out graph to S*.
+        """
+        Create a Helper class that represents a (partially) mapped out graph to S*.
 
         Attributes:
         - graph - reference to a Graph instance that was (partially) matched
@@ -226,7 +229,8 @@ class AtomCache:
     def check_atom_interactions(
         self, g_atom: str, atom_id: int, partial: GraphMatch
     ) -> tuple[bool, list[tuple[int, tuple[str, int]]]]:
-        """Check if atom_id can be g_atom in the graph, based on interaction filters.
+        """
+        Check if atom_id can be g_atom in the graph, based on interaction filters.
 
         Returns True if adding g_atom=atom_id to the graph match is
         possible (all interaction requirements fulfilled).

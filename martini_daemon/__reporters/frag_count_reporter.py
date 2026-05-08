@@ -30,10 +30,10 @@ class FragCountReporter(Reporter):
         )
         self.handle.flush()
 
-    def on_simulation_finish(self, simulation) -> None:
+    def on_simulation_finish(self, simulation: Simulation) -> None:
         self.handle.close()
 
-    def interactive_line(self, simulation) -> str:
+    def interactive_line(self, simulation: Simulation) -> str:
         return f"fragments: {simulation.top.frag_list.num_fragments()}"
 
     def finish(self, simulation: Simulation) -> None:

@@ -1,21 +1,24 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
 
 from .token_list import TokenList
 
 
 class Directive(ABC):
-    """Base class for directives.
+    """
+    Base class for directives.
 
     You should not instantiate this directly.
 
     Directives should implement all of the methods.
     """
 
-    def __init__(self, parent: Any, path: str, line_num: int) -> None:
-        """Called when a directive occurs in the source file.
+    def __init__(self, parent: Directive, path: str, line_num: int) -> None:
+        """
+        Start parsing a directive.
+
+         Called each time a directive of this type occurs in the source file.
 
         :param parent: The instance of the parent directive or root object. Directives mutate this instance during parsing.
         :param path: Path to where it occurs.
@@ -26,20 +29,22 @@ class Directive(ABC):
         self.line_num = line_num
 
     def where(self) -> tuple[str, int]:
-        """Should return the path and line number passed in the constructor for error messages."""
+        """Return the path and line number passed in the constructor for error messages."""
         return self.path, self.line_num
 
     @abstractmethod
     def line(self, tokens: TokenList) -> None:
-        """Called on every non-empty source line inside the directive.
+        """
+        Parse a non-empty source line inside the directive.
 
         :param tokens: Preprocessed and tokenized source line.
         """
         raise NotImplementedError
 
     @abstractmethod
-    def finish(self):
-        """Called when a directive ends.
+    def finish(self) -> None:
+        """
+        End directive parsing.
 
         This happens when a new directive is encountered, for which this directive is not a valid parent for.
         """
@@ -47,8 +52,9 @@ class Directive(ABC):
 
     @classmethod
     @abstractmethod
-    def is_mandatory(cls):
-        """Whether this directive is mandatory.
+    def is_mandatory(cls) -> bool:
+        """
+        Return whether this directive is mandatory.
 
         Only valid for directives at root.
         """
@@ -56,8 +62,9 @@ class Directive(ABC):
 
     @classmethod
     @abstractmethod
-    def is_unique(cls):
-        """Whether this directive is unique.
+    def is_unique(cls) -> bool:
+        """
+        Return whether this directive is unique.
 
         Only valid for directives at root.
         """
@@ -65,8 +72,9 @@ class Directive(ABC):
 
     @classmethod
     @abstractmethod
-    def is_valid_parent(cls, parent: Any) -> bool:
-        """Whether the provided object instance is of a valid type for parent of this directive.
+    def is_valid_parent(cls, parent: Directive) -> bool:
+        """
+        Return whether the provided object instance is of a valid type for parent of this directive.
 
         This is used to guarantee that certain directives are "inside" other directives,
         such as [bonds] being inside [moleculetype].
@@ -78,7 +86,7 @@ class Directive(ABC):
     @classmethod
     @abstractmethod
     def get_name(cls) -> str:
-        """Should return the name for the directive used in []."""
+        """Return the name for the directive used in []."""
         raise NotImplementedError
 
     aliases = set()

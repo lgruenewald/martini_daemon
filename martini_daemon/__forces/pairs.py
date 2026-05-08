@@ -1,6 +1,6 @@
 import openmm as mm
 
-from ..__core import BondedForce, register_available_force
+from ..__core import BondedForce, System, register_available_force
 from ..__parser import (
     Directive,
     GromacsTopFile,
@@ -14,6 +14,7 @@ from ..__parser import (
 @register_directive
 class PairTypes(Directive):
     def line(self, tokens: TokenList) -> None:
+        assert isinstance(self.parent, GromacsTopFile)
         pair_types = self.parent.system.additional_data.get("pairtypes")
         if pair_types is None:
             pair_types = {}
@@ -39,7 +40,7 @@ class PairTypes(Directive):
         return False
 
     @classmethod
-    def is_valid_parent(cls, parent: GromacsTopFile) -> bool:
+    def is_valid_parent(cls, parent: Directive) -> bool:
         return isinstance(parent, GromacsTopFile)
 
     @classmethod
@@ -74,7 +75,7 @@ class PairsDirective(InteractionDirective):
 
 @register_available_force
 class Pairs(BondedForce):
-    def __init__(self, system) -> None:
+    def __init__(self, system: System) -> None:
         super().__init__(system)
         self.epsilon_r = system.additional_data["epsilon_r"]
 

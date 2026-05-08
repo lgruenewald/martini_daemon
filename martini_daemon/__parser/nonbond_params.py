@@ -6,6 +6,7 @@ from .token_list import TokenList, TokenParseException
 @register_directive
 class NonbondParams(Directive):
     def line(self, tokens: TokenList) -> None:
+        assert isinstance(self.parent, GromacsTopFile)
         type1 = tokens.unwrap(0, "word")
         type2 = tokens.unwrap(1, "word")
         funct = tokens.unwrap(2, "int")
@@ -30,7 +31,7 @@ class NonbondParams(Directive):
         return True
 
     @classmethod
-    def is_valid_parent(cls, parent: GromacsTopFile) -> bool:
+    def is_valid_parent(cls, parent: Directive) -> bool:
         return type(parent) is GromacsTopFile
 
     @classmethod

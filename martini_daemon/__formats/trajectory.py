@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from os.path import splitext
+from types import TracebackType
 
 import numpy as np
 import numpy.typing as npt
@@ -44,7 +45,8 @@ class TrajectoryWriter:
         append: bool = False,
         keep_n_frames: int | None = None,
     ) -> None:
-        """Create a TrajectoryWriter object.
+        """
+        Create a TrajectoryWriter object.
 
         Note: based on the backend, this object may own open file handles.
         These must be closed manually with .finish() if using this class!
@@ -102,7 +104,12 @@ class TrajectoryWriter:
     def __enter__(self) -> TrajectoryWriter:
         return self
 
-    def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
         self.close()
 
     def write_frame(
@@ -113,7 +120,8 @@ class TrajectoryWriter:
         pos: npt.NDArray[np.float32 | np.float64],
         vel: npt.NDArray[np.float32 | np.float64] | None = None,
     ) -> None:
-        """Write a single frame to the trajectory file.
+        """
+        Write a single frame to the trajectory file.
 
         :param sim_step: Current simulation step.
         :param time_ps: Current simulation time in ps.
@@ -174,7 +182,8 @@ class TrajectoryReader:
     }
 
     def __init__(self, path: str, backend: str | None = None) -> None:
-        """Create a TrajectoryReader object.
+        """
+        Create a TrajectoryReader object.
 
         Note: based on the backend, this object may own open file handles.
         These must be closed manually with .finish() if using this class!
@@ -211,13 +220,19 @@ class TrajectoryReader:
     def __enter__(self) -> TrajectoryReader:
         return self
 
-    def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
         self.close()
 
     def read_frame(
         self,
     ) -> None | tuple[int, float, PeriodicBox, np.ndarray, np.ndarray | None]:
-        """Read a single frame from the trajectory file.
+        """
+        Read a single frame from the trajectory file.
 
         :return: Current simulation step, simulation time in ps, periodic box, positions in nm
             and the velocities in nm/ps if format supports it, or None if not. None if all frames were read.

@@ -5,13 +5,15 @@ import zlib
 from collections.abc import Collection
 from dataclasses import dataclass
 from io import SEEK_CUR
+from types import TracebackType
 from typing import Any
 
 from ..__rust import BondGraph
 
 
 class TopTrajWriter:
-    """The Topology-Trajectory File Format .toptraj is described here.
+    """
+    The Topology-Trajectory File Format .toptraj is described here.
 
     Goals of this format:
     - Store per-trajectory data in the header:
@@ -102,7 +104,8 @@ class TopTrajWriter:
         append: bool = False,
         truncate: None | int = None,
     ) -> None:
-        """Creates a Topology Trajectory writer.
+        """
+        Create a Topology Trajectory writer.
 
         Note: this class owns a file handle. If using it directly, call .finish() manually when done!
 
@@ -184,18 +187,24 @@ class TopTrajWriter:
 
             # reopen for appending
             self.__handle.close()
-            self.__handle = open(path, "ab")
+            self.__handle = open(path, "ab")  # noqa: SIM115
 
     def __enter__(self) -> TopTrajWriter:
         return self
 
-    def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
         self.finish()
 
     def new_frame(
         self, frame_num: int, sim_step: int, time_ps: float, n_atoms: int
     ) -> None:
-        """Write the frame header to the disk for a new frame.
+        """
+        Write the frame header to the disk for a new frame.
 
         Frames should be written in this order:
 
@@ -227,7 +236,8 @@ class TopTrajWriter:
         charges: Collection[float],
         masses: Collection[float],
     ) -> None:
-        """Writes the current frame atom information to disk.
+        """
+        Write the current frame atom information to disk.
 
         The number of atoms must be the same as n_atoms specified in new_frame().
         new_frame() must be called first. register_frame_atoms() must be called exactly once per frame.
@@ -276,7 +286,8 @@ class TopTrajWriter:
         self.__frame["atoms"] = True
 
     def write_frame_bonds(self, bonds: BondGraph) -> None:
-        """Writes the bonds for the current frame to disk.
+        """
+        Write the bonds for the current frame to disk.
 
         :param bonds: The bonds to write, as a BondGraph object.
         """
@@ -309,7 +320,8 @@ class TopTrajWriter:
         self.__write(raw_bytes)
 
     def write_frame(self) -> None:
-        """Finishes writing the current frame to disk.
+        """
+        Finish writing the current frame to disk.
 
         Must call register_frame_atoms and register_frame_bonds exactly once first.
 
@@ -319,11 +331,12 @@ class TopTrajWriter:
         self.__flush()
 
     def __write(self, raw_bytes: bytes | bytearray) -> None:
-        """Writes raw bytes to internal buffer."""
+        """Write raw bytes to internal buffer."""
         self.__buffer += raw_bytes
 
     def __flush(self) -> None:
-        """Writes the internal buffer to disk.
+        """
+        Write the internal buffer to disk.
 
         * Uses zlib for compression.
         * Prepends the number of compressed bytes.
@@ -367,7 +380,7 @@ class TopTrajReader:
     def __init__(self, path: str) -> None:
         """Create a ``.toptraj`` file reader."""
         self.path = path
-        self.__handle = open(path, "rb")
+        self.__handle = open(path, "rb")  # noqa: SIM115
         self.header = self.__handle.read(8)
         assert self.header == b"\xc0TOPTR\x01\x00"
         self.major_version = 1
@@ -405,11 +418,17 @@ class TopTrajReader:
     def __enter__(self) -> TopTrajReader:
         return self
 
-    def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        exc_traceback: TracebackType | None,
+    ) -> None:
         self.close()
 
     def skip_frame(self) -> None:
-        """Skip a single frame.
+        """
+        Skip a single frame.
 
         Note: if already at the end, will silently do nothing.
         """
@@ -448,7 +467,7 @@ class TopTrajReader:
     def __read_strings(
         self, content: bytes, i: int, n_atoms: int
     ) -> tuple[int, list[bytes]]:
-        """Reads n pascal strings."""
+        """Read n pascal strings."""
         res = []
         for _ in range(n_atoms):
             len_ = content[i]
@@ -460,7 +479,7 @@ class TopTrajReader:
     def __read_any(
         self, content: bytes, i: int, n_atoms: int, byte_format: str, n_bytes: int
     ) -> tuple[int, list[Any]]:
-        """Reads n occurrences of the byte format specified."""
+        """Read n occurrences of the byte format specified."""
         res = []
         for _ in range(n_atoms):
             res.append(struct.unpack(byte_format, content[i : i + n_bytes])[0])
@@ -468,7 +487,8 @@ class TopTrajReader:
         return i, res
 
     def read_frame(self) -> TopTrajFrame | None:
-        """Reads a frame from the ``toptraj`` file.
+        """
+        Read a frame from the ``toptraj`` file.
 
         :return: A toptraj frame, or None if finished.
         """

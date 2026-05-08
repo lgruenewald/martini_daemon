@@ -7,11 +7,12 @@ from .reaction_reporter import ReactionReporter
 
 
 class CheckpointReporter(Reporter):
-    def on_simulation_finish(self, simulation) -> None:
+    def on_simulation_finish(self, simulation: Simulation) -> None:
         pass
 
     def __init__(self, interval: int = 0, n_checkpoints: int = 3) -> None:
-        """Create a Checkpoint Reporter.
+        """
+        Create a Checkpoint Reporter.
 
         The Checkpoint Reporter will write checkpoint files, allowing for continuable simulations in case of
         interruption. Load checkpoints by instantiating the class CheckpointLoader(). Using the same arguments as
@@ -114,8 +115,9 @@ class CheckpointReporter(Reporter):
 
 
 class CheckpointLoader(Simulation):
-    def __init__(self, checkpoint: str, *args, **kwargs) -> None:
-        """Load a checkpoint from chk_path.
+    def __init__(self, checkpoint: str, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
+        """
+        Load a checkpoint from chk_path.
 
         Pass additional arguments as you would to Simulation().
         """

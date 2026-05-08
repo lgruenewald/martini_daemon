@@ -8,7 +8,10 @@ from .force import Force
 
 
 def wrap_coupling(mm_force: mm.Force) -> type[Force]:
-    """Given an OpenMM force that should act as a coupling for a simulation,
+    """
+    Create a Martini Daemon force for coupling.
+
+    Given an OpenMM force that should act as a coupling for a simulation,
     it creates a Martini Daemon Force from it.
     """
     used = False

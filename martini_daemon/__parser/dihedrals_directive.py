@@ -1,3 +1,6 @@
+from collections.abc import Callable
+
+from ..__core import Force
 from .gromacs_top_file import register_directive
 from .interaction_directive import InteractionDirective
 
@@ -11,7 +14,9 @@ class DihedralsDirective(InteractionDirective):
     __type_data: dict[int, tuple[str, list[str]]] = {}
 
     @classmethod
-    def register_type(cls, class_, type_: int, name: str, args: list[str]) -> None:
+    def register_type(
+        cls, class_: type[Force], type_: int, name: str, args: list[str]
+    ) -> None:
         assert type_ not in cls.__type_data
         cls.__type_data[type_] = (name, args)
 
@@ -36,8 +41,10 @@ class DihedralsDirective(InteractionDirective):
         return len(args), len(args)
 
 
-def register_dihedral_type(type_: int, args: list[str]):
-    def inner(class_):
+def register_dihedral_type(
+    type_: int, args: list[str]
+) -> Callable[[type[Force]], type[Force]]:
+    def inner(class_: type[Force]) -> type[Force]:
         name = class_.get_name()
         DihedralsDirective.register_type(class_, type_, name, args)
         return class_

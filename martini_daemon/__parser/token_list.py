@@ -1,5 +1,6 @@
 import math
 import re
+from typing import Any
 
 from .token import Token
 
@@ -13,12 +14,6 @@ class TokenParseException(Exception):
 
 
 class TokenList:
-    """A list of tokens.
-
-    Parser calls the line method of :doc:`Directive</autoapi/martini_daemon/Directive>` with this type as the argument.
-    Directive implementations should call the unwrap method with the
-    """
-
     __int_pat = re.compile("^[-+]?[0-9]+$")
     __float_pat = re.compile("^[-+]?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?$")
     __word_pat = re.compile("^[a-zA-Z0-9_.]+$")
@@ -29,7 +24,13 @@ class TokenList:
     __DEFAULT = object()
 
     def __init__(self, line: str, tokens: list[Token], defines: dict[str, str]) -> None:
-        """Note that tokenization has to performed first before constructing TokenList. This is done by the Parser.
+        """
+        Make a list of tokens.
+
+        Parser calls the line method of :doc:`Directive</autoapi/martini_daemon/Directive>` with this type as the argument.
+        Directive implementations should call the unwrap method with the
+
+        Note that tokenization has to performed first before constructing TokenList. This is done by the Parser.
         This is because the Parser needs to process line continuations first.
 
         :param line: Line that was tokenized.
@@ -69,10 +70,13 @@ class TokenList:
         self,
         index: int,
         type_filter: str,
-        default=__DEFAULT,
+        default: Any = __DEFAULT,  # noqa: ANN401
         error_msg: str | None = None,
-    ):
-        """Given a TokenList try to index it and convert to a usable value
+    ) -> Any:  # noqa: ANN401
+        """
+        Get a single token and extract its value.
+
+        Given a TokenList try to index it and convert to a usable value
         based on type_filter. If the index is out of range, a default
         value can be specified in place. Will also perform preprocessor #define
         replacements.

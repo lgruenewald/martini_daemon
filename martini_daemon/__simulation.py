@@ -30,7 +30,8 @@ from .__topstar import TopStar
 
 class Reporter(ABC):
     def pre_simulation_start(self, simulation: Simulation) -> None:
-        """Set up reporting.
+        """
+        Set up reporting.
 
         Called just before the context is initialized.
 
@@ -40,7 +41,8 @@ class Reporter(ABC):
 
     @abstractmethod
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
-        """Set up reporting.
+        """
+        Set up reporting.
 
         Called after the context is initialized.
 
@@ -56,14 +58,16 @@ class Reporter(ABC):
 
     @abstractmethod
     def on_simulation_finish(self, simulation: Simulation) -> None:
-        """Report once when simulation's finish() is called.
+        """
+        Report once when simulation's finish() is called.
 
         Must be implemented, as handles owned by reporters must be closed in it.
         """
         pass
 
     def on_trajectory_frame(self, simulation: Simulation) -> None:
-        """Report every traj_frequency frames.
+        """
+        Report every traj_frequency frames.
 
         There is a single per simulation traj_frequency because that's a simple
         way of getting multiple output types with nicely aligned time frames.
@@ -80,7 +84,8 @@ class Reporter(ABC):
     def on_reaction(
         self, simulation: Simulation, reactions: list[tuple[str, list[Fragment]]]
     ) -> None:
-        """Report after the modification algorithm runs.
+        """
+        Report after the modification algorithm runs.
 
         :param simulation: Simulation object.
         :param reactions: List of reactions that were applied, as tuples of reaction name and references to reacting fragments.
@@ -141,7 +146,8 @@ class Simulation:
         copy_on_continue: bool = False,
         checkpoint: Checkpoint | None = None,
     ) -> None:
-        """Create a simulation.
+        """
+        Create a simulation.
 
         * Provides a friendly interface for reporters requesting output files. Contains default values for Martini simulations.
         * Holds simulation metadata, such as current step, simulation name.
@@ -388,7 +394,8 @@ class Simulation:
 
     # File handles and loggers
     def request_path(self, suffix: str, continue_sim: bool = False) -> str:
-        """Request a writable path for an output file. Back up the file if it already exists.
+        """
+        Request a writable path for an output file. Back up the file if it already exists.
 
         :param suffix: suffix to use. Usually a file extension, e.g. ".xtc".
         :param continue_sim: If True, it will:
@@ -413,7 +420,8 @@ class Simulation:
         return path
 
     def finish(self) -> None:
-        """End the simulation.
+        """
+        End the simulation.
 
         Runs finish on all reporters. Reporters should close their own file handles.
 
@@ -452,7 +460,8 @@ class Simulation:
     # Friendly interface for setting up and running simulations
     @classmethod
     def set_process_title(cls, newname: bytes = b"daemon") -> None:
-        """Set process title to something else than "python".
+        """
+        Set process title to something else than "python".
 
         Nothing critical, purely aesthetic.
         Only works on (some versions of) linux. May fail silently with no exceptions thrown.
@@ -480,7 +489,8 @@ class Simulation:
         return self.__context
 
     def save_geometry(self, path: str) -> None:
-        """Save the current simulation geometry to path.
+        """
+        Save the current simulation geometry to path.
 
         This may include atom names, residue id, residue names, timestep, current time,
         simulation name, positions, velocities and the pbc box, depending on the file format used.
@@ -503,7 +513,8 @@ class Simulation:
         )
 
     def simulate(self) -> None:
-        """Run the simulation.
+        """
+        Run the simulation.
 
         Performs the remaining steps (self.total_steps - self.current_step) with the appropriate D/M and trajectory
         frequencies.
@@ -548,7 +559,8 @@ class Simulation:
         self.trajectory_frame += 1
 
     def get_openmm_topology(self) -> mmapp.Topology:
-        """Get an OpenMM Topology object.
+        """
+        Get an OpenMM Topology object.
 
         Helper that generates an OpenMM Topology object required for creating an OpenMMApp Simulation object.
 
@@ -617,7 +629,8 @@ class Simulation:
     def step(
         self, n_steps: int, traj: bool = False, dm: bool = False, silent: bool = False
     ) -> None:
-        """Perform simulation steps.
+        """
+        Perform simulation steps.
 
         Does the following:
         - Write a trajectory frame

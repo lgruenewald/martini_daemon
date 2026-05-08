@@ -1,3 +1,6 @@
+from collections.abc import Callable
+
+from ..__core import Force
 from .gromacs_top_file import register_directive
 from .interaction_directive import InteractionDirective
 
@@ -44,8 +47,10 @@ class BondsDirective(InteractionDirective):
         return len(args), len(args)
 
 
-def register_bond_type(type_: int, args: list[str], is_excl: bool):
-    def inner(class_):
+def register_bond_type(
+    type_: int, args: list[str], is_excl: bool
+) -> Callable[[type[Force]], type[Force]]:
+    def inner(class_: type[Force]) -> type[Force]:
         name = class_.get_name()
         BondsDirective.register_type(type_, name, args, is_excl)
         return class_

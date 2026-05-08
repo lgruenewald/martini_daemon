@@ -4,7 +4,8 @@ from ..__simulation import Reporter, Simulation
 
 class TopTrajReporter(Reporter):
     def __init__(self) -> None:
-        """Create a TopTrajReporter.
+        """
+        Create a TopTrajReporter.
 
         Will write a "topology trajectory" file to a file ending with `.toptraj`, written at each trajectory
         frame of the simulation.

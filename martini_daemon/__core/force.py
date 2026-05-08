@@ -1,12 +1,13 @@
 from abc import ABCMeta, abstractmethod
-from typing import Any
 
 import openmm as mm
 
 
 class Force(metaclass=ABCMeta):
-    def __init__(self, system: Any) -> None:
-        """Parent metaclass for all forces in the system.
+    # avoids typing to avoid circular dependency
+    def __init__(self, system) -> None:  # noqa: ANN001
+        """
+        Parent metaclass for all forces in the system.
 
         Note the following invariant:
 
@@ -41,7 +42,10 @@ class Force(metaclass=ABCMeta):
         self.system = system
 
     def build(self, must: bool = False) -> None:
-        """System calls this before initializing or reinitializing the context.
+        """
+        Build the OpenMM force associated with this Martini Daemon force.
+
+        System calls this before initializing or reinitializing the context.
         It actually creates the OpenMM force and adds it to the system.
 
         :param must: If must is True, then assume that the force object has been deleted manually and a new one is
@@ -56,7 +60,8 @@ class Force(metaclass=ABCMeta):
                 self.system._add_mm_force(self._force)
 
     def _destroy(self) -> None:
-        """Will destroy the OpenMM force and remove it from the OpenMM system.
+        """
+        Will destroy the OpenMM force and remove it from the OpenMM system.
 
         Note: the force will automatically get rebuilt before continuing the simulation.
 
@@ -67,8 +72,8 @@ class Force(metaclass=ABCMeta):
             self._force = None
 
     def _prepare_force_obj(self) -> None:
-        """Prepares the OpenMM force object before it is added to System,
-        after _set_force_obj().
+        """
+        Prepare the OpenMM force object before it is added to System, after _set_force_obj().
 
         The default impl sets the name to the result of self.get_name(),
         which should be done, as System may rely on this.
@@ -77,7 +82,8 @@ class Force(metaclass=ABCMeta):
         self._force.setName(self.get_name())
 
     def should_build(self) -> bool:
-        """Returns whether the force should be built when appropriate.
+        """
+        Return whether the force should be built when appropriate.
 
         If it returns False, the force is either built or it does not need to be
         built (because it makes 0 difference whether it's present). By default
@@ -95,7 +101,8 @@ class Force(metaclass=ABCMeta):
 
     @abstractmethod
     def delta_degrees_of_freedom(self) -> int:
-        """How many degrees of freedom does this force remove from the system.
+        """
+        How many degrees of freedom does this force remove from the system.
 
         For example, COMM removal should return -3.
         Virtual sites should return -3N where N is the number of virtual sites in the force.
@@ -104,7 +111,8 @@ class Force(metaclass=ABCMeta):
 
     @abstractmethod
     def _set_force_obj(self) -> mm.Force:
-        """Create the OpenMM force object.
+        """
+        Create the OpenMM force object.
 
         Define an OpenMM force object and return it. This will get added to the OpenMM System by the
         martini_daemon.System that owns this Force.
@@ -119,15 +127,18 @@ class Force(metaclass=ABCMeta):
     @classmethod
     @abstractmethod
     def get_name(cls) -> str:
-        """Return the name associated with this force.
+        """
+        Return the name associated with this force.
 
         There can only be one force with this name per martini_daemon.System.
         """
         raise NotImplementedError
 
     def flag_atom_change(self, atom_id: int, change_charge: bool = False) -> None:
-        """Called by System when an atom's type, charge or mass are changed.
+        """
+        Let the force know that an atom type, charge or mass are changed.
 
+        Called by System.
         Override if you need to update the OpenMM Force when this happens.
 
         Note: you should check if self.force exists first, before doing anything to it.
@@ -135,7 +146,10 @@ class Force(metaclass=ABCMeta):
         pass
 
     def flag_atom_add(self) -> None:
-        """Called by System when a new atom is added.
+        """
+        Let the force object know, that a new atom was added to the system.
+
+        Called by System, but child classes can override.
 
         Note: currently this only happens during system construction.
 

@@ -1,5 +1,3 @@
-from typing import Any
-
 from .directive import Directive
 from .gromacs_top_file import register_directive
 from .molecule_type_directive import MoleculeTypeDirective
@@ -9,6 +7,7 @@ from .token_list import TokenList
 @register_directive
 class ExclusionsDirective(Directive):
     def line(self, tokens: TokenList) -> None:
+        assert isinstance(self.parent, MoleculeTypeDirective)
         i = self.parent.parse_index(tokens, 0)
         # j is mandatory -> separate
         j = self.parent.parse_index(tokens, 1)
@@ -30,7 +29,7 @@ class ExclusionsDirective(Directive):
         return False
 
     @classmethod
-    def is_valid_parent(cls, parent: Any) -> bool:
+    def is_valid_parent(cls, parent: Directive) -> bool:
         return isinstance(parent, MoleculeTypeDirective)
 
     @classmethod

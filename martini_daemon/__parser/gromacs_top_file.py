@@ -1,5 +1,3 @@
-from typing import Any
-
 from ..__core import System
 from .directive import Directive
 from .parser import Parser
@@ -11,11 +9,6 @@ class InvalidTopologyError(Exception):
 
 
 class GromacsTopFile(Directive):
-    """This class is:
-    * Metadata about the .top format, allowing for the construction of parsers and generators of said format.
-    * A class you can instantiate given a .top file, which will perform the parsing into itself that you can then read out.
-    """
-
     # static fields
     __top_directives: list[type[Directive]] = []
 
@@ -31,12 +24,18 @@ class GromacsTopFile(Directive):
         include_dirs: list[str] | None = None,
         defines: dict[str, str] | None = None,
     ) -> None:
-        """:param path: Path to the .top file.
+        """
+        Parse a Gromacs Top File.
+
+        This class is:
+        * Metadata about the .top format, allowing for the construction of parsers and generators of said format.
+        * A class you can instantiate given a .top file, which will perform the parsing into itself that you can then read out.
+
+        :param path: Path to the .top file.
         :param system: __core.System.
         :param include_dirs: List of directories to be searched if #include fails to find a file in the current dir.
         :param defines: dict[str, str] of keys and values for token replacements by the limited C preprocessor impl.
         """
-        super().__init__(None, "", 0)
         if defines is None:
             defines = {}
         defines["DAEMON"] = ""
@@ -77,15 +76,15 @@ class GromacsTopFile(Directive):
 
     # the other methods of Directive should not get called on the root, so it's fine
     @classmethod
-    def is_mandatory(cls):
+    def is_mandatory(cls) -> bool:
         raise NotImplementedError()
 
     @classmethod
-    def is_unique(cls):
+    def is_unique(cls) -> bool:
         raise NotImplementedError()
 
     @classmethod
-    def is_valid_parent(cls, parent: Any) -> bool:
+    def is_valid_parent(cls, parent: Directive) -> bool:
         raise NotImplementedError()
 
     def where(self) -> tuple[str, int]:

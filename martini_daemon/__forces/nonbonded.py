@@ -4,11 +4,14 @@ from collections import OrderedDict
 
 import openmm as mm
 
-from ..__core import BondedForce, Force
+from ..__core import BondedForce, Force, System
 
 
 class NonBonded(Force):
-    """A special force. It is special, because it is passed as an argument to Simulation rather than constructed
+    """
+    Create a Martini NonBonded force, with optional soft core.
+
+    A special force. It is special, because it is passed as an argument to Simulation rather than constructed
     based on .top files. It also is responsible for generating the Exclusion Helper. Simulation handles adding it
     to System, which does not treat it in a special way. The Exclusion Helper's name "exclusion" is also special,
     since molecule types hardcode it, since exclusion handling is its own whole thing.
@@ -30,15 +33,18 @@ class NonBonded(Force):
     def get_name(cls) -> str:
         return "nonbonded"
 
-    def __init__(self, system) -> None:
+    def __init__(self, system: System) -> None:
         super().__init__(system)
         self.epsilon_r = system.additional_data.get("epsilon_r")
         self.cutoff_nm = system.additional_data.get("cutoff")
         self.__atom_types: OrderedDict[str, int] = OrderedDict()
         self.__exclusions: None | ExclusionHelper = None
 
-    def get_exclusion_helper(self):
-        """Called by Simulation when adding the NonBonded force to the system.
+    def get_exclusion_helper(self) -> ExclusionHelper:
+        """
+        Instantiate and get the exclusion helper object.
+
+        Called by Simulation when adding the NonBonded force to the system.
 
         ExclusionHelper is responsible for:
         - adding and removing exclusions from NonBonded and flagging reinitialize when that happens.
@@ -132,7 +138,10 @@ class NonBonded(Force):
 
 
 class ExclusionHelper(BondedForce):
-    """The force behind the force name "exclusion". Instantiated by NonBonded.get_exclusion_helper().
+    """
+    Create a helper for exclusions with NonBonded.
+
+    The force behind the force name "exclusion". Instantiated by NonBonded.get_exclusion_helper().
     Added to the system by Simulation. Each NonBonded force implementation should provide its own.
     Also handles the electrostatic self correction force.
 
@@ -197,7 +206,7 @@ class ExclusionHelper(BondedForce):
     def get_name(cls) -> str:
         return "exclusion"
 
-    def __init__(self, system, nb) -> None:
+    def __init__(self, system: System, nb: NonBonded) -> None:
         super().__init__(system)
         self.__nb = nb
         self.epsilon_r = system.additional_data.get("epsilon_r")

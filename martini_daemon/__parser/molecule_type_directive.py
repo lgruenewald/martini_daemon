@@ -1,5 +1,3 @@
-from typing import Any
-
 from ..__core import MoleculeType
 from .directive import Directive
 from .gromacs_top_file import GromacsTopFile, register_directive
@@ -36,7 +34,7 @@ class MoleculeTypeDirective(Directive):
         return False
 
     @classmethod
-    def is_valid_parent(cls, parent: Any) -> bool:
+    def is_valid_parent(cls, parent: Directive) -> bool:
         return isinstance(parent, GromacsTopFile)
 
     @classmethod

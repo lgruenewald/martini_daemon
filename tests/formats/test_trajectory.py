@@ -19,7 +19,8 @@ backends = TrajectoryWriter.backends
 
 @pytest.mark.parametrize("backend", backends)
 def test_read_write_trajectory(backend: str, rootdir: str) -> None:
-    """Read/write trajectories in available backends.
+    """
+    Read/write trajectories in available backends.
 
     Will skip formats with missing optional dependencies.
     """
@@ -71,7 +72,8 @@ def test_read_write_trajectory(backend: str, rootdir: str) -> None:
 
 @pytest.mark.parametrize("backend", backends)
 def test_truncate_append_trajectory(backend: str, rootdir: str) -> None:
-    """Read/write trajectories in available backends.
+    """
+    Read/write trajectories in available backends.
 
     Will skip formats with missing optional dependencies.
     """

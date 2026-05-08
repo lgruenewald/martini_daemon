@@ -33,6 +33,10 @@ extend-select = [
   "ANN", # missing type annotations
   "D" # warn on missing documentation
 ]
+ignore = [
+  "D203", # we want to blank lines after class
+  "D212", # we want a formally "empty" line after """ in docstrings
+]
 
 [project.optional-dependencies]
 

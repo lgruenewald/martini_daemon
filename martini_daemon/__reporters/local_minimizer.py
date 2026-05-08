@@ -1,29 +1,33 @@
+from __future__ import annotations
+
 import math
 from typing import TextIO
 
 import numpy as np
 import openmm as mm
 
+from ..__rust import Fragment
 from ..__simulation import Reporter, Simulation
 
 
 class LocalMinimizer(Reporter):
-    def on_simulation_start(self, simulation, continue_sim: bool) -> None:
+    def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
         pass
 
-    def on_simulation_finish(self, simulation) -> None:
+    def on_simulation_finish(self, simulation: Simulation) -> None:
         pass
 
     def __init__(
         self,
-        minimizer,
-        minimization_steps=500,
-        r_movable=1.0,
-        whole_molecule=True,
-        harmonic_constraints=True,
-        report_every=0,
+        minimizer: LocalGradientDescent,
+        minimization_steps: int = 500,
+        r_movable: float = 1.0,
+        whole_molecule: bool = True,
+        harmonic_constraints: bool = True,
+        report_every: int = 0,
     ) -> None:
-        """Local Minimizer. Uses the Reporter API to locally minimize the energy after the modification algorithm runs.
+        """
+        Local Minimizer. Uses the Reporter API to locally minimize the energy after the modification algorithm runs.
 
         :param minimizer: The minimization algorithm choice. LocalGradientDescent is currently the only one.
         :param minimization_steps: The number of steps to run the minimization algorithm for.
@@ -57,7 +61,9 @@ class LocalMinimizer(Reporter):
         handle.write(self.minimizer._report())
         handle.write("\n==============================================\n")
 
-    def on_reaction(self, simulation: Simulation, reactions) -> None:
+    def on_reaction(
+        self, simulation: Simulation, reactions: list[tuple[str, list[Fragment]]]
+    ) -> None:
         # save velocities
         assert self.integrator_index is not None
         simulation.info("on_reaction Local Minimizer")
@@ -97,7 +103,7 @@ class LocalMinimizer(Reporter):
         remaining = self.minimization_steps
         suffix = f"_minimization{simulation.current_step}.log"
         if self.report_every > 0:
-            handle = open(simulation.request_path(suffix), "w")
+            handle = open(simulation.request_path(suffix), "w")  # noqa: SIM115
             self.report(handle, remaining)
 
         simulation.info("initial reporting done, minimizing now")
@@ -127,13 +133,17 @@ class LocalMinimizer(Reporter):
 
 class LocalGradientDescent:
     def __init__(
-        self, initial_step_size_nm=0.1, etol=0.0, smoothing_factor=0.1
+        self,
+        initial_step_size_nm: float = 0.1,
+        etol: float = 0.0,
+        smoothing_factor: float = 0.1,
     ) -> None:
-        """Construct a (smoothed) gradient descent minimization integrator.
+        """
+        Construct a (smoothed) gradient descent minimization integrator.
 
         :param initial_step_size_nm: Only matters at the start. An adaptive step size is used.
         :param etol: energy tolerance, will stop doing anything once the change in energy reaches this for 1 step. If 0, no convergence check is performed.
-        :param smoothing_factor: - 0 to 1, the smaller the smoother but slower convergence, but it could be more stable.
+        :param smoothing_factor: 0 to 1, the smaller, the smoother but slower convergence, but it could be more stable.
 
         Modified version, originally from OpenMM Tools
         https://github.com/choderalab/openmmtools/blob/main/openmmtools/integrators.py
@@ -225,7 +235,7 @@ class LocalGradientDescent:
             self.integrator.endBlock()
 
     def _set_movable(self, movable: np.ndarray) -> None:
-        """Called by LocalMinimizer to pick the degrees of freedom that are movable."""
+        """Set the degrees of freedom that are movable."""
         self.integrator.setPerDofVariableByName("movable", movable)
 
     def _has_converged(self) -> bool:

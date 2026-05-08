@@ -1,9 +1,9 @@
-from typing import Any
-
-
 class MoleculeType:
     def __init__(self) -> None:
-        """A class that contains all the information that is in a moleculetype.
+        """
+        Create a new empty MoleculeType.
+
+        A class that contains all the information that is in a moleculetype.
         Along with helpers to mutate system to add the required atoms for it
         to system, and then to instantiate the bonded interactions on top
         of the new atoms added.
@@ -18,8 +18,10 @@ class MoleculeType:
         self.interactions: list[tuple[str, list[int], list[float], bool]] = []
 
     # methods called by [molecules] and reactions
-    def add_atoms_to_system(self, system: Any) -> list[int]:
-        """Adds the atoms in molecule type to system.
+    # typing missing to avoid circular dependencies
+    def add_atoms_to_system(self, system) -> list[int]:  # noqa: ANN001
+        """
+        Add the atoms in molecule type to system.
 
         :param system: The Martini Daemon system.
         :return: list of atom indices that got added to the system.
@@ -34,7 +36,8 @@ class MoleculeType:
         return res
 
     def process_nrexcl(self) -> None:
-        """Process bond-generated exclusions.
+        """
+        Process bond-generated exclusions.
 
         Called after parsing. It looks at self.interactions to see which bonds generate exclusions, and then
         it adds the generated exclusions to it based on the nr_excl argument in [moleculetype].
@@ -44,8 +47,10 @@ class MoleculeType:
                 assert len(members) == 2
                 self.exclusions.add((members[0], members[1]))
 
-    def instantiate(self, system, atom_indices: list[int]) -> None:
-        """Adds the bonded interactions and exclusions stored in this MoleculeType to system.
+    # typing missing to avoid circular dependencies
+    def instantiate(self, system, atom_indices: list[int]) -> None:  # noqa: ANN001
+        """
+        Add the bonded interactions and exclusions stored in this MoleculeType to system.
 
         :param system: The Martini Daemon system.
         :param atom_indices: the selected atom indices belonging to this molecule.

@@ -4,7 +4,8 @@ date_format = "%Y-%m-%d %H:%M:%S,%f"
 
 
 def extract_timings_from_log(path: str, ignore_first: bool = False) -> dict[str, float]:
-    """Given a Martini Daemon log file, extract the timing information of different components.
+    """
+    Given a Martini Daemon log file, extract the timing information of different components.
 
     This can be used for benchmarking purposes.
 

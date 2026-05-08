@@ -1,5 +1,9 @@
+from collections.abc import Callable
+
+from ..__core import Force
 from .gromacs_top_file import register_directive
 from .interaction_directive import InteractionDirective
+from .molecule_type_directive import MoleculeTypeDirective
 from .token_list import TokenList, TokenParseException
 
 
@@ -42,6 +46,7 @@ class VirtualSitesN(InteractionDirective):
         return False
 
     def read_members(self, tokens: TokenList) -> list[int]:
+        assert isinstance(self.parent, MoleculeTypeDirective)
         n_params = self.get_number_params(tokens.unwrap(1, "int"))[0]
         start = 2
         end = len(tokens) - n_params
@@ -80,6 +85,7 @@ class VirtualSitesN(InteractionDirective):
     def line(self, tokens: TokenList) -> None:
         # we don't want to trigger nrexcl processing with these exclusions
         super().line(tokens)
+        assert isinstance(self.parent, MoleculeTypeDirective)
         if len(members := self.read_members(tokens)) == 2:
             self.parent.molecule_type.exclusions.add(
                 (
@@ -89,10 +95,12 @@ class VirtualSitesN(InteractionDirective):
             )
 
 
-def register_vsiten_type(type_: int, args: list[str]):
+def register_vsiten_type(
+    type_: int, args: list[str]
+) -> Callable[[type[Force]], type[Force]]:
     """Args are per constructing atom."""
 
-    def inner(class_):
+    def inner(class_: type[Force]) -> type[Force]:
         name = class_.get_name()
         VirtualSitesN.register_type(type_, name, args)
         return class_

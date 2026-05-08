@@ -11,7 +11,8 @@ from .xyz_file import read_xyz, write_xyz
 def read_geometry(
     path: str,
 ) -> tuple[PeriodicBox, npt.NDArray[np.float64], npt.NDArray[np.float64] | None]:
-    """Read a geometry file, format implied from extension.
+    """
+    Read a geometry file, format implied from extension.
 
     :param path: path to file
     :return: periodic box (PeriodicBox), positions (numpy float64 array), velocities (numpy float64 array or None).
@@ -36,7 +37,8 @@ def write_geometry(
     pos: npt.NDArray[np.float64 | np.float32],
     vel: npt.NDArray[np.float64 | np.float32] | None = None,
 ) -> None:
-    """Write a geometry file, format implied from extension.
+    """
+    Write a geometry file, format implied from extension.
 
     :param path: path to file to write.
     :param title: title of geometry

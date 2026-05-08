@@ -11,13 +11,18 @@ from .token_list import TokenList, TokenParseException
 
 class ParseException(Exception):
     def __init__(self, message: str) -> None:
-        """Generic exception raised during parsing."""
+        """Create a generic exception raised during parsing."""
         self.message = message
 
 
 class DirectiveException(Exception):
-    def __init__(self, message: str, path, start_line, end_line) -> None:
-        """Exception raised during the finish() method of directives.
+    def __init__(
+        self, message: str, path: str, start_line: int, end_line: int | None
+    ) -> None:
+        """
+        Create a Directive Exception.
+
+        This exception is raised during the finish() method of directives.
         ParseExceptions get re-raised as this type automatically.
         """
         self.path = path
@@ -41,7 +46,8 @@ class Parser:
         include_dirs: list[str] | None = None,
         defines: dict[str, str] | None = None,
     ) -> None:
-        """Generic Gromacs-style .ini format parser.
+        """
+        Create a generic Gromacs-style .ini format parser.
 
         See :doc:`/autoapi/martini_daemon/GromacsTopFile` for the parser specifically for GROMACS ``.top`` files,
         which inherits this class. For extending Martini Daemon with custom directives, also see :doc:`/extending`.
@@ -81,7 +87,8 @@ class Parser:
         self.__done = False
 
     def add_directive(self, directive: type[Directive]) -> None:
-        """Add a new directive to this Parser.
+        """
+        Add a new directive to this Parser.
 
         :param directive: the directive to add.
         """
@@ -95,7 +102,8 @@ class Parser:
             self.__directives[alias] = directive
 
     def parse(self) -> bool:
-        """Performs the parsing and mutates the root argument passed during construction.
+        """
+        Perform the parsing and mutates the root argument passed during construction.
 
         :returns: Whether parsing succeeded. If not, the error message was already printed to stderr.
 
@@ -153,10 +161,13 @@ class Parser:
         path: str,
         line_num: int,
         line: str | None,
-        start=None,
-        end=None,
+        start: int | None = None,
+        end: int | None = None,
     ) -> None:
-        """Prints an error message. Three modes available:
+        """
+        Print an error message.
+
+        Three modes available:
 
         - ``line``, ``start``, ``end`` are all None - will print the line based on the file on disk
         - only ``line`` is not None - will print ``line`` as line content
@@ -187,7 +198,10 @@ class Parser:
     def __error_directive(
         cls, message: str, path: str, start: int, end: int | None
     ) -> None:
-        """Prints an error message. If end is not None, it will read the file and highlight the whole directive's
+        """
+        Print an error message.
+
+        If end is not None, it will read the file and highlight the whole directive's
         text in yellow, with line numbers.
         """
         assert end is None or end > start
@@ -217,7 +231,8 @@ class Parser:
     __token_pat = re.compile(r'\[|]|"[^"]*"|<[^>]*>|[^ \t\n\r\f\v\[\]"<>]+')
 
     def __tokenize(self, line: str) -> TokenList:
-        """Splits a line-up into a list of tokens.
+        """
+        Split a line-up into a list of tokens.
 
         * Assumes lines have been made whole already, and that comments were removed.
         * Separates based on whitespace.
@@ -283,7 +298,8 @@ class Parser:
         self.__directive_stack.append(directive)
 
     def __parse(self, path: str) -> None:
-        """Parses a single file at path.
+        """
+        Parse a single file at path.
 
         Recursively calls itself through #includes.
         """

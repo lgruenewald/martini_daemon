@@ -7,6 +7,7 @@ from .token_list import TokenList, TokenParseException
 @register_directive
 class AtomTypesDirective(Directive):
     def line(self, tokens: TokenList) -> None:
+        assert isinstance(self.parent, GromacsTopFile)
         if len(tokens) != 6:
             raise ParseException(
                 "Only atomtypes lines formatted as type, m, q,"
@@ -42,7 +43,7 @@ class AtomTypesDirective(Directive):
         return False
 
     @classmethod
-    def is_valid_parent(cls, parent) -> bool:
+    def is_valid_parent(cls, parent: Directive) -> bool:
         return type(parent) is GromacsTopFile
 
     @classmethod

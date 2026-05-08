@@ -1,5 +1,4 @@
 from abc import ABCMeta, abstractmethod
-from typing import Any
 
 from .directive import Directive
 from .molecule_type_directive import MoleculeTypeDirective
@@ -7,8 +6,12 @@ from .token_list import TokenList, TokenParseException
 
 
 class InteractionDirective(Directive, metaclass=ABCMeta):
-    def __init__(self, parent, path, line_num) -> None:
-        """Base class for custom .top file directives that add interactions to [moleculetype]."""
+    def __init__(self, parent: Directive, path: str, line_num: int) -> None:
+        """
+        Override this base class to implement custom directives for bonded interactions.
+
+        Bonded interactions = interactions within [moleculetype].
+        """
         super().__init__(parent, path, line_num)
 
     # default Directive boilerplate
@@ -24,13 +27,14 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
         return False
 
     @classmethod
-    def is_valid_parent(cls, parent: Any) -> bool:
+    def is_valid_parent(cls, parent: Directive) -> bool:
         return isinstance(parent, MoleculeTypeDirective)
 
     # get_name should be implemented by child classes
 
     # customizable line parsing
     def line(self, tokens: TokenList) -> None:
+        assert isinstance(self.parent, MoleculeTypeDirective)
         type_num, type_name = self.read_type(tokens)
 
         self.parent.molecule_type.interactions.append(
@@ -44,6 +48,7 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
 
     # reasonable defaults that still can be overridden for e.g. virtual_sitesn
     def read_members(self, tokens: TokenList) -> list[int]:
+        assert isinstance(self.parent, MoleculeTypeDirective)
         return [
             self.parent.parse_index(tokens, i)
             # 0 to n

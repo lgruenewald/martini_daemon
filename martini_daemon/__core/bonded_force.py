@@ -9,8 +9,12 @@ from .force import Force
 
 
 class BondedForce(Force, metaclass=ABCMeta):
-    def __init__(self, system) -> None:
-        """Parent class of all bonded forces.
+    # to avoid circular dependencies, no typing
+    def __init__(self, system) -> None:  # noqa: ANN001
+        """
+        Override this force to implement custom bonded forces.
+
+        Parent class of all bonded forces.
 
         Manages the list of bonds (as a dict of bond_id -> members, params).
         Provides an API to add/remove bonds, while it appropriately keeps
@@ -32,7 +36,8 @@ class BondedForce(Force, metaclass=ABCMeta):
         self.__next_entry_id = 0
 
     def _prepare_force_obj(self) -> None:
-        """Prepares the OpenMM force object before it is added to System, after _set_force_obj().
+        """
+        Prepare the OpenMM force object before it is added to System, after _set_force_obj().
 
         The BondedForce version if it:
 
@@ -55,7 +60,8 @@ class BondedForce(Force, metaclass=ABCMeta):
     def _add_to_force(
         cls, force: mm.Force, members: list[int], params: list[float]
     ) -> None:
-        """Add an intereaction to the OpenMM force.
+        """
+        Add an intereaction to the OpenMM force.
 
         This is called lazily and may be called multiple times each time the force is re-constructed.
         Therefore, it should not have side effects. Put side effects in _parse.
@@ -67,7 +73,8 @@ class BondedForce(Force, metaclass=ABCMeta):
         raise NotImplementedError
 
     def should_build(self) -> bool:
-        """Returns whether the force should be built when appropriate.
+        """
+        Return whether the force should be built when appropriate.
 
         By default, this happens if there are any entries and there is no force.
         To trigger a rebuild, you generally therefore want to call _destroy().
@@ -76,7 +83,8 @@ class BondedForce(Force, metaclass=ABCMeta):
 
     @abstractmethod
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
-        """Parse parameters.
+        """
+        Parse parameters.
 
         This is called eagerly when the bond is added to the force, and only once.
 
@@ -96,7 +104,10 @@ class BondedForce(Force, metaclass=ABCMeta):
     @classmethod
     @abstractmethod
     def uses_pbc(cls) -> bool:
-        """Should return False if and only if this interaction is unable to handle being its constituent atoms be
+        """
+        Return whether the OpenMM force backing this supports running in a PBC.
+
+        Should return False if and only if this interaction is unable to handle being its constituent atoms be
         in different instances of the periodic box.
 
         Note: will call setUsesPeriodicBoundaryConditions on self.force. Override _prepare_force_obj for really
@@ -105,7 +116,8 @@ class BondedForce(Force, metaclass=ABCMeta):
         raise NotImplementedError
 
     def _add_bond(self, members: list[int], params: list[float]) -> int:
-        """API function to parse parameters and add it to the force.
+        """
+        Add a bond to the force.
 
         Protected because only System should call this.
         """
@@ -118,13 +130,18 @@ class BondedForce(Force, metaclass=ABCMeta):
         return self.__next_entry_id - 1
 
     def _remove_bond(self, bond_id: int) -> None:
-        """Protected because only System should call this."""
+        """
+        Remove a bond from the force.
+
+        Protected because only System should call this.
+        """
         del self.__entries[bond_id]
         if self._force is not None:
             self._destroy()
 
     def iterate_bonds(self) -> Iterable[tuple[int, tuple[list[int], list[float]]]]:
-        """Returns an Iterable over bond_id's and a tuple of members and params.
+        """
+        Return an Iterable over bond_id's and a tuple of members and params.
 
         WARNING! Do not edit the bonds given by this function!
         """

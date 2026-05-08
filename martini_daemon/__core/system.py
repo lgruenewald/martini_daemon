@@ -13,8 +13,9 @@ from .molecule_type import MoleculeType
 class System:
     __available_forces: dict[str, type[BondedForce]] = {}
 
-    def __init__(self, options=None) -> None:
-        """Martini Daemon System.
+    def __init__(self, options: None | dict[str, Any] = None) -> None:
+        """
+        Create a Martini Daemon System.
 
         * Contains all the topology information.
         * Wraps OpenMM Force and System objects, and keeps them up to date based on its own topology information.
@@ -58,7 +59,8 @@ class System:
     # ==== Initial molecules ====
 
     def build_initial_molecules(self) -> None:
-        """Adds atoms and interactions to the system based on the initial_molecules attribute.
+        """
+        Add atoms and interactions to the system based on the initial_molecules attribute.
 
         Note: automatically called during parsing.
         """
@@ -78,7 +80,8 @@ class System:
         charge: float | None,
         mass: float | None,
     ) -> int:
-        """Add an atom to the system.
+        """
+        Add an atom to the system.
 
         Note: residue ID is assigned by system and can be bumped using System.new_residue().
 
@@ -119,63 +122,68 @@ class System:
         return len(self.__names) - 1
 
     def new_residue(self) -> None:
-        """Bumps the current residue ID, used for adding new atoms to the system."""
+        """Bump the current residue ID, used for adding new atoms to the system."""
         self.__last_resid += 1
 
     def num_atoms(self) -> int:
-        """Returns the current number of atoms in the system."""
+        """Return the current number of atoms in the system."""
         return len(self.__names)
 
     def get_name(self, atom_id: int) -> str:
-        """Gets the atom name for atom_id."""
+        """Get the atom name for atom_id."""
         return self.__names[atom_id]
 
     def get_atom_names(self) -> list[str]:
-        """Returns all atom names.
+        """
+        Return all atom names.
 
         Warning! Assume returned list is read-only.
         """
         return self.__names
 
     def get_res_id(self, atom_id: int) -> int:
-        """Gets the residue number of atom_id."""
+        """Get the residue number of atom_id."""
         return self.__res_ids[atom_id]
 
     def get_res_ids(self) -> list[int]:
-        """Returns all residue ids.
+        """
+        Return all residue ids.
 
         Warning! Assume returned list is read-only.
         """
         return self.__res_ids
 
     def get_res_names(self) -> list[str]:
-        """Returns all residue names.
+        """
+        Return all residue names.
 
         Warning! Assume returned list is read-only.
         """
         return self.__res_names
 
     def get_res_name(self, atom_id: int) -> str:
-        """Gets the residue name of atom_id."""
+        """Get the residue name of atom_id."""
         return self.__res_names[atom_id]
 
     def rename(self, atom_id: int, new_name: str) -> None:
-        """Changes the atom name of atom_id to new_name."""
+        """Change the atom name of atom_id to new_name."""
         self.__names[atom_id] = new_name
 
     def get_type(self, atom_id: int) -> str:
-        """Gets the atom type of atom_id."""
+        """Get the atom type of atom_id."""
         return self.__types[atom_id]
 
     def get_types(self) -> list[str]:
-        """Returns all atom types.
+        """
+        Return all atom types.
 
         Warning! Assume returned list is read-only.
         """
         return self.__types
 
     def retype(self, atom_id: int, new_type: str) -> None:
-        """Changes the atom type of atom_id to new_type.
+        """
+        Change the atom type of atom_id to new_type.
 
         Informs all forces to let them automatically update it.
         """
@@ -183,34 +191,37 @@ class System:
         self.__flag_atom_change(atom_id, False)
 
     def get_charge(self, atom_id: int) -> float:
-        """Gets the (partial) charge of atom_id."""
+        """Get the (partial) charge of atom_id."""
         return self.__charges[atom_id]
 
     def get_charges(self) -> list[float]:
-        """Returns all (partial) charges.
+        """
+        Return all (partial) charges.
 
         Warning! Assume returned list is read-only.
         """
         return self.__charges
 
     def recharge(self, atom_id: int, new_charge: float) -> None:
-        """Changes the (partial) charge of atom_id to new_charge."""
+        """Change the (partial) charge of atom_id to new_charge."""
         self.__charges[atom_id] = new_charge
         self.__flag_atom_change(atom_id, True)
 
     def get_mass(self, atom_id: int) -> float:
-        """Gets the mass of atom_id, in atomic units."""
+        """Get the mass of atom_id, in atomic units."""
         return self.__masses[atom_id]
 
     def get_masses(self) -> list[float]:
-        """Returns all atom masses, in atomic units.
+        """
+        Return all atom masses, in atomic units.
 
         Warning! Assume returned list is read-only.
         """
         return self.__masses
 
     def remass(self, atom_id: int, new_mass: float) -> None:
-        """Changes the mass of atom_id to new_mass.
+        """
+        Change the mass of atom_id to new_mass.
 
         Informs all forces to let them automatically update it.
         """
@@ -219,22 +230,24 @@ class System:
         self.flag_reinitialize()
 
     def get_sc(self, atom_id: int) -> tuple[float, float]:
-        """Gets the current soft-core parameters of atom_id.
+        """
+        Get the current soft-core parameters of atom_id.
 
         Soft-core parameters are additional per-atom data for the Non-Bonded force, used by Local Minimization.
         """
         return self.__softcore[atom_id]
 
-    def get_sc_lam(self, atom_id) -> float:
-        """Gets the lambda soft core parameter for atom_id."""
+    def get_sc_lam(self, atom_id: int) -> float:
+        """Get the lambda soft core parameter for atom_id."""
         return self.get_sc(atom_id)[0]
 
-    def get_sc_alpha(self, atom_id) -> float:
-        """Gets the alpha soft core parameter for atom_id."""
+    def get_sc_alpha(self, atom_id: int) -> float:
+        """Get the alpha soft core parameter for atom_id."""
         return self.get_sc(atom_id)[1]
 
     def update_sc(self, atom_id: int, sc_lam: float, sc_alpha: float) -> None:
-        """Updates the soft-core parameters for atom_id.
+        """
+        Update the soft-core parameters for atom_id.
 
         :param atom_id: The atom id.
         :param sc_lam: The lambda soft core parameter.
@@ -248,7 +261,8 @@ class System:
     # ==== ATOM TYPE HANDLING ====
 
     def add_atom_type(self, atom_type: str, charge: float, mass: float) -> None:
-        """Adds a new atom type to the system.
+        """
+        Add a new atom type to the system.
 
         :param atom_type: The new NonBonded atom type.
         :param charge: The default (partial) charge for this type.
@@ -258,14 +272,16 @@ class System:
         self.__atom_types[atom_type] = (charge, mass)
 
     def iterate_atom_types(self) -> Iterable[tuple[str, tuple[float, float]]]:
-        """Returns an iterator over all atom types.
+        """
+        Get an iterator over all atom types.
 
         :return: An iterator over tuples of (atom_type, tuples of (charge, mass)).
         """
         return self.__atom_types.items()
 
     def get_atom_type(self, atom_type: str) -> None | tuple[float, float]:
-        """Get default charge and mass for atom type.
+        """
+        Get default charge and mass for atom type.
 
         :param atom_type: The atom type.
         :return: The default charge and mass for atom type as a tuple.
@@ -275,7 +291,9 @@ class System:
     # ==== STATE SYNCHRONIZATION ====
 
     def flag_reinitialize(self) -> None:
-        """Mark the context associated with the system to be reinitialized.
+        """
+        Mark the context associated with the system to be reinitialized.
+
         Doesn't do anything if the context is not yet initialized.
 
         Called by Forces in this system, when their contents change.
@@ -296,7 +314,8 @@ class System:
 
     # PROTECTED API for __core and Forces
     def _add_mm_force(self, force: mm.Force) -> None:
-        """Add an OpenMM force to the system. The name provided must be unique.
+        """
+        Add an OpenMM force to the system. The name provided must be unique.
 
         Should only be called by Force/BondedForce. Should be only called if Force is already in __forces.
 
@@ -308,7 +327,8 @@ class System:
         self.flag_reinitialize()
 
     def _rebuild(self) -> None:
-        """Call this before initializing or reinitializing the context.
+        """
+        Call this before initializing or reinitializing the context.
 
         Protected because it should only be called by Context.
         This should be considered private, changing this is not a breaking change.
@@ -317,7 +337,8 @@ class System:
             force.build()
 
     def _remove_mm_force(self, force: mm.Force) -> None:
-        """Remove an OpenMM force from the system, using its unique name.
+        """
+        Remove an OpenMM force from the system, using its unique name.
 
         Should only be called by Force/BondedForce.
 
@@ -335,35 +356,52 @@ class System:
         assert removed
         self.flag_reinitialize()
 
-    def _add_constraint(self, i, j, length) -> None:
-        """Called by constraint force sometimes.
+    def _add_constraint(self, i: int, j: int, length: float) -> None:
+        """
+        Add a constraint to the OpenMM system.
+
+        Must be called by forces implementing constraints only.
 
         Protected, because only Forces should call this.
         """
         self.__system.addConstraint(i, j, length)
 
-    def _add_vsite(self, atom_id: int, vsite) -> None:
-        """Called by vsite.py.
+    def _add_vsite(self, atom_id: int, vsite: mm.VirtualSite) -> None:
+        """
+        Add a virtual site to the OpenMM system.
+
+        Must be called by vsite.py only.
 
         Protected, because only Forces/VSites should call this.
         """
         self.__system.setVirtualSite(atom_id, vsite)
 
     def __del_all_constraints(self) -> None:
-        """Used for constraints <=> harmonic bond replace."""
+        """
+        Temporarily remove all constraints from the system.
+
+        Used for constraints <=> harmonic bond replace.
+        """
         for i in range(self.__system.getNumConstraints() - 1, -1, -1):
             self.__system.removeConstraint(i)
         assert self.__system.getNumConstraints() == 0
 
     def _set_default_pbc(self, box: PeriodicBox) -> None:
-        """Called by context to set the default periodic box in System to it, so context can be constructed.
+        """
+        Set the default PBC for the OpenMM system.
+
+        Called by context to set the default periodic box in System to it, so context can be constructed.
 
         Protected, but only context should call it. Not a part of the public API, changing this is non-breaking.
         """
         self.__system.setDefaultPeriodicBoxVectors(box.a, box.b, box.c)
 
-    def _bind_context(self, context) -> None:
-        """Should only be called by context.
+    # to avoid circular dependency, no typing
+    def _bind_context(self, context) -> None:  # noqa: ANN001
+        """
+        Set the reference for context.
+
+        Should only be called by context.
 
         Protected, but only context should call it. Not a part of the public API, changing this is non-breaking.
         """
@@ -371,7 +409,8 @@ class System:
 
     # PUBLIC API for users and custom Forces
     def toggle_constraints_as_harmonic_bonds(self, harmonic: bool) -> None:
-        """Toggle between using harmonic bonds and constraints.
+        """
+        Toggle between using harmonic bonds and constraints.
 
         Assumes constraints have the name "constraint".
 
@@ -410,7 +449,8 @@ class System:
 
     @classmethod
     def provide_force(cls, force_class: type[BondedForce]) -> None:
-        """Register a class to the list of available forces.
+        """
+        Register a class to the list of available forces.
 
         If attempting to add a new interaction with its name, it will get instantiated and added to Forces.
         """
@@ -426,7 +466,8 @@ class System:
         return self.__forces.get(force_name)
 
     def get_openmm_system(self) -> mm.System:
-        """Get the OpenMM system.
+        """
+        Get the OpenMM system.
 
         Useful if you want to use Martini Daemon only as a .top file parser, and get an OpenMM
         system that you can use. Calling this will also make sure that all OpenMM Force objects get constructed
@@ -438,7 +479,8 @@ class System:
     def add_interaction(
         self, name: str, members: list[int], params: list[float]
     ) -> None:
-        """Add a new interaction to the System, such as bond, angle...
+        """
+        Add a new interaction to the System, such as bond, angle...
 
         Note: automatically called by MoleculeType instances or the modification algorithm as appropriate.
 
@@ -468,7 +510,8 @@ class System:
             self.__interactions_by_atom[member].append((name, bond_id))
 
     def remove_interaction(self, force_name: str, bond_id: int) -> None:
-        """Remove an interaction from the System.
+        """
+        Remove an interaction from the System.
 
         :param force_name: name of the force.
         :param bond_id: interaction index.
@@ -486,7 +529,8 @@ class System:
         f._remove_bond(bond_id)
 
     def get_members(self, force_name: str, bond_id: int) -> list[int]:
-        """Get which members constitute an interaction.
+        """
+        Get which members constitute an interaction.
 
         :param force_name: name of the force.
         :param bond_id: interaction index.
@@ -499,7 +543,8 @@ class System:
         return f.get_members(bond_id)
 
     def get_filters(self) -> set[str]:
-        """Return all the possible BondedForce filters that can be used.
+        """
+        Return all the possible BondedForce filters that can be used.
 
         Corresponds to the valid interaction filters used in the graph matching algorithm.
         """
@@ -544,7 +589,8 @@ class System:
         return self.__interactions_by_atom[atom_id]
 
     def get_number_of_degrees_of_freedom(self) -> int:
-        """Get the total number of degrees of freedom in the system.
+        """
+        Get the total number of degrees of freedom in the system.
 
         By default, 3*N, but some forces, such as virtual sites, constraints, or center of mass motion removal
         will decrease it.
@@ -554,7 +600,8 @@ class System:
         )
 
     def collect_bonds(self, filters: list[str]) -> BondGraph:
-        """Returns a list of bonds that matches any of the filters.
+        """
+        Return a list of bonds that matches any of the filters.
 
         Virtual sites will be added as each constructing particle being bonded to the virtual site.
 
@@ -593,7 +640,8 @@ class System:
         return bonds
 
     def collect_bonds_for_whole(self) -> BondGraph:
-        """Returns a bond graph that need to be made whole across the PBC before simulation can start.
+        """
+        Return a bond graph that need to be made whole across the PBC before simulation can start.
 
         This usually includes constraints and virtual sites.
         Uses the `uses_pbc()` function of BondedForce to determine which one it is.
@@ -615,7 +663,8 @@ class System:
     def populate_neighbors(
         self, atoms: Iterable[int], recursive: bool = False
     ) -> set[int]:
-        """For a set of atoms, return a set that also contains their neighbors.
+        """
+        For a set of atoms, return a set that also contains their neighbors.
 
         Neighbors are determined based on shared interactions (e.g. bond, angle, exclusion...).
         If recursive, will traverse interactions recursively to get the whole molecule.
@@ -646,7 +695,7 @@ class System:
         return res
 
 
-def register_available_force(cls):
+def register_available_force(cls: type[BondedForce]) -> type[BondedForce]:
     """Add an available force to all System objects."""
     System.provide_force(cls)
     return cls

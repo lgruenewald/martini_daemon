@@ -20,7 +20,8 @@ def truncate_reactions(handle: TextIO, current_step: int) -> None:
 
 class ReactionReporter(Reporter):
     def __init__(self) -> None:
-        """Create a ReactionReporter to log reaction information to <name>.reactions.
+        """
+        Create a ReactionReporter to log reaction information to <name>.reactions.
 
         The created file has a text format, where every line is a reaction.
         First, the frame number and reaction name are separated by a comma,
@@ -78,6 +79,7 @@ class ReactionReporter(Reporter):
                 )
                 + "\n",
             )
+        self.handle.flush()
 
     def interactive_line(self, simulation: Simulation) -> str:
         return f"reactions: {simulation.reactions_so_far}"
@@ -86,7 +88,8 @@ class ReactionReporter(Reporter):
     def read_reactions(
         cls, path: str
     ) -> list[tuple[int, str, list[tuple[str, int, list[int]]]]]:
-        """.reactions format reader suited for test_detection.py.
+        """
+        .reactions format reader suited for test_detection.py.
 
         Returns a list of simulation steps, reaction names and list of reactant atom lists
         """

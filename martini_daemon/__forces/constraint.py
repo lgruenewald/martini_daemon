@@ -2,7 +2,7 @@ from typing import NoReturn
 
 import openmm as mm
 
-from ..__core import BondedForce, register_available_force
+from ..__core import BondedForce, System, register_available_force
 from ..__parser import register_constraint_type
 
 
@@ -10,14 +10,14 @@ from ..__parser import register_constraint_type
 @register_constraint_type(type_=2, args=["float"], is_excl=False)
 @register_available_force
 class Constraint(BondedForce):
-    def __init__(self, system) -> None:
+    def __init__(self, system: System) -> None:
         super().__init__(system)
         self.__built = False
 
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         return params
 
-    def build(self, must=False) -> None:
+    def build(self, must: bool = False) -> None:
         if not self.__built or must:
             self.__built = True
             for index, (members, params) in self.iterate_bonds():
@@ -40,7 +40,7 @@ class Constraint(BondedForce):
     def _set_force_obj(self) -> mm.Force:
         assert False
 
-    def remove(self, i) -> NoReturn:
+    def remove(self, i: int) -> NoReturn:
         raise Exception("Can't remove constraints")
 
     def should_build(self) -> bool:

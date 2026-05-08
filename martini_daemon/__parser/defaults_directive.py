@@ -1,5 +1,3 @@
-from typing import Any
-
 from .directive import Directive
 from .gromacs_top_file import GromacsTopFile, register_directive
 from .token_list import TokenList, TokenParseException
@@ -32,7 +30,7 @@ class Defaults(Directive):
         return True
 
     @classmethod
-    def is_valid_parent(cls, parent: Any) -> bool:
+    def is_valid_parent(cls, parent: Directive) -> bool:
         return type(parent) is GromacsTopFile
 
     @classmethod

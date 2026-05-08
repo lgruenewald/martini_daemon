@@ -18,7 +18,6 @@ class Root(Directive):
 
     def __init__(self) -> None:
         """Create an example root directive."""
-        super().__init__(None, "", 0)
         self.root_lines = []
         self.a_s = []
         self.b_s = []
@@ -73,6 +72,7 @@ class A(Directive):
 
     def finish(self) -> None:
         """Finish parsing this directive."""
+        assert isinstance(self.parent, Root)
         self.parent.finish_events.append("a")
 
     @classmethod
@@ -113,6 +113,7 @@ class B(Directive):
 
     def finish(self) -> None:
         """Finish parsing this directive."""
+        assert isinstance(self.parent, Root)
         self.parent.finish_events.append("b")
 
     @classmethod
@@ -152,6 +153,7 @@ class C(Directive):
 
     def finish(self) -> None:
         """Finish parsing this directive."""
+        assert isinstance(self.parent, B)
         self.parent.finish_events.append("c")
 
     @classmethod
@@ -191,7 +193,8 @@ def parse(path: str) -> tuple[bool, Root]:
 
 
 def test_parser(rootdir: str) -> None:
-    """Test Parser() with manually added directives.
+    """
+    Test Parser() with manually added directives.
 
     Relevant file: test.ini.
     """

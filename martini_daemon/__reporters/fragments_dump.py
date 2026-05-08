@@ -1,5 +1,6 @@
 from typing import TextIO
 
+from ..__rust import Fragment
 from ..__simulation import Reporter, Simulation
 
 
@@ -16,7 +17,8 @@ def write_frame(handle: TextIO, sim: Simulation) -> None:
 
 class FragmentsDump(Reporter):
     def __init__(self) -> None:
-        """Dumps the fragment list, including all atom indices.
+        """
+        Dump the fragment list, including all atom indices.
 
         The purpose of this reporter is to facilitate debugging graph matching.
 
@@ -28,8 +30,8 @@ class FragmentsDump(Reporter):
         """
         pass
 
-    def on_simulation_start(self, simulation, continue_sim: bool) -> None:
-        self.handle = open(
+    def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
+        self.handle = open(  # noqa: SIM115
             simulation.request_path(".fragments_dump", continue_sim=continue_sim), "a"
         )
         n = simulation.system.num_atoms()
@@ -38,8 +40,10 @@ class FragmentsDump(Reporter):
             self.handle.write("# Written by Martini Daemon FragmentsDump\n")
         write_frame(self.handle, simulation)
 
-    def on_simulation_finish(self, simulation) -> None:
+    def on_simulation_finish(self, simulation: Simulation) -> None:
         self.handle.close()
 
-    def on_reaction(self, simulation, reactions) -> None:
+    def on_reaction(
+        self, simulation: Simulation, reactions: list[tuple[str, list[Fragment]]]
+    ) -> None:
         write_frame(self.handle, simulation)

@@ -1,4 +1,6 @@
-from .chk_file import Checkpoint, read_checkpoint, write_checkpoint
+from .chk_file import Checkpoint as Checkpoint
+from .chk_file import read_checkpoint as read_checkpoint
+from .chk_file import write_checkpoint as write_checkpoint
 from .geometry import read_geometry as read_geometry
 from .geometry import write_geometry as write_geometry
 from .log_extract import extract_timings_from_log as extract_timings_from_log

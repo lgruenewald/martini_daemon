@@ -192,13 +192,17 @@ impl PeriodicBox {
     /// * Input should be a 2D numpy array of type f64 and dimension (n, 3).
     /// * Also see move_within.
     pub fn move_all_within(&self, mut array: PyReadwriteArray<f64, Ix2>) -> PyResult<()> {
-        if let [_, inner] = array.shape()
-            && *inner != 3
-        {
+        let [outer, inner] = array.shape() else {
             return Err(PyValueError::new_err(format!(
-                "Invalid dimensions, expected Nx3, got (N, {inner})"
+                "Invalid dimensions, expected Nx3, got ({:?})", array.shape()
+            )));
+        };
+        if *inner != 3 {
+            return Err(PyValueError::new_err(format!(
+                "Invalid dimensions, expected Nx3, got ({outer}, {inner})"
             )));
         }
+        assert_eq!(array.len(), outer * inner);
 
         for v in array.as_slice_mut()?.chunks_mut(3) {
             [v[0], v[1], v[2]] = self.move_within([v[0], v[1], v[2]]);

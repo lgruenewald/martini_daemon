@@ -36,7 +36,8 @@ def write_frame(handle: TextIO, sim: Simulation) -> None:
 
 class SystemDump(Reporter):
     def __init__(self) -> None:
-        """Create a SystemDump Reporter.
+        """
+        Create a SystemDump Reporter.
 
         Dumps all info from System, including all atom details and all interactions
         in a human-readable plaintext file. Dumps it at the start of a simulation and
@@ -84,7 +85,8 @@ class SystemDump(Reporter):
             list[tuple[str, list[list[float]]]],
         ]
     ]:
-        """.sstar dump reader.
+        """
+        .sstar dump reader.
 
         Returns a list of frames read.
 

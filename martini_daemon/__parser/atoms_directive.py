@@ -1,5 +1,3 @@
-from typing import Any
-
 from .directive import Directive
 from .gromacs_top_file import register_directive
 from .molecule_type_directive import MoleculeTypeDirective
@@ -9,6 +7,7 @@ from .token_list import TokenList, TokenParseException
 @register_directive
 class AtomsDirective(Directive):
     def line(self, tokens: TokenList) -> None:
+        assert isinstance(self.parent, MoleculeTypeDirective)
         index = tokens.unwrap(0, "index")
         type_ = tokens.unwrap(1, "word")
         res_num = tokens.unwrap(2, "int")
@@ -39,8 +38,8 @@ class AtomsDirective(Directive):
         return False
 
     @classmethod
-    def is_valid_parent(cls, parent: Any) -> bool:
-        return type(parent) is MoleculeTypeDirective
+    def is_valid_parent(cls, parent: Directive) -> bool:
+        return isinstance(parent, MoleculeTypeDirective)
 
     @classmethod
     def get_name(cls) -> str:

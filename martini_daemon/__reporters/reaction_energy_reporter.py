@@ -6,7 +6,8 @@ from .variables_reporter import truncate_energies, write_energies
 
 class ReactionEnergyReporter(Reporter):
     def __init__(self, write_coords: bool = False, ext: str = ".gro") -> None:
-        """Create a reporter that will write energies before and after a reaction.
+        """
+        Create a reporter that will write energies before and after a reaction.
 
         Note: will have post-minimization in the output file, regardless of whether there is a minimization,
         this is because it does not know what other reporters are in the simulation.

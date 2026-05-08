@@ -8,7 +8,8 @@ from ..__rust import PeriodicBox
 def read_gro(
     path: str,
 ) -> tuple[PeriodicBox, npt.NDArray[np.float64], npt.NDArray[np.float64] | None]:
-    """Reads .gro file at path.
+    """
+    Read .gro file at path.
 
     :return: periodic box (PeriodicBox), numpy array of positions in nm,
         numpy array of velocities in nm/picosecond if present.
@@ -71,7 +72,8 @@ def write_gro(
     pos: npt.NDArray[np.float64 | np.float32],
     vel: npt.NDArray[np.float64 | np.float32] | None = None,
 ) -> None:
-    """Write .gro file at path.
+    """
+    Write .gro file at path.
 
     :param path: path to .gro file.
     :param title: title of .gro file.

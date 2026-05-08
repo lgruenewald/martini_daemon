@@ -37,7 +37,8 @@ def get_topology(path: str) -> TopStar:
 
 
 def parse_expected(path: str) -> list[tuple[str, list[int]]]:
-    """Parse a json of excepted graph match results.
+    """
+    Parse a json of excepted graph match results.
 
     Format:
     [
@@ -79,7 +80,8 @@ def print_error(
 
 
 def compare(name: str, top: TopStar, expected: list[tuple[str, list[int]]]) -> None:
-    """Make sure top has all of and only the fragments in expected.
+    """
+    Make sure top has all of and only the fragments in expected.
 
     Expected contains the frag names and particles.
     Note: the order of expected is arbitrary.

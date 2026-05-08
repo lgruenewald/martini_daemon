@@ -1,5 +1,9 @@
+from collections.abc import Callable
+
+from ..__core import Force
 from .gromacs_top_file import register_directive
 from .interaction_directive import InteractionDirective
+from .molecule_type_directive import MoleculeTypeDirective
 from .token_list import TokenList
 
 
@@ -38,14 +42,17 @@ class VirtualSites1(InteractionDirective):
 
     def line(self, tokens: TokenList) -> None:
         # we don't want to trigger nrexcl processing with these exclusions
+        assert isinstance(self.parent, MoleculeTypeDirective)
         super().line(tokens)
         self.parent.molecule_type.exclusions.add(
             (self.parent.parse_index(tokens, 0), self.parent.parse_index(tokens, 1))
         )
 
 
-def register_vsite1_type(type_: int, args: list[str]):
-    def inner(class_):
+def register_vsite1_type(
+    type_: int, args: list[str]
+) -> Callable[[type[Force]], type[Force]]:
+    def inner(class_: type[Force]) -> type[Force]:
         name = class_.get_name()
         VirtualSites1.register_type(type_, name, args)
         return class_

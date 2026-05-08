@@ -22,7 +22,8 @@ class Context:
         platform: mm.Platform,
         params: dict[str, str],
     ) -> None:
-        """Context object. Created by Simulation automatically, based on the provided `.top` and geometry file.
+        """
+        Context object. Created by Simulation automatically, based on the provided `.top` and geometry file.
 
         :param system: Martini Daemon system linked with this context.
         :param integrator: OpenMM integrator linked with this context. Simulation always builds CompoundIntegrators.
@@ -43,7 +44,8 @@ class Context:
         self.reinitialize = False
 
     def do_steps(self, n: int) -> None:
-        """Perform integration steps.
+        """
+        Perform integration steps.
 
         Note: reinitializes if needed automatically.
 
@@ -54,7 +56,8 @@ class Context:
             self.__integrator.step(n)
 
     def __reinitialize(self) -> None:
-        """Automatically called before stepping, reading energies or forces.
+        """
+        Automatically called before stepping, reading energies or forces.
 
         If self.reinitialize was "flagged" to True, rebuilds system and then reinitializes the context.
         """
@@ -65,7 +68,8 @@ class Context:
         self.reinitialize = False
 
     def get_current_integrator(self) -> int:
-        """If supplied integrator was an OpenMM compound integrator, get the current index.
+        """
+        If supplied integrator was an OpenMM compound integrator, get the current index.
 
         Note: Simulation always sets up compound integrators, so generally it will be a compound integrator if using
         the Simulation API.
@@ -76,7 +80,8 @@ class Context:
         return self.__integrator.getCurrentIntegrator()
 
     def set_current_integrator(self, idx: int) -> None:
-        """If supplied integrator was an OpenMM compound integrator, set the current index.
+        """
+        If supplied integrator was an OpenMM compound integrator, set the current index.
 
         :param idx: Index of integrator within compound integrator to set.
         """
@@ -86,7 +91,8 @@ class Context:
     def set_positions(
         self, positions: npt.NDArray[np.float64], box: PeriodicBox
     ) -> None:
-        """Set atom positions and periodic box vectors in context.
+        """
+        Set atom positions and periodic box vectors in context.
 
         Constraints, virtual sites, and other interactions that are not periodic in OpenMM are made whole, so that
         their constituting atoms are in a single copy of the periodic space.
@@ -104,7 +110,8 @@ class Context:
         self.__context.setPeriodicBoxVectors(box.a, box.b, box.c)
 
     def set_velocities(self, velocities: npt.NDArray[np.float64]) -> None:
-        """Set atom velocities.
+        """
+        Set atom velocities.
 
         :param velocities: Numpy array of velocities, in nanometers / picosecond.
         """
@@ -118,7 +125,8 @@ class Context:
         self.__context.setVelocitiesToTemperature(temp)
 
     def minimize_energy(self, tolerance: float = 10.0, max_steps: int = 0) -> None:
-        """Minimize the potential energy of the system. Calls OpenMM.LocalEnergyMinimizer.minimize().
+        """
+        Minimize the potential energy of the system. Calls OpenMM.LocalEnergyMinimizer.minimize().
 
         :param tolerance: root-mean-square deviation of all forces must be below this value to stop minimization,
             in kJ/mol/nm.
@@ -128,14 +136,16 @@ class Context:
         mm.LocalEnergyMinimizer.minimize(self.__context, tolerance, max_steps)
 
     def apply_constraints(self, tol: float = 1e-10) -> None:
-        """Recalculates constraint and virtual site positions. Calls OpenMM.Context.applyConstraints(tol).
+        """
+        Recalculates constraint and virtual site positions. Calls OpenMM.Context.applyConstraints(tol).
 
         :param tol: distance tolerance for the constraint calculation.
         """
         self.__context.applyConstraints(tol=tol)
 
     def get_positions(self) -> tuple[np.ndarray, PeriodicBox]:
-        """Get current atom positions from the context.
+        """
+        Get current atom positions from the context.
 
         Positions returned are put in a single copy of the periodic box -- they are not whole!
 
@@ -164,7 +174,8 @@ class Context:
         return pos, box
 
     def get_velocities(self) -> npt.NDArray[np.float64]:
-        """Get current atom velocities from the context.
+        """
+        Get current atom velocities from the context.
 
         :return: velocities, in nanometers/ps.
         """
@@ -174,7 +185,8 @@ class Context:
         )  # nm / ps
 
     def get_energies(self) -> tuple[float, float, float]:
-        """Get the current energies in the system.
+        """
+        Get the current energies in the system.
 
         :return: kinetic, potential and total energy of the system, in kJ/mol.
         """
@@ -190,7 +202,8 @@ class Context:
         return ke, pe, te
 
     def get_forces(self) -> npt.NDArray[np.float64]:
-        """Get the current forces acting on each atom.
+        """
+        Get the current forces acting on each atom.
 
         :return: forces for each atom, in kJ/(mol nm).
         """

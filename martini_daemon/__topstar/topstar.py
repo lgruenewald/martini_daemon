@@ -9,7 +9,8 @@ from .modification_template import ModificationTemplate
 
 class TopStar:
     def __init__(self, system: System) -> None:
-        """Create a TopStar object.
+        """
+        Create a TopStar object.
 
         The glue between the following components:
         - graph matching algorithm
@@ -37,7 +38,8 @@ class TopStar:
                 i += n_atoms
 
     def try_match_graphs(self, atoms: set[int]) -> None:
-        """Run the graph matching algorithm on atoms.
+        """
+        Run the graph matching algorithm on atoms.
 
         Given a set of atoms, find all graph matches of all known
         graphs and add them to the fragment list.
@@ -69,7 +71,8 @@ class TopStar:
     def detection(
         self, pbc: PeriodicBox, pos: npt.NDArray[np.float64]
     ) -> list[tuple[str, list[int]]]:
-        """Run the detection algorithm.
+        """
+        Run the detection algorithm.
 
         :param pbc: Periodic Box.
         :param pos: Atom positions.
@@ -80,7 +83,8 @@ class TopStar:
     def modification(
         self, reactions: list[tuple[str, list[int]]]
     ) -> list[tuple[str, list[Fragment]]]:
-        """Run the modification algorithm.
+        """
+        Run the modification algorithm.
 
         Modifies TopStar and System according to the reaction templates.
 
@@ -125,7 +129,8 @@ class TopStar:
     def toggle_softcore(
         self, reactions: list[tuple[str, list[Fragment]]], on: bool
     ) -> None:
-        """Toggle soft core on/off based on the provided reactions.
+        """
+        Toggle soft core on/off based on the provided reactions.
 
         Will look up the modification template to see which atoms need soft core.
 

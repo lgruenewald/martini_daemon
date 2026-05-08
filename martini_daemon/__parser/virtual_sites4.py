@@ -1,3 +1,6 @@
+from collections.abc import Callable
+
+from ..__core import Force
 from .gromacs_top_file import register_directive
 from .interaction_directive import InteractionDirective
 
@@ -36,8 +39,10 @@ class VirtualSites4(InteractionDirective):
         return len(args), len(args)
 
 
-def register_vsite4_type(type_: int, args: list[str]):
-    def inner(class_):
+def register_vsite4_type(
+    type_: int, args: list[str]
+) -> Callable[[type[Force]], type[Force]]:
+    def inner(class_: type[Force]) -> type[Force]:
         name = class_.get_name()
         VirtualSites4.register_type(type_, name, args)
         return class_

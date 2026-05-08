@@ -1,3 +1,5 @@
+"""MD Simulations with OpenMM, Martini and Template based reactions."""
+
 # select exported symbols for public API
 # ruff: noqa: F401, F403
 # private submodules that mutate global state when imported, but export no symbols

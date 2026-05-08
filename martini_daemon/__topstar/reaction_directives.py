@@ -18,7 +18,8 @@ from .modification_template import ModificationTemplate
 @register_directive
 class ReactionDirective(MoleculeTypeDirective):
     def __init__(self, parent: Directive, path: str, line_num: int) -> None:
-        """Create a new [reaction] directive.
+        """
+        Create a new [reaction] directive.
 
         Instantiated by the parser.
         """
@@ -110,6 +111,7 @@ class ReactionDirective(MoleculeTypeDirective):
 @register_directive
 class ReactantsDirective(Directive):
     def line(self, tokens: TokenList) -> None:
+        assert isinstance(self.parent, ReactionDirective)
         if len(self.parent.d_template.reactants) > 0:
             raise TokenParseException(
                 tokens[0], "Only one line containing all reactants per reaction."
@@ -152,7 +154,8 @@ class ReactantsDirective(Directive):
 def _parse_angle_conditions(
     tokens: TokenList, start: int, wrap: bool
 ) -> list[tuple[int, int]]:
-    """Parse a line containing an angle or dihedral condition.
+    """
+    Parse a line containing an angle or dihedral condition.
 
     If wrap is false, the "angle space" is 0 to pi
     If wrap is true, the "angle space" is -pi to pi and is considered periodic
@@ -246,6 +249,7 @@ def _parse_angle_conditions(
 @register_directive
 class ConditionsDirective(Directive):
     def line(self, tokens: TokenList) -> None:
+        assert isinstance(self.parent, ReactionDirective)
         last_reaction = self.parent.d_template
         key = tokens.unwrap(0, "word")
         # sets on which angles and dihedrals were already defined
@@ -337,6 +341,7 @@ class ConditionsDirective(Directive):
 @register_directive
 class BreakDirective(Directive):
     def line(self, tokens: TokenList) -> None:
+        assert isinstance(self.parent, ReactionDirective)
         self.parent.molecule_type.break_groups.append(
             [self.parent.parse_index(tokens, i) for i in range(len(tokens))]
         )
@@ -364,6 +369,7 @@ class BreakDirective(Directive):
 @register_directive
 class UpdateDirective(Directive):
     def line(self, tokens: TokenList) -> None:
+        assert isinstance(self.parent, ReactionDirective)
         self.parent.molecule_type.update_groups.append(
             [self.parent.parse_index(tokens, i) for i in range(len(tokens))]
         )
@@ -391,6 +397,7 @@ class UpdateDirective(Directive):
 @register_directive
 class RedefineDirective(Directive):
     def line(self, tokens: TokenList) -> None:
+        assert isinstance(self.parent, ReactionDirective)
         atom_index = self.parent.parse_index(tokens, 0)
         changes = set()
         i = 1
@@ -445,6 +452,7 @@ class RedefineDirective(Directive):
 @register_directive
 class SoftCoreDirective(Directive):
     def line(self, tokens: TokenList) -> None:
+        assert isinstance(self.parent, ReactionDirective)
         atom_index = self.parent.parse_index(tokens, 0)
         sc_lam = tokens.unwrap(1, "float")
         sc_alpha = tokens.unwrap(2, "float")

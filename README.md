@@ -71,6 +71,8 @@ The python tests can be found in the `tests` folder in the repo, containing the 
 - `test_periodic_box` - Fuzz the PeriodicBox implementation against mdtraj.
 - `test_bond_graph` - Test the class `BondGraph`, which features things, such as pbc whole.
 
+Note: Running all the tests may take ~10-15 minutes.
+
 If a test does not pass, please open an Issue.
 
 Some single_frame tests have looser tolerances, this is documented at the top of `tests/single_frame/test_single_frame.py`.
@@ -83,6 +85,13 @@ is an overview of which these are:
 - `pylsp` - Python LSP server for autocomplete.
 - `ruff` - the linter and formatter used. Run using `ruff check` and `ruff format`.
 - `ty` - type checker. Run using `ty check`.
+
+If these dependencies are installed,
+linting, type checking and formatting can be done with a single command:
+
+```
+ty check && ruff check --fix && ruff format
+```
 
 To re-generate the type stubs for the rust parts, run `cargo run --bin stub_gen`.
 This only needs to be done when changing the rust part of the code, as the .pyi

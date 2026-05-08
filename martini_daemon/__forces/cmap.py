@@ -14,6 +14,7 @@ from ..__parser import (
 @register_directive
 class CMAPTypeDirective(Directive):
     def line(self, tokens: TokenList) -> None:
+        assert isinstance(self.parent, GromacsTopFile)
         parts = tuple(self.parent.unwrap_atom_type(tokens, i) for i in range(5))
         type_ = tokens.unwrap(5, "int")
         if type_ != 1:

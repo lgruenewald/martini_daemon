@@ -1,14 +1,17 @@
 from abc import ABCMeta, abstractmethod
-from typing import Any
 
 import openmm as mm
 
 from .bonded_force import BondedForce
+from .system import System
 
 
 class VirtualSite(BondedForce, metaclass=ABCMeta):
-    def __init__(self, system: Any) -> None:
-        """Base class for virtual sites, based on BondedForce.
+    def __init__(self, system: System) -> None:
+        """
+        Override this class to create custom virtual sites.
+
+        Base class for virtual sites, based on BondedForce.
 
         :param system: Martini Daemon System object.
         """
@@ -19,7 +22,10 @@ class VirtualSite(BondedForce, metaclass=ABCMeta):
     def _make_vsite(
         self, vid: int, other: list[int], params: list[float]
     ) -> mm.VirtualSite:
-        """Overridden by child classes. They should return a virtual site.
+        """
+        Create an OpenMM virtual site object with given parameters.
+
+        Overridden by child classes.
 
         :param vid: the atom index, which will be the virtual site, as a reference.
         :param other: list of constructing atoms.
@@ -30,8 +36,12 @@ class VirtualSite(BondedForce, metaclass=ABCMeta):
         """
         raise NotImplementedError
 
-    def build(self, must=False) -> None:
-        """Overrides Force's build for virtual sites, since virtual sites are not built like forces in OpenMM."""
+    def build(self, must: bool = False) -> None:
+        """
+        Add all virtual sites to the system.
+
+        Overrides Force's build for virtual sites, since virtual sites are not built like forces in OpenMM.
+        """
         if self._built:
             return
         self._built = True
@@ -44,7 +54,11 @@ class VirtualSite(BondedForce, metaclass=ABCMeta):
         return self.num_bonds() * 3
 
     def _add_bond(self, members: list[int], params: list[float]) -> int:
-        """Same as in BondedForce, but errors if happening not at the start of the simulation."""
+        """
+        Add a new virtual site.
+
+        Same as in BondedForce, but errors if happening not at the start of the simulation.
+        """
         if self._built:
             raise ValueError("Virtual sites cannot be added during the simulation.")
         return super()._add_bond(members, params)
