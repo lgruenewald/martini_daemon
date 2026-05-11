@@ -1,16 +1,14 @@
-#!/usr/bin/env python3
+"""Test still MD frames, compare energies and forces between engines."""
 
-import os
-import openmm as mm
-from openmm.unit import femtosecond, kilojoule_per_mole, kilojoule, mole, nanometer
-import numpy as np
 import math
+import os
+
+import numpy as np
+import openmm as mm
+import openmm.app as mmapp
 import pytest
 
-from martini_daemon.top_parser import DaemonTopFile
-from martini_daemon.gro_file import read_gro
-from martini_daemon.forces.nonbonded import NonBonded
-from martini_daemon.utils import pdist
+from martini_daemon import Simulation, read_geometry
 
 # == CONFIG ==
 e_tol = 1e-5  # energy relative tolerance
@@ -22,6 +20,11 @@ r_tol = 2e-3  # distance tolerance
 # It's possible to override the tol for certain tests.
 # Setting it to 0 will disable that test (only works for ftol).
 # Put an explanation here.
+#
+# CNAP:
+# the only force in it is a 180 degree improper dihedral
+# apparently there is a small relative deviation that's slightly larger than
+# tolerance, but a very small absolute difference and the forces seem to pass
 #
 # cmap:
 # probably different interpolation in OpenMM and GROMACS
@@ -35,117 +38,151 @@ r_tol = 2e-3  # distance tolerance
 # only slightly raised the tolerance because forces still
 # seem *slightly* off for a few atoms
 #
-etol_override = {
-}
-ftol_override = {
-    "cmap": 1e-2,
-    "cutoff_LJ": 0,
-    "pairs": 5e-5
-}
+etol_override = {"CNAP": 3e-5}
+ftol_override = {"cmap": 1e-2, "cutoff_LJ": 0, "pairs": 5e-5}
 
 cutoff_nm = 1.1
 
 
 @pytest.fixture
-def rootdir(request):
+def rootdir(request: pytest.FixtureRequest) -> str:
+    """Get the root directory where this test is located."""
     return os.path.dirname(request.path)
 
 
 tests = [
-    "cutoff_LJ", "cmap",
-    "pairs", "pairs_VW", "pairs_VWQ", "pairs_type",
+    # notable soft skips
+    "CNAP",
+    "cutoff_LJ",
+    # cmap, pairs
+    "cmap",
+    "pairs",
+    "pairs_VW",
+    "pairs_VWQ",
+    "pairs_type",
     # biomolecule tests
-    "trypsin", "posres",
+    "trypsin",
+    "posres",
     # polymer tests
     "polyurethane",
     # small molecule tests
-    "NMC", "CHOL_in_W", "AEA", "NAPH", "nacl+waterbox", "solvent_mixture",
-    "waterbox", "DPPC_DIPC_in_W", "CAFF", "BDT", "BZTF_CLPR", "benzbox",
+    "NMC",
+    "CHOL_in_W",
+    "AEA",
+    "NAPH",
+    "nacl+waterbox",
+    "solvent_mixture",
+    "waterbox",
+    "DPPC_DIPC_in_W",
+    "CAFF",
+    "BDT",
+    "BZTF_CLPR",
+    "benzbox",
     # specific interaction tests
     "vsite1",
-    "morse", "vsite4fdn", "quartic_angle", "proper_dihedral",
-    "cross_bond_bond", "vsiten2", "urey_bradley", "fourier_dihedral",
-    "linear_angle", "fene", "cubic", "distance_restraint",
-    "connection", "rbtorsion", "vsiten3", "vsite2fd",
-    "cross_bond_angle", "vsite3fd", "g96_bond",
-    "restricted_dihedral", "restricted_angle", "combined_bending_torsion",
+    "morse",
+    "vsite4fdn",
+    "quartic_angle",
+    "proper_dihedral",
+    "cross_bond_bond",
+    "vsiten2",
+    "urey_bradley",
+    "fourier_dihedral",
+    "linear_angle",
+    "fene",
+    "cubic",
+    "distance_restraint",
+    "connection",
+    "rbtorsion",
+    "vsiten3",
+    "vsite2fd",
+    "cross_bond_angle",
+    "vsite3fd",
+    "g96_bond",
+    "restricted_dihedral",
+    "restricted_angle",
+    "combined_bending_torsion",
 ]
 
-# TODO: use Simulation, not TopParser
+
 # == TEST CLASS ==
-class TestSingleFrame():
-    def apply_constraints(self):
-        # applies constraints and vsites and checks for position change
-        platform = mm.Platform.getPlatformByName("Reference")
-        _, respos, _ = read_gro(self.respos)
-        ok, res = DaemonTopFile(
-            self.top, NonBonded(cutoff_nm=cutoff_nm), respos=respos,
-            experimental=True
+class TestSingleFrame:
+    """Single frame test class."""
+
+    def apply_constraints(self) -> None:
+        """Apply constraints and vsites and checks for position change."""
+        _, reference, _ = read_geometry(self.gro)
+        _, respos, _ = read_geometry(self.respos)
+        sim = Simulation(
+            self.top, self.gro, 0, [], options={"respos": respos}, platform="Reference"
         )
-        assert ok
-        system, top = res
-        box, pos, vel = read_gro(self.gro)
-        system.build_context(
-            mm.VerletIntegrator(20 * femtosecond),
-            box,
-            platform=platform
-        )
-        system.set_positions(pos)
-        system.apply_constraints()
-        newpos = system.get_state().getPositions(asNumpy=True)\
-            .value_in_unit(mm.unit.nanometer)
-        r_diff = np.linalg.norm(newpos - pos, axis=1)
-        largest_index = np.argmax(r_diff)
-        nm = r_diff[largest_index]
-        assert not np.any(r_diff > r_tol), (
-            f"Constraint/VSite position moved by {nm} nm "
-            f"(particle {largest_index})."
+        sim.context.apply_constraints()
+        new_pos, box = sim.context.get_positions()
+        for i in range(len(reference)):
+            r_diff = box.distance(reference[i], new_pos[i])
+            assert r_diff < r_tol, (
+                f"Constraint/VSite position moved by {r_diff} nm (particle {i})."
+            )
+        sim.finish()
+
+    def compare_daemon_gmx(self) -> None:
+        """Compare Martini Daemon and GROMACS energies and forces."""
+        _, respos, _ = read_geometry(self.respos)
+        sim = Simulation(
+            self.top, self.gro, 0, [], options={"respos": respos}, platform="Reference"
         )
 
-    def compare_daemon_gmx(self):
-        platform = mm.Platform.getPlatformByName("Reference")
-        _, respos, _ = read_gro(self.respos)
-        ok, res = DaemonTopFile(
-            self.top, NonBonded(cutoff_nm=1.1), respos=respos,
-            experimental=True
-        )
-        assert ok
-        system, top = res
-        box, pos, vel = read_gro(self.gro)
-        system.build_context(
-            mm.VerletIntegrator(20 * femtosecond),
-            box,
-            platform=platform
-        )
-        system.set_positions(pos)
-        state = system.get_state()
-        energy = state.getPotentialEnergy().value_in_unit(kilojoule_per_mole)
-        forces = state.getForces(asNumpy=True).\
-            value_in_unit(kilojoule / nanometer / mole).flatten()
-        for vsite in system.vsites:
-            forces[vsite * 3] = 0.
-            forces[vsite * 3 + 1] = 0.
-            forces[vsite * 3 + 2] = 0.
+        _, energy, _ = sim.context.get_energies()
+        forces = sim.context.get_forces().flatten()
+        for i in range(sim.system.num_atoms()):
+            if sim.system.get_mass(i) == 0.0:
+                forces[i * 3] = 0.0
+                forces[i * 3 + 1] = 0.0
+                forces[i * 3 + 2] = 0.0
+        sim.finish()
 
-        if energy != 0.:
+        if energy != 0.0:
             e_diff = math.fabs(self.gmx_energy / energy - 1)
         else:
             assert self.gmx_energy == energy, f"{self.gmx_energy} != {energy}"
             e_diff = 0
         e_percent = e_diff * 100
-        cetol = etol_override.get(self.test_name) or e_tol
-        assert e_diff < cetol, (
+        c_etol = etol_override.get(self.test_name) or e_tol
+        assert e_diff < c_etol, (
             f"Gmx and daemon energy different by {e_percent:.2f} %.\n"
             f"Gromacs energy: {self.gmx_energy:.10e}\n"
             f"Daemon energy: {energy:.10e}\n"
-            f"Relative difference {e_diff:.3e} above tolerance {cetol:.2e}"
+            f"Relative difference {e_diff:.3e} above tolerance {c_etol:.2e}"
         )
 
-        cftol = ftol_override.get(self.test_name)
-        if cftol == 0:
+        # Secondary comparison with raw openmm but martini daemon as parser
+        # main purpose of this part is to just run the code in the public interface for exporting
+        sys = sim.system.get_openmm_system()
+        top = sim.get_openmm_topology()
+
+        sim = mmapp.Simulation(
+            top,
+            sys,
+            mm.VerletIntegrator(0.1),
+            mm.Platform.getPlatformByName("Reference"),
+        )
+        _, pos, _ = read_geometry(self.gro)
+        # note: there might be deviations here because martini_daemon's set_positions also makes vsites and constraints
+        # whole across the pbc. currently no such tests exist, but in the future it may cause problems if such a test
+        # is introduced.
+        sim.context.setPositions(pos)
+        raw_openmm_energy = (
+            sim.context.getState(energy=True)
+            .getPotentialEnergy()
+            .value_in_unit_system(mm.unit.md_unit_system)
+        )
+        assert np.isclose(raw_openmm_energy, energy), "Raw OpenMM energy mismatch"
+
+        c_ftol = ftol_override.get(self.test_name)
+        if c_ftol == 0:
             return
-        elif cftol is None:
-            cftol = f_tol
+        if c_ftol is None:
+            c_ftol = f_tol
 
         f_diff = np.fabs(self.gmx_forces - forces) / (np.fabs(forces) + f_tol)
         i_max = np.argmax(f_diff)
@@ -157,15 +194,17 @@ class TestSingleFrame():
         atom_index = i_max // 3
         atom_dim = i_max % 3
         # check if there is any exactly cutoffs
-        box = np.array(box)
+        box, pos, _ = read_geometry(self.gro)
         for other_atom in range(len(pos)):
-            dist = pdist(pos[atom_index], pos[other_atom], box)
+            dist = box.distance(pos[atom_index], pos[other_atom])
             if np.isclose(dist, cutoff_nm):
-                print(f"Atoms {atom_index+1} and {other_atom}+1 are exactly cutoff apart!")
+                print(
+                    f"Atoms {atom_index + 1} and {other_atom}+1 are exactly cutoff apart!"
+                )
                 print("This can cause artifacts in forces.")
-        assert np.allclose(self.gmx_forces, forces, cftol, 0), (
+        assert np.allclose(self.gmx_forces, forces, c_ftol, 0), (
             f"Gmx and daemon forces different by {f_percent:.2f} %.\n"
-            f"Particle {atom_index+1} (<-- indexes start from 1) "
+            f"Particle {atom_index + 1} (<-- indexes start from 1) "
             f"dimension {atom_dim}\n"
             f"Absolute diff: {abs_diff:.3e}    relative diff: {max:.3e}\n"
             f"Daemon force: {force:.10e}\n"
@@ -173,7 +212,8 @@ class TestSingleFrame():
         )
 
     @pytest.mark.parametrize("x", tests)
-    def test_single_frame(self, x, rootdir):
+    def test_single_frame(self, x: str, rootdir: str) -> None:
+        """Do the single frame test."""
         self.test_name = x
         os.chdir(rootdir)
         assert os.path.isfile("gmxrun.sh")
@@ -183,10 +223,10 @@ class TestSingleFrame():
         assert os.path.isfile("energy.xvg"), f"./gmxrun.sh failure for {x} (E)"
         assert os.path.isfile("forces.xvg"), f"./gmxrun.sh failure for {x} (F)"
         with open("energy.xvg") as f:
-            lines = [line for line in f]
+            lines = f.readlines()
             self.gmx_energy = float(lines[-1].split()[-1])
         with open("forces.xvg") as f:
-            lines = [line for line in f]
+            lines = f.readlines()
             gmx_force_line = lines[-1].split()
             self.gmx_forces = np.array([float(x) for x in gmx_force_line][1:])
         self.top = "system.top"

@@ -29,7 +29,7 @@ xy
 x y
 [conditions]
 r_max 1:x 2:y 0.5
-angle_between 1:x 2:y 2:z 80 100
+angle 1:x 2:y 2:z 80 to 100
 
 [reaction]
 xy2
@@ -38,7 +38,7 @@ y x
 [conditions]
 r_max 1:y 2:x 0.5
 ; it's exactly 115
-angle_between 1:z 1:y 2:x 114 116
+angle 1:z 1:y 2:x 114 to 116
 
 [system]
 detection test

@@ -1,0 +1,22 @@
+[package]
+name = "martini_daemon"
+version = "0.1.0+dev"
+edition = "2024"
+
+[lib]
+name = "martini_daemon"
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[build-dependencies]
+chrono = "0.4.44"
+
+[dependencies]
+glam = "0.32.1"
+pyo3 = "0.28.2"
+numpy = "0.28.0"
+rand = "0.10.0"
+kdtree = "0.8.0"
+ordermap = "1.1.0"
+sortedlist-rs = "0.2.5"
+pyo3-stub-gen = "0.21.1"

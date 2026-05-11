@@ -1,13 +1,17 @@
-import os
+"""Test the detection algorithm."""
+
 import glob
+import os
+
 import pytest
-from martini_daemon.simulation import Simulation
-from martini_daemon.reporters.topstar import ReactionReporter
+
+from martini_daemon import ReactionReporter, Simulation
 
 
 # == CONFIG ==
 @pytest.fixture
-def rootdir(request):
+def rootdir(request: pytest.FixtureRequest) -> str:
+    """Fixture to get root directory."""
     return os.path.dirname(request.path)
 
 
@@ -17,85 +21,61 @@ tests = [
     "polyurethane",
     "bdt",
     # dummy systems
+    "three_reagent",
     "distance",
     "angle",
-    "dihedral"
-# TODO
-#    "dihedral",
-#    "mono_distance",
-#    "optional",
-#    "overlap"
+    "dihedral",
+    "optional",
+    "overlap",
 ]
 
 
-# == TEST CLASS ==
-class TestDetection():
+def get_sim(
+    top: str, gro: str
+) -> list[tuple[int, str, list[tuple[str, int, list[int]]]]]:
+    """Run a single frame detection algorithm and return the reactions."""
+    rep = ReactionReporter()
+    sim = Simulation(top, gro, 0, reporters=[rep])
+    sim.step(0, traj=False, dm=True)
+    sim.finish()
+    return ReactionReporter.read_reactions("out.reactions")
 
-    def get_sim(self, top, gro):
-        rep = ReactionReporter()
-        sim = Simulation(
-            top, gro,
-            reporters=[
-                rep
-            ]
-        )
-        sim.step(0, xtc=False, dm=True)
-        # force closing of file
-        # TODO oof
-        rep.__del__()
-        return "out.reactions"
 
-    def read_reactions(self, path):
-        """
-        .reactions format reader suited for test_detection.py
-        """
-        reactions = []
-        with open(path, "r") as f:
-            lines = f.read().splitlines()
-            for line in lines:
-                if line[0] == "#" or len(line) == 0:
-                    continue
-                elems = line.split(";")
-                frame, rx = elems[0].split(",")
-                # list of atoms
-                frags = [
-                    elem.split(",")[2:] for elem in elems[1:]
-                ]
-                reactions.append(
-                    (rx, frags)
-                )
-        return reactions
+def compare(
+    reactions: list[tuple[int, str, list[tuple[str, int, list[int]]]]],
+    expected: list[tuple[int, str, list[tuple[str, int, list[int]]]]],
+) -> None:
+    """Compare expected and obtained reactions, raise errors if not the same."""
+    dump = f"\nGot: {reactions}, expected: {expected}."
+    for (_, r1, frags1), (_, r2, frags2) in zip(reactions, expected):
+        # while order in theory can be different, it is simpler
+        # to for now make systems where we just form the expected
+        # .reactions in the order detection will (deterministically)
+        # output them
+        assert r1 == r2, f"Name differs. {dump}"
+        assert len(frags1) == len(frags2), "second len check" + dump
+        for (_, _, atoms1), (_, _, atoms2) in zip(frags1, frags2):
+            assert len(atoms1) == len(atoms2), "third len check" + dump
+            for atom1, atom2 in zip(atoms1, atoms2):
+                assert atom1 == atom2, f"Atom differs. {dump}"
+    assert len(reactions) == len(expected), f"first len check {dump}"
 
-    def compare(self, reactions, expected):
-        dump = f"\nGot: {reactions}, expected: {expected}."
-        assert len(reactions) == len(expected), f"first len check {dump}"
-        for (r1, frags1), (r2, frags2) in zip(reactions, expected):
-            # while order in theory can be different, it is simpler
-            # to for now make systems where we just form the expected
-            # .reactions in the order detection will (deterministically)
-            # output them
-            assert r1 == r2, f"Name differs. {dump}"
-            assert len(frags1) == len(frags2), "second len check" + dump
-            for atoms1, atoms2 in zip(frags1, frags2):
-                assert len(atoms1) == len(atoms2), "third len check" + dump
-                for atom1, atom2 in zip(atoms1, atoms2):
-                    assert atom1 == atom2, f"Atom differs. {dump}"
 
-    @pytest.mark.parametrize("x", tests)
-    def test_detection(self, x, rootdir):
-        # enter dir
-        os.chdir(rootdir)
-        assert os.path.isdir(x)
-        os.chdir(x)
+@pytest.mark.parametrize("x", tests)
+def test_detection(x: str, rootdir: str) -> None:
+    """Test the detection algorithm."""
+    # enter dir
+    os.chdir(rootdir)
+    assert os.path.isdir(x)
+    os.chdir(x)
 
-        # meat of the test
-        rx_path = self.get_sim("system.top", "system.gro")
-        reactions = self.read_reactions(rx_path)
-        expected = self.read_reactions("expected.reactions")
-        self.compare(reactions, expected)
+    # vegan meat substitute of the test
+    reactions = get_sim("system.top", "system.gro")
+    expected = ReactionReporter.read_reactions("expected.reactions")
+    compare(reactions, expected)
 
-        # cleanup
-        for filename in glob.glob("./out*"):
-            os.remove(filename)
-        for filename in glob.glob("./#*"):
-            os.remove(filename)
+    # cleanup
+    for filename in glob.glob("./out*"):
+        os.remove(filename)
+    for filename in glob.glob("./#*"):
+        os.remove(filename)

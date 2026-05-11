@@ -1,0 +1,38 @@
+import openmm as mm
+
+from ..__core import BondedForce, register_available_force
+from ..__parser import register_bond_type
+
+
+@register_bond_type(type_=3, args=["float", "float", "float"], is_excl=True)
+@register_available_force
+class MorseBond(BondedForce):
+    @classmethod
+    def _add_to_force(
+        cls, force: mm.Force, members: list[int], params: list[float]
+    ) -> None:
+        assert isinstance(force, mm.CustomBondForce)
+        force.addBond(*members, params)
+
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return params
+
+    @classmethod
+    def uses_pbc(cls) -> bool:
+        return True
+
+    def delta_degrees_of_freedom(self) -> int:
+        return 0
+
+    def _set_force_obj(self) -> mm.Force:
+        force = mm.CustomBondForce("D * (1 - exp(-beta * (r - b)))^2")
+        force.addPerBondParameter("b")  # equilibrium length
+        force.addPerBondParameter("D")  # force constant
+        force.addPerBondParameter("beta")  # cubic force constant
+        return force
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "morse_bond"
+
+    filters = {"bond"}

@@ -1,0 +1,52 @@
+integrator               = md
+dt                       = 0.02
+nsteps                   = 0 ; single frame computation
+; frequency of center of mass removal
+nstcomm                  = 10
+comm-grps		         =
+
+; output writing
+nstxout                  = 1 ; position frequency
+nstvout                  = 1 ; velocity frequency
+nstfout                  = 1 ; force frequency
+nstlog                   = 1 ; energies
+nstenergy                = 1 ; energies (.edr)
+nstxout-compressed       = 1 ; positions (.xtc)
+compressed-x-precision   = 1000
+compressed-x-grps        = SYSTEM
+energygrps               = SYSTEM
+
+cutoff-scheme            = Verlet
+nstlist                  = 20
+ns_type                  = grid
+pbc                      = xyz
+verlet-buffer-tolerance  = -1
+rlist                    = 1.35
+
+coulombtype              = reaction-field 
+rcoulomb                 = 1.1
+epsilon_r                = 15
+epsilon_rf               = 0
+vdw_type                 = cutoff  
+vdw-modifier             = Potential-shift-verlet
+rvdw                     = 1.1
+
+tcoupl                   = v-rescale 
+tc-grps                  = SYSTEM 
+tau_t                    = 1.0 
+ref_t                    = 298 
+Pcoupl                   = C-rescale
+Pcoupltype               = isotropic
+tau_p                    = 12.0
+compressibility          = 3e-4
+ref_p                    = 1.0
+
+gen_vel                  = no
+gen_temp                 = 298
+gen_seed                 = 11111
+
+constraints              = none 
+constraint_algorithm     = Lincs
+continuation = yes
+lincs_order = 4
+lincs_warnangle = 30

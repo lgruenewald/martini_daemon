@@ -1,11 +1,6 @@
 [build-system]
-requires = [
-  "setuptools",
-  "setuptools-scm",
-  "cython",
-  "numpy"
-]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
 
 [project]
 name = "martini_daemon"
@@ -18,17 +13,54 @@ classifiers = []
 dependencies = [
   "numpy",
   "openmm",
-  "freud-analysis",
-  "tqdm",
-  "molly@git+https://git.sr.ht/~ma3ke/molly#egg=molly&subdirectory=bindings/python",
+  "molly@git+https://github.com/aster31/molly#egg=molly&subdirectory=bindings/python",
 ]
 dynamic = ["version"]
 
+[project.scripts]
+daemon = "martini_daemon.__main:main"
+
+[tool.maturin]
+module-name = "martini_daemon.__rust"
+features = ["pyo3/extension-module"]
+python-source = "."
+
+[tool.ruff.lint]
+extend-select = [
+  "F", # Pyflakes
+  "I", # Import sorting
+  "UP", # Warn on older python features such as %
+  "C4", # flag unneccessary iteration patterns
+  "RET", # warn on useless else blocks and explicit "return None"
+  "SIM", # simplifications
+  "ANN", # missing type annotations
+  "D" # warn on missing documentation
+]
+ignore = [
+  "D203", # we want to blank lines after class
+  "D212", # we want a formally "empty" line after """ in docstrings
+]
+
 [project.optional-dependencies]
-all = [
-# Testing
+
+test = [
   "pytest",
-# Docs
+  "mdtraj",
+]
+
+docs = [
   "sphinx",
-  "sphinx-autoapi"
+  "sphinx-autoapi",
+  "sphinx-rtd-theme",
+  "myst-parser"
+]
+
+dev = [
+  "python-lsp-server",
+  "ruff",
+  "ty"
+]
+
+trr = [
+  "mdtraj"
 ]

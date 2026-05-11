@@ -1,0 +1,6 @@
+Inspired by the martini_openmm CNAP single molecule test
+
+Notable because it only has a 180 degree improper dihedral
+that creates a slight relative deviation in energy from GROMACS
+that is above 1e-5 (2.86e-5). Forces are fine. Absolute deviation in energy
+is also quite small, so it's soft skipped.

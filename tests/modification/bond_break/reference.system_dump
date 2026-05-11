@@ -1,0 +1,44 @@
+# Written by Martini Daemon SysStarDump
+==== Frame 0 ====
+Atoms
+# (name, resid, resname, type, charge, mass, sc_lam, sc_alpha)
+('X1', 1, 'X', 'W', 0.0, 72.0, 1.0, 0.5)
+('X2', 1, 'X', 'W', 0.0, 72.0, 1.0, 0.5)
+('X3', 1, 'X', 'W', 0.0, 72.0, 1.0, 0.5)
+('X4', 1, 'X', 'W', 0.0, 72.0, 1.0, 0.5)
+
+Forces
+Force:exclusion
+(2, 1)
+(1, 0)
+(3, 2)
+Force:harmonic_bond
+(0, 1, 0.5, 1000.0)
+(1, 2, 0.5, 1000.0)
+(2, 3, 0.5, 1000.0)
+Force:harmonic_angle
+(0, 1, 2, 1.0471975511965974, 100.0)
+(1, 2, 3, 1.0471975511965974, 100.0)
+Force:proper_dihedral
+(0, 1, 2, 3, 1.0, 1.0471975511965974, 30.0)
+End Frame
+
+==== Frame 0 ====
+Atoms
+# (name, resid, resname, type, charge, mass, sc_lam, sc_alpha)
+('X1', 1, 'X', 'W', 0.0, 72.0, 1.0, 0.5)
+('X2', 1, 'X', 'W', 0.0, 72.0, 1.0, 0.5)
+('X3', 1, 'X', 'W', 0.0, 72.0, 1.0, 0.5)
+('X4', 1, 'X', 'W', 0.0, 72.0, 1.0, 0.5)
+
+Forces
+Force:exclusion
+(1, 0)
+(3, 2)
+Force:harmonic_bond
+(0, 1, 0.5, 1000.0)
+(2, 3, 0.5, 1000.0)
+Force:harmonic_angle
+Force:proper_dihedral
+End Frame
+

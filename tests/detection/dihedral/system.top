@@ -20,7 +20,7 @@ zero
 y y
 [conditions]
 r_max 1:z 2:y 0.5
-dihedral_between 1:y 1:z 2:y 2:z -10 10
+dihedral 1:y 1:z 2:y 2:z -10 to 10
 
 [reaction]
 ninety
@@ -28,7 +28,7 @@ ninety
 y y
 [conditions]
 r_max 1:z 2:y 0.5
-dihedral_between 1:y 1:z 2:y 2:z 80 110
+dihedral 1:y 1:z 2:y 2:z 80 to 110
 
 [reaction]
 minus_ninety
@@ -36,7 +36,7 @@ minus_ninety
 y y
 [conditions]
 r_max 1:z 2:y 0.5
-dihedral_between 1:y 1:z 2:y 2:z -110 -80
+dihedral 1:y 1:z 2:y 2:z -110 to -80
 
 [reaction]
 hundredeighty
@@ -44,7 +44,7 @@ hundredeighty
 y y
 [conditions]
 r_max 1:z 2:y 0.5
-dihedral_between 1:y 1:z 2:y 2:z 170 190
+dihedral 1:y 1:z 2:y 2:z 170 to 190
 
 [system]
 detection test

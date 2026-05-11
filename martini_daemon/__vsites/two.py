@@ -1,0 +1,22 @@
+import openmm as mm
+
+from ..__core import VirtualSite, register_available_force
+from ..__parser import register_vsite2_type
+
+
+@register_vsite2_type(1, ["float"])
+@register_available_force
+class VSiteTwo(VirtualSite):
+    def _parse(self, members: list[int], params: list[float]) -> list[float]:
+        return [1 - params[0], params[0]]
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "vsite2"
+
+    def _make_vsite(
+        self, vid: int, other: list[int], params: list[float]
+    ) -> mm.VirtualSite:
+        return mm.TwoParticleAverageSite(other[0], other[1], params[0], params[1])
+
+    _filters = {"virtual_site", "vsite"}
