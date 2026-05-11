@@ -74,6 +74,7 @@ impl PeriodicBox {
     /// Must obey same conditions as constructor.
     #[pyo3(signature = (ax, by, cz, ay=None, az=None, bx=None, bz=None, cx=None, cy=None))]
     #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
     pub fn from_gro(
         ax: f64,
         by: f64,
@@ -118,6 +119,7 @@ impl PeriodicBox {
     ///
     /// Must obey same conditions as constructor.
     #[staticmethod]
+    #[allow(clippy::too_many_arguments)]
     pub fn triclinic(ax: f64, bx: f64, by: f64, cx: f64, cy: f64, cz: f64) -> PyResult<Self> {
         PeriodicBox::new([ax, 0., 0.], [bx, by, 0.], [cx, cy, cz])
     }
@@ -194,7 +196,8 @@ impl PeriodicBox {
     pub fn move_all_within(&self, mut array: PyReadwriteArray<f64, Ix2>) -> PyResult<()> {
         let [outer, inner] = array.shape() else {
             return Err(PyValueError::new_err(format!(
-                "Invalid dimensions, expected Nx3, got ({:?})", array.shape()
+                "Invalid dimensions, expected Nx3, got ({:?})",
+                array.shape()
             )));
         };
         if *inner != 3 {
@@ -291,7 +294,6 @@ impl PeriodicBox {
         self.b.into()
     }
 
-
     #[getter]
     /// Get the third unit cell vector.
     ///
@@ -313,8 +315,8 @@ impl PeriodicBox {
     pub fn diff(&self, v1: [f64; 3], v2: [f64; 3]) -> [f64; 3] {
         let v1 = DVec3::from(v1);
         let v2: DVec3 = DVec3::from(v2);
-        let diff = DVec3::from(self.move_near_origin((v1-v2).into()));
-        let mut best = diff.clone();
+        let diff = DVec3::from(self.move_near_origin((v1 - v2).into()));
+        let mut best = diff;
         let mut best_dist = best.length_squared();
         for i in -1..=1 {
             for j in -1..=1 {

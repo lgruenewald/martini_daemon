@@ -1,15 +1,15 @@
 use pyo3::prelude::*;
+use pyo3_stub_gen::{define_stub_info_gatherer, derive::gen_stub_pyfunction};
 use std::env;
-use pyo3_stub_gen::{derive::gen_stub_pyfunction, define_stub_info_gatherer};
 
-mod periodic_box;
-mod fragment;
-mod detection_template;
+mod bond_graph;
 mod detection;
 mod detection_one;
-mod frag_list;
+mod detection_template;
 mod detection_template_list;
-mod bond_graph;
+mod frag_list;
+mod fragment;
+mod periodic_box;
 
 #[gen_stub_pyfunction]
 #[pyfunction]

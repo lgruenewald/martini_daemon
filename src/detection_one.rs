@@ -1,22 +1,17 @@
-use std::collections::HashSet;
 use numpy::{Ix2, PyArray};
 use pyo3::prelude::*;
 use rand::prelude::*;
+use std::collections::HashSet;
 
-use crate::{
-    fragment::Fragment,
-    detection_template::DetectionTemplate,
-    periodic_box::PeriodicBox,
-};
+use crate::{detection_template::DetectionTemplate, fragment::Fragment, periodic_box::PeriodicBox};
 
-pub fn detection_one<'py>(
+pub fn detection_one(
     rx: &DetectionTemplate,
     frags: Vec<&Fragment>,
     pbc: &PeriodicBox,
     pos: Borrowed<PyArray<f64, Ix2>>,
     rng: &mut ThreadRng,
 ) -> bool {
-
     // check max distances
     for (idi, atom_i, idj, atom_j, max) in rx.distance_max.iter() {
         let p1 = frags[*idi].atoms[*atom_i];
@@ -115,7 +110,8 @@ pub fn detection_one<'py>(
     }
 
     // check dihedrals
-    for (idi, atom_i, idj, atom_j, idk, atom_k, idl, atom_l, min, max) in rx.dihedral_limits.iter() {
+    for (idi, atom_i, idj, atom_j, idk, atom_k, idl, atom_l, min, max) in rx.dihedral_limits.iter()
+    {
         let p1 = frags[*idi].atoms[*atom_i];
         let p2 = frags[*idj].atoms[*atom_j];
         let p3 = frags[*idk].atoms[*atom_k];

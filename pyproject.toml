@@ -17,6 +17,9 @@ dependencies = [
 ]
 dynamic = ["version"]
 
+[project.scripts]
+daemon = "martini_daemon.__main:main"
+
 [tool.maturin]
 module-name = "martini_daemon.__rust"
 features = ["pyo3/extension-module"]

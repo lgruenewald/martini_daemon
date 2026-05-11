@@ -1,7 +1,7 @@
-use pyo3::{prelude::*};
-use std::{collections::HashSet};
 use pyo3::exceptions::PyException;
+use pyo3::prelude::*;
 use pyo3_stub_gen::{derive::gen_stub_pyclass, derive::gen_stub_pymethods};
+use std::collections::HashSet;
 
 #[gen_stub_pyclass]
 #[pyclass]
@@ -53,30 +53,21 @@ impl DetectionTemplate {
     /// Add a maximum distance condition.
     ///
     /// Entry should be: reactant idx, graph node idx, reactant idx, graph node idx, distance^2 (nm^2)
-    pub fn add_distance_max(
-        &mut self,
-        entry: (usize, usize, usize, usize, f64),
-    ) {
+    pub fn add_distance_max(&mut self, entry: (usize, usize, usize, usize, f64)) {
         self.distance_max.push(entry);
     }
 
     /// Add a minimum distance condition.
     ///
     /// Entry should be: reactant idx, graph node idx, reactant idx, graph node idx, distance^2 (nm^2)
-    pub fn add_distance_min(
-        &mut self,
-        entry: (usize, usize, usize, usize, f64),
-    ) {
+    pub fn add_distance_min(&mut self, entry: (usize, usize, usize, usize, f64)) {
         self.distance_min.push(entry);
     }
 
     /// Add a forbidden angle range.
     ///
     /// Entry should be: reactant idx, graph node (3x), minimum (cosine of angle), maximum (cosine of angle)
-    pub fn add_angle_limit(
-        &mut self,
-        entry: (usize, usize, usize, usize, usize, usize, f64, f64),
-    ) {
+    pub fn add_angle_limit(&mut self, entry: (usize, usize, usize, usize, usize, usize, f64, f64)) {
         self.angle_limits.push(entry);
     }
 
@@ -85,9 +76,11 @@ impl DetectionTemplate {
     /// Entry should be: reactant idx, graph node (4x), minimum (angle), maximum (angle).
     ///
     /// min < max must be true. both min and max must be between -pi and pi, in radians.
-    pub fn add_dihedral_limit<'py>(
+    pub fn add_dihedral_limit(
         &mut self,
-        #[gen_stub(override_type(type_repr="tuple[int, int, int, int, int, int, int, int, float, float]"))]
+        #[gen_stub(override_type(
+            type_repr = "tuple[int, int, int, int, int, int, int, int, float, float]"
+        ))]
         entry: (
             usize,
             usize,
@@ -108,7 +101,9 @@ impl DetectionTemplate {
     ///
     /// Used during parsing.
     #[getter]
-    #[gen_stub(override_return_type(type_repr="list[tuple[int, int, int, int, int, int, float, float]]"))]
+    #[gen_stub(override_return_type(
+        type_repr = "list[tuple[int, int, int, int, int, int, float, float]]"
+    ))]
     pub fn angle_limits(&self) -> Vec<(usize, usize, usize, usize, usize, usize, f64, f64)> {
         self.angle_limits.clone()
     }
@@ -117,8 +112,12 @@ impl DetectionTemplate {
     ///
     /// Used during parsing.
     #[getter]
-    #[gen_stub(override_return_type(type_repr="list[tuple[int, int, int, int, int, int, int, int, float, float]]"))]
-    pub fn dihedral_limits(&self) -> Vec<(
+    #[gen_stub(override_return_type(
+        type_repr = "list[tuple[int, int, int, int, int, int, int, int, float, float]]"
+    ))]
+    pub fn dihedral_limits(
+        &self,
+    ) -> Vec<(
         usize,
         usize,
         usize,
@@ -139,9 +138,9 @@ impl DetectionTemplate {
     pub fn complete(&self) -> Result<(), PyErr> {
         // 1. must have name and reactants
         if self.name.is_none() {
-            return Err(PyException::new_err("Reaction must have a name"))
+            return Err(PyException::new_err("Reaction must have a name"));
         }
-        if self.reactants.len() == 0 {
+        if self.reactants.is_empty() {
             return Err(PyException::new_err(format!(
                 "Reaction {} has no reactants.",
                 self.name.clone().unwrap()
@@ -160,8 +159,7 @@ impl DetectionTemplate {
         let mut stack: Vec<usize> = Vec::new();
         stack.push(0);
 
-        while stack.len() > 0 {
-            let cur = stack.pop().unwrap();
+        while let Some(cur) = stack.pop() {
             marked.insert(cur);
             for i in connections[cur].iter() {
                 if !marked.contains(i) {
@@ -171,10 +169,11 @@ impl DetectionTemplate {
         }
 
         let all: HashSet<usize> = (0..self.reactants.len()).collect();
-        for unconnected in marked.difference(&all) {
+        if let Some(unconnected) = marked.difference(&all).next() {
             return Err(PyException::new_err(format!(
                 "Reaction {}: Reactants not all connected by r_max. First disconnected reactant index {}.",
-                self.name.clone().unwrap(), *unconnected
+                self.name.clone().unwrap(),
+                *unconnected
             )));
         }
         Ok(())

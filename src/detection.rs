@@ -1,14 +1,14 @@
-use std::collections::HashSet;
+use kdtree::{KdTree, distance::squared_euclidean};
 use numpy::{Ix2, PyArray};
 use pyo3::prelude::*;
-use kdtree::{KdTree, distance::squared_euclidean};
+use pyo3_stub_gen::derive::gen_stub_pyfunction;
 use sortedlist_rs::SortedList;
-use pyo3_stub_gen::{derive::gen_stub_pyfunction};
+use std::collections::HashSet;
 
-use crate::detection_template_list::DetectionTemplateList;
 use crate::detection_one::detection_one;
-use crate::periodic_box::PeriodicBox;
+use crate::detection_template_list::DetectionTemplateList;
 use crate::frag_list::FragList;
+use crate::periodic_box::PeriodicBox;
 
 /// Perform the detection algorithm.
 ///
@@ -20,9 +20,8 @@ use crate::frag_list::FragList;
 #[gen_stub_pyfunction]
 #[pyfunction]
 pub fn detection<'py>(
-    #[gen_stub(override_type(type_repr="FragList"))]
-    frag_list: &mut FragList,
-    #[gen_stub(override_type(type_repr="DetectionTemplateList"))]
+    #[gen_stub(override_type(type_repr = "FragList"))] frag_list: &mut FragList,
+    #[gen_stub(override_type(type_repr = "DetectionTemplateList"))]
     detection_template_list: &mut DetectionTemplateList,
     pbc: &PeriodicBox,
     pos: Bound<'py, PyArray<f64, Ix2>>,
@@ -91,7 +90,11 @@ pub fn detection<'py>(
             .get(&vec![frag_i.name.to_string()])
         {
             for uni_rx in uni_rxs {
-                let rx = detection_template_list.reactions.get(uni_rx).unwrap().borrow(py);
+                let rx = detection_template_list
+                    .reactions
+                    .get(uni_rx)
+                    .unwrap()
+                    .borrow(py);
                 let frags = vec![frag_i];
                 if detection_one(&rx, frags, pbc, pos, &mut rng) {
                     skip.insert(*i);
@@ -118,16 +121,18 @@ pub fn detection<'py>(
         // we need to start from every r_max having atom unfortunately, to guarantee that all
         // matches are still findable
         let mut matches = SortedList::new();
-        for frag_atom_index in detection_template_list.frag_name_to_r_max_atoms[&frag_i.name].iter() {
+        for frag_atom_index in detection_template_list.frag_name_to_r_max_atoms[&frag_i.name].iter()
+        {
             let index = frag_i.atoms[*frag_atom_index];
             if index == -1 {
                 // missing optional atom
                 continue;
             }
-            let pos: [f64; 3] = pos
-                .get_item(index as usize)?
-                .extract::<[f64; 3]>()?;
-            for (_, new_match) in tree.within_unsorted(&pos, cutoff.powi(2), &squared_euclidean).unwrap() {
+            let pos: [f64; 3] = pos.get_item(index as usize)?.extract::<[f64; 3]>()?;
+            for (_, new_match) in tree
+                .within_unsorted(&pos, cutoff.powi(2), &squared_euclidean)
+                .unwrap()
+            {
                 if !matches.contains(new_match) {
                     matches.insert(*new_match);
                 }
@@ -197,16 +202,19 @@ pub fn detection<'py>(
                         tri_matches.insert(*c);
                     }
                 }
-                for frag_atom_index in detection_template_list.frag_name_to_r_max_atoms[&frag_j_or_k.name].iter() {
+                for frag_atom_index in
+                    detection_template_list.frag_name_to_r_max_atoms[&frag_j_or_k.name].iter()
+                {
                     let index = frag_j_or_k.atoms[*frag_atom_index];
                     if index == -1 {
                         // missing optional atom
                         continue;
                     }
-                    let pos: [f64; 3] = pos
-                        .get_item(index as usize)?
-                        .extract::<[f64; 3]>()?;
-                    for (_, new_match) in tree.within_unsorted(&pos, cutoff.powi(2), &squared_euclidean).unwrap() {
+                    let pos: [f64; 3] = pos.get_item(index as usize)?.extract::<[f64; 3]>()?;
+                    for (_, new_match) in tree
+                        .within_unsorted(&pos, cutoff.powi(2), &squared_euclidean)
+                        .unwrap()
+                    {
                         if !tri_matches.contains(new_match) {
                             tri_matches.insert(*new_match);
                         }
@@ -222,9 +230,12 @@ pub fn detection<'py>(
                     }
                     let frag_k_or_j = frag_list.get(*k_or_j).unwrap();
                     // get the first reaction that's possible
-                    if let Some(tri_rxs) = detection_template_list
-                        .reactions_by_reactants
-                        .get(&vec![frag_i.name.to_string(), frag_j_or_k.name.to_string(), frag_k_or_j.name.to_string()])
+                    if let Some(tri_rxs) =
+                        detection_template_list.reactions_by_reactants.get(&vec![
+                            frag_i.name.to_string(),
+                            frag_j_or_k.name.to_string(),
+                            frag_k_or_j.name.to_string(),
+                        ])
                     {
                         for tri_rx in tri_rxs {
                             let rx = detection_template_list
@@ -246,9 +257,12 @@ pub fn detection<'py>(
                     if skip.contains(i) {
                         break; // for k_or_j
                     }
-                    if let Some(tri_rxs) = detection_template_list
-                        .reactions_by_reactants
-                        .get(&vec![frag_i.name.to_string(), frag_k_or_j.name.to_string(), frag_j_or_k.name.to_string()])
+                    if let Some(tri_rxs) =
+                        detection_template_list.reactions_by_reactants.get(&vec![
+                            frag_i.name.to_string(),
+                            frag_k_or_j.name.to_string(),
+                            frag_j_or_k.name.to_string(),
+                        ])
                     {
                         for tri_rx in tri_rxs {
                             let rx = detection_template_list
@@ -267,12 +281,7 @@ pub fn detection<'py>(
                             }
                         }
                     };
-
-
                 }
-
-
-
             }
         }
     }

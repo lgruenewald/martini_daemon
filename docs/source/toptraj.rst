@@ -24,61 +24,12 @@ based on this format.
 Making trajectories whole
 -------------------------
 
-:doc:`/autoapi/martini_daemon/BondGraph` has a method ``make_whole``, which can be utilized to make trajectories
-with dynamic bonds whole. Below is a quick script utilizing Martini Daemon's helper classes to make ``out.xtc`` whole
-based on ``out.toptraj``, writing ``whole.xtc``, printing progress to stdout. Do note, that ``BondGraph`` requires
-its argument to be float64, while ``pos`` will be a dtype based on the backend (``float32`` for the default
-``molly_xtc``).
+Martini Daemon provides a minimal CLI for using ``.toptraj`` files to make trajectories whole, using the following
+syntax:
 
 ::
 
-    #!/usr/bin/env python3
-
-    from martini_daemon import TopTrajReader, BondGraph, TrajectoryReader, TrajectoryWriter
-    import sys
-    import numpy as np
-
-    inp = "out"
-    oup = "whole"
-
-    r = TopTrajReader(f"{inp}.toptraj")
-
-    bonds = []
-
-    print()
-    i = 0
-    while (f := r.read_frame()):
-        i += 1
-        bonds.append(f.bonds)
-        sys.stdout.write(f"\033[2K\rReading bonds: {i}")
-    print()
-
-    n_frames = len(bonds)
-    n_atoms = len(r.res_names)
-
-    r.close()
-
-    r = TrajectoryReader(f"{inp}.xtc")
-    w = TrajectoryWriter(f"{oup}.xtc")
-
-    for i in range(n_frames):
-        sys.stdout.write(f"\033[2K\rMaking whole frame: {i+1}/{n_frames+1}")
-        frame = r.read_frame()
-        assert frame is not None
-        step, time, pbc, pos, _ = frame
-        pos = np.array(pos, dtype=np.float64)
-
-        graph = BondGraph(n_atoms)
-        for a, b in bonds[i]:
-            graph.add_bond(a, b)
-        graph.make_whole(pbc, pos)
-
-        w.write_frame(
-            step, time, pbc, pos
-        )
-
-    r.close()
-    w.close()
+    daemon whole -i out.xtc -o whole.xtc -s out.toptraj
 
 Topology analysis
 -----------------

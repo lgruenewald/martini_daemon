@@ -1,10 +1,10 @@
+use crate::fragment::Fragment;
 use ordermap::OrderMap;
+use pyo3::prelude::*;
+use pyo3_stub_gen::{derive::gen_stub_pyclass, derive::gen_stub_pymethods};
 use std::collections::HashMap;
 use std::iter::Iterator;
 use std::ops::IndexMut;
-use pyo3::prelude::*;
-use crate::fragment::Fragment;
-use pyo3_stub_gen::{derive::gen_stub_pyclass, derive::gen_stub_pymethods};
 
 #[gen_stub_pyclass]
 #[pyclass]
@@ -19,8 +19,7 @@ pub struct FragList {
 
 // rust only API
 impl FragList {
-    pub fn values(&self) -> impl Iterator<Item = &Fragment>
-    {
+    pub fn values(&self) -> impl Iterator<Item = &Fragment> {
         self.frag_list.values()
     }
 
@@ -55,11 +54,7 @@ impl FragList {
     ///
     /// Atom indices of -1 for missing optional and forbidden graph nodes.
     /// Will also update the defrag list.
-    pub fn add_fragment(
-        &mut self,
-        name: String,
-        atoms: Vec<isize>,
-    ) -> usize {
+    pub fn add_fragment(&mut self, name: String, atoms: Vec<isize>) -> usize {
         // frag counts
         if let Some(count) = self.frag_counts.get_mut(&name) {
             *count += 1;
@@ -92,13 +87,7 @@ impl FragList {
     ///
     /// Returns None if not found.
     pub fn get_fragment(&mut self, index: usize) -> Option<Fragment> {
-        let frag = self.frag_list.get(&index);
-        match frag {
-            // returns a read only copy
-            // usually there isn't that many atoms per fragment, so this isn't so bad
-            Some(frag) => Some(frag.clone()),
-            None => None,
-        }
+        self.frag_list.get(&index).cloned()
     }
 
     /// Remove a fragment corresponding to frag_id of index.
@@ -111,11 +100,9 @@ impl FragList {
                 // defrag list
                 for atom in frag.atoms {
                     if atom == -1 {
-                        continue
+                        continue;
                     }
-                    self.defrag_list[atom as usize].retain(
-                        |e| *e != frag.frag_id
-                    )
+                    self.defrag_list[atom as usize].retain(|e| *e != frag.frag_id)
                 }
                 // frag counts
                 *self
@@ -164,6 +151,6 @@ impl FragList {
     ///
     /// Will make a copy, so should not be called often.
     pub fn get_all_frag_ids(&self) -> Vec<usize> {
-        self.frag_list.keys().map(|key| *key).collect()
+        self.frag_list.keys().copied().collect()
     }
 }

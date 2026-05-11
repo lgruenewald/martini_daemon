@@ -1,9 +1,8 @@
 use numpy::{PyReadwriteArray2, PyUntypedArrayMethods};
-use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
-use std::collections::{HashSet};
+use pyo3::prelude::*;
 use pyo3_stub_gen::{derive::gen_stub_pyclass, derive::gen_stub_pymethods};
-
+use std::collections::HashSet;
 
 use crate::periodic_box::PeriodicBox;
 
@@ -11,7 +10,7 @@ use crate::periodic_box::PeriodicBox;
 #[pyclass]
 pub struct BondGraph {
     n_atoms: usize,
-    bonds: Vec<HashSet<usize>>
+    bonds: Vec<HashSet<usize>>,
 }
 
 #[gen_stub_pymethods]
@@ -24,7 +23,7 @@ impl BondGraph {
     pub fn new(n_atoms: usize) -> Self {
         BondGraph {
             n_atoms,
-            bonds: (0..n_atoms).map(|_| HashSet::new()).collect()
+            bonds: (0..n_atoms).map(|_| HashSet::new()).collect(),
         }
     }
 
@@ -46,12 +45,16 @@ impl BondGraph {
     ///
     /// Performs a depth-first traversal of the bond graph and mutates pos, so each bond discovered
     /// is made as short as possible by translating by whole multiples of the periodic box vectors.
-    pub fn make_whole<'py>(&self, pbc: &PeriodicBox, mut pos: PyReadwriteArray2<f64>) -> PyResult<()> {
+    pub fn make_whole(&self, pbc: &PeriodicBox, mut pos: PyReadwriteArray2<f64>) -> PyResult<()> {
         if pos.shape()[0] != self.n_atoms {
-            return Err(PyValueError::new_err("Supplied positions have wrong dimension. Is the number of atoms correct?"));
+            return Err(PyValueError::new_err(
+                "Supplied positions have wrong dimension. Is the number of atoms correct?",
+            ));
         }
         if pos.shape()[1] != 3 {
-            return Err(PyValueError::new_err("Supplied positions second dimension is not 3."))
+            return Err(PyValueError::new_err(
+                "Supplied positions second dimension is not 3.",
+            ));
         }
         let pos = pos.as_slice_mut()?;
 
@@ -62,20 +65,19 @@ impl BondGraph {
             }
 
             let mut stack: Vec<(usize, [f64; 3])> = Vec::new();
-            stack.push((i, [pos[i*3 + 0], pos[i*3 + 1], pos[i*3 + 2]]));
+            stack.push((i, [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]]));
 
-            while stack.len() > 0 {
-                let (c, reference) = stack.pop().unwrap();
+            while let Some((c, reference)) = stack.pop() {
                 if visited[c] {
                     continue;
                 }
-                let cpos: [f64; 3] = pos[c*3..(c+1)*3].try_into()?;
-                pos[c*3..(c+1)*3].copy_from_slice(&pbc.move_to(reference, cpos));
+                let cpos: [f64; 3] = pos[c * 3..(c + 1) * 3].try_into()?;
+                pos[c * 3..(c + 1) * 3].copy_from_slice(&pbc.move_to(reference, cpos));
 
                 visited[c] = true;
 
                 for j in self.bonds[c].iter() {
-                    stack.push((*j, pos[c*3..(c+1)*3].try_into()?));
+                    stack.push((*j, pos[c * 3..(c + 1) * 3].try_into()?));
                 }
             }
         }
@@ -108,8 +110,7 @@ impl BondGraph {
     pub fn reachable_from(&self, atoms: HashSet<usize>) -> HashSet<usize> {
         let mut res: HashSet<usize> = HashSet::new();
         let mut stack: Vec<usize> = atoms.into_iter().collect();
-        while stack.len() > 0 {
-            let atom = stack.pop().unwrap();
+        while let Some(atom) = stack.pop() {
             if res.contains(&atom) {
                 continue;
             }

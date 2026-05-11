@@ -588,8 +588,7 @@ static char *on_frame_change(
     int res = Tcl_VarEval(interp, "molinfo ", molid, " get frame", NULL);
     CHECK_RES("molinfo get frame")
     int64_t c_frame = atol(Tcl_GetStringResult(interp));
-    if (c_frame < 0 || (size_t)c_frame > toptraj->n_frames) {
-        printf("TOPTRAJ FATAL: Frame %li is out of range for the loaded .toptraj.\n", c_frame);
+    if (c_frame < 0 || (size_t)c_frame >= toptraj->n_frames) {
         return NULL;
     }
 

@@ -21,7 +21,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-
 //! `build.rs` - Generates a full version string at compile time.
 //!
 //! ## Purpose:
@@ -54,11 +53,9 @@ fn get_git_version() -> Option<String> {
         .ok()
         .filter(|output| output.status.success())
         .and_then(|output| {
-            let commit_hash = String::from_utf8(output.stdout)
+            String::from_utf8(output.stdout)
                 .ok()
-                .map(|s| s.trim().to_string());
-
-            commit_hash
+                .map(|s| s.trim().to_string())
         });
 
     let is_dirty = Command::new("git")
@@ -86,7 +83,6 @@ fn set_build_version() {
     }
 
     full_version.push_str(&format!("{build_date})"));
-    
+
     println!("cargo:rustc-env=BUILD_VERSION={}", full_version);
 }
-

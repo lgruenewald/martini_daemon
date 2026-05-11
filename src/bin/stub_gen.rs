@@ -1,5 +1,5 @@
-use pyo3_stub_gen::Result;
 use martini_daemon::stub_info;
+use pyo3_stub_gen::Result;
 
 // run with cargo run --bin stub_gen
 

@@ -4,7 +4,7 @@ import struct
 import zlib
 from collections.abc import Collection
 from dataclasses import dataclass
-from io import SEEK_CUR
+from io import SEEK_CUR, SEEK_SET
 from types import TracebackType
 from typing import Any
 
@@ -285,11 +285,14 @@ class TopTrajWriter:
 
         self.__frame["atoms"] = True
 
-    def write_frame_bonds(self, bonds: BondGraph) -> None:
+    def write_frame_bonds(self, bonds: BondGraph | list[tuple[int, int]]) -> None:
         """
         Write the bonds for the current frame to disk.
 
-        :param bonds: The bonds to write, as a BondGraph object.
+        Note: will automatically remove duplicates, self-bonds
+              and will re-order bonds to have smaller first in each entry.
+
+        :param bonds: The bonds to write, as a BondGraph object or list of (i, j) tuples.
         """
         if self.__frame is None:
             raise ValueError("Must call new_frame() first!")
@@ -305,7 +308,12 @@ class TopTrajWriter:
         raw_bytes += struct.pack("<Q", 0)
         n_bonds = 0
         wrote = set()
-        for i, j in bonds.to_list():
+        if isinstance(bonds, BondGraph):
+            bond_list = bonds.to_list()
+        else:
+            bond_list = bonds
+
+        for i, j in bond_list:
             if i == j:
                 continue
 
@@ -367,10 +375,8 @@ class TopTrajFrame:
     sim_step: int
     sim_time: float
     n_atoms: int
-    names: list[bytes]
-    res_names: list[bytes]
-    res_ids: list[int]
-    atom_types: list[bytes]
+    names: list[str]
+    atom_types: list[str]
     charges: list[float]
     masses: list[float]
     bonds: list[tuple[int, int]]
@@ -393,11 +399,12 @@ class TopTrajReader:
             )
 
         title_len = header[0]
-        (self.title,) = struct.unpack(f"<{title_len}s", header[1 : 1 + title_len])
+        title, = struct.unpack(f"<{title_len}s", header[1 : 1 + title_len])
+        self.title: str = title.decode("utf-8")
         i = 1 + title_len
         (n_init,) = struct.unpack("<I", header[i : i + 4])
         i += 4
-        self.initial_molecules: list[tuple[bytes, int, int]] = []
+        self.initial_molecules: list[tuple[str, int, int]] = []
         for _ in range(n_init):
             name_len = header[i]
             i += 1
@@ -405,9 +412,10 @@ class TopTrajReader:
             i += name_len
             (n, n_atoms_per) = struct.unpack("<II", header[i : i + 8])
             i += 8
-            self.initial_molecules.append((name, n, n_atoms_per))
+            self.initial_molecules.append((name.decode("utf-8"), n, n_atoms_per))
 
         (n_atoms,) = struct.unpack("<I", header[i : i + 4])
+        self.n_atoms = n_atoms
         i += 4
         i, self.res_names = self.__read_strings(header, i, n_atoms)
         i, self.res_ids = self.__read_any(header, i, n_atoms, "<I", 4)
@@ -426,21 +434,26 @@ class TopTrajReader:
     ) -> None:
         self.close()
 
-    def skip_frame(self) -> None:
+    def skip_frame(self) -> bool:
         """
         Skip a single frame.
 
-        Note: if already at the end, will silently do nothing.
+        :return: True if a frame was skipped, False if already at the end of the file.
         """
         chunk_len_bytes = self.__handle.read(8)
         if len(chunk_len_bytes) == 0:
-            return
+            return False
         (chunk_len,) = struct.unpack("<Q", chunk_len_bytes)
         self.__handle.seek(8 + chunk_len + 4, SEEK_CUR)
+        return True
 
     def tell(self) -> int:
         """Return the current position in the file."""
         return self.__handle.tell()
+
+    def seek(self, pos: int) -> None:
+        """Set the reader to position, as returned by tell()."""
+        self.__handle.seek(pos, SEEK_SET)
 
     def __read_chunk(self) -> bytes | None:
         chunk_len_bytes = self.__handle.read(8)
@@ -466,13 +479,15 @@ class TopTrajReader:
 
     def __read_strings(
         self, content: bytes, i: int, n_atoms: int
-    ) -> tuple[int, list[bytes]]:
+    ) -> tuple[int, list[str]]:
         """Read n pascal strings."""
         res = []
         for _ in range(n_atoms):
             len_ = content[i]
             i += 1
-            res.append(struct.unpack(f"<{len_}s", content[i : i + len_])[0])
+            bytes_: bytes
+            bytes_, = struct.unpack(f"<{len_}s", content[i : i + len_])
+            res.append(bytes_.decode("utf-8"))
             i += len_
         return i, res
 
@@ -519,8 +534,6 @@ class TopTrajReader:
             sim_time,
             n_atoms,
             names,
-            self.res_names,
-            self.res_ids,
             types,
             charges,
             masses,

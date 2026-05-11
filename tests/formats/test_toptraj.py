@@ -78,10 +78,14 @@ def test_toptraj_writer(rootdir: str) -> None:
 
     print("reading from file and verifying")
     with TopTrajReader(tmp_file) as r:
-        assert r.title == b"example title"
-        assert r.initial_molecules[0] == (b"a", 1, 1)
-        assert r.initial_molecules[1] == (b"b", 2, 1)
-        assert r.initial_molecules[2] == (b"c", n_atoms - 3, 1)
+        assert r.title == "example title"
+        assert r.initial_molecules[0] == ("a", 1, 1)
+        assert r.initial_molecules[1] == ("b", 2, 1)
+        assert r.initial_molecules[2] == ("c", n_atoms - 3, 1)
+
+        for j in range(r.n_atoms):
+            assert r.res_names[j] == res_names[j]
+            assert r.res_ids[j] == res_ids[j]
 
         for i, frame in enumerate(frames):
             if i % 5 == 0:
@@ -95,12 +99,10 @@ def test_toptraj_writer(rootdir: str) -> None:
             assert isclose(f.sim_time, i * 0.1, rel_tol=1e-5)
             assert f.n_atoms == frame["n_atoms"]
             for j in range(f.n_atoms):
-                assert f.names[j] == frame["names"][j].encode("utf-8")
-                assert f.res_names[j] == res_names[j].encode("utf-8")
-                assert f.atom_types[j] == frame["types"][j].encode("utf-8")
+                assert f.names[j] == frame["names"][j]
+                assert f.atom_types[j] == frame["types"][j]
                 assert isclose(f.charges[j], frame["charges"][j], rel_tol=1e-5)
                 assert isclose(f.masses[j], frame["masses"][j], rel_tol=1e-5)
-                assert f.res_ids[j] == res_ids[j]
             assert len(f.bonds) == len(frame["bonds"].to_list())
             # Note: if this fails in the future, consider if the order (i, j) and (j, i) is not inverted
             # currently there is a fixed order in to_list, which the writer also calls, so a simple equality is fine
