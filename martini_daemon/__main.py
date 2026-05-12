@@ -106,9 +106,9 @@ def whole(args: list[str]) -> int:
         description="Make a trajectory whole using a .toptraj file",
         add_help=False
     )
-    parser.add_argument("-i", required=True, help="input trajectory file")
-    parser.add_argument("-o", required=True, help="output trajectory file")
-    parser.add_argument("-s", required=True, help="structure (toptraj file)")
+    parser.add_argument("-i", "--input", required=True, help="input trajectory file")
+    parser.add_argument("-o", "--output", required=True, help="output trajectory file")
+    parser.add_argument("-s", "--topology", required=True, help="topology (toptraj file)")
     parsed_args = parser.parse_args(args)
     inp = parsed_args.i
     oup = parsed_args.o
@@ -166,15 +166,15 @@ def whole(args: list[str]) -> int:
     print()
     return 0
 
-def parse_slice(slice: str, n: int) -> tuple[int, int, int]:
+def parse_slice(slice_: str, n: int) -> tuple[int, int, int]:
     """Parse a slice string into start, end and step slice."""
 
-    if len(slice) == 0:
+    if len(slice_) == 0:
         return 0, n, 1
     else:
-        toks = slice.split(":")
+        toks = slice_.split(":")
         if len(toks) == 1:
-            i = int(slice)
+            i = int(slice_)
             return i, i+1, 1
         elif 2 <= len(toks) <= 3:
             start = int(toks[0]) if toks[0] != "" else 0
@@ -195,8 +195,8 @@ def select(args: list[str]) -> int:
         description="Select atoms and/or frames for a .toptraj file",
         add_help=False
     )
-    parser.add_argument("-i", required=True, help="input toptraj file")
-    parser.add_argument("-o", required=True, help="output toptraj file")
+    parser.add_argument("-i", "--input", required=True, help="input toptraj file")
+    parser.add_argument("-o", "--output", required=True, help="output toptraj file")
     parser.add_argument("-a", "--atoms", required=False, help="atom selection (start:stop:step)")
     parser.add_argument("-f", "--frames", required=False, help="frame selection (start:stop:step)")
     parsed_args = parser.parse_args(args)
@@ -297,6 +297,57 @@ def select(args: list[str]) -> int:
 
     return 0
 
+def logo():
+    print(r"""@                                                         %                     
+@@                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ %                      
+@ @        @@@@@@                                       %   @@@@               @
+   @       @@@@                                        %   @@@@@             @@@
+ @   @      @@          @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ @@  @            @@ @@
+ @     @@@@@@@@   ......... ...................}......}     @@          @@@   @@
+  @       @@@@ @ ..... .......................]........}...@@@@@@@@@@@@       @ 
+   @      @ @@  @@  . .........................}.......]..@ @@               @@ 
+    @     @  @@   @ ........................]<<.:<___<].)@ @@@              @@  
+     @     @  @@   @ . ....................)......]....@   @@             @@    
+      @    @  @@    @  ....................].......[.=@    @@            @@     
+        @@  @@@@     @@.....................}......^@@     @@          @@       
+           @@@@        @....................<{)_{~@@        @@@@@@@@@@@         
+                         @.................%~... @                              
+                          @...............%.. ..@                               
+                           @.............%....@@                                 
+                             @..........%..@@@                                  
+                               @@@@@@@@@@@ @@                                   
+                                @         @                                     
+                                 @@     @@                                      
+                                   @@@@@                                        
+                                   @  @@                                        
+                                   @  @@                                        
+                                   @  @@                                        
+                                   @  @@                                        
+                                   @  @@                                        
+                                   @  @@                                        
+                                   @  @@                                        
+                                   @  @@                                @@@     
+                                   @  @@                              @@@@      
+                                   @  @@              @@          @@@@@@@       
+                                   @  @@         @@@@@@@@@@  @@@@@@@@@@@        
+                                   @  @@     @@@@@@      @@      @@@@@@         
+                                   @  @@  @@@@@@@         @@   @@@@@@@@         
+                                   @  @@@@@@@@             @@@@@   @@@          
+                               @@@@@  @@@@@@@                       @           
+                         @@@@     @     @@     @@@                              
+                      @@        @        @@@       @                            
+                     @@        @@@@@@@@@@@@         @                           
+                      @@@                           @                           
+                        @@@@@@@                @@@@@                            
+                              @@@@@@@@@@@@@@@@@@                                
+                                                                                
+    __  __            _   _       _    ____                                     
+   |  \/  | __ _ _ __| |_(_)_ __ (_)  |  _ \  __ _  ___ _ __ ___   ___  _ __    
+   | |\/| |/ _` | '__| __| | '_ \| |  | | | |/ _` |/ _ \ '_ ` _ \ / _ \| '_ \   
+   | |  | | (_| | |  | |_| | | | | |  | |_| | (_| |  __/ | | | | | (_) | | | |  
+   |_|  |_|\__,_|_|   \__|_|_| |_|_|  |____/ \__,_|\___|_| |_| |_|\___/|_| |_|  
+""")
+
 def main():
     """The `daemon` CLI main function."""
 
@@ -318,6 +369,9 @@ def main():
             sys.exit(whole(args))
         case "select":
             sys.exit(select(args))
+        case "logo":
+            logo()
+            sys.exit(0)
         case _:
             print(f"Unknown command: {subcommand}")
             print()
