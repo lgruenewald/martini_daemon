@@ -479,6 +479,7 @@ if (res->is_err) { \
             printf("Mol name: %s\n", molname);
             printf("Mol count: %u\n", molcount);
             printf("Atoms per mol: %u\n", atoms_per_mol);
+            free(molname);
         }
 
         int tcl_res;
@@ -517,6 +518,7 @@ if (res->is_err) { \
         }
 
         free_chunk(header);
+        free(atomselect);
 
         // SKIP OVER ALL FRAMES BUT SAVE OFFSETS
         res->cap_frames = 1000;
@@ -562,27 +564,36 @@ static char *on_frame_change(
     (void)flags;
     (void)name1;
     (void)name2;
+
+    // all that needs freeing
+    Chunk *chunk = NULL;
+    char *names = NULL;
+    char *types = NULL;
+    char *charges = NULL;
+    char *masses = NULL;
+    char *bonds = NULL;
+    char *sel = NULL;
+    Vec3 *coords = NULL;
+    
     TopTrajData *toptraj = (TopTrajData *)data;
 
     // GET CURRENT FRAME
     char molid[64];
     snprintf(molid, 64, "%i", toptraj->molid);
 
-
-#define FREE
+    // error handling
 #define CHECK_RES(x) \
     if (res != TCL_OK) {\
-        FREE \
         printf("TOPTRAJ FATAL: Trace failed at " x ": %s\n", Tcl_GetStringResult(interp)); \
-        return NULL; \
+        goto free; \
     }
+
 #define CHECK_TR \
     if (toptraj->is_err) { \
         printf("%s\n", toptraj->error_msg); \
         toptraj->is_err = false; \
         toptraj->error_msg = NULL; \
-        FREE \
-        return NULL; \
+        goto free; \
     }
 
     int res = Tcl_VarEval(interp, "molinfo ", molid, " get frame", NULL);
@@ -599,9 +610,8 @@ static char *on_frame_change(
     res = Tcl_VarEval(interp, "atomselect ", molid, " all frame ", frame_str, NULL);
     CHECK_RES("atomselect")
 
-    char *sel = strdup(Tcl_GetStringResult(interp));
-#undef FREE
-#define FREE free(sel);
+    sel = strdup(Tcl_GetStringResult(interp));
+
     // NUMBER OF ATOMS IN SEL
     res = Tcl_VarEval(interp, sel, " num", NULL);
     CHECK_RES("failed at num")
@@ -613,23 +623,7 @@ static char *on_frame_change(
     main.index = 0;
     main.len = toptraj->fsize - (main.content - toptraj->content);
 
-#undef FREE
-#define FREE \
-    if (chunk != NULL) free_chunk(chunk); \
-    if (names != NULL) free(names); \
-    if (types != NULL) free(types); \
-    if (charges != NULL) free(charges); \
-    if (masses != NULL) free(masses); \
-    if (bonds != NULL) free(bonds); \
-    free(sel);
-
-
-    Chunk *chunk = read_chunk(toptraj, &main);
-    char *names = NULL;
-    char *types = NULL;
-    char *charges = NULL;
-    char *masses = NULL;
-    char *bonds = NULL;
+    chunk = read_chunk(toptraj, &main);
     CHECK_TR
 
     uint32_t frame_number = parse_I(chunk);
@@ -654,23 +648,28 @@ static char *on_frame_change(
     CHECK_TR
 
     // REMOVE PBC BONDS IF NEEDED
-    Vec3 *coords = NULL;
     Vec3 box = {0., 0., 0.};
     // if ignoring bonds that cross pbc, read out the coords
     if (toptraj->remove_pbc_crossing) {
         res = Tcl_VarEval(interp, sel, " get x", NULL);
         if (res != TCL_OK) {
             printf("TOPTRAJ FATAL: failed at get x: %s\n", Tcl_GetStringResult(interp));
+            goto free;
         }
         char *xs = strdup(Tcl_GetStringResult(interp));
         res = Tcl_VarEval(interp, sel, " get y", NULL);
         if (res != TCL_OK) {
             printf("TOPTRAJ FATAL: failed at get y: %s\n", Tcl_GetStringResult(interp));
+            free(xs);
+            goto free;
         }
         char *ys = strdup(Tcl_GetStringResult(interp));
         res = Tcl_VarEval(interp, sel, " get z", NULL);
         if (res != TCL_OK) {
             printf("TOPTRAJ FATAL: failed at get z: %s\n", Tcl_GetStringResult(interp));
+            free(xs);
+            free(ys);
+            goto free;
         }
         char *zs = strdup(Tcl_GetStringResult(interp));
 
@@ -691,6 +690,10 @@ static char *on_frame_change(
         res = Tcl_VarEval(interp, "molinfo ", molid, " get {a b c}", NULL);
         if (res != TCL_OK) {
             printf("TOPTRAJ FATAL: failed at get pbc: %s\n", Tcl_GetStringResult(interp));
+            free(xs);
+            free(ys);
+            free(zs);
+            goto free;
         }
         char *bs = strdup(Tcl_GetStringResult(interp));
         char *bp = bs;
@@ -727,7 +730,15 @@ static char *on_frame_change(
     res = Tcl_VarEval(interp, sel, " delete", NULL);
     CHECK_RES("delete")
 
-    FREE
+free:
+    if (chunk != NULL) free_chunk(chunk);
+    if (names != NULL) free(names);
+    if (types != NULL) free(types);
+    if (charges != NULL) free(charges);
+    if (masses != NULL) free(masses);
+    if (bonds != NULL) free(bonds);
+    if (sel != NULL) free(sel);
+    if (coords != NULL) free(coords);
 
     return NULL;
 }
