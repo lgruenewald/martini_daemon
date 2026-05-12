@@ -223,9 +223,13 @@ def select(args: list[str]) -> int:
     frame_start, frame_end, frame_step = parse_slice(parsed_args.frames or "", len(tells))
 
     if atom_start > atom_end or atom_step < 0:
-        print("Atom selection error - must have a positive step.")
+        raise ValueError("Atom selection error - must have a positive step.")
+    if atom_start > 0 or atom_step != 1:
+        # to fix this, a map of old atom -> new atom indices would need to be made, applied to bonds, and made usable
+        # in e.g. the vmd plugin
+        raise ValueError("Currently, only atom selections starting at 0 and with step 1 are supported.")
     if frame_start > frame_end or frame_step < 0:
-        print("Frame selection error - must have a positive step.")
+        raise ValueError("Frame selection error - must have a positive step.")
 
     res_names = [
         r.res_names[j]
