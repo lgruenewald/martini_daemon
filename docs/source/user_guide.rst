@@ -74,6 +74,19 @@ All output file paths are prefixed with the value passed to the argument ``sim_n
 By default, no final or post-minimization geometry is written. The script should include ``sim.save_geometry(...)``
 calls if this is desired.
 
+Some notes regarding run.py files:
+
+* D/M frequency of 250 is recommended as default. Lower frequencies can create
+  a large performance overhead. Do note, that the D/M frequency will impact
+  reaction rates to an extent, depending on the nature of the system,
+  the reaction and the conditions used.
+
+* Langevin integrators are recommended at the moment, as they are the most tested.
+
+* It is possible to do minimization and equilibration using Martini Daemon as well.
+  A separate ``min+eq.py`` can be made for this purpose, and dm_frequency can be
+  set to 0 to disable reactions.
+
 Including reactions
 -------------------
 
@@ -85,6 +98,9 @@ A typical workflow for adding a reaction consists of the following steps:
 4. A graph for the reactant should be constructed. This lets Martini Daemon recognize which beads together form a
    reactive functional group (**fragment**).
 5. A reaction template should be defined. This consists of reaction conditions and topology modifications.
+6. Reaction templates should be fine-tuned to get the desired conditions, rates and products.
+   Note, that the time scale of MD simulations may require compromises, such as unrealistically
+   high rates. However, a detailed discussion of this is beyond the scope of this document.
 
 This User Guide focuses on steps 4 and 5. The end result of these steps is a reaction template (``.rx``) file, containing
 graph definitions, reaction conditions and topology modifications.
@@ -121,25 +137,28 @@ The define ``DAEMON`` is always defined for Martini Daemon, so ``.rx`` files sho
 
 This ensures that the same ``.top`` file can be used with GROMACS and Martini Daemon without modification.
 
-Creating reactant graphs
-------------------------
+Fragments
+---------
 
-The graph matching algorithm provides a flexible way to define reactants in a flexible manner.
-Each successful graph match will construct a **fragment**, which represents a grouping of beads that can react
-according to reaction templates. The list of fragments at each point of the simulation is a list of known
-reactants in the system.
-
-The graphs specified in input files contain descriptions of a list of beads to match, as well as the interactions
-that connect them. Beads are matched according to name and type filters.
-The matched interactions can be generic (e.g. ``bond``), or specific (e.g. ``harmonic_bond`` or ``morse_bond``).
-All beads should be connected to each other with such interactions.
+Before reactions can be defined, Martini Daemon must identify potential
+reactants in the system. A **fragment** is a group of connected beads representing
+a reactant, matching a pre-defined pattern. They can be thought of as a separate
+*layer* on top of the simulation, containing only labels for various groups of atoms.
+The complete list of fragments, updated throughout the simulation,
+represents all potential reactants currently in the system.
+This list is kept up to date using the graph matching algorithm.
+Therefore, fragments are defined in input files as graphs, with node and edge
+filters to match for.
 
 The basic syntax for defining graphs is done using the ``[graph]`` directive.
 Lines within this directive start with a keyword, followed by keyword-specific parameters.
 All graphs must be given a name using the ``name`` keyword.
-Beads to be matched should be defined with the ``atom`` keyword,
+Beads to be matched (graph nodes) should be defined with the ``atom`` keyword,
 followed by the graph node name, the name filter, and the type filter.
 The graph node name is the name that will be used to refer to that bead in ``.rx`` input files.
+The matched interactions (graph edges) can be generic (e.g. ``bond``),
+or specific (e.g. ``harmonic_bond`` or ``morse_bond``).
+All beads should be connected to each other with such interactions.
 
 Below is a simple example, where a bead representing an alcohol (name: ROH, type: SP3) is matched.
 Another bead is included for angle conditions and angle forces.

@@ -1,18 +1,18 @@
-
 Frequently Asked Questions
 ==========================
 
-Which Martini .top files are supported
---------------------------------------
+Which Martini .top files are supported?
+---------------------------------------
 
-More than other OpenMM implementations of ``.top`` parsing to date, but not fully everything!
+More than other OpenMM implementations of ``.top`` (Gromacs Topology format) parsing to date,
+but there are some things still missing.
 
-Example things missing:
+Unsupported features include:
 
-* nrexcl > 1 (not used in Martini)
+* nrexcl != 1 (number relative exclusions, used to generate exclusions for second or third indirect neighbors, not used in Martini)
 * LJ fudge in ``[defaults]`` (not present in Martini's force field itp)
 * ``[bondtypes]``, ``[angletypes]``, ``[dihedraltypes]``, ``[constrainttypes]`` (uncommon in Martini)
-* Tabulated bonds (might be used rarely)
+* Tabulated bonds (uncommon)
 * Things you would define in an ``.mdp`` need defining in terms of OpenMM objects (e.g. coupling, PME), which might
   need some extra work in some cases.
 
@@ -21,32 +21,34 @@ An easy method to check if your system is supported is to try it, and see if the
 Specifying the GPU and CPU cores to use
 ---------------------------------------
 
-Pass ``context_parameters={"DeviceIndex": "0"}`` to the constructor of ``Simulation`` to choose GPU 0.
+Pass ``context_parameters={"DeviceIndex": "0"}`` to the constructor of :doc:`/autoapi/martini_daemon/Simulation` to choose GPU 0.
 If passing context parameters, it is also recommended to specify the platform (e.g. ``platform="CUDA"``) when
 constructing ``Simulation``.
 
 Selecting CPU cores for the simulation can be done with the ``taskset`` command. For example,
 ``taskset -c 0-63:2 python3 run.py`` will limit run.py to even numbered cores 0 to 62.
-Typically when using a GPU platform, such as CUDA in OpenMM, virtually all the work is performed on the GPU though,
-meaning CPU consumption should never be very high when running simulations.
+Note that when using a GPU platform (e.g. CUDA) in OpenMM,
+typically almost all the work is performed on the GPU,
+meaning CPU consumption is typically not high when running simulations.
 
-Using Martini Daemon as a ``.top`` file parser for OpenMM
----------------------------------------------------------
+Can I use Martini Daemon as only a ``.top`` file parser for OpenMM?
+-------------------------------------------------------------------
 
 Since Martini Daemon implements a large superset of the ``.top`` format, and allows the user to extend it
-with custom bond types (see :doc:`/extending`), you might want to use Martini Daemon even for simulations containing
-no reactions. If you would like to use the OpenMM Simulation object and OpenMM Reporters, it is possible to export
-the OpenMM System and Topology objects from Martini Daemon. Here is a quick script template doing that:
+with custom bond types (see :doc:`/extending`),
+there is reasons to try using Martini Daemon even for simulations containing no reactions.
+If you would like to use the OpenMM Simulation object and OpenMM Reporters, it is possible to export
+the OpenMM System and Topology objects. Here is a quick script template doing that:
 
 ::
 
     #!/usr/bin/env python3
 
-    import martini_daemon as daemon
+    import martini_daemon
     import openmm as mm
     import openmm.app as mmapp
 
-    daemon_sim = daemon.Simulation(
+    daemon_sim = martini_daemon.Simulation(
         "system.top", "system.gro",
         sim_name="out",
         # We won't be using Martini Daemon to simulate, so this does not matter
@@ -57,10 +59,8 @@ the OpenMM System and Topology objects from Martini Daemon. Here is a quick scri
     top = daemon_sim.get_openmm_topology()
     sys = daemon_sim.system.get_openmm_system()
 
-    # Do not use daemon simulation any more if using sys on your own!
-    del daemon_sim
-
     # Feel free to do with top and sys as you would with any OpenMM Topology and System instance
+    # Note: do not use daemon_sim any more, once putting sys in an OpenMM simulation.
     sim = mmapp.Simulation(
         top, sys, mm.VerletIntegrator(0.02), mm.Platform.getPlatformByName("CUDA")
     )
@@ -71,7 +71,8 @@ the OpenMM System and Topology objects from Martini Daemon. Here is a quick scri
 
 Additional note: if a ``.gro`` file is not specified, Martini Daemon will still parse the ``.top`` file,
 but it will not initialize a context. The system returned by ``get_openmm_system()`` will then not
-have the default PBC vectors set to the PBC described in the ``.gro`` file. You will have to do that
+have the default periodic box (PBC) vectors set to the
+PBC described in the ``.gro`` file. You will have to do that
 yourself in that case.
 
 Periodic Boundary Conditions
@@ -100,8 +101,8 @@ Martini Daemon handles the periodic boundary condition:
       to be modified during reactions.
 
 
-Limitations
------------
+Current Limitations
+-------------------
 
 * The number of particles cannot change during reactions.
 
@@ -115,7 +116,7 @@ Limitations
       due to the conservation of mass.
 
     * This limitation can be bypassed with some creativity, such as converting to/from solvent molecules.
-      Note: Beads with no interaction with anything seem to not work as of now.
+      Note: Beads with no interaction with anything else in the system do not currently work.
 
 * Constraints and virtual sites cannot be created or removed during reactions.
 
@@ -143,7 +144,7 @@ Duplicate exclusion error
 OpenMM does not allow the addition of multiple exclusions between two particles. Here is how Martini Daemon handles
 this, and when you will get a duplicate exclusion error.
 
-* Exclusions are of course generated also for bonds, based on the nrexcl entry in ``[moleculetype]``.
+* Exclusions are of course generated also for bonds, based on the nrexcl entry (comes after the molecule name, always 1 for Martini) in ``[moleculetype]``.
 
 * When starting a simulation for the first time, if multiple exclusions are specified in the ``[moleculetype]``
   directive, only one will be added between any pair of particles.
@@ -174,22 +175,37 @@ the following things can be done:
 * If this fails, try :doc:`/autoapi/martini_daemon/LocalMinimizer`, it may help in some cases.
 
 
-Indexing
---------
+Are atoms 0-indexed or 1-indexed?
+---------------------------------
 
-Different things are 0 and 1 indexed.
+Both. Depends on where:
 
-* GROMACS file formats, such as itp or gro are 1 indexed
-* In .rx files, to mirror itp, reactants are 1 indexed
-* Error messages during parsing of itp files should be 1 indexed
-* Atom indices through the python API, and in Martini Daemon-specific output files are typically 0 indexed
+* GROMACS file formats, such as itp or gro are 1-indexed.
 
-When are trajectory frames written
-----------------------------------
+* In .rx files, to mirror itp, reactants are 1-indexed.
 
-* First frame before any MD steps were done, unless loading from a checkpoint
-* After each traj_frequency MD steps
-* At the end of simulations (no duplicate if it's exactly at traj_frequency)
+* Internally in OpenMM, everything is 0-indexed.
 
-* Simulation.trajectory_frame represents the current frame index being written, if in a reporter currently writing
-  a frame. If a frame is not currently being written, it is the number of frames completed.
+* Atom indices through Martini Daemon's Python API, and in Martini Daemon-specific output files are 0-indexed.
+
+* Error messages during parsing of itp files are 1-indexed (open an issue if you find an exception to this).
+
+* Some error messages (e.g. in test suite) explicitly state indexing.
+
+When are trajectory frames written?
+-----------------------------------
+
+Also see :doc:`/user_guide` section on Reporters.
+
+Trajectory frames are synchronized for all Reporters using the ``on_trajectory_frame`` hook.
+They are written:
+
+* First frame before any MD steps were done, unless loading from a checkpoint,
+
+* After each traj_frequency MD steps,
+
+* At the end of simulations (no duplicate if it's exactly at traj_frequency).
+
+``Simulation.trajectory_frame``` represents the current frame index being written,
+if in a reporter currently writing a frame.
+If a frame is not currently being written, it can be thought of as the number of frames completed.
