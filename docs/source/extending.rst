@@ -11,8 +11,8 @@ Martini Daemon is intended to be extensible. Extending is possible in multiple w
 Creating new reporters
 ----------------------
 
-New reporters should inherit the ``Reporter`` class and override various of its methods. Each of the overridden
-methods implements a callback that is called by ``Simulation`` at certain points during Martini Daemon simulations.
+New reporters should inherit the ``Reporter`` class and override various methods. Each overridden
+method implements a callback called by ``Simulation``.
 :doc:`/autoapi/martini_daemon/Reporter` can be checked for an up-to-date list of possible callbacks. In this section,
 a specific example will be shown, along with explanations. This example will be CustomReporter, which will call
 methods of an imaginary CustomWriter class. This imaginary class is used to hide the complexity of file format
@@ -21,10 +21,11 @@ writers, and to focus on interfacing with Martini Daemon.
 ::
 
     from martini_daemon import Reporter, Simulation
+    import numpy as np
 
     class CustomReporter(Reporter):
         def __init__(self):
-            self.writer: CustomWriter | None = None
+            self.writer = None
 
 One of the main methods to implement is ``on_simulation_start``. Reporters during this callback should open
 their output files and write their headers. If the ``continue_sim`` argument is true, reporters should open
@@ -33,8 +34,8 @@ frame, as can be read from Simulation (``Simulation.current_step`` for the curre
 the current time in ps, ``Simulation.trajectory_frame`` for the number of trajectory frames in the past).
 The output file paths should be obtained using ``Simulation.request_path``, since all Reporters should
 have the simulation name as a prefix to all output file paths. ``Simulation.request_path`` will also back the file
-found at the path up and inform the user of this. If the copy argument of ``Simulation.request_path`` is True,
-the backup process is a copy rather than a move. This should be True if ``continue_sim`` is True.
+found at the path up and inform the user of this. ``Simulation.request_path`` has a second argument, ``continue_sim``
+should be passed to it. By default, the backup does not happen when simulations are continued.
 
 ::
 
@@ -69,7 +70,7 @@ is reported at each frame, using CustomWriter's methods.
             # box is a PeriodicBox instance, CustomWriter might expect e.g. the unit cell vectors as a 3x3 numpy array
             box_np = np.array([box.a, box.b, box.c])
             # collect bonds that pass the filter "bond" or "vsite", convert it to a python list of bonds
-            bond_list: list[tuple[int, int]] = simulation.system.collect_bonds(["vsite", "bond"]).to_list(),
+            bond_list = simulation.system.collect_bonds(["vsite", "bond"]).to_list()
 
             assert self.writer is not None
             # Imaginary method that writes frame metadata, atom positions, periodic box and list of bonds
@@ -85,9 +86,10 @@ is reported at each frame, using CustomWriter's methods.
             # Recommendation: flush every frame
             self.writer.flush()
 
-Resource cleanup happens during ``on_simulation_finish``. It is the assumption that many Reporters will own
-open file handles. This gets called when ``Simulation.finish()`` is called either manually, or when it goes
-out of scope in a ``with Simulation(...) as sim:`` block. Open file handles owned by the Reporter should be closed
+Resource cleanup happens during ``on_simulation_finish``. It is assumed that many Reporters will own
+open file handles. This callback is called when ``Simulation.finish()`` is called either manually, or when it goes
+out of scope in a context manager (``with Simulation(...) as sim:``) block automatically.
+Open file handles owned by the Reporter should be closed
 during this method. The simulation object is still available to query, should some information from it be necessary.
 
 ::
@@ -99,8 +101,17 @@ during this method. The simulation object is still available to query, should so
 Creating new interactions
 -------------------------
 
-For this section, the implementation of Harmonic Bond in Martini Daemon is explained. It can be modified to
-get custom bond, angle or dihedral types. Note: this part of the API is newer and still up to change.
+The following example shows the implementation of Harmonic Bond in Martini Daemon.
+It can be modified to get custom bond, angle or dihedral types.
+Currently, Martini Daemon uses decorators to find all possible interaction types,
+regardless of whether they are defined within Martini Daemon or other libraries
+that import it. This is achieved by having the decorators
+(``@register_available_force``, ``@register_bond_type``, ...)
+mutate a global list of types when the specific file is imported.
+Class instances for these decorated types are then instantiated and their methods
+called appropriately during each simulation.
+
+Note: this part of the API is newer and will likely change.
 
 ::
 
@@ -148,7 +159,8 @@ that must be overridden:
   whether exclusions should be generated by this bond, according to the ``nrexcl`` rule for the moleculetype.
 
 * ``register_available_force`` is a decorator that allows the automatic addition of this force to any Martini Daemon
-  System, if a molecule type references it.
+  System, if a molecule type references it. Note, that if a force is not used by any molecule in the system,
+  the corresponding class is never instantiated.
 
 * ``_add_to_force`` should call the OpenMM function that adds a new interaction, given members and parsed parameters.
   It can be assumed that the force argument is the same as returned by ``_set_force_obj``, but may be modified.
@@ -165,8 +177,7 @@ that must be overridden:
 
 * ``delta_degrees_of_freedom`` should return if the addition of this force changes the number of degrees of freedom in the system (usually 0).
 
-* ``_set_force_obj`` should return the OpenMM force object. This is also called lazily. It may read things out
-  from self.system.
+* ``_set_force_obj`` should return the corresponding OpenMM force object. This is also called lazily. It may read things out from self.system, but not mutate anything.
 
 * ``filters`` should be a set of filters other than the name, which can be used to reference it. Generally, filters
   such as ``bond``, ``angle`` or ``dihedral`` should be specified, as well as other aliases that a force may be
@@ -174,27 +185,33 @@ that must be overridden:
 
 * ``get_name`` should return a unique name for the interaction.
 
-Changing the NonBonded force
-----------------------------
+Changing the non-bonded force
+-----------------------------
 
-In broad terms :doc:`/autoapi/martini_daemon/NonBonded`  (found in the repo at ``/martini_daemon/__forces/nonbonded.py``)
-works as such:
+:doc:`/autoapi/martini_daemon/NonBonded`  (found in the repo at ``/martini_daemon/__forces/nonbonded.py``)
+works as follows:
 
-* The base NonBonded force is a shifted LJ and reaction field electrostatic, with a cutoff. Additionally, it has soft core
+* The base NonBonded force is a shifted Lennard-Jones and reaction field electrostatic, with a cutoff. Additionally, it has soft core
   parameters, that can be "toggled on" by changing the values away from the default.
 * The parsed nonbonded params directive result from parsing the ``.top`` is put into ``system.additional_data["nb_types"]``.
   This is read by ``NonBonded`` into a Discrete 2D table of OpenMM.
 * ``ExclusionHelper`` handles storing exclusions, as well as adding reaction field corrections to the energy.
+  This class is instantiated by ``NonBonded`` and they mutually reference eachother. ``Simulation`` calls
+  a specific method of ``NonBonded`` to set this up. ``ExclusionHelper`` itself is also a force object,
+  with name ``exclusion``, and is added to ``System`` as a force of its own.
 
-There is no proper API to only change the NonBonded function. Nevertheless, it can be changed.
-
-* Make a subclass of NonBonded that overrides everything. Copy the implementation and edit it.
-* Pass the modified class as the argument ``nonbonded`` to Simulation.
+The current API for changing out the non-bonded force is still rudimentary.
+``Simulation`` has a ``nonbonded`` argument, to which the non-bonded force
+for the simulation can be passed. The user can make a subclass of ``NonBonded``
+and override methods for custom non-bonded forces. However, only one non-bonded
+force is currently supported, and it must follow the same interface as ``NonBonded``.
+Therefore, copying the implementation and editing it might be the best way to
+go currently.
 
 Adding new directives
 ---------------------
 
-In broad terms:
+To add new directives:
 
 * Custom directives should inherit the :doc:`/autoapi/martini_daemon/Directive` class.
 * Custom directives need to be registered using ``@register_directive``.
