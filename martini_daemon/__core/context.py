@@ -163,6 +163,8 @@ class Context:
         pos = state.getPositions(asNumpy=True).value_in_unit_system(
             md_unit_system
         )  # nm
+        assert pos.dtype == np.float64
+        assert pos.shape == (self.N, 3)
         if np.any(np.abs(pos) > 2147483.0):
             # would be too large to store without remaindering, so likely
             # the system blew up
@@ -180,9 +182,12 @@ class Context:
         :return: velocities, in nanometers/ps.
         """
         state = self.__context.getState(velocities=True)
-        return state.getVelocities(asNumpy=True).value_in_unit_system(
+        vel = state.getVelocities(asNumpy=True).value_in_unit_system(
             mm.unit.md_unit_system
         )  # nm / ps
+        assert vel.dtype == np.float64
+        assert vel.shape == (self.N, 3)
+        return vel
 
     def get_energies(self) -> tuple[float, float, float]:
         """
