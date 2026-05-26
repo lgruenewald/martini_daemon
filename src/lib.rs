@@ -10,6 +10,7 @@ mod detection_template_list;
 mod frag_list;
 mod fragment;
 mod periodic_box;
+mod toptraj;
 
 #[gen_stub_pyfunction]
 #[pyfunction]
@@ -29,6 +30,9 @@ fn rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<detection_template::DetectionTemplate>()?;
     m.add_class::<detection_template_list::DetectionTemplateList>()?;
     m.add_class::<bond_graph::BondGraph>()?;
+    m.add_class::<toptraj::TopTrajFrame>()?;
+    m.add_class::<toptraj::TopTrajReader>()?;
+    m.add_class::<toptraj::TopTrajWriter>()?;
     m.add_function(wrap_pyfunction!(detection::detection, m)?)?;
     m.add_function(wrap_pyfunction!(build_version, m)?)?;
     Ok(())
