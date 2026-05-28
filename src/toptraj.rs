@@ -1,5 +1,6 @@
 // WIP - this file is currently not used, martini_daemon/__formats/top_traj.py is used
 
+#![allow(dead_code, unused)]
 use flate2::Compression;
 use flate2::Crc;
 use flate2::read::ZlibDecoder;
