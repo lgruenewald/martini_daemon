@@ -430,6 +430,7 @@ class Simulation:
         if self.__finished:
             return
         self.__finished = True
+        self.info(".finish() called, closing output files.")
         for r in self.__reporters:
             r.on_simulation_finish(self)
         self.log.close()
@@ -544,7 +545,9 @@ class Simulation:
                     ),
                 )
                 skip_1 = False
+            self.info("Writing final trajectory frame")
             self.__do_traj_frame()
+            self.info(f"Simulation of {remaining} steps finished successfully")
             print()
         except Exception as e:
             self.error(f"Unexpected Exception: {e}")
