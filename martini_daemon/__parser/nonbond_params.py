@@ -28,7 +28,7 @@ class NonbondParams(Directive):
 
     @classmethod
     def is_unique(cls) -> bool:
-        return True
+        return False
 
     @classmethod
     def is_valid_parent(cls, parent: Directive) -> bool:
