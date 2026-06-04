@@ -104,3 +104,4 @@ def write_gro(
                 file.write(f"{cvel[0]:8.4f}{cvel[1]:8.4f}{cvel[2]:8.4f}")
             file.write("\n")
         file.write(box.to_gro())
+        file.write("\n")

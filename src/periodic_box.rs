@@ -98,10 +98,10 @@ impl PeriodicBox {
     /// Space separated list of the diagonal a.x, b.y, c.z, and then the remaining a.y, a.z, b.x, b.z, c.x, c.y.
     pub fn to_gro(&self) -> String {
         if self.b.x == 0. && self.c.x == 0. && self.c.y == 0. {
-            format!("{} {} {}", self.a.x, self.b.y, self.c.z)
+            format!(" {:9.5} {:9.5} {:9.5}", self.a.x, self.b.y, self.c.z)
         } else {
             format!(
-                "{} {} {} {} {} {} {} {} {}",
+                " {:9.5} {:9.5} {:9.5} {:9.5} {:9.5} {:9.5} {:9.5} {:9.5} {:9.5}",
                 self.a.x,
                 self.b.y,
                 self.c.z,
