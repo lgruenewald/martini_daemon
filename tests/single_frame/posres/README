@@ -1,4 +1,4 @@
-An equilibrated box with a coarse grained (elastic network) trypsin with
+An equilibrated box with a coarse grained (elastic network) protein with
 position restraints.
 
 posres.gro contains the position restraint coordinates, and they are

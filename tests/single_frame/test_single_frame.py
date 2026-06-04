@@ -61,7 +61,7 @@ tests = [
     "pairs_VWQ",
     "pairs_type",
     # biomolecule tests
-    "trypsin",
+    "elastic",
     "posres",
     # polymer tests
     "polyurethane",

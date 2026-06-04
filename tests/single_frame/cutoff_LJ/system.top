@@ -1,4 +1,4 @@
-#include "/martini/aster/martini_daemon/itp/martini_v3.0.0.itp"
+#include "../../../itp/martini_v3.0.0.itp"
 
 [ moleculetype ] 
 AA 1 

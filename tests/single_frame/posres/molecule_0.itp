@@ -1,5 +1,5 @@
 ; This file was generated using the following command:
-; /home/aster/.local/miniconda3/envs/martini/bin/martinize2 -f trypsin_clean.pdb -o trypsin_CG.top -x trypsin_CG.pdb -ff martini3001 -p backbone -elastic -ef 700.0 -el 0.5 -eu 0.9 -ea 0 -ep 0 -scfix -cys auto
+; /home/aster/.local/miniconda3/envs/martini/bin/martinize2 -f clean.pdb -o elastic_CG.top -x elastic_CG.pdb -ff martini3001 -p backbone -elastic -ef 700.0 -el 0.5 -eu 0.9 -ea 0 -ep 0 -scfix -cys auto
 ; martinize with vermouth 0.11.0
 
 ; Please cite the following papers:
