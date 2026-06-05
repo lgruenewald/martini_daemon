@@ -133,6 +133,7 @@ class Context:
         :param max_steps: maximum number of minimization steps. If 0, minimization will be performed until it
             converges.
         """
+        self.__reinitialize()
         mm.LocalEnergyMinimizer.minimize(self.__context, tolerance, max_steps)
 
     def apply_constraints(self, tol: float = 1e-10) -> None:

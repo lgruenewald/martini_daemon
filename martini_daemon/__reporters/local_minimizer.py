@@ -85,11 +85,13 @@ class LocalMinimizer(Reporter):
                 for atom in frag.atoms:
                     if atom != -1:
                         atoms.add(atom)
+
+        if self.r_movable > 0.0:
+            atoms |= box.which_atoms_within_distance(pos, atoms, self.r_movable)
+
         atoms = simulation.system.populate_neighbors(
             atoms, recursive=self.whole_molecule
         )
-        if self.r_movable > 0.0:
-            atoms |= box.which_atoms_within_distance(pos, atoms, self.r_movable)
 
         movable = np.zeros(shape=vel.shape)
         for atom in atoms:
@@ -130,6 +132,82 @@ class LocalMinimizer(Reporter):
         simulation.context.set_current_integrator(old_integrator)
         simulation.info("back")
 
+
+class MaximumDisplacementVerlet:
+    def __init__(
+        self,
+        timestep_ps: float = 0.01,
+        max_step_size_nm: float = 0.005,
+    ) -> None:
+        """
+        Construct a Maximum Displacement Verlet integrator.
+
+        :param max_step_size_nm: Maximum step size during a single time step.
+        """
+        assert max_step_size_nm > 0., "Maximum step must be larger than 0."
+
+        self.global_variables = {
+            "x_sum": 0,
+            "v_sum": 0,
+            "fnorm2": 0,
+            "dta": timestep_ps,
+            "maxstep": max_step_size_nm,
+        }
+
+        self.per_dof_variables = {
+            "movable": 0,
+            "x0": 0,
+        }
+
+        self.integrator = mm.CustomIntegrator(0.0)
+
+        for k, v in self.global_variables.items():
+            self.integrator.addGlobalVariable(k, v)
+
+        for k, v in self.per_dof_variables.items():
+            self.integrator.addPerDofVariable(k, v)
+
+
+        self.integrator.addComputePerDof("x0", "x")
+        self.integrator.addUpdateContextState()
+        self.integrator.addComputePerDof("v", "v+dta*f/m")
+        self.integrator.addConstrainVelocities()
+        self.integrator.addComputePerDof("x", "x+max(min(dta*v*movable, maxstep), -maxstep)")
+        self.integrator.addConstrainPositions()
+        self.integrator.addComputePerDof("v", "(x-x0)/dt")
+
+        self.integrator.addComputeSum("x_sum", "x*movable")
+        self.integrator.addComputeSum("v_sum", "v*movable")
+        self.integrator.addComputeSum("fnorm2", "f*f*movable")
+
+    def _set_movable(self, movable: np.ndarray) -> None:
+        """Set the degrees of freedom that are movable."""
+        self.integrator.setPerDofVariableByName("movable", movable)
+
+    def _has_converged(self) -> bool:
+        """Has the minimization converged."""
+        return False
+
+    def _reset(self, shape: tuple[int, int]) -> None:
+        """Reset the integrator to its initial state."""
+        for k, v in self.global_variables.items():
+            self.integrator.setGlobalVariableByName(k, v)
+
+        for k, v in self.per_dof_variables.items():
+            assert v == 0
+            vals = np.zeros(shape)
+            self.integrator.setPerDofVariableByName(k, vals)
+
+    def _report(self) -> str:
+        """Return a string that would be reported."""
+        return (
+            "\n".join(
+                f"{k}: {self.integrator.getGlobalVariableByName(k)}"
+                for k in self.global_variables
+            )
+            + "\n"
+        )
+        
 
 class LocalGradientDescent:
     def __init__(
