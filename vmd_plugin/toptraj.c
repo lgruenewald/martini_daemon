@@ -254,7 +254,7 @@ static char *read_bonds(Chunk *chunk, size_t n_atoms, long lim, int pbc, Vec3 bo
 
     // sorted list of bonds
     size_t sorted_len = 0;
-    Bond *sorted_bonds = calloc(sizeof(struct bond), 2 * n_bonds);
+    Bond *sorted_bonds = calloc(2 * n_bonds, sizeof(struct bond));
     
     for (size_t i = 0; i < n_bonds; i++)
     {
@@ -367,7 +367,7 @@ static Chunk *read_chunk(TopTrajData *data, Chunk *main) {
         crc32
     );
 
-    Chunk *chunk = (Chunk *)calloc(sizeof(Chunk), 1);
+    Chunk *chunk = (Chunk *)calloc(1, sizeof(Chunk));
     chunk->content = content;
     chunk->len = len_decomp;
     chunk->index = 0;
@@ -423,7 +423,7 @@ static TopTrajData *load_toptraj(Tcl_Interp *interp, const char *path, int molid
     /// While doing so, prints a progress bar on STDOUT.
     /// 
     /// Prints error message to STDERR and returns NULL if there is any error.
-    TopTrajData *res = (TopTrajData *)calloc(sizeof(TopTrajData), 1);
+    TopTrajData *res = (TopTrajData *)calloc(1, sizeof(TopTrajData));
     res->is_err = false;
 
     res->molid = molid;
@@ -522,7 +522,7 @@ if (res->is_err) { \
 
         // SKIP OVER ALL FRAMES BUT SAVE OFFSETS
         res->cap_frames = 1000;
-        res->frames = calloc(sizeof(char *), res->cap_frames);
+        res->frames = calloc(res->cap_frames, sizeof(char *));
         res->n_frames = 0;
 
         size_t frame_index = 0;
@@ -673,7 +673,7 @@ static char *on_frame_change(
         }
         char *zs = strdup(Tcl_GetStringResult(interp));
 
-        coords = calloc(sizeof(Vec3), n_atoms);
+        coords = calloc(n_atoms, sizeof(Vec3));
         char *xp = xs;
         char *yp = ys;
         char *zp = zs;
