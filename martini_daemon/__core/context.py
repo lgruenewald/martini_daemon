@@ -134,7 +134,11 @@ class Context:
             converges.
         """
         self.__reinitialize()
-        mm.LocalEnergyMinimizer.minimize(self.__context, tolerance, max_steps)
+        mm.LocalEnergyMinimizer.minimize(
+            self.__context,
+            tolerance=tolerance,
+            maxIterations=max_steps
+        )
 
     def apply_constraints(self, tol: float = 1e-10) -> None:
         """
@@ -219,3 +223,12 @@ class Context:
             .getForces(asNumpy=True)
             .value_in_unit_system(mm.unit.md_unit_system)
         )
+
+    def _get_context(self) -> mm.Context:
+        """
+        Get the raw OpenMM context.
+
+        Protected, because this method only exists
+        to make implementing System._get_context() possible.
+        """
+        return self.__context

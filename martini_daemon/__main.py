@@ -1,10 +1,18 @@
-from argparse import ArgumentParser
-import sys
 import os
+import sys
+from argparse import ArgumentParser
+
 import numpy as np
 
-from .__rust import build_version, BondGraph
-from .__formats import read_checkpoint, TopTrajReader, TrajectoryReader, TrajectoryWriter, TopTrajWriter
+from .__formats import (
+    TopTrajReader,
+    TopTrajWriter,
+    TrajectoryReader,
+    TrajectoryWriter,
+    read_checkpoint,
+)
+from .__rust import BondGraph, build_version
+
 
 def print_help(topic: None | str = None) -> int:
     match topic:
@@ -53,7 +61,7 @@ Takes the following arguments:
     return 0
 
 def info(args: list[str]) -> int:
-    """The `daemon info` CLI."""
+    """Get information about daemon files using the `daemon info` CLI."""
     if len(args) < 1:
         print_help("info")
         return 1
@@ -92,15 +100,19 @@ def info(args: list[str]) -> int:
             first_frame = r.read_frame()
             r.seek(tells[-1])
             last_frame = r.read_frame()
-            print(f"step:                     {first_frame.sim_step}-{last_frame.sim_step}")
-            print(f"time:                     {first_frame.sim_time:.0f}-{last_frame.sim_time:.0f} ps")
+            first_step = f"{first_frame.sim_step}" if first_frame is not None else "n/a"
+            last_step = f"{last_frame.sim_step}" if last_frame is not None else "n/a"
+            first_time = f"{first_frame.sim_time:.0f}" if first_frame is not None else "n/a"
+            last_time = f"{last_frame.sim_time:0.f}" if last_frame is not None else "n/a"
+            print(f"step:                     {first_step}-{last_step}")
+            print(f"time:                     {first_time}-{last_time} ps")
         case _:
             print(f"No info for file extension: {ext}.")
             return 1
     return 0
 
 def whole(args: list[str]) -> int:
-    """The `daemon whole` CLI."""
+    """Make a trajectory whole using the `daemon whole` CLI."""
     parser = ArgumentParser(
         prog="daemon whole",
         description="Make a trajectory whole using a .toptraj file",
@@ -168,28 +180,25 @@ def whole(args: list[str]) -> int:
 
 def parse_slice(slice_: str, n: int) -> tuple[int, int, int]:
     """Parse a slice string into start, end and step slice."""
-
     if len(slice_) == 0:
         return 0, n, 1
-    else:
-        toks = slice_.split(":")
-        if len(toks) == 1:
-            i = int(slice_)
-            return i, i+1, 1
-        elif 2 <= len(toks) <= 3:
-            start = int(toks[0]) if toks[0] != "" else 0
-            if start < 0:
-                start += n
-            end = int(toks[1]) if toks[1] != "" else n
-            if end < 0:
-                end += n
-            step = int(toks[2]) if len(toks) == 3 else 1
-            return start, end, step
-        else:
-            raise ValueError("Too many ':' in slice, up to 2 expected.")
+    toks = slice_.split(":")
+    if len(toks) == 1:
+        i = int(slice_)
+        return i, i+1, 1
+    if 2 <= len(toks) <= 3:
+        start = int(toks[0]) if toks[0] != "" else 0
+        if start < 0:
+            start += n
+        end = int(toks[1]) if toks[1] != "" else n
+        if end < 0:
+            end += n
+        step = int(toks[2]) if len(toks) == 3 else 1
+        return start, end, step
+    raise ValueError("Too many ':' in slice, up to 2 expected.")
 
 def select(args: list[str]) -> int:
-    """The `daemon select` CLI."""
+    """Select frames or atoms using the `daemon select` CLI."""
     parser = ArgumentParser(
         prog="daemon select",
         description="Select atoms and/or frames for a .toptraj file",
@@ -301,7 +310,8 @@ def select(args: list[str]) -> int:
 
     return 0
 
-def logo():
+def logo() -> None:
+    """Print the Martini Daemon logo."""
     print(r"""@                                                         %                     
 @@                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ %                      
 @ @        @@@@@@                                       %   @@@@               @
@@ -352,9 +362,8 @@ def logo():
    |_|  |_|\__,_|_|   \__|_|_| |_|_|  |____/ \__,_|\___|_| |_| |_|\___/|_| |_|  
 """)
 
-def main():
-    """The `daemon` CLI main function."""
-
+def main() -> None:
+    """Parse arguments and run the right subcommand of the `daemon` CLI."""
     if len(sys.argv) < 2:
         print_help()
         sys.exit(1)

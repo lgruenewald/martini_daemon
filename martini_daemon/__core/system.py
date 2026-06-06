@@ -392,7 +392,8 @@ class System:
 
         Called by context to set the default periodic box in System to it, so context can be constructed.
 
-        Protected, but only context should call it. Not a part of the public API, changing this is non-breaking.
+        Protected, but only context should call it.
+        Not a part of the public API, changing this is non-breaking.
         """
         self.__system.setDefaultPeriodicBoxVectors(box.a, box.b, box.c)
 
@@ -403,9 +404,19 @@ class System:
 
         Should only be called by context.
 
-        Protected, but only context should call it. Not a part of the public API, changing this is non-breaking.
+        Protected, but only context should call it.
+        Not a part of the public API, changing this is non-breaking.
         """
         self.__context = context
+
+    def _get_context(self) -> mm.Context | None:
+        """
+        Get the raw OpenMM context.
+
+        Protected, because this method currently exists to support UpdateParametersInContext
+        as a potential future optimization. A better way may be provided in the future.
+        """
+        return self.__context._get_context() if self.__context is not None else None
 
     # PUBLIC API for users and custom Forces
     def toggle_constraints_as_harmonic_bonds(self, harmonic: bool) -> None:

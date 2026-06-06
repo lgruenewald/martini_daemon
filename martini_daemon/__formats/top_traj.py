@@ -226,10 +226,7 @@ class TopTrajWriter:
         raw_bytes += struct.pack("<Q", 0)
         n_bonds = 0
         wrote = set()
-        if isinstance(bonds, BondGraph):
-            bond_list = bonds.to_list()
-        else:
-            bond_list = bonds
+        bond_list = bonds.to_list() if isinstance(bonds, BondGraph) else bonds
 
         for i, j in bond_list:
             if i == j:
