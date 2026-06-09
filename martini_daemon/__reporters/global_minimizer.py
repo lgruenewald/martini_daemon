@@ -72,8 +72,8 @@ class GlobalMinimizer(Reporter):
     def __init__(
         self,
         minimization_steps: int = 50,
-        restraint_force_global: float = 1000,
-        restraint_force_local: float = 50,
+        restraint_force_global: float = 0.0,
+        restraint_force_local: float = 0.0,
         r_movable: float = 0.0,
         whole_molecule: bool = False,
     ) -> None:
@@ -97,15 +97,17 @@ class GlobalMinimizer(Reporter):
 
     def pre_simulation_start(self, simulation: Simulation) -> None:
         assert simulation.integrator is not None
-        self.restraint_force = MinimizationRestraint(simulation.system)
-        simulation.system.add_force(self.restraint_force)
+        if self.k_local > 0.0 or self.k_global > 0.0:
+            self.restraint_force = MinimizationRestraint(simulation.system)
+            simulation.system.add_force(self.restraint_force)
 
     def on_reaction(
         self, simulation: Simulation, reactions: list[tuple[str, list[Fragment]]]
     ) -> None:
         # save velocities
         simulation.info("on_reaction Global Minimizer")
-        assert self.restraint_force is not None
+        if self.k_local > 0.0 or self.k_global > 0.0:
+            assert self.restraint_force is not None
 
         pos, box = simulation.context.get_positions()
         # set movable
@@ -125,9 +127,11 @@ class GlobalMinimizer(Reporter):
         )
         simulation.info("atoms chosen")
 
-        for i in range(simulation.system.num_atoms()):
-            k = self.k_local if i in atoms else self.k_global
-            self.restraint_force.set_atom_restraints(i, k, pos[i, 0], pos[i, 1], pos[i, 2])
+
+        if self.k_local > 0.0 or self.k_global > 0.0:
+            for i in range(simulation.system.num_atoms()):
+                k = self.k_local if i in atoms else self.k_global
+                self.restraint_force.set_atom_restraints(i, k, pos[i, 0], pos[i, 1], pos[i, 2])
 
         simulation.info("restraints set")
         simulation.info("minimization start")
@@ -135,5 +139,6 @@ class GlobalMinimizer(Reporter):
         simulation.context.minimize_energy(max_steps=self.minimization_steps)
 
         simulation.info("minimization finished")
-        self.restraint_force.reset()
+        if self.k_local > 0.0 or self.k_global > 0.0:
+            self.restraint_force.reset()
         simulation.info("restraints reset")
