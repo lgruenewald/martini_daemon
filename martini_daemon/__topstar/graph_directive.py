@@ -1,3 +1,4 @@
+from martini_daemon import ParseException
 import difflib
 
 from ..__core import System
@@ -48,12 +49,50 @@ class GraphDirective(Directive):
                 name_pat = tokens.unwrap(2, "pattern")
                 type_pat = tokens.unwrap(3, "pattern")
                 type_ = keyword_to_GraphAtomType[keyword]
-                self.graph.atoms.append((part_id, name_pat, type_pat, type_))
+                if self.graph.atom_name_to_index.get(part_id) is not None:
+                    raise TokenParseException(
+                        tokens[1],
+                        f"Same graph has already a node called {part_id}."
+                    )
+                self.graph.add_atom(part_id, name_pat, type_pat, type_)
             case "equivalent":
-                parts = {tokens.unwrap(i, "word") for i in range(1, len(tokens))}
+                parts = set()
+                for i in range(1, len(tokens)):
+                    tok = tokens.unwrap(i, "word")
+                    if self.graph.atom_name_to_index.get(tok) is None:
+                        raise TokenParseException(
+                            tokens[i],
+                            f"Node {tok} was not yet defined. Define it before `equivalent`."
+                        )
+                    if tok in parts:
+                        raise TokenParseException(
+                            tokens[i],
+                            f"Node {tok} is specified twice on the same `equivalent` line."
+                        )
+                    parts.add(tok)
                 self.graph.equivalents.append(parts)
             case _:
                 if keyword in self.filters:
+                    parts = []
+                    last_special = None
+                    for i in range(1, len(tokens)):
+                        tok = tokens.unwrap(i, "word")
+                        idx = self.graph.atom_name_to_index.get(tok)
+                        if idx is None:
+                            raise TokenParseException(
+                                tokens[i],
+                                f"Interaction {keyword} references undefined node {tok}."
+                            )
+                        if self.graph.atoms[idx][3] != GraphAtomType.NORMAL:
+                            if last_special is not None:
+                                raise TokenParseException(
+                                    tokens[i],
+                                    f"Interaction {keyword} references more than one "
+                                    + f" optional or forbidden atoms ({last_special}, {tok}). "
+                                    + "Forbidden/optional atoms connected to eachother are not allowed."
+                                )
+                            last_special = tok
+                        parts.append(tok)
                     parts = [tokens.unwrap(i, "word") for i in range(1, len(tokens))]
                     self.graph.interactions.append((keyword, parts))
                 else:

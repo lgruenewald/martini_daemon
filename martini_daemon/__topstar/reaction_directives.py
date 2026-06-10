@@ -35,6 +35,12 @@ class ReactionDirective(MoleculeTypeDirective):
 
     def line(self, tokens: TokenList) -> None:
         name = tokens.unwrap(0, "word")
+        if self.d_template.name is not None and len(self.d_template.name) > 0:
+            raise TokenParseException(
+                tokens[0],
+                f"Reaction already has a name: {self.d_template.name}"
+            )
+        
         self.d_template.name = name
         self.molecule_type.name = name
         tokens.assert_no_more_than(1)

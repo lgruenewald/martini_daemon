@@ -168,13 +168,15 @@ impl DetectionTemplate {
             }
         }
 
-        let all: HashSet<usize> = (0..self.reactants.len()).collect();
-        if let Some(unconnected) = marked.difference(&all).next() {
-            return Err(PyException::new_err(format!(
-                "Reaction {}: Reactants not all connected by r_max. First disconnected reactant index {}.",
-                self.name.clone().unwrap(),
-                *unconnected
-            )));
+        for i in 0..self.reactants.len() {
+            if !marked.contains(&i) {
+                return Err(PyException::new_err(format!(
+                    "Reaction {}: Reactants not all connected by r_max. First disconnected reactant index {} name {}.",
+                    self.name.clone().unwrap(),
+                    i,
+                    self.reactants[i]
+                )));
+            }
         }
         Ok(())
     }

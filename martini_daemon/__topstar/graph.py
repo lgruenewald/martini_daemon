@@ -45,6 +45,13 @@ class Graph:
         self.equivalents: list[set[str]] = []
         self.atom_name_to_index: dict[str, int] = {}
 
+    def add_atom(self, name: str, name_pat: str, type_pat: str, type_: GraphAtomType) -> int:
+        """Add a new atom to the graph and returns its index."""
+        i = len(self.atoms)
+        self.atoms.append((name, name_pat, type_pat, type_))
+        self.atom_name_to_index[name] = i
+        return i
+    
     def finish_init(self) -> None:
         """
         Must be called after parsing the graph and before it's used.
@@ -62,12 +69,9 @@ class Graph:
                 "First atom in graph must be a normal atom (not opt or not)."
             )
         for i, (name, _, _, _) in enumerate(self.atoms):
-            if nodes.get(name) is not None:
-                raise ParseException(
-                    f"Same graph has multiple atoms of the same name: {name}."
-                )
+            assert nodes.get(name) is None
             nodes[name] = set()
-            self.atom_name_to_index[name] = i
+            assert self.atom_name_to_index[name] == i
         for filter_str, atoms in self.interactions:
             if len(atoms) < 2:
                 raise ParseException(
@@ -78,20 +82,11 @@ class Graph:
             for atom in atoms:
                 if self.atoms[self.atom_name_to_index[atom]][3] != GraphAtomType.NORMAL:
                     num_special += 1
-                if nodes.get(atom) is None:
-                    raise ParseException(
-                        f"Interaction {filter_str} for atoms {atoms} "
-                        f"references undefined atom name {atom}."
-                    )
+                assert nodes.get(atom) is not None
                 for other_atom in atoms:
                     if atom != other_atom:
                         nodes[atom].add(other_atom)
-            if num_special > 1:
-                raise ParseException(
-                    f"Interaction {filter_str} for atoms {atoms} "
-                    + "references more than one optional or forbidden atoms. "
-                    + "Grouping forbidden/optional atoms is not supported."
-                )
+            assert num_special <= 1
 
         # if there is more than 1 atom, they all must be connected to at least
         # one other atom with an interaction

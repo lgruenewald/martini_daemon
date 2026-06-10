@@ -1,15 +1,20 @@
 from .directive import Directive
 from .gromacs_top_file import GromacsTopFile, register_directive
-from .token_list import TokenList
+from .token_list import TokenList, TokenParseException
 
 
 @register_directive
 class MoleculesDirective(Directive):
     def line(self, tokens: TokenList) -> None:
         assert isinstance(self.parent, GromacsTopFile)
-        self.parent.system.initial_molecules.append(
-            (tokens.unwrap(0, "word"), tokens.unwrap(1, "int"))
-        )
+
+        key = tokens.unwrap(0, "word")
+        if self.parent.system.molecule_types.get(key) is None:
+            raise TokenParseException(key, f"Molecule {key} was not defined.")
+        
+        self.parent.system.initial_molecules.append((
+            key, tokens.unwrap(1, "int")
+        ))
 
     def finish(self) -> None:
         pass
