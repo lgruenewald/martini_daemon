@@ -718,15 +718,12 @@ class Simulation:
             step_time = (end_time - start_time) / n_steps
             if self.__last_step_time > 0.0:
                 self.__last_step_time = step_time * 0.01 + self.__last_step_time * 0.99
-            elif not traj or not dm:
+            elif self.__first_step_time > 0.0:
                 # step 0 tends to have both xtc and dm as True, and is
                 # usually unrepresentatively slow
                 scale = self.dm_frequency / self.traj_frequency
                 if scale > 1.0:
                     scale = 1.0 / scale
-                if self.__first_step_time == 0.0:
-                    # continuations might not start with an expensive step
-                    scale = 0.0
                 self.__last_step_time = (
                     step_time * (1 - scale) + scale * self.__first_step_time
                 )

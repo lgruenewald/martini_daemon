@@ -71,10 +71,6 @@ def test_integration(x: str, variant: str, rootdir: str) -> None:
             reporters.append(
                 GlobalMinimizer(
                     minimization_steps=50,
-                    restraint_force_global=1000,
-                    restraint_force_local=50,
-                    r_movable=0.0,
-                    whole_molecule=False,
                 )
             )
 
