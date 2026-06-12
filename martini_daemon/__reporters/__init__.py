@@ -6,6 +6,9 @@ from .checkpoint_reporter import (
 )
 from .frag_count_reporter import FragCountReporter as FragCountReporter
 from .fragments_dump import FragmentsDump as FragmentsDump
+from .global_integrator_minimizer import (
+    GlobalIntegratorMinimizer as GlobalIntegratorMinimizer,
+)
 from .global_minimizer import GlobalMinimizer as GlobalMinimizer
 from .local_minimizer import (
     LocalGradientDescent as LocalGradientDescent,

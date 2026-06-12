@@ -5,6 +5,8 @@ import os
 
 import pytest
 
+import openmm as mm
+
 from martini_daemon import (
     CheckpointReporter,
     FragCountReporter,
@@ -17,7 +19,7 @@ from martini_daemon import (
     Simulation,
     TopTrajReporter,
     TrajectoryReporter,
-    VariablesReporter,
+    VariablesReporter, GlobalIntegratorMinimizer,
 )
 
 
@@ -30,7 +32,7 @@ def rootdir(request: pytest.FixtureRequest) -> str:
 tests = ["silica_dummy"]
 
 variation = [
-    "global", "default", "local"
+    "global", "global_integrator", "default", "local"
 ]
 
 
@@ -71,6 +73,16 @@ def test_integration(x: str, variant: str, rootdir: str) -> None:
             reporters.append(
                 GlobalMinimizer(
                     minimization_steps=50,
+                )
+            )
+
+        case "global_integrator":
+            reporters.append(
+                GlobalIntegratorMinimizer(
+                    mm.LangevinMiddleIntegrator(
+                        298, 20, 0.01
+                    ),
+                    n_steps=200
                 )
             )
 
