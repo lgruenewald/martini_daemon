@@ -72,10 +72,10 @@ def info(args: list[str]) -> int:
     base, ext = os.path.splitext(path)
     print(f"path:                     {path}")
     match ext:
-        case ".chk":
+        case ".chk" | ".chk2" | ".chk3":
             chk = read_checkpoint(path)
             print(f"step:                     {chk.current_step}")
-            print(f"time:                     {chk.time_ps} ps")
+            print(f"time:                     {chk.time_ps:.1f} ps")
             print(f"frame index:              {chk.trajectory_frame}")
             print(f"n_atoms:                  {chk.n_atoms}")
             print(f"n_reactions:              {chk.reactions_so_far}")
@@ -103,7 +103,7 @@ def info(args: list[str]) -> int:
             first_step = f"{first_frame.sim_step}" if first_frame is not None else "n/a"
             last_step = f"{last_frame.sim_step}" if last_frame is not None else "n/a"
             first_time = f"{first_frame.sim_time:.0f}" if first_frame is not None else "n/a"
-            last_time = f"{last_frame.sim_time:0.f}" if last_frame is not None else "n/a"
+            last_time = f"{last_frame.sim_time:.0f}" if last_frame is not None else "n/a"
             print(f"step:                     {first_step}-{last_step}")
             print(f"time:                     {first_time}-{last_time} ps")
         case _:
