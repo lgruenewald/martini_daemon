@@ -3,6 +3,7 @@ import sys
 from argparse import ArgumentParser
 
 import numpy as np
+from random import random
 
 from .__formats import (
     TopTrajReader,
@@ -362,6 +363,40 @@ def logo() -> None:
    |_|  |_|\__,_|_|   \__|_|_| |_|_|  |____/ \__,_|\___|_| |_| |_|\___/|_| |_|  
 """)
 
+def logo_small() -> None:
+    """Print the smaller version of the logo"""
+    print(r"""           @                               %                           
+           @@                             %                 @          
+           @  @      @@@ @@@@@@@@@@@@@@@@@@@@@@@          @ @          
+            @   @@@  @  --------- ---[    \-----@ @@@ @@@   @          
+             @   @ @  @---- --------[     ]---@ @         @            
+              @     @  @------- ---/ \___/---@  @        @@            
+                @@@ @   @---- ----[    /----@   @       @              
+                          @-------\___]---@       @@@@@                
+                           @--- ---%----@                              
+                             @----%---@@                               
+                               @ %   @                                 
+                                @@@@@                                  
+                                 @ @                                   
+                                 @ @                                   
+                                 @ @                                   
+                                 @ @                                   
+                                 @ @                   @@              
+                                 @ @        @@@     @@@@@              
+                                 @ @   @@@@@  @@    @@@@               
+                                 @ @@@@@       @@@@@ @@                
+                       	  @@@@  @@@@@@@@          @                    
+                         @     @    @      @                           
+                         @      @@@@       @                           
+                          @@@@@@@@@@@@@@@@                             
+                                                                       
+⣿⣤   ⣤⣿             ⣿   ⣤       ⣤ ⣿⠶⠶                                  
+⣿ ⣿ ⣿ ⣿ ⣤⣤⣤⣤  ⣤ ⣤⣤  ⣿⣤⣤   ⣤ ⣤⣤    ⣿  ⣿ ⣤⣤⣤⣤   ⣤⣤⣤  ⣿ ⣤⣤  ⣤⣤   ⣤⣤  ⣤ ⣤⣤ 
+⣿  ⣿  ⣿  ⣤⣤⣤⣿ ⣿⠛  ⠛ ⣿   ⣿ ⣿⠛  ⣿ ⣿ ⣿  ⣿  ⣤⣤⣤⣿ ⣿⣤⣤⣤⣿ ⣿⠛  ⣿⠛  ⣿ ⣿  ⣿ ⣿⠛  ⣿
+⣿     ⣿ ⣿   ⣿ ⣿     ⣿   ⣿ ⣿   ⣿ ⣿ ⣿  ⣿ ⣿   ⣿ ⣿     ⣿   ⣿   ⣿ ⣿  ⣿ ⣿   ⣿
+⣿     ⣿ ⠛⣤⣤⣤⣿ ⣿     ⠛⣤⣤ ⣿ ⣿   ⣿ ⣿ ⣿⣤⣤⣿ ⠛⣤⣤⣤⣿ ⠛⣤⣤⣤  ⣿   ⣿   ⣿ ⠛⣤⣤⠛ ⣿   ⣿
+""")
+
 def main() -> None:
     """Parse arguments and run the right subcommand of the `daemon` CLI."""
     if len(sys.argv) < 2:
@@ -383,7 +418,10 @@ def main() -> None:
         case "select":
             sys.exit(select(args))
         case "logo":
-            logo()
+            if random() > 0.5:
+                logo()
+            else:
+                logo_small()
             sys.exit(0)
         case _:
             print(f"Unknown command: {subcommand}")
