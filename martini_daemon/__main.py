@@ -123,9 +123,9 @@ def whole(args: list[str]) -> int:
     parser.add_argument("-o", "--output", required=True, help="output trajectory file")
     parser.add_argument("-s", "--topology", required=True, help="topology (toptraj file)")
     parsed_args = parser.parse_args(args)
-    inp = parsed_args.i
-    oup = parsed_args.o
-    toptraj = parsed_args.s
+    inp = parsed_args.input
+    oup = parsed_args.output
+    toptraj = parsed_args.topology
 
     if inp == oup:
         print(f"Error: {inp} and {oup} are the same path.")
@@ -210,8 +210,8 @@ def select(args: list[str]) -> int:
     parser.add_argument("-a", "--atoms", required=False, help="atom selection (start:stop:step)")
     parser.add_argument("-f", "--frames", required=False, help="frame selection (start:stop:step)")
     parsed_args = parser.parse_args(args)
-    inp = parsed_args.i
-    oup = parsed_args.o
+    inp = parsed_args.input
+    oup = parsed_args.output
 
     if inp == oup:
         print(f"Error: {inp} and {oup} are the same path.")
