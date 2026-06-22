@@ -144,7 +144,7 @@ class MaximumDisplacementVerlet:
 
         :param max_step_size_nm: Maximum step size during a single time step.
         """
-        assert max_step_size_nm > 0., "Maximum step must be larger than 0."
+        assert max_step_size_nm > 0.0, "Maximum step must be larger than 0."
 
         self.global_variables = {
             "x_sum": 0,
@@ -167,12 +167,13 @@ class MaximumDisplacementVerlet:
         for k, v in self.per_dof_variables.items():
             self.integrator.addPerDofVariable(k, v)
 
-
         self.integrator.addComputePerDof("x0", "x")
         self.integrator.addUpdateContextState()
         self.integrator.addComputePerDof("v", "v+dta*f/m")
         self.integrator.addConstrainVelocities()
-        self.integrator.addComputePerDof("x", "x+max(min(dta*v*movable, maxstep), -maxstep)")
+        self.integrator.addComputePerDof(
+            "x", "x+max(min(dta*v*movable, maxstep), -maxstep)"
+        )
         self.integrator.addConstrainPositions()
         self.integrator.addComputePerDof("v", "(x-x0)/dt")
 
@@ -207,7 +208,7 @@ class MaximumDisplacementVerlet:
             )
             + "\n"
         )
-        
+
 
 class LocalGradientDescent:
     def __init__(

@@ -45,13 +45,15 @@ class Graph:
         self.equivalents: list[set[str]] = []
         self.atom_name_to_index: dict[str, int] = {}
 
-    def add_atom(self, name: str, name_pat: str, type_pat: str, type_: GraphAtomType) -> int:
+    def add_atom(
+        self, name: str, name_pat: str, type_pat: str, type_: GraphAtomType
+    ) -> int:
         """Add a new atom to the graph and returns its index."""
         i = len(self.atoms)
         self.atoms.append((name, name_pat, type_pat, type_))
         self.atom_name_to_index[name] = i
         return i
-    
+
     def finish_init(self) -> None:
         """
         Must be called after parsing the graph and before it's used.

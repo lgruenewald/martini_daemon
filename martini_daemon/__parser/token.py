@@ -6,16 +6,14 @@ class Token:
     """
     A single whitespace separated token from parsing.
 
-    :param content: The processed content of the token.
-    :param line: The whole line that contains the token. Before preprocessing, after removing comments and making lines whole across backslashes.
+    :param content: The processed content of the token (before preprocessing, TokenList.unwrap() runs macro substitutions).
     :param line_num: The line number in the source file.
     :param path: The path to the source file.
-    :param start: The start position in the line for this Token.
-    :param end: The end position in the line for this Token.
+    :param start: The start position in the line for this Token (before preprocessing).
+    :param end: The end position in the line for this Token (before preprocessing).
     """
 
     content: str
-    line: str
     line_num: int
     path: str
     start: int

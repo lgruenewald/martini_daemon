@@ -4,6 +4,7 @@ import traceback
 from enum import Enum
 from sys import stderr
 
+from ..__rust import tokenize
 from .directive import Directive
 from .token import Token
 from .token_list import TokenList, TokenParseException
@@ -131,7 +132,6 @@ class Parser:
                 pe.message,
                 pe.token.path,
                 pe.token.line_num,
-                pe.token.line,
                 pe.token.start,
                 pe.token.end,
             )
@@ -160,7 +160,6 @@ class Parser:
         message: str,
         path: str,
         line_num: int,
-        line: str | None,
         start: int | None = None,
         end: int | None = None,
     ) -> None:
@@ -176,14 +175,13 @@ class Parser:
         print(f"\033[1;33m{message}\033[0m", file=stderr)
         print(f"In file {path} at line {line_num + 1}.", file=stderr)
 
-        if start is None or end is None:
-            if line is None:
-                with open(path) as file:
-                    lines = file.read().splitlines()
-                    if len(lines) <= line_num:
-                        return
-                    line = lines[line_num]
+        with open(path) as file:
+            lines = file.read().splitlines()
+            if len(lines) <= line_num:
+                return
+            line = lines[line_num]
 
+        if start is None or end is None:
             print(f"{line_num + 1}: \033[1;33m{line}\033[0m", file=stderr)
         else:
             assert line is not None
@@ -236,18 +234,19 @@ class Parser:
 
         * Assumes lines have been made whole already, and that comments were removed.
         * Separates based on whitespace.
-        * Performs #define replacements.
+        * Sets up #define replacements (they happen lazily in TokenList.unwrap()).
         """
         tokens = [
             Token(
-                content=line[match.start() : match.end()],
-                line=line,
+                content=line[start:end],
                 line_num=self.__line_num,
                 path=self.__path,
-                start=match.start(),
-                end=match.end(),
+                start=start,
+                end=end,
             )
-            for match in self.__token_pat.finditer(line)
+            for start, end in tokenize(line)
+            # ignore comments for now
+            if line[start] != ";"
         ]
         return TokenList(line, tokens, self.__defines)
 
@@ -329,9 +328,6 @@ class Parser:
                     line = cumulative + line
                     cumulative = ""
 
-                # remove comments and leading/trailing whitespace
-                line = re.sub(r";.*", "", line).strip()
-                # tokenize, doesn't resolve #define's yet
                 token_list = self.__tokenize(line)
 
                 # ignore empty lines

@@ -14,17 +14,13 @@ class TokenParseException(Exception):
 
 
 class TokenList:
-    __int_pat = re.compile("^[-+]?[0-9]+$")
-    __float_pat = re.compile("^[-+]?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?$")
-    __word_pat = re.compile("^[a-zA-Z0-9_.]+$")
     __pattern_pat = re.compile("^[a-zA-Z0-9_?!*{}]+$")
     __pair_pat = re.compile(r"^[0-9]+:[a-zA-Z0-9_.]+$")
-    __string_pat = re.compile(r'^"[^"]*"|<[^>]*>$')
 
     __DEFAULT = object()
 
     def __init__(self, line: str, tokens: list[Token], defines: dict[str, str]) -> None:
-        """
+        r"""
         Make a list of tokens.
 
         Parser calls the line method of :doc:`Directive</autoapi/martini_daemon/Directive>` with this type as the argument.
@@ -33,8 +29,8 @@ class TokenList:
         Note that tokenization has to performed first before constructing TokenList. This is done by the Parser.
         This is because the Parser needs to process line continuations first.
 
-        :param line: Line that was tokenized.
-        :param tokens: List of tokens obtained.
+        :param line: Line that was tokenized, before preprocessing, after making \ continuations whole.
+        :param tokens: List of tokens obtained, before macro substitution.
         """
         self.__line = line
         self.__tokens = tokens
@@ -110,47 +106,71 @@ class TokenList:
             return default
 
         tok = self.__tokens[index]
-        content = tok.line[tok.start : tok.end]
+        content = tok.content
 
         while (got := self.__defines.get(content)) is not None:
             content = got
 
         match type_filter:
             case "int":
-                if self.__int_pat.match(content):
+                try:
                     return int(content)
+                except Exception as _:
+                    raise TokenParseException(
+                        tok, error_msg or f"Expected integer, got {content}."
+                    )
             case "float":
-                if self.__float_pat.match(content):
+                try:
                     return float(content)
+                except Exception as _:
+                    raise TokenParseException(
+                        tok, error_msg or f"Expected number, got {content}."
+                    )
             case "positive":
-                if self.__float_pat.match(content):
-                    if float(content) <= 0.0:
-                        raise TokenParseException(
-                            tok,
-                            error_msg or "Expected a positive non-zero real number.",
-                        )
-                    return float(content)
+                try:
+                    val = float(content)
+                except Exception as _:
+                    raise TokenParseException(
+                        tok, error_msg or f"Expected number, got {content}."
+                    )
+                if val <= 0.0:
+                    raise TokenParseException(
+                        tok,
+                        error_msg or "Expected a positive non-zero real number.",
+                    )
+                return val
             case "index":
-                if self.__int_pat.match(content):
-                    if int(content) <= 0:
-                        raise TokenParseException(
-                            tok,
-                            error_msg
-                            or "Expected index, got an integer 0 or smaller."
-                            "Note: indexing in .itp/.top files is usually 1 based.",
-                        )
-                    return int(content) - 1
+                try:
+                    val = int(content)
+                except Exception as _:
+                    raise TokenParseException(
+                        tok,
+                        error_msg
+                        or f"Expected index (positive integer), got {content}.",
+                    )
+                if val <= 0:
+                    raise TokenParseException(
+                        tok,
+                        error_msg
+                        or "Expected index, got an integer 0 or smaller."
+                        "Note: indexing in .itp/.top files is usually 1 based.",
+                    )
+                return val - 1
             case "degree":
-                if self.__float_pat.match(content):
+                try:
                     angle = float(content) * math.pi / 180.0
                     while angle < math.pi:
                         angle += math.tau
                     while angle > math.pi:
                         angle -= math.tau
                     return angle
+                except Exception as _:
+                    raise TokenParseException(
+                        tok, error_msg or f"Expected number, got {content}."
+                    )
             case "word":
-                if self.__word_pat.match(content):
-                    return content
+                # optimization: allow anything through, since this is one of the most common tokens
+                return content
             case "pattern":
                 if self.__pattern_pat.match(content):
                     return content.replace("{", "[").replace("}", "]")
@@ -160,7 +180,9 @@ class TokenList:
                     items = content.split(":")
                     return int(items[0]) - 1, items[1]
             case "string":
-                if self.__string_pat.match(content):
+                if (content[0] == '"' and content[-1] == '"') or (
+                    content[0] == "<" and content[-1] == ">"
+                ):
                     return content[1:-1]
             case "raw":
                 return content
@@ -169,6 +191,7 @@ class TokenList:
                     tok, f"Filter {type_filter} couldn't be understood."
                 )
 
+        # some match cases still fall through to here
         raise TokenParseException(
-            tok, error_msg or f"Expected token of type {type_filter}."
+            tok, error_msg or f"Expected token of type {type_filter}, got {content}."
         )

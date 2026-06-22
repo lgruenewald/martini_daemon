@@ -32,9 +32,7 @@ class GlobalIntegratorMinimizer(Reporter):
 
     def pre_simulation_start(self, simulation: Simulation) -> None:
         assert simulation.integrator is not None
-        self.integrator_index = simulation.integrator.addIntegrator(
-            self.minimizer
-        )
+        self.integrator_index = simulation.integrator.addIntegrator(self.minimizer)
 
     def on_reaction(
         self, simulation: Simulation, reactions: list[tuple[str, list[Fragment]]]

@@ -1,7 +1,7 @@
 from .directive import Directive
 from .gromacs_top_file import GromacsTopFile, register_directive
-from .token_list import TokenList
 from .parser import ParseException
+from .token_list import TokenList
 
 
 @register_directive
@@ -9,7 +9,9 @@ class SystemDirective(Directive):
     def line(self, tokens: TokenList) -> None:
         assert isinstance(self.parent, GromacsTopFile)
         if title := self.parent.system.additional_data.get("title") is not None:
-            raise ParseException(f"Double title definition, title was already defined to be {title}")
+            raise ParseException(
+                f"Double title definition, title was already defined to be {title}"
+            )
         self.parent.system.additional_data["title"] = tokens.get_line()
 
     def finish(self) -> None:

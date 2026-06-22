@@ -21,16 +21,14 @@ class MinimizationRestraint(Force):
 
     def _set_force_obj(self) -> mm.Force:
         # FIXME: verify non 90 degree angles
-        force = mm.CustomExternalForce(
-            "0.5*k*periodicdistance(x,y,z,x0,y0,z0)^2;"
-        )
+        force = mm.CustomExternalForce("0.5*k*periodicdistance(x,y,z,x0,y0,z0)^2;")
         force.addPerParticleParameter("k")
         force.addPerParticleParameter("x0")
         force.addPerParticleParameter("y0")
         force.addPerParticleParameter("z0")
 
         for i in range(self.system.num_atoms()):
-            force.addParticle(i, [0., 0., 0., 0.])
+            force.addParticle(i, [0.0, 0.0, 0.0, 0.0])
 
         return force
 
@@ -46,11 +44,13 @@ class MinimizationRestraint(Force):
         if self._force is not None:
             assert isinstance(self._force, mm.CustomExternalForce)
             for i in range(self.system.num_atoms()):
-                self._force.setParticleParameters(i, i, [0., 0., 0., 0.])
+                self._force.setParticleParameters(i, i, [0.0, 0.0, 0.0, 0.0])
             self.system.flag_reinitialize()
         # FIXME switch to self.update_context()
 
-    def set_atom_restraints(self, i: int, k: float, x: float, y: float, z: float) -> None:
+    def set_atom_restraints(
+        self, i: int, k: float, x: float, y: float, z: float
+    ) -> None:
         """
         Set parameters for a single atom.
 
@@ -61,6 +61,7 @@ class MinimizationRestraint(Force):
         self._force.setParticleParameters(i, i, [k, x, y, z])
         self.system.flag_reinitialize()
         # FIXME rely on self.__update_context()
+
 
 class GlobalMinimizer(Reporter):
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
@@ -93,7 +94,7 @@ class GlobalMinimizer(Reporter):
         self.whole_molecule = whole_molecule
         self.restraint_force = None
         self.k_local = restraint_force_local
-        self.k_global =restraint_force_global
+        self.k_global = restraint_force_global
 
     def pre_simulation_start(self, simulation: Simulation) -> None:
         assert simulation.integrator is not None
@@ -106,9 +107,6 @@ class GlobalMinimizer(Reporter):
     ) -> None:
         # save velocities
         simulation.info("on_reaction Global Minimizer")
-        if self.k_local > 0.0 or self.k_global > 0.0:
-            assert self.restraint_force is not None
-
         pos, box = simulation.context.get_positions()
         # set movable
         # atoms in reacting atoms only
@@ -127,11 +125,13 @@ class GlobalMinimizer(Reporter):
         )
         simulation.info("atoms chosen")
 
-
         if self.k_local > 0.0 or self.k_global > 0.0:
+            assert self.restraint_force is not None
             for i in range(simulation.system.num_atoms()):
                 k = self.k_local if i in atoms else self.k_global
-                self.restraint_force.set_atom_restraints(i, k, pos[i, 0], pos[i, 1], pos[i, 2])
+                self.restraint_force.set_atom_restraints(
+                    i, k, pos[i, 0], pos[i, 1], pos[i, 2]
+                )
 
         simulation.info("restraints set")
         simulation.info("minimization start")
@@ -140,5 +140,6 @@ class GlobalMinimizer(Reporter):
 
         simulation.info("minimization finished")
         if self.k_local > 0.0 or self.k_global > 0.0:
+            assert self.restraint_force is not None
             self.restraint_force.reset()
         simulation.info("restraints reset")

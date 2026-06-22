@@ -314,7 +314,7 @@ class TopTrajReader:
             )
 
         title_len = header[0]
-        title, = struct.unpack(f"<{title_len}s", header[1 : 1 + title_len])
+        (title,) = struct.unpack(f"<{title_len}s", header[1 : 1 + title_len])
         self.title: str = title.decode("utf-8")
         i = 1 + title_len
         (n_init,) = struct.unpack("<I", header[i : i + 4])
@@ -401,7 +401,7 @@ class TopTrajReader:
             len_ = content[i]
             i += 1
             bytes_: bytes
-            bytes_, = struct.unpack(f"<{len_}s", content[i : i + len_])
+            (bytes_,) = struct.unpack(f"<{len_}s", content[i : i + len_])
             res.append(bytes_.decode("utf-8"))
             i += len_
         return i, res

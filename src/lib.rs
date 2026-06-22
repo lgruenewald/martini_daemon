@@ -9,6 +9,7 @@ mod detection_template;
 mod detection_template_list;
 mod frag_list;
 mod fragment;
+mod parser;
 mod periodic_box;
 mod toptraj;
 
@@ -35,6 +36,7 @@ fn rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<toptraj::TopTrajWriter>()?;
     m.add_function(wrap_pyfunction!(detection::detection, m)?)?;
     m.add_function(wrap_pyfunction!(build_version, m)?)?;
+    m.add_function(wrap_pyfunction!(parser::tokenize, m)?)?;
     Ok(())
 }
 

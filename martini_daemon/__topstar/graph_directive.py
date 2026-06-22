@@ -1,4 +1,3 @@
-from martini_daemon import ParseException
 import difflib
 
 from ..__core import System
@@ -51,8 +50,7 @@ class GraphDirective(Directive):
                 type_ = keyword_to_GraphAtomType[keyword]
                 if self.graph.atom_name_to_index.get(part_id) is not None:
                     raise TokenParseException(
-                        tokens[1],
-                        f"Same graph has already a node called {part_id}."
+                        tokens[1], f"Same graph has already a node called {part_id}."
                     )
                 self.graph.add_atom(part_id, name_pat, type_pat, type_)
             case "equivalent":
@@ -62,12 +60,12 @@ class GraphDirective(Directive):
                     if self.graph.atom_name_to_index.get(tok) is None:
                         raise TokenParseException(
                             tokens[i],
-                            f"Node {tok} was not yet defined. Define it before `equivalent`."
+                            f"Node {tok} was not yet defined. Define it before `equivalent`.",
                         )
                     if tok in parts:
                         raise TokenParseException(
                             tokens[i],
-                            f"Node {tok} is specified twice on the same `equivalent` line."
+                            f"Node {tok} is specified twice on the same `equivalent` line.",
                         )
                     parts.add(tok)
                 self.graph.equivalents.append(parts)
@@ -81,7 +79,7 @@ class GraphDirective(Directive):
                         if idx is None:
                             raise TokenParseException(
                                 tokens[i],
-                                f"Interaction {keyword} references undefined node {tok}."
+                                f"Interaction {keyword} references undefined node {tok}.",
                             )
                         if self.graph.atoms[idx][3] != GraphAtomType.NORMAL:
                             if last_special is not None:
@@ -89,7 +87,7 @@ class GraphDirective(Directive):
                                     tokens[i],
                                     f"Interaction {keyword} references more than one "
                                     + f" optional or forbidden atoms ({last_special}, {tok}). "
-                                    + "Forbidden/optional atoms connected to eachother are not allowed."
+                                    + "Forbidden/optional atoms connected to eachother are not allowed.",
                                 )
                             last_special = tok
                         parts.append(tok)

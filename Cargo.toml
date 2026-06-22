@@ -21,3 +21,4 @@ ordermap = "1.1.0"
 sortedlist-rs = "0.2.5"
 pyo3-stub-gen = "0.21.1"
 flate2 = { version = "1.1.9", features = ["zlib-rs"] }
+logos = "0.16.1"

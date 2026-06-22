@@ -26,7 +26,6 @@ def test_parse_angle_conditions() -> None:
         tokens = [
             Token(
                 content=line[match.start() : match.end()],
-                line=line,
                 line_num=0,
                 path="",
                 start=match.start(),

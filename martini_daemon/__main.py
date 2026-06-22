@@ -1,9 +1,9 @@
 import os
 import sys
 from argparse import ArgumentParser
+from random import random
 
 import numpy as np
-from random import random
 
 from .__formats import (
     TopTrajReader,
@@ -61,6 +61,7 @@ Takes the following arguments:
             return 1
     return 0
 
+
 def info(args: list[str]) -> int:
     """Get information about daemon files using the `daemon info` CLI."""
     if len(args) < 1:
@@ -103,8 +104,12 @@ def info(args: list[str]) -> int:
             last_frame = r.read_frame()
             first_step = f"{first_frame.sim_step}" if first_frame is not None else "n/a"
             last_step = f"{last_frame.sim_step}" if last_frame is not None else "n/a"
-            first_time = f"{first_frame.sim_time:.0f}" if first_frame is not None else "n/a"
-            last_time = f"{last_frame.sim_time:.0f}" if last_frame is not None else "n/a"
+            first_time = (
+                f"{first_frame.sim_time:.0f}" if first_frame is not None else "n/a"
+            )
+            last_time = (
+                f"{last_frame.sim_time:.0f}" if last_frame is not None else "n/a"
+            )
             print(f"step:                     {first_step}-{last_step}")
             print(f"time:                     {first_time}-{last_time} ps")
         case _:
@@ -112,16 +117,19 @@ def info(args: list[str]) -> int:
             return 1
     return 0
 
+
 def whole(args: list[str]) -> int:
     """Make a trajectory whole using the `daemon whole` CLI."""
     parser = ArgumentParser(
         prog="daemon whole",
         description="Make a trajectory whole using a .toptraj file",
-        add_help=False
+        add_help=False,
     )
     parser.add_argument("-i", "--input", required=True, help="input trajectory file")
     parser.add_argument("-o", "--output", required=True, help="output trajectory file")
-    parser.add_argument("-s", "--topology", required=True, help="topology (toptraj file)")
+    parser.add_argument(
+        "-s", "--topology", required=True, help="topology (toptraj file)"
+    )
     parsed_args = parser.parse_args(args)
     inp = parsed_args.input
     oup = parsed_args.output
@@ -161,7 +169,9 @@ def whole(args: list[str]) -> int:
         assert frame is not None
         step, time, pbc, pos, _ = frame
         if len(pos) != n_atoms:
-            print(f"Number of atoms in {toptraj} ({n_atoms}) and in {inp} ({len(pos)}) does not match.")
+            print(
+                f"Number of atoms in {toptraj} ({n_atoms}) and in {inp} ({len(pos)}) does not match."
+            )
             return 1
         pos = np.array(pos, dtype=np.float64)
 
@@ -170,14 +180,13 @@ def whole(args: list[str]) -> int:
             graph.add_bond(a, b)
         graph.make_whole(pbc, pos)
 
-        w.write_frame(
-            step, time, pbc, pos
-        )
+        w.write_frame(step, time, pbc, pos)
 
     r.close()
     w.close()
     print()
     return 0
+
 
 def parse_slice(slice_: str, n: int) -> tuple[int, int, int]:
     """Parse a slice string into start, end and step slice."""
@@ -186,7 +195,7 @@ def parse_slice(slice_: str, n: int) -> tuple[int, int, int]:
     toks = slice_.split(":")
     if len(toks) == 1:
         i = int(slice_)
-        return i, i+1, 1
+        return i, i + 1, 1
     if 2 <= len(toks) <= 3:
         start = int(toks[0]) if toks[0] != "" else 0
         if start < 0:
@@ -198,17 +207,22 @@ def parse_slice(slice_: str, n: int) -> tuple[int, int, int]:
         return start, end, step
     raise ValueError("Too many ':' in slice, up to 2 expected.")
 
+
 def select(args: list[str]) -> int:
     """Select frames or atoms using the `daemon select` CLI."""
     parser = ArgumentParser(
         prog="daemon select",
         description="Select atoms and/or frames for a .toptraj file",
-        add_help=False
+        add_help=False,
     )
     parser.add_argument("-i", "--input", required=True, help="input toptraj file")
     parser.add_argument("-o", "--output", required=True, help="output toptraj file")
-    parser.add_argument("-a", "--atoms", required=False, help="atom selection (start:stop:step)")
-    parser.add_argument("-f", "--frames", required=False, help="frame selection (start:stop:step)")
+    parser.add_argument(
+        "-a", "--atoms", required=False, help="atom selection (start:stop:step)"
+    )
+    parser.add_argument(
+        "-f", "--frames", required=False, help="frame selection (start:stop:step)"
+    )
     parsed_args = parser.parse_args(args)
     inp = parsed_args.input
     oup = parsed_args.output
@@ -230,39 +244,33 @@ def select(args: list[str]) -> int:
 
     atom_start, atom_end, atom_step = parse_slice(parsed_args.atoms or "", r.n_atoms)
     new_n_atoms = len(range(atom_start, atom_end, atom_step))
-    frame_start, frame_end, frame_step = parse_slice(parsed_args.frames or "", len(tells))
+    frame_start, frame_end, frame_step = parse_slice(
+        parsed_args.frames or "", len(tells)
+    )
 
     if atom_start > atom_end or atom_step < 0:
         raise ValueError("Atom selection error - must have a positive step.")
     if atom_start > 0 or atom_step != 1:
         # to fix this, a map of old atom -> new atom indices would need to be made, applied to bonds, and made usable
         # in e.g. the vmd plugin
-        raise ValueError("Currently, only atom selections starting at 0 and with step 1 are supported.")
+        raise ValueError(
+            "Currently, only atom selections starting at 0 and with step 1 are supported."
+        )
     if frame_start > frame_end or frame_step < 0:
         raise ValueError("Frame selection error - must have a positive step.")
 
-    res_names = [
-        r.res_names[j]
-        for j in range(atom_start, atom_end, atom_step)
-    ]
-    res_ids = [
-        r.res_ids[j]
-        for j in range(atom_start, atom_end, atom_step)
-    ]
-
+    res_names = [r.res_names[j] for j in range(atom_start, atom_end, atom_step)]
+    res_ids = [r.res_ids[j] for j in range(atom_start, atom_end, atom_step)]
 
     if (sel_start := r.title.find("(select")) > -1:
         new_title = r.title[:sel_start] + "(selected multiple times)"
     else:
-        new_title = r.title + f" (select atoms: {atom_start}:{atom_end}:{atom_step}; frames: {frame_start}:{frame_end}:{frame_step})"
+        new_title = (
+            r.title
+            + f" (select atoms: {atom_start}:{atom_end}:{atom_step}; frames: {frame_start}:{frame_end}:{frame_step})"
+        )
 
-    w = TopTrajWriter(
-        oup,
-        new_title,
-        r.initial_molecules,
-        res_names,
-        res_ids
-    )
+    w = TopTrajWriter(oup, new_title, r.initial_molecules, res_names, res_ids)
 
     new_i = -1
     for new_i, i in enumerate(range(frame_start, frame_end, frame_step)):
@@ -270,46 +278,22 @@ def select(args: list[str]) -> int:
         r.seek(tells[i])
         frame = r.read_frame()
         assert frame is not None
-        w.new_frame(
-            new_i,
-            frame.sim_step,
-            frame.sim_time,
-            new_n_atoms
-        )
+        w.new_frame(new_i, frame.sim_step, frame.sim_time, new_n_atoms)
 
-        names = [
-            frame.names[j]
-            for j in range(atom_start, atom_end, atom_step)
-        ]
-        types = [
-            frame.atom_types[j]
-            for j in range(atom_start, atom_end, atom_step)
-        ]
-        charges = [
-            frame.charges[j]
-            for j in range(atom_start, atom_end, atom_step)
-        ]
-        masses = [
-            frame.masses[j]
-            for j in range(atom_start, atom_end, atom_step)
-        ]
-        w.write_frame_atoms(
-            names, types, charges, masses
-        )
+        names = [frame.names[j] for j in range(atom_start, atom_end, atom_step)]
+        types = [frame.atom_types[j] for j in range(atom_start, atom_end, atom_step)]
+        charges = [frame.charges[j] for j in range(atom_start, atom_end, atom_step)]
+        masses = [frame.masses[j] for j in range(atom_start, atom_end, atom_step)]
+        w.write_frame_atoms(names, types, charges, masses)
 
         sel = set(range(atom_start, atom_end, atom_step))
-        bonds = [
-            (a, b)
-            for a, b in frame.bonds
-            if a in sel and b in sel
-        ]
-        w.write_frame_bonds(
-            bonds
-        )
+        bonds = [(a, b) for a, b in frame.bonds if a in sel and b in sel]
+        w.write_frame_bonds(bonds)
         w.write_frame()
-    print(f"\033[2K\rProcessed a total of {new_i+1} frames.")
+    print(f"\033[2K\rProcessed a total of {new_i + 1} frames.")
 
     return 0
+
 
 def logo() -> None:
     """Print the Martini Daemon logo."""
@@ -363,8 +347,9 @@ def logo() -> None:
    |_|  |_|\__,_|_|   \__|_|_| |_|_|  |____/ \__,_|\___|_| |_| |_|\___/|_| |_|  
 """)
 
+
 def logo_small() -> None:
-    """Print the smaller version of the logo"""
+    """Print the smaller version of the logo."""
     print(r"""           @                               %                           
            @@                             %                 @          
            @  @      @@@ @@@@@@@@@@@@@@@@@@@@@@@          @ @          
@@ -396,6 +381,7 @@ def logo_small() -> None:
 ⣿     ⣿ ⣿   ⣿ ⣿     ⣿   ⣿ ⣿   ⣿ ⣿ ⣿  ⣿ ⣿   ⣿ ⣿     ⣿   ⣿   ⣿ ⣿  ⣿ ⣿   ⣿
 ⣿     ⣿ ⠛⣤⣤⣤⣿ ⣿     ⠛⣤⣤ ⣿ ⣿   ⣿ ⣿ ⣿⣤⣤⣿ ⠛⣤⣤⣤⣿ ⠛⣤⣤⣤  ⣿   ⣿   ⣿ ⠛⣤⣤⠛ ⣿   ⣿
 """)
+
 
 def main() -> None:
     """Parse arguments and run the right subcommand of the `daemon` CLI."""

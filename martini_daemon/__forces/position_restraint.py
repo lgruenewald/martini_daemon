@@ -44,7 +44,7 @@ class FlatBottomedRestraint(BondedForce):
         assert isinstance(force, mm.CustomExternalForce)
         assert len(members) == 1
         i = members[0]
-        force.addParticle(i, params)        
+        force.addParticle(i, params)
 
     @classmethod
     def uses_pbc(cls) -> bool:

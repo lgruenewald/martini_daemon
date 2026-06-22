@@ -11,10 +11,8 @@ class MoleculesDirective(Directive):
         key = tokens.unwrap(0, "word")
         if self.parent.system.molecule_types.get(key) is None:
             raise TokenParseException(key, f"Molecule {key} was not defined.")
-        
-        self.parent.system.initial_molecules.append((
-            key, tokens.unwrap(1, "int")
-        ))
+
+        self.parent.system.initial_molecules.append((key, tokens.unwrap(1, "int")))
 
     def finish(self) -> None:
         pass

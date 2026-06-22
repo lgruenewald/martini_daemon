@@ -135,9 +135,7 @@ class Context:
         """
         self.__reinitialize()
         mm.LocalEnergyMinimizer.minimize(
-            self.__context,
-            tolerance=tolerance,
-            maxIterations=max_steps
+            self.__context, tolerance=tolerance, maxIterations=max_steps
         )
 
     def apply_constraints(self, tol: float = 1e-10) -> None:
