@@ -2,6 +2,8 @@
 
 import math
 import os
+from pathlib import Path
+from subprocess import run
 
 import numpy as np
 import openmm as mm
@@ -51,6 +53,15 @@ def rootdir(request: pytest.FixtureRequest) -> str:
 
 
 tests = [
+    # flat bottom restraint tests
+    "flat_bottom_water",
+    "flat_negative_R",
+    "flat_cylx",
+    "flat_cyly",
+    "flat_cylz",
+    "flat_layx",
+    "flat_layy",
+    "flat_layz",
     # notable soft skips
     "CNAP",
     "cutoff_LJ",
@@ -219,6 +230,9 @@ class TestSingleFrame:
         assert os.path.isfile("gmxrun.sh")
         assert os.path.isdir(x)
         os.chdir(x)
+        with open("stdout.txt", "w") as stdout, open("stderr.txt", "w") as stderr:
+            run(["../gmxrun.sh"], stdout=stdout, stderr=stderr).check_returncode()
+
         os.system("../gmxrun.sh")
         assert os.path.isfile("energy.xvg"), f"./gmxrun.sh failure for {x} (E)"
         assert os.path.isfile("forces.xvg"), f"./gmxrun.sh failure for {x} (F)"
@@ -239,3 +253,12 @@ class TestSingleFrame:
         self.compare_daemon_gmx()
         os.remove("energy.xvg")
         os.remove("forces.xvg")
+        os.remove("stdout.txt")
+        os.remove("stderr.txt")
+        os.remove("mdout.mdp")
+        for outfile in Path("./").glob("run*"):
+            outfile.unlink()
+        for outfile in Path("./").glob("out*"):
+            outfile.unlink()
+        for outfile in Path("./").glob("#*"):
+            outfile.unlink()
