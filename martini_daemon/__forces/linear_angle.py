@@ -19,7 +19,7 @@ class LinearAngle(BondedForce):
 
     @classmethod
     def uses_pbc(cls) -> bool:
-        return True
+        return False
 
     def delta_degrees_of_freedom(self) -> int:
         return 0
@@ -29,8 +29,9 @@ class LinearAngle(BondedForce):
         return "linear_angle"
 
     def _set_force_obj(self) -> mm.Force:
+        # FIXME: this is not pbc friendly
         force = mm.CustomCompoundBondForce(
-            3,  # 3 particles per compund bond force
+            3,
             "0.5*k*distj2; "
             "distj2=(xj-x2)^2+(yj-y2)^2+(zj-z2)^2; "
             "xj=a*x1+(1-a)*x3; "

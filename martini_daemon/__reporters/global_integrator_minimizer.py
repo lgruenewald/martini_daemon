@@ -40,5 +40,8 @@ class GlobalIntegratorMinimizer(Reporter):
         prev_integrator = simulation.context.get_current_integrator()
         assert self.integrator_index is not None
         simulation.context.set_current_integrator(self.integrator_index)
+        simulation.top.toggle_softcore(reactions, True)
         simulation.context.do_steps(self.n_steps)
         simulation.context.set_current_integrator(prev_integrator)
+        simulation.top.toggle_softcore(reactions, False)
+

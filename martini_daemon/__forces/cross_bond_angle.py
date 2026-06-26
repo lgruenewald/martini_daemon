@@ -30,7 +30,7 @@ class CrossBondAngle(BondedForce):
 
     def _set_force_obj(self) -> mm.Force:
         force = mm.CustomCompoundBondForce(
-            3,  # 3 particles per compund bond force
+            3,
             "k*(distance(p1,p3)-r3)*(distance(p1,p2)-r1+distance(p3,p2)-r2)",
         )
         force.addPerBondParameter("r1")
