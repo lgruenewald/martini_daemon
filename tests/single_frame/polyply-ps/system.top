@@ -1,0 +1,11 @@
+; Generated with polyply, PS
+
+#include "../../../itp/martini_v3.0.0.itp"
+#include "./ps20.itp"
+
+[system]
+ps polymers
+
+[molecules]
+PS20 250
+

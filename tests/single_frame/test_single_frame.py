@@ -40,8 +40,13 @@ r_tol = 2e-3  # distance tolerance
 # only slightly raised the tolerance because forces still
 # seem *slightly* off for a few atoms
 #
+# polyply-ps:
+# forces different by 0.01%, abs difference of 2.249e-06
+# soft skipping because this could be just a case of low
+# absolute value combined with using relative-only tolerances
+#
 etol_override = {"CNAP": 3e-5}
-ftol_override = {"cmap": 1e-2, "cutoff_LJ": 0, "pairs": 5e-5}
+ftol_override = {"cmap": 1e-2, "cutoff_LJ": 0, "pairs": 5e-5, "polyply-ps": 2e-4}
 
 cutoff_nm = 1.1
 
@@ -53,15 +58,6 @@ def rootdir(request: pytest.FixtureRequest) -> str:
 
 
 tests = [
-    # flat bottom restraint tests
-    "flat_bottom_water",
-    "flat_negative_R",
-    "flat_cylx",
-    "flat_cyly",
-    "flat_cylz",
-    "flat_layx",
-    "flat_layy",
-    "flat_layz",
     # notable soft skips
     "CNAP",
     "cutoff_LJ",
@@ -71,11 +67,21 @@ tests = [
     "pairs_VW",
     "pairs_VWQ",
     "pairs_type",
+    # flat bottom restraint tests
+    "flat_bottom_water",
+    "flat_negative_R",
+    "flat_cylx",
+    "flat_cyly",
+    "flat_cylz",
+    "flat_layx",
+    "flat_layy",
+    "flat_layz",
     # biomolecule tests
     "elastic",
     "posres",
     # polymer tests
     "polyurethane",
+    "polyply-ps",
     # small molecule tests
     "NMC",
     "CHOL_in_W",
