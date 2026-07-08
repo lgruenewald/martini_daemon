@@ -17,6 +17,16 @@ pub struct Fragment {
     pub atoms: Vec<isize>,
 }
 
+#[pymethods]
+impl Fragment {
+    #[new]
+    pub fn new(name: String, frag_id: usize, atoms: Vec<isize>) -> Self {
+        Self {
+            name, frag_id, atoms
+        }
+    }
+}
+
 impl Display for Fragment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}({}; {:?})", self.name, self.frag_id, self.atoms)

@@ -26,9 +26,6 @@ class TrajectoryReporter(Reporter):
 
     def on_trajectory_frame(self, simulation: Simulation) -> None:
         assert self.writer is not None
-        assert simulation.context is not None, (
-            "Simulation context is None. Was it constructed with "
-        )
         pos, box = simulation.context.get_positions()
         self.writer.write_frame(simulation.current_step, simulation.time_ps, box, pos)
 

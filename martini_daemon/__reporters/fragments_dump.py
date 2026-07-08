@@ -1,3 +1,4 @@
+import warnings
 from typing import TextIO
 
 from ..__rust import Fragment
@@ -14,7 +15,6 @@ def write_frame(handle: TextIO, sim: Simulation) -> None:
         handle.write(f"{frag.name},{frag_id};{atoms}\n")
     handle.write("End Frame\n\n")
 
-
 class FragmentsDump(Reporter):
     def __init__(self) -> None:
         """
@@ -28,7 +28,7 @@ class FragmentsDump(Reporter):
         Due to the debug-oriented nature of this format, it will not be truncated when continuing simulations
         from an older frame.
         """
-        pass
+        warnings.warn("Use the more versatile fragment reporter instead. The use of this class is deprecated.", DeprecationWarning)
 
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
         self.handle = open(  # noqa: SIM115

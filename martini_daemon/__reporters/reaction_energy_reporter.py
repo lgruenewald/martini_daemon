@@ -1,4 +1,5 @@
 import os
+import warnings
 
 from ..__simulation import Reporter, Simulation
 from .variables_reporter import truncate_energies, write_energies
@@ -12,9 +13,11 @@ class ReactionEnergyReporter(Reporter):
         Note: will have post-minimization in the output file, regardless of whether there is a minimization,
         this is because it does not know what other reporters are in the simulation.
 
-        :param write_coords: if set to True, it will print .gro files pre and post minimization
+        :param write_coords: if set to True, it will print .gro files pre and post minimization (deprecated)
         :param ext: extension for writing the geometries. Set to ".xyz" if xyz files are desired.
         """
+        if write_coords:
+            warnings.warn("ReactionEnergyReporter with write_coords=True is deprecated. Use ReactionReporter.")
         self.write_coords = write_coords
         self.ext = ext
 

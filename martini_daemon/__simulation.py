@@ -129,12 +129,12 @@ class Simulation:
         topology: str,
         geometry: str
         | None
-        | tuple[PeriodicBox, npt.NDArray[np.float64], npt.NDArray[np.float64] | None],
-        md_steps: int,
+        | tuple[PeriodicBox, npt.NDArray[np.float64], npt.NDArray[np.float64] | None] = None,
+        md_steps: int = 0,
         reporters: list[Reporter] | None = None,
         dm_frequency: int = 0,
         traj_frequency: int = 0,
-        sim_name: str = "out",
+        sim_name: str | None = "out",
         coupling: list[mm.Force] | None = None,
         integrator: mm.Integrator | None = None,
         options: dict[str, Any] | None = None,
@@ -163,7 +163,8 @@ class Simulation:
         :param reporters: List of reporters to use during simulation.
         :param dm_frequency: Frequency of the Detection/Modification algorithm.
         :param traj_frequency: Frequency of Trajectory frames.
-        :param sim_name: Short name of the simulation. All output files will be prefixed by this name.
+        :param sim_name: Short name of the simulation. All output files will be prefixed by this name. If None, no
+            output files are written at all, but no reporters can be used.
         :param coupling: List of OpenMM coupling forces to use. If None, pressure coupling at 1 bar and 300 kelvin,
             and center of mass motion removal will be employed.
         :param integrator: Base integrator to use during the simulation. Note: a compound integrator will be set up
@@ -276,7 +277,10 @@ class Simulation:
         if nonbonded is None:
             nonbonded = NonBonded
 
-        self.log = open(self.request_path(".log", continue_sim=self.continue_sim), "a")  # noqa: SIM115
+        if self.__sim_name is not None:
+            self.log = open(self.request_path(".log", continue_sim=self.continue_sim), "a")  # noqa: SIM115
+        else:
+            self.log = None
         self.info(f"Martini Daemon {version('martini_daemon')} log file")
         self.info("Build version:", build_version())
         assert isinstance(platform, mm.Platform)
@@ -402,6 +406,8 @@ class Simulation:
             * not make a backup (default)
             * make a copy if self.copy_on_continue is True
         """
+        if self.__sim_name is None:
+            raise ValueError(f"No simulation name was specified, but a reporter attempted to open a {suffix} file.")
         path = self.__sim_name + suffix
 
         parent, filename = os.path.split(path)
@@ -433,7 +439,8 @@ class Simulation:
         self.info(".finish() called, closing output files.")
         for r in self.__reporters:
             r.on_simulation_finish(self)
-        self.log.close()
+        if self.log is not None:
+            self.log.close()
 
     def close(self) -> None:
         """Alias for finish()."""
@@ -441,12 +448,13 @@ class Simulation:
 
     def info(self, *args: str) -> None:
         """Write a message to log."""
-        self.log.write(
-            " ".join(
-                [datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S,%f")[:-3], *args]
+        if self.log is not None:
+            self.log.write(
+                " ".join(
+                    [datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S,%f")[:-3], *args]
+                )
+                + "\n"
             )
-            + "\n"
-        )
 
     def warn(self, message: str) -> None:
         """Write a warning to the log file and to stderr."""

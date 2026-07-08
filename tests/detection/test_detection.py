@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-from martini_daemon import ReactionReporter, Simulation
+from martini_daemon import ReactionsFileReaction, ReactionReporter, Simulation
 
 
 # == CONFIG ==
@@ -32,7 +32,7 @@ tests = [
 
 def get_sim(
     top: str, gro: str
-) -> list[tuple[int, str, list[tuple[str, int, list[int]]]]]:
+) -> list[ReactionsFileReaction]:
     """Run a single frame detection algorithm and return the reactions."""
     rep = ReactionReporter()
     sim = Simulation(top, gro, 0, reporters=[rep])
@@ -42,8 +42,8 @@ def get_sim(
 
 
 def compare(
-    reactions: list[tuple[int, str, list[tuple[str, int, list[int]]]]],
-    expected: list[tuple[int, str, list[tuple[str, int, list[int]]]]],
+    reactions: list[ReactionsFileReaction],
+    expected: list[ReactionsFileReaction],
 ) -> None:
     """Compare expected and obtained reactions, raise errors if not the same."""
     dump = f"\nGot: {reactions}, expected: {expected}."

@@ -3,13 +3,13 @@
 import glob
 import os
 
-import pytest
-
 import openmm as mm
+import pytest
 
 from martini_daemon import (
     CheckpointReporter,
-    FragCountReporter,
+    FragmentReporter,
+    GlobalIntegratorMinimizer,
     GlobalMinimizer,
     LocalGradientDescent,
     LocalMinimizer,
@@ -19,7 +19,7 @@ from martini_daemon import (
     Simulation,
     TopTrajReporter,
     TrajectoryReporter,
-    VariablesReporter, GlobalIntegratorMinimizer,
+    VariablesReporter,
 )
 
 
@@ -47,9 +47,9 @@ def test_integration(x: str, variant: str, rootdir: str) -> None:
         TrajectoryReporter(),
         TopTrajReporter(),
         VariablesReporter(),
-        ReactionReporter(),
-        FragCountReporter(),
-        ReactionEnergyReporter(write_coords=True, ext=".xyz"),
+        ReactionReporter(traj_format="xtc"),
+        FragmentReporter(detailed=True, on_reaction=True),
+        ReactionEnergyReporter(),
         CheckpointReporter(interval=2000, n_checkpoints=5),
     ]
 

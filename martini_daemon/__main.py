@@ -12,7 +12,9 @@ from .__formats import (
     TrajectoryWriter,
     read_checkpoint,
 )
+from .__reporters import FragmentReporter
 from .__rust import BondGraph, build_version
+from .__simulation import Simulation
 
 
 def print_help(topic: None | str = None) -> int:
@@ -55,6 +57,17 @@ Takes the following arguments:
 -o output toptraj file
 -a/--atoms start:end:step
 -f/--frames start:end:step
+""")
+        case "dist":
+            print("""daemon dist
+
+Print distance, angle or dihedrals from a trajectory, based on fragments and graph information, for making distributions.
+Takes the following arguments:
+-i, --input input trajectory file
+-o, --output output file
+-f, --frags '.frags' file with detailed fragment listing enabled
+-p, --topology topology .top file with graph information #included
+-s, --selection Selection pattern, e.g. "monomer:r-s" for a distance between nodes r and s in graph monomer.
 """)
         case _:
             print(f"Unknown subcommand: {topic}.")
@@ -187,6 +200,71 @@ def whole(args: list[str]) -> int:
     print()
     return 0
 
+def dist(args: list[str]) -> int:
+    """Analyze distributions."""
+    parser = ArgumentParser(
+        prog="daemon dist",
+        description="Analyze bond, angle or dihedral distributions",
+        add_help=False,
+    )
+    parser.add_argument("-i", "--input", required=True, help="input trajectory file")
+    parser.add_argument("-o", "--output", required=True, help="output file")
+    parser.add_argument("-f", "--frags", required=True, help=".frags file with detailed fragment listing")
+    parser.add_argument("-p", "--topology", required=True, help="topology .top file with graph information #included")
+    parser.add_argument("-s", "--selection", required=True, help='Selection pattern, e.g. "monomer:r-s" for a distance between nodes r and s in graph monomer. T')
+
+    parsed_args = parser.parse_args(args)
+    inp = TrajectoryReader(parsed_args.input)
+    frag_frames = FragmentReporter.read_fragments(parsed_args.frags)
+    graphs = Simulation(parsed_args.topology, sim_name=None).top.graphs
+    graph_name = parsed_args.selection.split(":")[0].strip()
+    node_names = [x.strip() for x in parsed_args.selection.split(":")[1].split("-")]
+
+    if graph_name not in graphs:
+        print(f"{graph_name} not defined in {parsed_args.topology}.")
+        return 1
+    graph = graphs[graph_name]
+
+    for node in node_names:
+        if node not in graph.atom_name_to_index:
+            print(f"{node} not part of graph {graph_name} in {parsed_args.topology}.")
+            return 1
+    nodes = [graph.atom_name_to_index[x] for x in node_names]
+    if len(nodes) < 2 or len(nodes) > 4:
+        print(f"Specify 2 (distance), 3 (angle) or 4 (dihedral) nodes to write to output file.")
+
+    with open(parsed_args.output, "w") as f:
+        f.write(f"# Written by daemon dist with arguments {args}\n")
+        n_tot = 0
+        for frame in frag_frames:
+            sys.stdout.write(f"\033[2K\rAnalyzing frame: {frame.frame_index} out of {len(frag_frames)}")
+            traj_frame = inp.read_frame()
+            if traj_frame is None:
+                print(f"Trajectory {parsed_args.input} does not have enough frames in comparison with {parsed_args.frags}.")
+                return 2
+            step, time, box, pos, vel = traj_frame
+            f.write(f"# Frame {frame.frame_index}, Step {frame.step}, Box {box.to_lattice()}\n")
+            if step != frame.step or not np.isclose(time, frame.time_ps, atol=0.1):
+                print(f"Trajectory {parsed_args.input} and .frags file {parsed_args.frags} are not in sync.")
+                return 2
+
+            for frag in frame.fragments:
+                n_tot += 1
+                if frag.name != graph_name:
+                    continue
+                idx = [frag.atoms[x] for x in nodes]
+                if any(x == -1 for x in idx):
+                    continue
+                match idx:
+                    case i1, i2:
+                        f.write(f"{box.distance(pos[i1], pos[i2])}\n")
+                    case i1, i2, i3:
+                        f.write(f"{box.angle(pos[i1], pos[i2], pos[i3])}\n")
+                    case i1, i2, i3, i4:
+                        f.write(f"{box.dihedral(pos[i1], pos[i2], pos[i3], pos[i4])}\n")
+        sys.stdout.write(f"\033[2K\rAnalyzed {len(frag_frames)} frames, wrote a total of {n_tot} entries.\n")
+
+    return 0
 
 def parse_slice(slice_: str, n: int) -> tuple[int, int, int]:
     """Parse a slice string into start, end and step slice."""
@@ -403,6 +481,8 @@ def main() -> None:
             sys.exit(whole(args))
         case "select":
             sys.exit(select(args))
+        case "dist":
+            sys.exit(dist(args))
         case "logo":
             if random() > 0.5:
                 logo()

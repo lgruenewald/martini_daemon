@@ -7,7 +7,7 @@ name = "martini_daemon"
 authors = []
 description = ""
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 keywords = []
 classifiers = []
 dependencies = [
