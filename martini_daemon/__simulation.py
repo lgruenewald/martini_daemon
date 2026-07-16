@@ -129,7 +129,9 @@ class Simulation:
         topology: str,
         geometry: str
         | None
-        | tuple[PeriodicBox, npt.NDArray[np.float64], npt.NDArray[np.float64] | None] = None,
+        | tuple[
+            PeriodicBox, npt.NDArray[np.float64], npt.NDArray[np.float64] | None
+        ] = None,
         md_steps: int = 0,
         reporters: list[Reporter] | None = None,
         dm_frequency: int = 0,
@@ -278,7 +280,9 @@ class Simulation:
             nonbonded = NonBonded
 
         if self.__sim_name is not None:
-            self.log = open(self.request_path(".log", continue_sim=self.continue_sim), "a")  # noqa: SIM115
+            self.log = open(  # noqa: SIM115
+                self.request_path(".log", continue_sim=self.continue_sim), "a"
+            )
         else:
             self.log = None
         self.info(f"Martini Daemon {version('martini_daemon')} log file")
@@ -407,7 +411,9 @@ class Simulation:
             * make a copy if self.copy_on_continue is True
         """
         if self.__sim_name is None:
-            raise ValueError(f"No simulation name was specified, but a reporter attempted to open a {suffix} file.")
+            raise ValueError(
+                f"No simulation name was specified, but a reporter attempted to open a {suffix} file."
+            )
         path = self.__sim_name + suffix
 
         parent, filename = os.path.split(path)
@@ -451,7 +457,10 @@ class Simulation:
         if self.log is not None:
             self.log.write(
                 " ".join(
-                    [datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S,%f")[:-3], *args]
+                    [
+                        datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S,%f")[:-3],
+                        *args,
+                    ]
                 )
                 + "\n"
             )

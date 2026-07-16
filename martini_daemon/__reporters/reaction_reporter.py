@@ -18,19 +18,24 @@ def truncate_reactions(handle: TextIO, current_step: int) -> None:
     handle.truncate(prev_pos)
     handle.seek(0, os.SEEK_END)
 
+
 class ReactionsFileReactant(NamedTuple):
     """Reactant parsed from a .reactions file."""
+
     # FIXME: identical signature to Fragment, so this is redundant, but for backwards compat it's a named tuple
     frag_name: str
     frag_id: int
     atoms: list[int]
 
+
 class ReactionsFileReaction(NamedTuple):
     """Reaction parsed from a .reactions file."""
+
     # FIXME: normally I would prefer a dataclass, but a named tuple is used for backwards compat
     step: int
     reaction_name: str
     reactant: list[ReactionsFileReactant]
+
 
 class ReactionReporter(Reporter):
     def __init__(self, traj_format: str | None = None) -> None:
@@ -57,7 +62,11 @@ class ReactionReporter(Reporter):
         self.path: str | None = None
         self.handle: TextIO | None = None
         # _reactions.{format}
-        self.traj_format = traj_format if traj_format is None or traj_format[0] == "." else f".{traj_format}"
+        self.traj_format = (
+            traj_format
+            if traj_format is None or traj_format[0] == "."
+            else f".{traj_format}"
+        )
         self.traj_path: str | None = None
         self.traj_writer: TrajectoryWriter | None = None
 
@@ -78,7 +87,9 @@ class ReactionReporter(Reporter):
 
         # _reactions.{format}
         if self.traj_format is not None:
-            self.traj_path = simulation.request_path(f"_reactions{self.traj_format}", continue_sim=continue_sim)
+            self.traj_path = simulation.request_path(
+                f"_reactions{self.traj_format}", continue_sim=continue_sim
+            )
             append = continue_sim and os.path.exists(self.traj_path)
             self.traj_writer = TrajectoryWriter(
                 self.traj_path,
@@ -88,7 +99,6 @@ class ReactionReporter(Reporter):
                 # (or during trajectory frame also the index of the frame currently being written)
                 keep_n_frames=simulation.trajectory_frame if append else None,
             )
-
 
     def on_simulation_finish(self, simulation: Simulation) -> None:
         assert self.handle is not None
@@ -130,15 +140,15 @@ class ReactionReporter(Reporter):
         if self.traj_format is not None:
             assert self.traj_writer is not None
             pos, box = simulation.context.get_positions()
-            self.traj_writer.write_frame(simulation.current_step, simulation.time_ps, box, pos)
+            self.traj_writer.write_frame(
+                simulation.current_step, simulation.time_ps, box, pos
+            )
 
     def interactive_line(self, simulation: Simulation) -> str:
         return f"reactions: {simulation.reactions_so_far}"
 
     @classmethod
-    def read_reactions(
-        cls, path: str
-    ) -> list[ReactionsFileReaction]:
+    def read_reactions(cls, path: str) -> list[ReactionsFileReaction]:
         """
         .reactions format reader suited for test_detection.py.
 
@@ -160,7 +170,9 @@ class ReactionReporter(Reporter):
                     tokens = elem.split(",")
                     # name, frag_id, atoms
                     frags.append(
-                        ReactionsFileReactant(tokens[0], int(tokens[1]), [int(tok) for tok in tokens[2:]])
+                        ReactionsFileReactant(
+                            tokens[0], int(tokens[1]), [int(tok) for tok in tokens[2:]]
+                        )
                     )
                 reactions.append(ReactionsFileReaction(int(frame), rx, frags))
         return reactions

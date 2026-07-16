@@ -2,9 +2,11 @@
 # ruff: noqa: E501, F401, F403, F405
 
 import builtins
+import typing
+
 import numpy
 import numpy.typing
-import typing
+
 __all__ = [
     "BondGraph",
     "DetectionTemplate",
@@ -22,53 +24,65 @@ class BondGraph:
     def __new__(cls, n_atoms: builtins.int) -> BondGraph:
         r"""
         Create a new empty bond graph.
-        
+
         Currently bond graphs are internally Vec<HashSet<usize>>
         """
     def add_bond(self, i: builtins.int, j: builtins.int) -> None:
         r"""
         Add a bond to the bond graph.
-        
+
         Note: i==j, or already present bonds will be ignored.
-        
+
         i<j or j>i does not matter.
         """
-    def make_whole(self, pbc: PeriodicBox, pos: numpy.typing.NDArray[numpy.float64]) -> None:
+    def make_whole(
+        self, pbc: PeriodicBox, pos: numpy.typing.NDArray[numpy.float64]
+    ) -> None:
         r"""
         Make positions whole (in place).
-        
+
         Uses bond graph in self, and pbc passed as first argument.
-        
+
         Performs a depth-first traversal of the bond graph and mutates pos, so each bond discovered
         is made as short as possible by translating by whole multiples of the periodic box vectors.
         """
     def to_list(self) -> builtins.list[tuple[builtins.int, builtins.int]]:
         r"""
         Get a list of bonds.
-        
+
         Each combination (i, j) is guaranteed to only be there once.
         """
-    def reachable_from(self, atoms: builtins.set[builtins.int]) -> builtins.set[builtins.int]:
+    def reachable_from(
+        self, atoms: builtins.set[builtins.int]
+    ) -> builtins.set[builtins.int]:
         r"""
         Return which atoms can be reached by graph traversal.
-        
+
         Will perform a depth-first traversal, and include the starting atoms in the result.
         """
 
 @typing.final
 class DetectionTemplate:
     @property
-    def name(self) -> typing.Optional[builtins.str]: ...
+    def name(self) -> builtins.str | None: ...
     @name.setter
-    def name(self, value: typing.Optional[builtins.str]) -> None: ...
+    def name(self, value: builtins.str | None) -> None: ...
     @property
     def reactants(self) -> builtins.list[builtins.str]: ...
     @reactants.setter
     def reactants(self, value: typing.Sequence[builtins.str]) -> None: ...
     @property
-    def distance_max(self) -> builtins.list[tuple[builtins.int, builtins.int, builtins.int, builtins.int, builtins.float]]: ...
+    def distance_max(
+        self,
+    ) -> builtins.list[
+        tuple[builtins.int, builtins.int, builtins.int, builtins.int, builtins.float]
+    ]: ...
     @property
-    def distance_min(self) -> builtins.list[tuple[builtins.int, builtins.int, builtins.int, builtins.int, builtins.float]]: ...
+    def distance_min(
+        self,
+    ) -> builtins.list[
+        tuple[builtins.int, builtins.int, builtins.int, builtins.int, builtins.float]
+    ]: ...
     @property
     def probability(self) -> builtins.float: ...
     @probability.setter
@@ -77,52 +91,78 @@ class DetectionTemplate:
     def angle_limits(self) -> list[tuple[int, int, int, int, int, int, float, float]]:
         r"""
         Get a list of angle limits already present.
-        
+
         Used during parsing.
         """
     @property
-    def dihedral_limits(self) -> list[tuple[int, int, int, int, int, int, int, int, float, float]]:
+    def dihedral_limits(
+        self,
+    ) -> list[tuple[int, int, int, int, int, int, int, int, float, float]]:
         r"""
         Get a list of dihedral limits already present.
-        
+
         Used during parsing.
         """
     def __new__(cls) -> DetectionTemplate:
         r"""
         Create a new empty detection template.
-        
+
         Must be fully parsed before adding it to DetectionTemplateList.
         """
-    def add_distance_max(self, entry: tuple[builtins.int, builtins.int, builtins.int, builtins.int, builtins.float]) -> None:
+    def add_distance_max(
+        self,
+        entry: tuple[
+            builtins.int, builtins.int, builtins.int, builtins.int, builtins.float
+        ],
+    ) -> None:
         r"""
         Add a maximum distance condition.
-        
+
         Entry should be: reactant idx, graph node idx, reactant idx, graph node idx, distance^2 (nm^2)
         """
-    def add_distance_min(self, entry: tuple[builtins.int, builtins.int, builtins.int, builtins.int, builtins.float]) -> None:
+    def add_distance_min(
+        self,
+        entry: tuple[
+            builtins.int, builtins.int, builtins.int, builtins.int, builtins.float
+        ],
+    ) -> None:
         r"""
         Add a minimum distance condition.
-        
+
         Entry should be: reactant idx, graph node idx, reactant idx, graph node idx, distance^2 (nm^2)
         """
-    def add_angle_limit(self, entry: tuple[builtins.int, builtins.int, builtins.int, builtins.int, builtins.int, builtins.int, builtins.float, builtins.float]) -> None:
+    def add_angle_limit(
+        self,
+        entry: tuple[
+            builtins.int,
+            builtins.int,
+            builtins.int,
+            builtins.int,
+            builtins.int,
+            builtins.int,
+            builtins.float,
+            builtins.float,
+        ],
+    ) -> None:
         r"""
         Add a forbidden angle range.
-        
+
         Entry should be: reactant idx, graph node (3x), minimum (cosine of angle), maximum (cosine of angle)
         """
-    def add_dihedral_limit(self, entry: tuple[int, int, int, int, int, int, int, int, float, float]) -> None:
+    def add_dihedral_limit(
+        self, entry: tuple[int, int, int, int, int, int, int, int, float, float]
+    ) -> None:
         r"""
         Add a forbidden dihedral range.
-        
+
         Entry should be: reactant idx, graph node (4x), minimum (angle), maximum (angle).
-        
+
         min < max must be true. both min and max must be between -pi and pi, in radians.
         """
     def complete(self) -> None:
         r"""
         Raise an exception if reaction is not valid.
-        
+
         Must be called when reaction is done parsing.
         """
 
@@ -131,25 +171,25 @@ class DetectionTemplateList:
     def __new__(cls) -> DetectionTemplateList:
         r"""
         Create a new detection template list.
-        
+
         Will also store cached information for the detection template.
         """
     def add_detection_template(self, rx: DetectionTemplate) -> builtins.bool:
         r"""
         Add a new detection template.
-        
+
         Will build and cache additional information about it, so should be already in a fully parsed state.
         """
-    def get_detection_template(self, name: builtins.str) -> typing.Optional[DetectionTemplate]:
+    def get_detection_template(self, name: builtins.str) -> DetectionTemplate | None:
         r"""
         Get a mutable copy of detection template.
-        
+
         Returns None if no reaction exists with name.
         """
     def reaction_names(self) -> builtins.list[builtins.str]:
         r"""
         Get a list of all reactions, by their name.
-        
+
         Will make a copy.
         """
 
@@ -162,56 +202,58 @@ class FragList:
     def __new__(cls, n_atoms: builtins.int) -> FragList:
         r"""
         Create a new FragList, for n_atoms total atoms.
-        
+
         Will create an ordered hashmap for fragments, and a dense Vec for atom_id -> fragment relationships.
         """
-    def add_fragment(self, name: builtins.str, atoms: typing.Sequence[builtins.int]) -> builtins.int:
+    def add_fragment(
+        self, name: builtins.str, atoms: typing.Sequence[builtins.int]
+    ) -> builtins.int:
         r"""
         Add a fragment to frag list.
-        
+
         Atom indices of -1 for missing optional and forbidden graph nodes.
         Will also update the defrag list.
         """
-    def get_fragment(self, index: builtins.int) -> typing.Optional[Fragment]:
+    def get_fragment(self, index: builtins.int) -> Fragment | None:
         r"""
         Get a fragment corresponding to frag_id of index.
-        
+
         Returns None if not found.
         """
     def delete_fragment(self, index: builtins.int) -> builtins.bool:
         r"""
         Remove a fragment corresponding to frag_id of index.
-        
+
         Returns whether a fragment of that frag_id was found.
         """
     def delete_fragments_for_atoms(self, atoms: typing.Sequence[builtins.int]) -> None:
         r"""
         Remove all fragments containing atoms.
-        
+
         Called before recalculation of graphs for those atoms.
         """
     def num_fragments(self) -> builtins.int:
         r"""
         Get the number of fragments.
-        
+
         Note: do not iterate 0 to this number, as frag_ids are not continuous.
         """
     def num_fragments_of_type(self, name: builtins.str) -> builtins.int:
         r"""
         Get the number of fragments with a specific type.
-        
+
         Always caches frag_counts, so should be fast.
         """
     def frag_ids_for(self, atom_index: builtins.int) -> builtins.list[builtins.int]:
         r"""
         Return all frag_ids for a specific atom.
-        
+
         Note: Will allocate a new list, but these lists are usually short, so should not be expensive.
         """
     def get_all_frag_ids(self) -> builtins.list[builtins.int]:
         r"""
         Get a copy of all frag IDs for debug purposes.
-        
+
         Will make a copy, so should not be called often.
         """
 
@@ -224,6 +266,12 @@ class Fragment:
     @property
     def atoms(self) -> builtins.list[builtins.int]: ...
     def __str__(self) -> builtins.str: ...
+    def __new__(
+        cls,
+        name: builtins.str,
+        frag_id: builtins.int,
+        atoms: typing.Sequence[builtins.int],
+    ) -> Fragment: ...
 
 @typing.final
 class PeriodicBox:
@@ -231,190 +279,264 @@ class PeriodicBox:
     def a(self) -> builtins.list[builtins.float]:
         r"""
         Get the first unit cell vector.
-        
+
         a.x > 0, a.y == 0, a.z == 0.
         """
     @property
     def b(self) -> builtins.list[builtins.float]:
         r"""
         Get the second unit cell vector.
-        
+
         |b.x| < a.x/2, b.y > 0, b.z == 0.
         """
     @property
     def c(self) -> builtins.list[builtins.float]:
         r"""
         Get the third unit cell vector.
-        
+
         |c.x| < a.x/2, |c.y| < b.y/2, c.z > 0.
         """
-    def __new__(cls, a: typing.Sequence[builtins.float], b: typing.Sequence[builtins.float], c: typing.Sequence[builtins.float]) -> PeriodicBox:
+    def __new__(
+        cls,
+        a: typing.Sequence[builtins.float],
+        b: typing.Sequence[builtins.float],
+        c: typing.Sequence[builtins.float],
+    ) -> PeriodicBox:
         r"""
         Create a new PeriodicBox from three unit cell vectors.
-        
+
         Must obey certain relationships:
-        
+
         * a.x > 0, a.y = 0, a.z = 0
         * 2|b.x| < a.x, b.y > 0, b.z = 0
         * 2|c.x| < a.x, 2|c.y| < b.y, c.z > 0
-        
+
         This is validated, and will raise a PyValueError if these conditions are not met.
         """
     @staticmethod
-    def from_gro(ax: builtins.float, by: builtins.float, cz: builtins.float, ay: typing.Optional[builtins.float] = None, az: typing.Optional[builtins.float] = None, bx: typing.Optional[builtins.float] = None, bz: typing.Optional[builtins.float] = None, cx: typing.Optional[builtins.float] = None, cy: typing.Optional[builtins.float] = None) -> PeriodicBox:
+    def from_gro(
+        ax: builtins.float,
+        by: builtins.float,
+        cz: builtins.float,
+        ay: builtins.float | None = None,
+        az: builtins.float | None = None,
+        bx: builtins.float | None = None,
+        bz: builtins.float | None = None,
+        cx: builtins.float | None = None,
+        cy: builtins.float | None = None,
+    ) -> PeriodicBox:
         r"""
         Create a PeriodicBox based on unit cell description, as found in Gro files.
-        
+
         Must obey same conditions as constructor.
         """
     def to_gro(self) -> builtins.str:
         r"""
         Represent this PeriodicBox as a string, in the .gro file format.
-        
+
         Space separated list of the diagonal a.x, b.y, c.z, and then the remaining a.y, a.z, b.x, b.z, c.x, c.y.
         """
     @staticmethod
-    def triclinic(ax: builtins.float, bx: builtins.float, by: builtins.float, cx: builtins.float, cy: builtins.float, cz: builtins.float) -> PeriodicBox:
+    def triclinic(
+        ax: builtins.float,
+        bx: builtins.float,
+        by: builtins.float,
+        cx: builtins.float,
+        cy: builtins.float,
+        cz: builtins.float,
+    ) -> PeriodicBox:
         r"""
         Create a triclinic PeriodicBox based on unit cell vector components.
-        
+
         Must obey same conditions as constructor.
         """
     def to_lattice(self) -> builtins.str:
         r"""
         Represent this PeriodicBox as a string, in the extended .xyz format Lattice parameter.
-        
+
         Represents a flat, space separated list of the three unit cell vectors.
         """
     @staticmethod
     def cubic(d: builtins.float) -> PeriodicBox:
         r"""
         Create a cubic PeriodicBox based on a unit cell length.
-        
+
         d must be positive.
         """
     @staticmethod
-    def orthogonal(x: builtins.float, y: builtins.float, z: builtins.float) -> PeriodicBox:
+    def orthogonal(
+        x: builtins.float, y: builtins.float, z: builtins.float
+    ) -> PeriodicBox:
         r"""
         Create an orthogonal PeriodicBox based on unit cell lengths.
-        
+
         x, y and z must be positive.
         """
-    def move_within(self, v: typing.Sequence[builtins.float]) -> builtins.list[builtins.float]:
+    def move_within(
+        self, v: typing.Sequence[builtins.float]
+    ) -> builtins.list[builtins.float]:
         r"""
         Move atom within the box 0, 0, 0 to a.x, b.y, c.z.
-        
+
         Note: this is not the box formed by unit cell vectors a, b, c.
         """
-    def move_near_origin(self, v: typing.Sequence[builtins.float]) -> builtins.list[builtins.float]:
+    def move_near_origin(
+        self, v: typing.Sequence[builtins.float]
+    ) -> builtins.list[builtins.float]:
         r"""
         Give the copy of point v closest to 0, 0, 0.
-        
+
         Three subsequent translations are performed, first by c, then by b, then by a.
         """
-    def move_to(self, reference: typing.Sequence[builtins.float], v: typing.Sequence[builtins.float]) -> builtins.list[builtins.float]:
+    def move_to(
+        self,
+        reference: typing.Sequence[builtins.float],
+        v: typing.Sequence[builtins.float],
+    ) -> builtins.list[builtins.float]:
         r"""
         Translate v by periodic box vectors so it is the closest possible to reference in non-periodic space.
-        
+
         Will use diff to obtain a shortest difference.
         """
     def move_all_within(self, array: numpy.typing.NDArray[numpy.float64]) -> None:
         r"""
         Move atoms within the box 0, 0, 0 to a.x, b.y, c.z.
-        
+
         * Input should be a 2D numpy array of type f64 and dimension (n, 3).
         * Also see move_within.
         """
-    def which_atoms_within_distance(self, positions: numpy.typing.NDArray[numpy.float64], reference: builtins.set[builtins.int], r: builtins.float) -> builtins.set[builtins.int]:
+    def which_atoms_within_distance(
+        self,
+        positions: numpy.typing.NDArray[numpy.float64],
+        reference: builtins.set[builtins.int],
+        r: builtins.float,
+    ) -> builtins.set[builtins.int]:
         r"""
         Get which atoms are within a distance to any of the reference atoms.
-        
+
         Will employ a KdTree to accelerate lookup.
         """
     def cell_lengths(self) -> builtins.list[builtins.float]:
         r"""
         Get the lengths of the three unit cell vectors.
-        
+
         Combine with cell_angles.
         """
-    def diff(self, v1: typing.Sequence[builtins.float], v2: typing.Sequence[builtins.float]) -> builtins.list[builtins.float]:
+    def diff(
+        self, v1: typing.Sequence[builtins.float], v2: typing.Sequence[builtins.float]
+    ) -> builtins.list[builtins.float]:
         r"""
         Get the difference between two points in periodic space.
-        
+
         Evaluates 27 different copies of the pbc to find the shortest difference vector.
         """
-    def crosses_box(self, v1: typing.Sequence[builtins.float], v2: typing.Sequence[builtins.float]) -> builtins.bool:
+    def crosses_box(
+        self, v1: typing.Sequence[builtins.float], v2: typing.Sequence[builtins.float]
+    ) -> builtins.bool:
         r"""
         Return whether the shortest path between two points crosses the periodic boundary condition.
-        
+
         Note: in a translation invariant manner.
         """
-    def distance_squared(self, v1: typing.Sequence[builtins.float], v2: typing.Sequence[builtins.float]) -> builtins.float:
+    def distance_squared(
+        self, v1: typing.Sequence[builtins.float], v2: typing.Sequence[builtins.float]
+    ) -> builtins.float:
         r"""
         Get the distance between two points in periodic space, squared.
-        
+
         Avoids sqrt() overhead.
         """
-    def distance(self, v1: typing.Sequence[builtins.float], v2: typing.Sequence[builtins.float]) -> builtins.float:
+    def distance(
+        self, v1: typing.Sequence[builtins.float], v2: typing.Sequence[builtins.float]
+    ) -> builtins.float:
         r"""
         Get the distance between two points in periodic space.
-        
+
         Uses distance_squared.sqrt().
         """
-    def cos_angle(self, v1: typing.Sequence[builtins.float], v2: typing.Sequence[builtins.float], v3: typing.Sequence[builtins.float]) -> builtins.float:
+    def cos_angle(
+        self,
+        v1: typing.Sequence[builtins.float],
+        v2: typing.Sequence[builtins.float],
+        v3: typing.Sequence[builtins.float],
+    ) -> builtins.float:
         r"""
         Get the cosine of the periodic space angle between three points.
-        
+
         Avoids acos() overhead, clamps -1.0 to 1.0.
         """
-    def angle(self, v1: typing.Sequence[builtins.float], v2: typing.Sequence[builtins.float], v3: typing.Sequence[builtins.float]) -> builtins.float:
+    def angle(
+        self,
+        v1: typing.Sequence[builtins.float],
+        v2: typing.Sequence[builtins.float],
+        v3: typing.Sequence[builtins.float],
+    ) -> builtins.float:
         r"""
         Get the periodic space angle between three points, in radians.
-        
+
         Uses cos_angle().acos().
         """
     def cell_angles(self) -> builtins.list[builtins.float]:
         r"""
         Get the angles between the pbc vectors, in radians.
-        
+
         Returned in order of alpha (b, c), beta (a, c), gamma (a, b).
         """
-    def dihedral(self, v1: typing.Sequence[builtins.float], v2: typing.Sequence[builtins.float], v3: typing.Sequence[builtins.float], v4: typing.Sequence[builtins.float]) -> builtins.float:
+    def dihedral(
+        self,
+        v1: typing.Sequence[builtins.float],
+        v2: typing.Sequence[builtins.float],
+        v3: typing.Sequence[builtins.float],
+        v4: typing.Sequence[builtins.float],
+    ) -> builtins.float:
         r"""
         Get the dihedral angle between four points in periodic space, in radians.
-        
+
         Uses atan2(y, x).
         """
-    def is_almost_inside(self, pos: typing.Sequence[builtins.float], cutoff: builtins.float) -> builtins.bool:
+    def is_almost_inside(
+        self, pos: typing.Sequence[builtins.float], cutoff: builtins.float
+    ) -> builtins.bool:
         r"""
         Return whether a position is close to the "central" copy of the periodic box.
-        
+
         This can be because:
         - inside the "central" copy of the pbc
         - within a cutoff distance of the pbc
-        
+
         Non-exactly! It can return true even if it is not within cutoff.
         The only guarantee is that if it returns false, the distance between pos
         and the pbc box is larger than cutoff.
         """
-    def translate_by(self, pos: typing.Sequence[builtins.float], i: builtins.int, j: builtins.int, k: builtins.int) -> builtins.list[builtins.float]:
+    def translate_by(
+        self,
+        pos: typing.Sequence[builtins.float],
+        i: builtins.int,
+        j: builtins.int,
+        k: builtins.int,
+    ) -> builtins.list[builtins.float]:
         r"""
         Translate pos by i, j, k times periodic box vectors.
-        
+
         This returns the same point in a different copy of the periodic box, but the same location in periodic space.
         """
 
 def build_version() -> builtins.str:
     r"""
     Return the current version and git commit as a string.
-    
+
     The output gets embedded in logs.
     """
 
-def detection(frag_list: FragList, detection_template_list: DetectionTemplateList, pbc: PeriodicBox, pos: numpy.typing.NDArray[numpy.float64]) -> builtins.list[tuple[builtins.str, builtins.list[builtins.int]]]:
+def detection(
+    frag_list: FragList,
+    detection_template_list: DetectionTemplateList,
+    pbc: PeriodicBox,
+    pos: numpy.typing.NDArray[numpy.float64],
+) -> builtins.list[tuple[builtins.str, builtins.list[builtins.int]]]:
     r"""
     Perform the detection algorithm.
-    
+
     Main entry point for the detection algorithm
     - takes T* components FragList and DetectionTemplateList, a pbc and the current positions.
     - builds a current frame neighbor list.
@@ -425,9 +547,8 @@ def detection(frag_list: FragList, detection_template_list: DetectionTemplateLis
 def tokenize(line: builtins.str) -> builtins.list[tuple[builtins.int, builtins.int]]:
     r"""
     Tokenize an input line.
-    
+
     * Will ignore comments starting with ;
     * Tokens are separated by whitespace, or enclosed within <> or ""
     * Additionally `[` and `]` are always separate tokens.
     """
-

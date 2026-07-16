@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-from martini_daemon import ReactionsFileReaction, ReactionReporter, Simulation
+from martini_daemon import ReactionReporter, ReactionsFileReaction, Simulation
 
 
 # == CONFIG ==
@@ -30,9 +30,7 @@ tests = [
 ]
 
 
-def get_sim(
-    top: str, gro: str
-) -> list[ReactionsFileReaction]:
+def get_sim(top: str, gro: str) -> list[ReactionsFileReaction]:
     """Run a single frame detection algorithm and return the reactions."""
     rep = ReactionReporter()
     sim = Simulation(top, gro, 0, reporters=[rep])

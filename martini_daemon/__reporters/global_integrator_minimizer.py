@@ -44,4 +44,3 @@ class GlobalIntegratorMinimizer(Reporter):
         simulation.context.do_steps(self.n_steps)
         simulation.context.set_current_integrator(prev_integrator)
         simulation.top.toggle_softcore(reactions, False)
-

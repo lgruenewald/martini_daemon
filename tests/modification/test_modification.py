@@ -6,7 +6,7 @@ from math import isclose
 
 import pytest
 
-from martini_daemon import FragCountReporter, ReactionReporter, Simulation, SystemDump
+from martini_daemon import FragmentReporter, ReactionReporter, Simulation, SystemDump
 
 
 # == CONFIG ==
@@ -33,7 +33,7 @@ tests = [
 def get_sim(top: str, gro: str) -> str:
     """Get a SysStar dump based on a single modification frame, based on top and gro."""
     sim = Simulation(
-        top, gro, 0, reporters=[SystemDump(), FragCountReporter(), ReactionReporter()]
+        top, gro, 0, reporters=[SystemDump(), FragmentReporter(), ReactionReporter()]
     )
     sim.step(0, traj=True, dm=True)
     sim.finish()

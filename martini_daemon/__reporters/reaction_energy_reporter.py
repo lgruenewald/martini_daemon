@@ -17,7 +17,9 @@ class ReactionEnergyReporter(Reporter):
         :param ext: extension for writing the geometries. Set to ".xyz" if xyz files are desired.
         """
         if write_coords:
-            warnings.warn("ReactionEnergyReporter with write_coords=True is deprecated. Use ReactionReporter.")
+            warnings.warn(
+                "ReactionEnergyReporter with write_coords=True is deprecated. Use ReactionReporter."
+            )
         self.write_coords = write_coords
         self.ext = ext
 

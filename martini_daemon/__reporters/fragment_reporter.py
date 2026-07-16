@@ -1,9 +1,11 @@
 import os
 import warnings
 from dataclasses import dataclass
+from typing import TextIO
 
 from ..__rust import Fragment, PeriodicBox
 from ..__simulation import Reporter, Simulation
+
 
 @dataclass
 class FragsFrame:
@@ -14,8 +16,14 @@ class FragsFrame:
     box: PeriodicBox | None = None
     fragments: list[Fragment] | None = None
 
+
 class FragmentReporter(Reporter):
-    def __init__(self, detailed: bool = False, on_trajectory: bool = True, on_reaction: bool = False) -> None:
+    def __init__(
+        self,
+        detailed: bool = False,
+        on_trajectory: bool = True,
+        on_reaction: bool = False,
+    ) -> None:
         """
         Write fragment information per trajectory frame to a `.frags` file.
 
@@ -35,6 +43,8 @@ class FragmentReporter(Reporter):
         self.detailed_frames = detailed
         self.write_on_trajectory = on_trajectory
         self.write_on_reaction = on_reaction
+        self.path: str | None = None
+        self.handle: TextIO | None = None
 
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
         self.path = simulation.request_path(".frags", continue_sim=continue_sim)
@@ -51,7 +61,7 @@ class FragmentReporter(Reporter):
                     c_step = int(token0.strip("Step:"))
                     if c_step > truncate_to:
                         break
-                    tell = self.handle.tell()
+                tell = self.handle.tell()
             self.handle.truncate(tell)
             self.handle.seek(0, os.SEEK_END)
 
@@ -66,6 +76,7 @@ class FragmentReporter(Reporter):
             self.__write_frame(simulation)
 
     def __write_frame(self, simulation: Simulation) -> None:
+        assert self.handle is not None
         self.handle.write(
             f"Step:{simulation.current_step},"
             + ",".join(
@@ -74,18 +85,23 @@ class FragmentReporter(Reporter):
             + "\n"
         )
         if self.detailed_frames:
-            self.handle.write(f"Frame:{simulation.trajectory_frame},Time:{simulation.time_ps}\n")
+            self.handle.write(
+                f"Frame:{simulation.trajectory_frame},Time:{simulation.time_ps}\n"
+            )
             # written in a way to reduce frag_list calls as those go through FFI
             for frag_id in simulation.top.frag_list.get_all_frag_ids():
                 frag = simulation.top.frag_list.get_fragment(frag_id)
                 assert frag is not None
                 frag_name = frag.name
                 frag_atoms = frag.atoms
-                self.handle.write(f"Name:{frag_name},Id:{frag_id},Atoms:[{' '.join(map(str, frag_atoms))}]\n")
+                self.handle.write(
+                    f"Name:{frag_name},Id:{frag_id},Atoms:[{' '.join(map(str, frag_atoms))}]\n"
+                )
 
         self.handle.flush()
 
     def on_simulation_finish(self, simulation: Simulation) -> None:
+        assert self.handle is not None
         self.handle.close()
 
     def interactive_line(self, simulation: Simulation) -> str:
@@ -94,7 +110,7 @@ class FragmentReporter(Reporter):
     @classmethod
     def read_fragments(cls, path: str) -> list[FragsFrame]:
         res: list[FragsFrame] = []
-        with open(path, "r") as handle:
+        with open(path) as handle:
             lines = handle.readlines()
 
         for line in lines:
@@ -112,7 +128,9 @@ class FragmentReporter(Reporter):
                     res.append(FragsFrame(step, counts))
                 case "Frame":
                     # secondary frame header if detailed mode is on
-                    assert len(res) > 0, ".frags file corrupt, as new frames must start with a line Step:... first."
+                    assert len(res) > 0, (
+                        ".frags file corrupt, as new frames must start with a line Step:... first."
+                    )
                     res[-1].frame_index = int(tokens[0].strip("Frame: "))
                     res[-1].time_ps = float(tokens[1].strip("Time: "))
                     # if the Frame line is present => detailed mode was on when writing this
@@ -136,6 +154,9 @@ class FragmentReporter(Reporter):
 
 
 class FragCountReporter(FragmentReporter):
-    def __init__(self, *args, **kwargs) -> None: # noqa: ANN002, ANN003
+    def __init__(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
         super().__init__(*args, **kwargs)
-        warnings.warn("FragCountReporter has been renamed to FragmentReporter. FragCountReporter is currently aliased, but this is deprecated. ", DeprecationWarning)
+        warnings.warn(
+            "FragCountReporter has been renamed to FragmentReporter. FragCountReporter is currently aliased, but this is deprecated. ",
+            DeprecationWarning,
+        )

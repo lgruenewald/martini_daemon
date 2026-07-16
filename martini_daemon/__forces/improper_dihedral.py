@@ -32,9 +32,7 @@ class ImproperDihedral(BondedForce):
 
     def _set_force_obj(self) -> mm.Force:
         force = mm.CustomTorsionForce(
-            "0.5*k*min(dtheta, 2*pi-dtheta)^2;"
-            "dtheta=abs(theta-theta0);"
-            f"pi = {math.pi}"
+            f"0.5*k*min(dtheta, 2*pi-dtheta)^2;dtheta=abs(theta-theta0);pi = {math.pi}"
         )
         force.addPerTorsionParameter("theta0")
         force.addPerTorsionParameter("k")

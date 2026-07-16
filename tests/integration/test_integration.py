@@ -31,9 +31,7 @@ def rootdir(request: pytest.FixtureRequest) -> str:
 
 tests = ["silica_dummy"]
 
-variation = [
-    "global", "global_integrator", "default", "local"
-]
+variation = ["global", "global_integrator", "default", "local"]
 
 
 @pytest.mark.parametrize("x", tests)
@@ -79,10 +77,7 @@ def test_integration(x: str, variant: str, rootdir: str) -> None:
         case "global_integrator":
             reporters.append(
                 GlobalIntegratorMinimizer(
-                    mm.LangevinMiddleIntegrator(
-                        298, 20, 0.01
-                    ),
-                    n_steps=200
+                    mm.LangevinMiddleIntegrator(298, 20, 0.01), n_steps=200
                 )
             )
 

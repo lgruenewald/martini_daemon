@@ -2,6 +2,7 @@ import os
 import sys
 from argparse import ArgumentParser
 from random import random
+from warnings import warn
 
 import numpy as np
 
@@ -200,6 +201,7 @@ def whole(args: list[str]) -> int:
     print()
     return 0
 
+
 def dist(args: list[str]) -> int:
     """Analyze distributions."""
     parser = ArgumentParser(
@@ -209,9 +211,24 @@ def dist(args: list[str]) -> int:
     )
     parser.add_argument("-i", "--input", required=True, help="input trajectory file")
     parser.add_argument("-o", "--output", required=True, help="output file")
-    parser.add_argument("-f", "--frags", required=True, help=".frags file with detailed fragment listing")
-    parser.add_argument("-p", "--topology", required=True, help="topology .top file with graph information #included")
-    parser.add_argument("-s", "--selection", required=True, help='Selection pattern, e.g. "monomer:r-s" for a distance between nodes r and s in graph monomer. T')
+    parser.add_argument(
+        "-f",
+        "--frags",
+        required=True,
+        help=".frags file with detailed fragment listing",
+    )
+    parser.add_argument(
+        "-p",
+        "--topology",
+        required=True,
+        help="topology .top file with graph information #included",
+    )
+    parser.add_argument(
+        "-s",
+        "--selection",
+        required=True,
+        help='Selection pattern, e.g. "monomer:r-s" for a distance between nodes r and s in graph monomer. T',
+    )
 
     parsed_args = parser.parse_args(args)
     inp = TrajectoryReader(parsed_args.input)
@@ -231,21 +248,37 @@ def dist(args: list[str]) -> int:
             return 1
     nodes = [graph.atom_name_to_index[x] for x in node_names]
     if len(nodes) < 2 or len(nodes) > 4:
-        print(f"Specify 2 (distance), 3 (angle) or 4 (dihedral) nodes to write to output file.")
+        print(
+            "Specify 2 (distance), 3 (angle) or 4 (dihedral) nodes to write to output file."
+        )
 
     with open(parsed_args.output, "w") as f:
         f.write(f"# Written by daemon dist with arguments {args}\n")
         n_tot = 0
         for frame in frag_frames:
-            sys.stdout.write(f"\033[2K\rAnalyzing frame: {frame.frame_index} out of {len(frag_frames)}")
+            sys.stdout.write(
+                f"\033[2K\rAnalyzing frame: {frame.frame_index} out of {len(frag_frames)}"
+            )
+            if frame.fragments is None:
+                warn(f"Frame {frame.frame_index} has no fragments.")
+                continue
+            if frame.time_ps is None:
+                warn(f"Frame {frame.frame_index} has no simulation time.")
+                continue
             traj_frame = inp.read_frame()
             if traj_frame is None:
-                print(f"Trajectory {parsed_args.input} does not have enough frames in comparison with {parsed_args.frags}.")
+                print(
+                    f"Trajectory {parsed_args.input} does not have enough frames in comparison with {parsed_args.frags}."
+                )
                 return 2
             step, time, box, pos, vel = traj_frame
-            f.write(f"# Frame {frame.frame_index}, Step {frame.step}, Box {box.to_lattice()}\n")
+            f.write(
+                f"# Frame {frame.frame_index}, Step {frame.step}, Box {box.to_lattice()}\n"
+            )
             if step != frame.step or not np.isclose(time, frame.time_ps, atol=0.1):
-                print(f"Trajectory {parsed_args.input} and .frags file {parsed_args.frags} are not in sync.")
+                print(
+                    f"Trajectory {parsed_args.input} and .frags file {parsed_args.frags} are not in sync."
+                )
                 return 2
 
             for frag in frame.fragments:
@@ -262,9 +295,12 @@ def dist(args: list[str]) -> int:
                         f.write(f"{box.angle(pos[i1], pos[i2], pos[i3])}\n")
                     case i1, i2, i3, i4:
                         f.write(f"{box.dihedral(pos[i1], pos[i2], pos[i3], pos[i4])}\n")
-        sys.stdout.write(f"\033[2K\rAnalyzed {len(frag_frames)} frames, wrote a total of {n_tot} entries.\n")
+        sys.stdout.write(
+            f"\033[2K\rAnalyzed {len(frag_frames)} frames, wrote a total of {n_tot} entries.\n"
+        )
 
     return 0
+
 
 def parse_slice(slice_: str, n: int) -> tuple[int, int, int]:
     """Parse a slice string into start, end and step slice."""

@@ -6,7 +6,7 @@ import shutil
 import pytest
 
 from martini_daemon import (
-    FragCountReporter,
+    FragmentReporter,
     ReactionEnergyReporter,
     ReactionReporter,
     Reporter,
@@ -70,7 +70,7 @@ def rootdir(request: pytest.FixtureRequest) -> str:
 
 
 formats = [
-    (".frags", FragCountReporter, "r"),
+    (".frags", FragmentReporter, "r"),
     (".ener", VariablesReporter, "r"),
     (".reactions", ReactionReporter, "r"),
     (".rxener", ReactionEnergyReporter, "r"),
