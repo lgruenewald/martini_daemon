@@ -1,18 +1,25 @@
 from __future__ import annotations
 
 import math
+import shutil
 from typing import TextIO
 
 import numpy as np
 import openmm as mm
 
+from ..__formats import TrajectoryWriter
 from ..__rust import Fragment
 from ..__simulation import Reporter, Simulation
 
 
 class LocalMinimizer(Reporter):
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
-        pass
+        if self.write_xtc:
+            self.tmp_path = simulation.request_path("_tmpmin.xtc")
+            self.xtc_path = simulation.request_path("_lastmin.xtc")
+            self.tmp_log = simulation.request_path("_tmpmin.log")
+            self.min_log = simulation.request_path("_lastmin.log")
+            
 
     def on_simulation_finish(self, simulation: Simulation) -> None:
         pass
@@ -25,6 +32,7 @@ class LocalMinimizer(Reporter):
         whole_molecule: bool = True,
         harmonic_constraints: bool = True,
         report_every: int = 0,
+        write_xtc: bool = False
     ) -> None:
         """
         Local Minimizer. Uses the Reporter API to locally minimize the energy after the modification algorithm runs.
@@ -34,7 +42,12 @@ class LocalMinimizer(Reporter):
         :param r_movable: Distance cutoff of how far from reacting atoms counts as local, in nanometers. Set to 0. to only consider the bond graph.
         :param whole_molecule: If True, the entire molecule will be considered local and included in the minimization. If false, only reactant atoms and their bond neighbors will be included.
         :param harmonic_constraints: If True, the constraints will be converted to stiff harmonic bonds during minimization.
-        :param report_every: If set to an integer larger than 0, minimization progress details will be written to log files.
+        :param report_every: If set to an integer larger than 0, minimization progress details will be written to a log file.
+            Always overwrites, so only the last minimization is shown, to save disk space. A temporary file is written first,
+            only writes _lastmin.log once the minimization is complete.
+        :param write_xtc: If True, will write a coordinate file with precision==10000 in <simname>_lastmin.xtc, always
+            overwriting the last to save disk space. Will report based on report_every. If report_every==0, will only
+            write at the start and end.
         """
         self.minimizer = minimizer
         assert minimization_steps > 0, "Must specify minimization_steps > 0"
@@ -44,6 +57,11 @@ class LocalMinimizer(Reporter):
         self.harmonic_constraints = harmonic_constraints
         self.report_every = report_every
         self.integrator_index = None
+        self.write_xtc = write_xtc
+        self.tmp_path = None
+        self.xtc_path = None
+        self.tmp_log = None
+        self.min_log = None
 
     def pre_simulation_start(self, simulation: Simulation) -> None:
         assert simulation.integrator is not None
@@ -54,12 +72,16 @@ class LocalMinimizer(Reporter):
     def reset(self, shape: tuple[int, int]) -> None:
         self.minimizer._reset(shape)
 
-    def report(self, handle: TextIO, rem: int) -> None:
+    def report(self, handle: TextIO, rem: int, simulation: Simulation, w: TrajectoryWriter | None) -> None:
         """Write optimization progress to the file handle."""
         handle.write("==============================================\n")
         handle.write(f"remaining steps: {rem}\n")
         handle.write(self.minimizer._report())
         handle.write("\n==============================================\n")
+        if w is not None:
+            assert self.xtc_path is not None
+            pos, box = simulation.context.get_positions()
+            w.write_frame(simulation.current_step, simulation.time_ps, box, pos)
 
     def on_reaction(
         self, simulation: Simulation, reactions: list[tuple[str, list[Fragment]]]
@@ -69,6 +91,14 @@ class LocalMinimizer(Reporter):
         simulation.info("on_reaction Local Minimizer")
         vel = simulation.context.get_velocities()
         pos, box = simulation.context.get_positions()
+        if self.write_xtc:
+            assert self.tmp_path is not None
+            w = TrajectoryWriter(self.tmp_path, precision=10000)
+            w.write_frame(
+                simulation.current_step, simulation.time_ps, box, pos, None
+            )
+        else:
+            w = None
         old_integrator = simulation.context.get_current_integrator()
         simulation.context.set_current_integrator(self.integrator_index)
         simulation.top.toggle_softcore(reactions, True)
@@ -103,10 +133,11 @@ class LocalMinimizer(Reporter):
 
         gcd = math.gcd(self.report_every, 10) if self.report_every > 0 else 10
         remaining = self.minimization_steps
-        suffix = f"_minimization{simulation.current_step}.log"
         if self.report_every > 0:
-            handle = open(simulation.request_path(suffix), "w")  # noqa: SIM115
-            self.report(handle, remaining)
+            assert self.tmp_log is not None
+            handle = open(self.tmp_log, "w")  # noqa: SIM115
+            handle.write(f"Simulation step {simulation.current_step}, time (ps) {simulation.time_ps}\n")
+            self.report(handle, remaining, simulation, w)
 
         simulation.info("initial reporting done, minimizing now")
         while remaining > 0:
@@ -114,13 +145,29 @@ class LocalMinimizer(Reporter):
             simulation.context.do_steps(c_steps)
             remaining -= c_steps
             if self.report_every > 0 and remaining % self.report_every == 0:
-                self.report(handle, remaining)
+                self.report(handle, remaining, simulation, w)
             if self.minimizer._has_converged():
                 simulation.info("minimizer converged")
                 break
 
+        if w is not None:
+            assert self.tmp_path is not None
+            assert self.xtc_path is not None
+            pos, box = simulation.context.get_positions()
+            w.write_frame(
+                simulation.current_step, simulation.time_ps, box, pos, None
+            )
+            w.close()
+            w = None
+            # only move when it's complete
+            shutil.move(self.tmp_path, self.xtc_path)
+
         if self.report_every > 0:
             handle.close()
+            assert self.tmp_log is not None
+            assert self.min_log is not None
+            # only move when it's complete
+            shutil.move(self.tmp_log, self.min_log)
 
         simulation.info("minimization over")
         simulation.context.set_velocities(vel)

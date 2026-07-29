@@ -44,6 +44,7 @@ class TrajectoryWriter:
         backend: str | None = None,
         append: bool = False,
         keep_n_frames: int | None = None,
+        precision: int | None = None
     ) -> None:
         """
         Create a TrajectoryWriter object.
@@ -60,8 +61,11 @@ class TrajectoryWriter:
         :param keep_n_frames: If appending, the number of frames to keep. Since formats have variable quality in what
             metadata they have, the number of frames to keep is the most portable choice across various trajectory
             formats.
+        :param precision: If specified, will attempt to use this precision. If specified, but the format or writer
+            does not support it, will throw an exception.
         """
         self.path = path
+        self.precision = precision
         if not append:
             assert keep_n_frames is None, "Truncate is only valid if append is True."
         if backend is None:
@@ -141,10 +145,14 @@ class TrajectoryWriter:
                 frame.positions = pos.flatten()
                 frame.step = sim_step % (np.iinfo(np.uint32).max + 1)
                 frame.time = time_ps
+                if self.precision is not None:
+                    frame.precision = self.precision
                 assert self.__writer_molly is not None
                 self.__writer_molly.write_frame(frame)
             case "trr_mdtraj":
                 assert len(pos.shape) == 2 and pos.shape[1] == 3
+                if self.precision is not None:
+                    raise ValueError("trr_mdtraj does not support customizing the precision")
                 self.__writer_trr._write(
                     np.array([pos], dtype=np.float32),
                     np.array([time_ps], dtype=np.float32),
