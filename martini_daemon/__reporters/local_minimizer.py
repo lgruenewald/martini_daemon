@@ -17,6 +17,7 @@ class LocalMinimizer(Reporter):
         if self.write_xtc:
             self.tmp_path = simulation.request_path("_tmpmin.xtc")
             self.xtc_path = simulation.request_path("_lastmin.xtc")
+        if self.report_every > 0:
             self.tmp_log = simulation.request_path("_tmpmin.log")
             self.min_log = simulation.request_path("_lastmin.log")
             
@@ -153,6 +154,7 @@ class LocalMinimizer(Reporter):
         if w is not None:
             assert self.tmp_path is not None
             assert self.xtc_path is not None
+            # final positions
             pos, box = simulation.context.get_positions()
             w.write_frame(
                 simulation.current_step, simulation.time_ps, box, pos, None
