@@ -10,9 +10,8 @@ class ReactionEnergyReporter(Reporter):
         """
         Create a reporter that will write energies before and after a reaction.
 
-        Note: will have post-minimization in the output file, regardless of whether there is a minimization,
-        this is because it does not know what other reporters are in the simulation.
-
+        Note: If minimizers are present, it will only print post-minimization energies.
+        
         :param write_coords: if set to True, it will print .gro files pre and post minimization (deprecated)
         :param ext: extension for writing the geometries. Set to ".xyz" if xyz files are desired.
         """
@@ -43,7 +42,7 @@ class ReactionEnergyReporter(Reporter):
         self.__write_pos("premin", simulation)
 
     def post_reaction(self, simulation: Simulation) -> None:
-        write_energies("post-minimization", self.handle, simulation)
+        write_energies("post-reaction", self.handle, simulation)
         self.__write_pos("postmin", simulation)
 
     def on_simulation_finish(self, simulation: Simulation) -> None:

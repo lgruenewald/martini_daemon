@@ -17,7 +17,6 @@ from .local_minimizer import (
 from .local_minimizer import (
     LocalMinimizer as LocalMinimizer,
 )
-from .local_minimizer import MaximumDisplacementVerlet as MaximumDisplacementVerlet
 from .reaction_energy_reporter import ReactionEnergyReporter as ReactionEnergyReporter
 from .reaction_reporter import ReactionReporter as ReactionReporter
 from .reaction_reporter import ReactionsFileReactant as ReactionsFileReactant

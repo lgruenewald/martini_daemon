@@ -27,10 +27,10 @@ class LocalMinimizer(Reporter):
     def __init__(
         self,
         minimizer: LocalGradientDescent,
-        minimization_steps: int = 500,
-        r_movable: float = 1.0,
-        whole_molecule: bool = True,
-        harmonic_constraints: bool = True,
+        minimization_steps: int = 10,
+        r_movable: float = 0.0,
+        whole_molecule: bool = False,
+        harmonic_constraints: bool = False,
         report_every: int = 0,
         write_xtc: bool = False
     ) -> None:
@@ -179,90 +179,13 @@ class LocalMinimizer(Reporter):
         simulation.context.set_current_integrator(old_integrator)
         simulation.info("back")
 
-
-class MaximumDisplacementVerlet:
-    def __init__(
-        self,
-        timestep_ps: float = 0.01,
-        max_step_size_nm: float = 0.005,
-    ) -> None:
-        """
-        Construct a Maximum Displacement Verlet integrator.
-
-        :param max_step_size_nm: Maximum step size during a single time step.
-        """
-        assert max_step_size_nm > 0.0, "Maximum step must be larger than 0."
-
-        self.global_variables = {
-            "x_sum": 0,
-            "v_sum": 0,
-            "fnorm2": 0,
-            "dta": timestep_ps,
-            "maxstep": max_step_size_nm,
-        }
-
-        self.per_dof_variables = {
-            "movable": 0,
-            "x0": 0,
-        }
-
-        self.integrator = mm.CustomIntegrator(0.0)
-
-        for k, v in self.global_variables.items():
-            self.integrator.addGlobalVariable(k, v)
-
-        for k, v in self.per_dof_variables.items():
-            self.integrator.addPerDofVariable(k, v)
-
-        self.integrator.addComputePerDof("x0", "x")
-        self.integrator.addUpdateContextState()
-        self.integrator.addComputePerDof("v", "v+dta*f/m")
-        self.integrator.addConstrainVelocities()
-        self.integrator.addComputePerDof(
-            "x", "x+max(min(dta*v*movable, maxstep), -maxstep)"
-        )
-        self.integrator.addConstrainPositions()
-        self.integrator.addComputePerDof("v", "(x-x0)/dt")
-
-        self.integrator.addComputeSum("x_sum", "x*movable")
-        self.integrator.addComputeSum("v_sum", "v*movable")
-        self.integrator.addComputeSum("fnorm2", "f*f*movable")
-
-    def _set_movable(self, movable: np.ndarray) -> None:
-        """Set the degrees of freedom that are movable."""
-        self.integrator.setPerDofVariableByName("movable", movable)
-
-    def _has_converged(self) -> bool:
-        """Has the minimization converged."""
-        return False
-
-    def _reset(self, shape: tuple[int, int]) -> None:
-        """Reset the integrator to its initial state."""
-        for k, v in self.global_variables.items():
-            self.integrator.setGlobalVariableByName(k, v)
-
-        for k, v in self.per_dof_variables.items():
-            assert v == 0
-            vals = np.zeros(shape)
-            self.integrator.setPerDofVariableByName(k, vals)
-
-    def _report(self) -> str:
-        """Return a string that would be reported."""
-        return (
-            "\n".join(
-                f"{k}: {self.integrator.getGlobalVariableByName(k)}"
-                for k in self.global_variables
-            )
-            + "\n"
-        )
-
-
 class LocalGradientDescent:
     def __init__(
         self,
-        initial_step_size_nm: float = 0.1,
+        initial_step_size_nm: float = 0.01,
         etol: float = 0.0,
         smoothing_factor: float = 0.1,
+        max_step: float | None = None
     ) -> None:
         """
         Construct a (smoothed) gradient descent minimization integrator.
@@ -289,9 +212,6 @@ class LocalGradientDescent:
             "eta": smoothing_factor,
             "converged": 0,
             "etol": etol,
-            "x_sum": 0,
-            "x_sum2": 0,
-            "v_sum": 0,
         }
 
         self.per_dof_variables = {"x_old": 0, "v_old": 0, "est_grad": 0, "movable": 0}
@@ -316,9 +236,6 @@ class LocalGradientDescent:
         self.integrator.addComputeGlobal("energy_old", "energy")
         self.integrator.addComputePerDof("x_old", "x")
         self.integrator.addComputePerDof("v_old", "v")
-        self.integrator.addComputeSum("x_sum", "x")
-        self.integrator.addComputeSum("x_sum2", "x*x")
-        self.integrator.addComputeSum("v_sum", "v")
 
         # Take step, re-constraint positions.
         self.integrator.addComputePerDof("est_grad", "(1-eta)*est_grad + eta*f")
@@ -348,9 +265,14 @@ class LocalGradientDescent:
         # self.addComputePerDof("x", "accept*x + (1-accept)*x_old")
 
         # Update step size.
-        self.integrator.addComputeGlobal(
-            "step_size", "step_size * (2.0*accept + 0.5*(1-accept))"
-        )
+        if max_step is not None:
+            self.integrator.addComputeGlobal(
+                "step_size", f"min(step_size * (2.0*accept + 0.5*(1-accept)), {max_step})"
+            )
+        else:
+            self.integrator.addComputeGlobal(
+                "step_size", "step_size * (2.0*accept + 0.5*(1-accept))"
+            )
 
         if etol > 0:
             # check convergence - must be not NaN and delta_energy < 0 and delta_energy > -etol
