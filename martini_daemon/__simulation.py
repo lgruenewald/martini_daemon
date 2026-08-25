@@ -6,6 +6,7 @@ import math
 import os
 import shutil
 import sys
+import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from datetime import datetime
@@ -26,6 +27,7 @@ from .__formats import Checkpoint, read_geometry, write_geometry
 from .__parser import GromacsTopFile, InvalidTopologyError
 from .__rust import Fragment, PeriodicBox, build_version
 from .__topstar import TopStar
+from .extra import set_process_title
 
 
 class Reporter(ABC):
@@ -478,25 +480,9 @@ class Simulation:
     # Friendly interface for setting up and running simulations
     @classmethod
     def set_process_title(cls, newname: bytes = b"daemon") -> None:
-        """
-        Set process title to something else than "python".
+        warnings.warn("Deprecated: Use martini_daemon.extra.set_process_title")
+        set_process_title(newname)
 
-        Nothing critical, purely aesthetic.
-        Only works on (some versions of) linux. May fail silently with no exceptions thrown.
-
-        Based on: https://stackoverflow.com/questions/564695/is-there-a-way-to-change-effective-process-name-in-python
-
-        :param newname: new process name, as a byte string.
-        """
-        try:
-            from ctypes import byref, cdll, create_string_buffer
-
-            libc = cdll.LoadLibrary("libc.so.6")
-            buff = create_string_buffer(len(newname) + 1)
-            buff.value = newname
-            libc.prctl(15, byref(buff), 0, 0, 0)
-        finally:
-            pass
 
     @property
     def context(self) -> Context:

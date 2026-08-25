@@ -16,6 +16,7 @@ from .__formats import (
 from .__reporters import FragmentReporter
 from .__rust import BondGraph, build_version
 from .__simulation import Simulation
+from .extra import logo, logo_small
 
 
 def print_help(topic: None | str = None) -> int:
@@ -304,6 +305,7 @@ def dist(args: list[str]) -> int:
 
 def parse_slice(slice_: str, n: int) -> tuple[int, int, int]:
     """Parse a slice string into start, end and step slice."""
+    assert n > 0, "n_frames must be positive"
     if len(slice_) == 0:
         return 0, n, 1
     toks = slice_.split(":")
@@ -326,13 +328,13 @@ def select(args: list[str]) -> int:
     """Select frames or atoms using the `daemon select` CLI."""
     parser = ArgumentParser(
         prog="daemon select",
-        description="Select atoms and/or frames for a .toptraj file",
+        description="Select atoms and/or frames for a .toptraj or .frags file",
         add_help=False,
     )
-    parser.add_argument("-i", "--input", required=True, help="input toptraj file")
-    parser.add_argument("-o", "--output", required=True, help="output toptraj file")
+    parser.add_argument("-i", "--input", required=True, help="input toptraj or frags file")
+    parser.add_argument("-o", "--output", required=True, help="output toptraj or frags file")
     parser.add_argument(
-        "-a", "--atoms", required=False, help="atom selection (start:stop:step)"
+        "-a", "--atoms", required=False, help="atom selection (start:stop:step), only valid for toptraj files"
     )
     parser.add_argument(
         "-f", "--frames", required=False, help="frame selection (start:stop:step)"
@@ -347,155 +349,107 @@ def select(args: list[str]) -> int:
     if not os.path.isfile(inp):
         print(f"{inp} does not exist, or is not a file.")
         return 1
+    _, ext = os.path.splitext(inp)
+    _, oup_ext = os.path.splitext(oup)
+    if oup_ext != ext:
+        print(f"Extension of input/output not the same. Input: {ext}, output: {oup_ext}.")
+        return 1
+    match ext:
+        case ".toptraj":
+            r = TopTrajReader(inp)
+            # count frames
+            tells = [r.tell()]
+            while r.skip_frame():
+                tells.append(r.tell())
+            del tells[-1]
+            r.seek(tells[0])
+            atom_start, atom_end, atom_step = parse_slice(parsed_args.atoms or "", r.n_atoms)
+            new_n_atoms = len(range(atom_start, atom_end, atom_step))
+            frame_start, frame_end, frame_step = parse_slice(
+                parsed_args.frames or "", len(tells)
+            )
 
-    r = TopTrajReader(inp)
-    # count frames
-    tells = [r.tell()]
-    while r.skip_frame():
-        tells.append(r.tell())
-    del tells[-1]
-    r.seek(tells[0])
+            if atom_start > atom_end or atom_step < 0:
+                raise ValueError("Atom selection error - must have a positive step.")
+            if atom_start > 0 or atom_step != 1:
+                # to fix this, a map of old atom -> new atom indices would need to be made, applied to bonds, and made usable
+                # in e.g. the vmd plugin
+                raise ValueError(
+                    "Currently, only atom selections starting at 0 and with step 1 are supported."
+                )
+            if frame_start > frame_end or frame_step < 0:
+                raise ValueError("Frame selection error - must have a positive step.")
 
-    atom_start, atom_end, atom_step = parse_slice(parsed_args.atoms or "", r.n_atoms)
-    new_n_atoms = len(range(atom_start, atom_end, atom_step))
-    frame_start, frame_end, frame_step = parse_slice(
-        parsed_args.frames or "", len(tells)
-    )
+            res_names = [r.res_names[j] for j in range(atom_start, atom_end, atom_step)]
+            res_ids = [r.res_ids[j] for j in range(atom_start, atom_end, atom_step)]
 
-    if atom_start > atom_end or atom_step < 0:
-        raise ValueError("Atom selection error - must have a positive step.")
-    if atom_start > 0 or atom_step != 1:
-        # to fix this, a map of old atom -> new atom indices would need to be made, applied to bonds, and made usable
-        # in e.g. the vmd plugin
-        raise ValueError(
-            "Currently, only atom selections starting at 0 and with step 1 are supported."
-        )
-    if frame_start > frame_end or frame_step < 0:
-        raise ValueError("Frame selection error - must have a positive step.")
+            if (sel_start := r.title.find("(select")) > -1:
+                new_title = r.title[:sel_start] + "(selected multiple times)"
+            else:
+                new_title = (
+                    r.title
+                    + f" (select atoms: {atom_start}:{atom_end}:{atom_step}; frames: {frame_start}:{frame_end}:{frame_step})"
+                )
 
-    res_names = [r.res_names[j] for j in range(atom_start, atom_end, atom_step)]
-    res_ids = [r.res_ids[j] for j in range(atom_start, atom_end, atom_step)]
+            w = TopTrajWriter(oup, new_title, r.initial_molecules, res_names, res_ids)
 
-    if (sel_start := r.title.find("(select")) > -1:
-        new_title = r.title[:sel_start] + "(selected multiple times)"
-    else:
-        new_title = (
-            r.title
-            + f" (select atoms: {atom_start}:{atom_end}:{atom_step}; frames: {frame_start}:{frame_end}:{frame_step})"
-        )
+            new_i = -1
+            for new_i, i in enumerate(range(frame_start, frame_end, frame_step)):
+                sys.stdout.write(f"\033[2K\rProcessing frame: {i + 1}/{len(tells) + 1}")
+                r.seek(tells[i])
+                frame = r.read_frame()
+                assert frame is not None
+                w.new_frame(new_i, frame.sim_step, frame.sim_time, new_n_atoms)
 
-    w = TopTrajWriter(oup, new_title, r.initial_molecules, res_names, res_ids)
+                names = [frame.names[j] for j in range(atom_start, atom_end, atom_step)]
+                types = [frame.atom_types[j] for j in range(atom_start, atom_end, atom_step)]
+                charges = [frame.charges[j] for j in range(atom_start, atom_end, atom_step)]
+                masses = [frame.masses[j] for j in range(atom_start, atom_end, atom_step)]
+                w.write_frame_atoms(names, types, charges, masses)
 
-    new_i = -1
-    for new_i, i in enumerate(range(frame_start, frame_end, frame_step)):
-        sys.stdout.write(f"\033[2K\rProcessing frame: {i + 1}/{len(tells) + 1}")
-        r.seek(tells[i])
-        frame = r.read_frame()
-        assert frame is not None
-        w.new_frame(new_i, frame.sim_step, frame.sim_time, new_n_atoms)
+                sel = set(range(atom_start, atom_end, atom_step))
+                bonds = [(a, b) for a, b in frame.bonds if a in sel and b in sel]
+                w.write_frame_bonds(bonds)
+                w.write_frame()
+            print(f"\033[2K\rProcessed a total of {new_i + 1} frames.")
 
-        names = [frame.names[j] for j in range(atom_start, atom_end, atom_step)]
-        types = [frame.atom_types[j] for j in range(atom_start, atom_end, atom_step)]
-        charges = [frame.charges[j] for j in range(atom_start, atom_end, atom_step)]
-        masses = [frame.masses[j] for j in range(atom_start, atom_end, atom_step)]
-        w.write_frame_atoms(names, types, charges, masses)
+        case ".frags":
+            if parsed_args.atoms is not None:
+                warn("Warning: Argument --atoms is ignored on .frags select.")
+            with open(inp) as f_in:
+                # sadly we need to know the number of frames in advance
+                # luckily due to disk caching this isn't a complete waste
+                # to read like this
+                n_frames = 0
+                while line := f_in.readline():
+                    if line == "":
+                        break
+                    if line.startswith("Step:"):
+                        n_frames += 1
+                
+            with open(oup, "w") as f_out:
+                frame_start, frame_end, frame_step = parse_slice(
+                    parsed_args.frames or "", n_frames
+                )
+                last_written = -1
+                for frame in FragmentReporter.iter_fragments(inp):
+                    if frame.frame_index is None:
+                        # detailed mode is off, best guess
+                        frame.frame_index = last_written + 1
+                    if frame.frame_index < frame_start:
+                        continue
+                    if frame.frame_index >= frame_end:
+                        break
+                    last_written += 1
+                    if last_written % frame_step != 0:
+                        continue
+                    f_out.write(
+                        frame.serialize()
+                    )
 
-        sel = set(range(atom_start, atom_end, atom_step))
-        bonds = [(a, b) for a, b in frame.bonds if a in sel and b in sel]
-        w.write_frame_bonds(bonds)
-        w.write_frame()
-    print(f"\033[2K\rProcessed a total of {new_i + 1} frames.")
-
+        case _:
+            print(f"File type {ext} not supported, only .toptraj and .frags is.")
     return 0
-
-
-def logo() -> None:
-    """Print the Martini Daemon logo."""
-    print(r"""@                                                         %                     
-@@                  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ %                      
-@ @        @@@@@@                                       %   @@@@               @
-   @       @@@@                                        %   @@@@@             @@@
- @   @      @@          @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ @@  @            @@ @@
- @     @@@@@@@@   ......... ...................}......}     @@          @@@   @@
-  @       @@@@ @ ..... .......................]........}...@@@@@@@@@@@@       @ 
-   @      @ @@  @@  . .........................}.......]..@ @@               @@ 
-    @     @  @@   @ ........................]<<.:<___<].)@ @@@              @@  
-     @     @  @@   @ . ....................)......]....@   @@             @@    
-      @    @  @@    @  ....................].......[.=@    @@            @@     
-        @@  @@@@     @@.....................}......^@@     @@          @@       
-           @@@@        @....................<{)_{~@@        @@@@@@@@@@@         
-                         @.................%~... @                              
-                          @...............%.. ..@                               
-                           @.............%....@@                                 
-                             @..........%..@@@                                  
-                               @@@@@@@@@@@ @@                                   
-                                @         @                                     
-                                 @@     @@                                      
-                                   @@@@@                                        
-                                   @  @@                                        
-                                   @  @@                                        
-                                   @  @@                                        
-                                   @  @@                                        
-                                   @  @@                                        
-                                   @  @@                                        
-                                   @  @@                                        
-                                   @  @@                                @@@     
-                                   @  @@                              @@@@      
-                                   @  @@              @@          @@@@@@@       
-                                   @  @@         @@@@@@@@@@  @@@@@@@@@@@        
-                                   @  @@     @@@@@@      @@      @@@@@@         
-                                   @  @@  @@@@@@@         @@   @@@@@@@@         
-                                   @  @@@@@@@@             @@@@@   @@@          
-                               @@@@@  @@@@@@@                       @           
-                         @@@@     @     @@     @@@                              
-                      @@        @        @@@       @                            
-                     @@        @@@@@@@@@@@@         @                           
-                      @@@                           @                           
-                        @@@@@@@                @@@@@                            
-                              @@@@@@@@@@@@@@@@@@                                
-                                                                                
-    __  __            _   _       _    ____                                     
-   |  \/  | __ _ _ __| |_(_)_ __ (_)  |  _ \  __ _  ___ _ __ ___   ___  _ __    
-   | |\/| |/ _` | '__| __| | '_ \| |  | | | |/ _` |/ _ \ '_ ` _ \ / _ \| '_ \   
-   | |  | | (_| | |  | |_| | | | | |  | |_| | (_| |  __/ | | | | | (_) | | | |  
-   |_|  |_|\__,_|_|   \__|_|_| |_|_|  |____/ \__,_|\___|_| |_| |_|\___/|_| |_|  
-""")
-
-
-def logo_small() -> None:
-    """Print the smaller version of the logo."""
-    print(r"""           @                               %                           
-           @@                             %                 @          
-           @  @      @@@ @@@@@@@@@@@@@@@@@@@@@@@          @ @          
-            @   @@@  @  --------- ---[    \-----@ @@@ @@@   @          
-             @   @ @  @---- --------[     ]---@ @         @            
-              @     @  @------- ---/ \___/---@  @        @@            
-                @@@ @   @---- ----[    /----@   @       @              
-                          @-------\___]---@       @@@@@                
-                           @--- ---%----@                              
-                             @----%---@@                               
-                               @ %   @                                 
-                                @@@@@                                  
-                                 @ @                                   
-                                 @ @                                   
-                                 @ @                                   
-                                 @ @                                   
-                                 @ @                   @@              
-                                 @ @        @@@     @@@@@              
-                                 @ @   @@@@@  @@    @@@@               
-                                 @ @@@@@       @@@@@ @@                
-                       	  @@@@  @@@@@@@@          @                    
-                         @     @    @      @                           
-                         @      @@@@       @                           
-                          @@@@@@@@@@@@@@@@                             
-                                                                       
-⣿⣤   ⣤⣿             ⣿   ⣤       ⣤ ⣿⠶⠶                                  
-⣿ ⣿ ⣿ ⣿ ⣤⣤⣤⣤  ⣤ ⣤⣤  ⣿⣤⣤   ⣤ ⣤⣤    ⣿  ⣿ ⣤⣤⣤⣤   ⣤⣤⣤  ⣿ ⣤⣤  ⣤⣤   ⣤⣤  ⣤ ⣤⣤ 
-⣿  ⣿  ⣿  ⣤⣤⣤⣿ ⣿⠛  ⠛ ⣿   ⣿ ⣿⠛  ⣿ ⣿ ⣿  ⣿  ⣤⣤⣤⣿ ⣿⣤⣤⣤⣿ ⣿⠛  ⣿⠛  ⣿ ⣿  ⣿ ⣿⠛  ⣿
-⣿     ⣿ ⣿   ⣿ ⣿     ⣿   ⣿ ⣿   ⣿ ⣿ ⣿  ⣿ ⣿   ⣿ ⣿     ⣿   ⣿   ⣿ ⣿  ⣿ ⣿   ⣿
-⣿     ⣿ ⠛⣤⣤⣤⣿ ⣿     ⠛⣤⣤ ⣿ ⣿   ⣿ ⣿ ⣿⣤⣤⣿ ⠛⣤⣤⣤⣿ ⠛⣤⣤⣤  ⣿   ⣿   ⣿ ⠛⣤⣤⠛ ⣿   ⣿
-""")
-
 
 def main() -> None:
     """Parse arguments and run the right subcommand of the `daemon` CLI."""
@@ -521,9 +475,9 @@ def main() -> None:
             sys.exit(dist(args))
         case "logo":
             if random() > 0.5:
-                logo()
+                print(logo())
             else:
-                logo_small()
+                print(logo_small())
             sys.exit(0)
         case _:
             print(f"Unknown command: {subcommand}")

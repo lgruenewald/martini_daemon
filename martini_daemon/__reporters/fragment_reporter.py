@@ -1,9 +1,10 @@
 import os
 import warnings
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import TextIO
 
-from ..__rust import Fragment, PeriodicBox
+from ..__rust import Fragment
 from ..__simulation import Reporter, Simulation
 
 
@@ -11,10 +12,35 @@ from ..__simulation import Reporter, Simulation
 class FragsFrame:
     step: int
     counts: dict[str, int]
+    detailed: bool = False
     frame_index: int | None = None
     time_ps: float | None = None
-    box: PeriodicBox | None = None
     fragments: list[Fragment] | None = None
+
+    def serialize(self) -> str:
+        """Get the in-file representation of this frame, with a newline at the end."""
+        res = []
+        res.append(
+            f"Step:{self.step},"
+            + ",".join(
+                [f"{k}:{v}" for k, v in self.counts.items()]
+            )
+        )
+        if self.detailed:
+            assert self.frame_index is not None and self.time_ps is not None
+            res.append(f"Frame:{self.frame_index},Time:{self.time_ps}")
+
+            assert self.fragments is not None
+            for frag in self.fragments:
+                frag_name = frag.name
+                frag_id = frag.frag_id
+                atoms = frag.atoms
+                res.append(
+                    f"Name:{frag_name},Id:{frag_id},Atoms:[{' '.join(map(str, atoms))}]"
+                )
+
+        return "\n".join(res) + "\n"
+        
 
 
 class FragmentReporter(Reporter):
@@ -77,26 +103,44 @@ class FragmentReporter(Reporter):
 
     def __write_frame(self, simulation: Simulation) -> None:
         assert self.handle is not None
-        self.handle.write(
-            f"Step:{simulation.current_step},"
-            + ",".join(
-                [f"{k}:{v}" for k, v in simulation.top.frag_list.frag_counts.items()]
-            )
-            + "\n"
-        )
+        frags = []
         if self.detailed_frames:
-            self.handle.write(
-                f"Frame:{simulation.trajectory_frame},Time:{simulation.time_ps}\n"
-            )
-            # written in a way to reduce frag_list calls as those go through FFI
-            for frag_id in simulation.top.frag_list.get_all_frag_ids():
-                frag = simulation.top.frag_list.get_fragment(frag_id)
+            # skip making this copy if not detailed
+            for id in simulation.top.frag_list.get_all_frag_ids():
+                frag = simulation.top.frag_list.get_fragment(id)
+                # because of type checker
                 assert frag is not None
-                frag_name = frag.name
-                frag_atoms = frag.atoms
-                self.handle.write(
-                    f"Name:{frag_name},Id:{frag_id},Atoms:[{' '.join(map(str, frag_atoms))}]\n"
-                )
+                frags.append(frag)
+        frame = FragsFrame(
+            simulation.current_step,
+            simulation.top.frag_list.frag_counts,
+            self.detailed_frames,
+            simulation.trajectory_frame,
+            simulation.time_ps,
+            frags
+        )
+        self.handle.write(frame.serialize())
+        
+        # self.handle.write(
+        #     f"Step:{simulation.current_step},"
+        #     + ",".join(
+        #         [f"{k}:{v}" for k, v in simulation.top.frag_list.frag_counts.items()]
+        #     )
+        #     + "\n"
+        # )
+        # if self.detailed_frames:
+        #     self.handle.write(
+        #         f"Frame:{simulation.trajectory_frame},Time:{simulation.time_ps}\n"
+        #     )
+        #     # written in a way to reduce frag_list calls as those go through FFI
+        #     for frag_id in simulation.top.frag_list.get_all_frag_ids():
+        #         frag = simulation.top.frag_list.get_fragment(frag_id)
+        #         assert frag is not None
+        #         frag_name = frag.name
+        #         frag_atoms = frag.atoms
+        #         self.handle.write(
+        #             f"Name:{frag_name},Id:{frag_id},Atoms:[{' '.join(map(str, frag_atoms))}]\n"
+        #         )
 
         self.handle.flush()
 
@@ -107,51 +151,113 @@ class FragmentReporter(Reporter):
     def interactive_line(self, simulation: Simulation) -> str:
         return f"fragments: {simulation.top.frag_list.num_fragments()}"
 
+
+    @classmethod
+    def iter_fragments(cls, path: str) -> Iterator[FragsFrame]:
+        """Read a .frags file frame by frame."""
+        class FragsFrameIterator:
+            def __init__(self, path: str) -> None:
+                self.__handle = open(path) # noqa: SIM115
+                self.__next: str | None = None
+
+            def __advance(self) -> str | None:
+                r"""
+                Get the next line.
+
+                Returns None on EOF.
+                """
+                if self.__next is not None:
+                    res = self.__next
+                    self.__next = None
+                    return res
+                next = self.__handle.readline()
+                if next == "":
+                    return None
+                return next
+
+            def __backtrack(self, next: str) -> None:
+                self.__next = next
+
+            def __finish(self) -> None:
+                self.__handle.close()
+
+            def __skip_whitespace(self) -> None:
+                """Skip all empty and comment lines."""
+                while line := self.__advance():
+                    if line is None:
+                        break
+                        
+                    if len(line) > 0 and line[0] != "#":
+                        # first content line
+                        self.__backtrack(line)
+                        break
+            
+            def __next__(self) -> FragsFrame:
+                self.__skip_whitespace()
+                header = self.__advance()
+                if header is None:
+                    self.__finish()
+                    raise StopIteration
+                tokens = header.split(",")
+                keyword = tokens[0].strip().split(":")[0]
+                assert keyword == "Step", ".frags format must start with 'Step:'."
+                step = int(tokens[0].strip("Step:"))
+                counts = {}
+                for tok in tokens[1:]:
+                    k, v = tok.strip().split(":")
+                    assert k.strip() not in counts
+                    counts[k.strip()] = int(v.strip())
+                res = FragsFrame(step, counts, False)
+                
+                # detailed mode stuff
+                while line := self.__advance():
+                    if line is None:
+                        break
+                    line = line.strip()
+                    if len(line) == 0 or line[0] == "#":
+                        continue
+                    tokens = line.split(",")
+                    keyword = tokens[0].split(":")[0].strip(":").strip()
+
+                    match keyword:
+                        case "Step":
+                            # next frame started
+                            self.__backtrack(line)
+                            break
+                        case "Frame":
+                            res.detailed = True
+                            res.frame_index = int(tokens[0].strip("Frame: "))
+                            res.time_ps = float(tokens[1].strip("Time: "))
+                        case "Name":
+                            res.detailed = True
+                            if res.fragments is None:
+                                res.fragments = []
+                            name = tokens[0].split(":")[1].strip()
+                            tok1 = tokens[1].strip()
+                            assert tok1.startswith("Id:")
+                            id = int(tok1.split(":")[1].strip())
+                            tok2 = tokens[2].strip()
+                            assert tok2.startswith("Atoms:[") and tok2.endswith("]")
+                            atoms = list(map(int, tok2.strip("Atoms:[ ]").split()))
+                            res.fragments.append(Fragment(name, id, atoms))
+                        case _:
+                            warnings.warn(f"Ignoring line '{line}'.")
+                return res
+
+            def __iter__(self) -> Iterator[FragsFrame]:
+                return self
+
+        return iter(FragsFrameIterator(path))
+
     @classmethod
     def read_fragments(cls, path: str) -> list[FragsFrame]:
-        res: list[FragsFrame] = []
-        with open(path) as handle:
-            lines = handle.readlines()
+        """
+        Read an entire .frags file.
 
-        for line in lines:
-            tokens = line.split(",")
-            keyword = tokens[0].strip().split(":")[0]
-            match keyword:
-                case "Step":
-                    # frame header
-                    step = int(tokens[0].strip("Step:"))
-                    counts = {}
-                    for tok in tokens[1:]:
-                        k, v = tok.strip().split(":")
-                        assert k.strip() not in counts
-                        counts[k.strip()] = int(v.strip())
-                    res.append(FragsFrame(step, counts))
-                case "Frame":
-                    # secondary frame header if detailed mode is on
-                    assert len(res) > 0, (
-                        ".frags file corrupt, as new frames must start with a line Step:... first."
-                    )
-                    res[-1].frame_index = int(tokens[0].strip("Frame: "))
-                    res[-1].time_ps = float(tokens[1].strip("Time: "))
-                    # if the Frame line is present => detailed mode was on when writing this
-                    res[-1].fragments = []
-                case "Name":
-                    # a single fragment entry, only written if detailed mode is on
-                    if res[-1].fragments is None:
-                        # normally shouldn't occur on files written by this reporter
-                        res[-1].fragments = []
-                    name = tokens[0].split(":")[1].strip()
-                    tok1 = tokens[1].strip()
-                    assert tok1.startswith("Id:")
-                    id = int(tok1.split(":")[1].strip())
-                    tok2 = tokens[2].strip()
-                    assert tok2.startswith("Atoms:[") and tok2.endswith("]")
-                    atoms = list(map(int, tok2.strip("Atoms:[ ]").split()))
-                    res[-1].fragments.append(Fragment(name, id, atoms))
-                # forward compat (?): ignore lines not starting with a known keyword
-
-        return res
-
+        Note: use iter_fragments if per-frame iteration is desired, as that
+        will not load the entire file into memory.
+        """
+        return list(cls.iter_fragments(path))
 
 class FragCountReporter(FragmentReporter):
     def __init__(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
