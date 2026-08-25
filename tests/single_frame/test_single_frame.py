@@ -213,7 +213,8 @@ class TestSingleFrame:
         # check if there is any exactly cutoffs
         box, pos, _ = read_geometry(self.gro)
         for other_atom in range(len(pos)):
-            dist = box.distance(pos[atom_index], pos[other_atom])
+            # np array -> list to satisfy ty
+            dist = box.distance(list(pos[atom_index]), list(pos[other_atom]))
             if np.isclose(dist, cutoff_nm):
                 print(
                     f"Atoms {atom_index + 1} and {other_atom}+1 are exactly cutoff apart!"
@@ -237,9 +238,8 @@ class TestSingleFrame:
         assert os.path.isdir(x)
         os.chdir(x)
         with open("stdout.txt", "w") as stdout, open("stderr.txt", "w") as stderr:
-            run(["../gmxrun.sh"], stdout=stdout, stderr=stderr).check_returncode()
+            run(["../gmxrun.sh"], stdout=stdout, stderr=stderr, check=True)
 
-        os.system("../gmxrun.sh")
         assert os.path.isfile("energy.xvg"), f"./gmxrun.sh failure for {x} (E)"
         assert os.path.isfile("forces.xvg"), f"./gmxrun.sh failure for {x} (F)"
         with open("energy.xvg") as f:

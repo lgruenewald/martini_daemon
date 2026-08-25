@@ -33,7 +33,7 @@ class TopStar:
             mol_type = system.molecule_types.get(mol)
             assert mol_type is not None
             n_atoms = len(mol_type.atoms)
-            for j in range(n):
+            for _ in range(n):
                 self.try_match_graphs(set(range(i, i + n_atoms)))
                 i += n_atoms
 
@@ -94,9 +94,16 @@ class TopStar:
         completed = []
 
         for rx, frag_ids in reactions:
-            frags = [self.frag_list.get_fragment(frag_id) for frag_id in frag_ids]
+            reactant_unavailable = False
+            frags = []
+            for frag_id in frag_ids:
+                frag = self.frag_list.get_fragment(frag_id)
+                if frag is None:
+                    reactant_unavailable = True
+                    break
+                frags.append(frag)
 
-            if any(frag is None for frag in frags):
+            if reactant_unavailable:
                 # pass reactions if a previous reactions' modification algorithm destroyed the reactant fragment
                 # of another reaction
                 continue

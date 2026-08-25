@@ -2,6 +2,7 @@
 
 import glob
 import os
+from subprocess import run
 
 import numpy as np
 import pytest
@@ -47,7 +48,7 @@ def load_checkpoint(
 
     assert sim.current_step == 1
     assert sim.reactions_so_far == 1
-    ke, pe, te = sim.context.get_energies()
+    _, pe, _ = sim.context.get_energies()
     forces = sim.context.get_forces()
     pos, box = sim.context.get_positions()
     vel = sim.context.get_velocities()
@@ -69,7 +70,8 @@ def get_chk(top: str, gro: str) -> tuple[str, PeriodicBox, np.ndarray, np.ndarra
 
 def run_gromacs(x: str) -> tuple[float, np.ndarray]:
     """Get GROMACS energy and force for the system in the current directory."""
-    os.system("../gmxrun.sh")
+    with open("stdout.txt", "w") as stdout, open("stderr.txt", "w") as stderr:
+        run(["../gmxrun.sh"], stdout=stdout, stderr=stderr, check=True)
     assert os.path.isfile("energy.xvg"), f"./gmxrun.sh failure for {x} (E)"
     assert os.path.isfile("forces.xvg"), f"./gmxrun.sh failure for {x} (F)"
     with open("energy.xvg") as f:
@@ -116,5 +118,7 @@ def test_replay(x: str, rootdir: str) -> None:
         os.remove(filename)
     for filename in glob.glob("./#*"):
         os.remove(filename)
-    # os.remove("energy.xvg")
-    # os.remove("forces.xvg")
+    os.remove("energy.xvg")
+    os.remove("forces.xvg")
+    os.remove("stdout.txt")
+    os.remove("stderr.txt")

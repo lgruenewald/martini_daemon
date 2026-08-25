@@ -44,7 +44,7 @@ class TrajectoryWriter:
         backend: str | None = None,
         append: bool = False,
         keep_n_frames: int | None = None,
-        precision: int | None = None
+        precision: int | None = None,
     ) -> None:
         """
         Create a TrajectoryWriter object.
@@ -152,7 +152,9 @@ class TrajectoryWriter:
             case "trr_mdtraj":
                 assert len(pos.shape) == 2 and pos.shape[1] == 3
                 if self.precision is not None:
-                    raise ValueError("trr_mdtraj does not support customizing the precision")
+                    raise ValueError(
+                        "trr_mdtraj does not support customizing the precision"
+                    )
                 self.__writer_trr._write(
                     np.array([pos], dtype=np.float32),
                     np.array([time_ps], dtype=np.float32),

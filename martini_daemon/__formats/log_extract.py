@@ -17,7 +17,7 @@ def extract_timings_from_log(path: str, ignore_first: bool = False) -> dict[str,
     categories_sums = {}
     try:
         with open(path) as f:
-            for line in f.readlines():
+            for line in f:
                 date = line[:23]
                 content = line[24:]
                 parsed_date = datetime.strptime(date, date_format)

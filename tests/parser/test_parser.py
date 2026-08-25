@@ -33,7 +33,6 @@ class Root(Directive):
 
     def finish(self) -> None:
         """Finish parsing this directive."""
-        pass
 
     @classmethod
     def is_mandatory(cls) -> bool:
@@ -256,5 +255,5 @@ should_fail = ["fail_mandatory.ini", "fail_unique.ini", "fail_wrong_parent.ini"]
 @pytest.mark.parametrize("x", should_fail)
 def test_should_fail(x: str, rootdir: str) -> None:
     """Test the Directive API's guarantee requirements."""
-    ok, root = parse(x)
+    ok, _ = parse(x)
     assert not ok

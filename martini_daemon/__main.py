@@ -331,10 +331,17 @@ def select(args: list[str]) -> int:
         description="Select atoms and/or frames for a .toptraj or .frags file",
         add_help=False,
     )
-    parser.add_argument("-i", "--input", required=True, help="input toptraj or frags file")
-    parser.add_argument("-o", "--output", required=True, help="output toptraj or frags file")
     parser.add_argument(
-        "-a", "--atoms", required=False, help="atom selection (start:stop:step), only valid for toptraj files"
+        "-i", "--input", required=True, help="input toptraj or frags file"
+    )
+    parser.add_argument(
+        "-o", "--output", required=True, help="output toptraj or frags file"
+    )
+    parser.add_argument(
+        "-a",
+        "--atoms",
+        required=False,
+        help="atom selection (start:stop:step), only valid for toptraj files",
     )
     parser.add_argument(
         "-f", "--frames", required=False, help="frame selection (start:stop:step)"
@@ -352,7 +359,9 @@ def select(args: list[str]) -> int:
     _, ext = os.path.splitext(inp)
     _, oup_ext = os.path.splitext(oup)
     if oup_ext != ext:
-        print(f"Extension of input/output not the same. Input: {ext}, output: {oup_ext}.")
+        print(
+            f"Extension of input/output not the same. Input: {ext}, output: {oup_ext}."
+        )
         return 1
     match ext:
         case ".toptraj":
@@ -363,7 +372,9 @@ def select(args: list[str]) -> int:
                 tells.append(r.tell())
             del tells[-1]
             r.seek(tells[0])
-            atom_start, atom_end, atom_step = parse_slice(parsed_args.atoms or "", r.n_atoms)
+            atom_start, atom_end, atom_step = parse_slice(
+                parsed_args.atoms or "", r.n_atoms
+            )
             new_n_atoms = len(range(atom_start, atom_end, atom_step))
             frame_start, frame_end, frame_step = parse_slice(
                 parsed_args.frames or "", len(tells)
@@ -402,9 +413,15 @@ def select(args: list[str]) -> int:
                 w.new_frame(new_i, frame.sim_step, frame.sim_time, new_n_atoms)
 
                 names = [frame.names[j] for j in range(atom_start, atom_end, atom_step)]
-                types = [frame.atom_types[j] for j in range(atom_start, atom_end, atom_step)]
-                charges = [frame.charges[j] for j in range(atom_start, atom_end, atom_step)]
-                masses = [frame.masses[j] for j in range(atom_start, atom_end, atom_step)]
+                types = [
+                    frame.atom_types[j] for j in range(atom_start, atom_end, atom_step)
+                ]
+                charges = [
+                    frame.charges[j] for j in range(atom_start, atom_end, atom_step)
+                ]
+                masses = [
+                    frame.masses[j] for j in range(atom_start, atom_end, atom_step)
+                ]
                 w.write_frame_atoms(names, types, charges, masses)
 
                 sel = set(range(atom_start, atom_end, atom_step))
@@ -426,7 +443,7 @@ def select(args: list[str]) -> int:
                         break
                     if line.startswith("Step:"):
                         n_frames += 1
-                
+
             with open(oup, "w") as f_out:
                 frame_start, frame_end, frame_step = parse_slice(
                     parsed_args.frames or "", n_frames
@@ -443,13 +460,12 @@ def select(args: list[str]) -> int:
                     last_written += 1
                     if last_written % frame_step != 0:
                         continue
-                    f_out.write(
-                        frame.serialize()
-                    )
+                    f_out.write(frame.serialize())
 
         case _:
             print(f"File type {ext} not supported, only .toptraj and .frags is.")
     return 0
+
 
 def main() -> None:
     """Parse arguments and run the right subcommand of the `daemon` CLI."""

@@ -1,5 +1,6 @@
 """'Bonus functionality' that's not essential features."""
 
+
 def set_process_title(newname: bytes = b"daemon") -> None:
     """
     Set process title to something else than "python".
@@ -20,6 +21,7 @@ def set_process_title(newname: bytes = b"daemon") -> None:
         libc.prctl(15, byref(buff), 0, 0, 0)
     finally:
         pass
+
 
 def logo() -> str:
     """Get the Martini Daemon logo."""
@@ -72,6 +74,7 @@ def logo() -> str:
    | |  | | (_| | |  | |_| | | | | |  | |_| | (_| |  __/ | | | | | (_) | | | |  
    |_|  |_|\__,_|_|   \__|_|_| |_|_|  |____/ \__,_|\___|_| |_| |_|\___/|_| |_|  
 """
+
 
 def logo_small() -> str:
     """Get the smaller version of the logo."""

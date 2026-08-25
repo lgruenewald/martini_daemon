@@ -56,7 +56,6 @@ class Reporter(ABC):
         is needed, but it is not implemented. Truncate to the MD step specified by simulation.current_step,
         if possible, verify that the same truncation would be obtained by simulation.time_ps.
         """
-        pass
 
     @abstractmethod
     def on_simulation_finish(self, simulation: Simulation) -> None:
@@ -65,7 +64,6 @@ class Reporter(ABC):
 
         Must be implemented, as handles owned by reporters must be closed in it.
         """
-        pass
 
     def on_trajectory_frame(self, simulation: Simulation) -> None:
         """
@@ -74,11 +72,9 @@ class Reporter(ABC):
         There is a single per simulation traj_frequency because that's a simple
         way of getting multiple output types with nicely aligned time frames.
         """
-        pass
 
     def interactive_line(self, simulation: Simulation) -> str | None:
         """Report to the interactive status progress display."""
-        pass
 
     def pre_modification(self, simulation: Simulation) -> None:
         """Report before the modification algorithm, but only if there may be any reactions happening."""
@@ -92,14 +88,12 @@ class Reporter(ABC):
         :param simulation: Simulation object.
         :param reactions: List of reactions that were applied, as tuples of reaction name and references to reacting fragments.
         """
-        pass
 
     def post_reaction(self, simulation: Simulation) -> None:
         """Report after all on_reaction reporters were resolved (some might apply minimization)."""
-        pass
 
 
-def _format_time(total_seconds: float | int) -> str:
+def _format_time(total_seconds: float) -> str:
     c = int(total_seconds)
     seconds = c % 60
     c //= 60
@@ -460,7 +454,8 @@ class Simulation:
             self.log.write(
                 " ".join(
                     [
-                        datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S,%f")[:-3],
+                        # I explicitly want local time and don't want to change format, therefore noqa
+                        datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S,%f")[:-3],  # noqa: DTZ005
                         *args,
                     ]
                 )
@@ -482,7 +477,6 @@ class Simulation:
     def set_process_title(cls, newname: bytes = b"daemon") -> None:
         warnings.warn("Deprecated: Use martini_daemon.extra.set_process_title")
         set_process_title(newname)
-
 
     @property
     def context(self) -> Context:

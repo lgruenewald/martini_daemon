@@ -158,7 +158,7 @@ class ReactantsDirective(Directive):
 
 def _parse_angle_conditions(
     tokens: TokenList, start: int, wrap: bool
-) -> list[tuple[int, int]]:
+) -> list[tuple[float, float]]:
     """
     Parse a line containing an angle or dihedral condition.
 

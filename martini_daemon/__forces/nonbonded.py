@@ -125,8 +125,8 @@ class NonBonded(Force):
         nb_types: dict[tuple[str, str], tuple[float, float]] = (
             self.system.additional_data.get("nb_types")
         )
-        for t1, i in self.__atom_types.items():
-            for t2, j in self.__atom_types.items():
+        for t1 in self.__atom_types:
+            for t2 in self.__atom_types:
                 sigma, epsilon = (
                     nb_types.get((t1, t2)) or nb_types.get((t2, t1)) or (0.0, 0.0)
                 )

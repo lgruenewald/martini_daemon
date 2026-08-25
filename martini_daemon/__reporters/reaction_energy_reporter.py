@@ -11,7 +11,7 @@ class ReactionEnergyReporter(Reporter):
         Create a reporter that will write energies before and after a reaction.
 
         Note: If minimizers are present, it will only print post-minimization energies.
-        
+
         :param write_coords: if set to True, it will print .gro files pre and post minimization (deprecated)
         :param ext: extension for writing the geometries. Set to ".xyz" if xyz files are desired.
         """

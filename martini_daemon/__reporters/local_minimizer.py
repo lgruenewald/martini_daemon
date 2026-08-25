@@ -20,7 +20,6 @@ class LocalMinimizer(Reporter):
         if self.report_every > 0:
             self.tmp_log = simulation.request_path("_tmpmin.log")
             self.min_log = simulation.request_path("_lastmin.log")
-            
 
     def on_simulation_finish(self, simulation: Simulation) -> None:
         pass
@@ -33,7 +32,7 @@ class LocalMinimizer(Reporter):
         whole_molecule: bool = False,
         harmonic_constraints: bool = False,
         report_every: int = 0,
-        write_xtc: bool = False
+        write_xtc: bool = False,
     ) -> None:
         """
         Local Minimizer. Uses the Reporter API to locally minimize the energy after the modification algorithm runs.
@@ -73,7 +72,13 @@ class LocalMinimizer(Reporter):
     def reset(self, shape: tuple[int, int]) -> None:
         self.minimizer._reset(shape)
 
-    def report(self, handle: TextIO, rem: int, simulation: Simulation, w: TrajectoryWriter | None) -> None:
+    def report(
+        self,
+        handle: TextIO,
+        rem: int,
+        simulation: Simulation,
+        w: TrajectoryWriter | None,
+    ) -> None:
         """Write optimization progress to the file handle."""
         handle.write("==============================================\n")
         handle.write(f"remaining steps: {rem}\n")
@@ -95,9 +100,7 @@ class LocalMinimizer(Reporter):
         if self.write_xtc:
             assert self.tmp_path is not None
             w = TrajectoryWriter(self.tmp_path, precision=10000)
-            w.write_frame(
-                simulation.current_step, simulation.time_ps, box, pos, None
-            )
+            w.write_frame(simulation.current_step, simulation.time_ps, box, pos, None)
         else:
             w = None
         old_integrator = simulation.context.get_current_integrator()
@@ -137,7 +140,9 @@ class LocalMinimizer(Reporter):
         if self.report_every > 0:
             assert self.tmp_log is not None
             handle = open(self.tmp_log, "w")  # noqa: SIM115
-            handle.write(f"Simulation step {simulation.current_step}, time (ps) {simulation.time_ps}\n")
+            handle.write(
+                f"Simulation step {simulation.current_step}, time (ps) {simulation.time_ps}\n"
+            )
             self.report(handle, remaining, simulation, w)
 
         simulation.info("initial reporting done, minimizing now")
@@ -156,9 +161,7 @@ class LocalMinimizer(Reporter):
             assert self.xtc_path is not None
             # final positions
             pos, box = simulation.context.get_positions()
-            w.write_frame(
-                simulation.current_step, simulation.time_ps, box, pos, None
-            )
+            w.write_frame(simulation.current_step, simulation.time_ps, box, pos, None)
             w.close()
             w = None
             # only move when it's complete
@@ -181,13 +184,14 @@ class LocalMinimizer(Reporter):
         simulation.context.set_current_integrator(old_integrator)
         simulation.info("back")
 
+
 class LocalGradientDescent:
     def __init__(
         self,
         initial_step_size_nm: float = 0.01,
         etol: float = 0.0,
         smoothing_factor: float = 0.1,
-        max_step: float | None = None
+        max_step: float | None = None,
     ) -> None:
         """
         Construct a (smoothed) gradient descent minimization integrator.
@@ -269,7 +273,8 @@ class LocalGradientDescent:
         # Update step size.
         if max_step is not None:
             self.integrator.addComputeGlobal(
-                "step_size", f"min(step_size * (2.0*accept + 0.5*(1-accept)), {max_step})"
+                "step_size",
+                f"min(step_size * (2.0*accept + 0.5*(1-accept)), {max_step})",
             )
         else:
             self.integrator.addComputeGlobal(

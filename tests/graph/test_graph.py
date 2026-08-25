@@ -96,6 +96,7 @@ def compare(name: str, top: TopStar, expected: list[tuple[str, list[int]]]) -> N
         for frag in frags:
             if frag in matched_frags:
                 continue
+            assert frag is not None
             if try_match(frag, frag_name, part_ids):
                 matched = True
                 matched_frags.add(frag)

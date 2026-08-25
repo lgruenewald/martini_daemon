@@ -13,12 +13,12 @@ def write_frame(handle: TextIO, sim: Simulation) -> None:
     handle.write("Atoms\n")
     handle.write("# (name, resid, resname, type, charge, mass, sc_lam, sc_alpha)\n")
 
-    for atom in range(sys.num_atoms()):
-        handle.write(
-            f"('{sys.get_name(atom)}', {sys.get_res_id(atom)}, '{sys.get_res_name(atom)}', "
-            + f"'{sys.get_type(atom)}', {sys.get_charge(atom)}, {sys.get_mass(atom)}, "
-            + f"{sys.get_sc_lam(atom)}, {sys.get_sc_alpha(atom)})\n",
-        )
+    handle.writelines(
+        f"('{sys.get_name(atom)}', {sys.get_res_id(atom)}, '{sys.get_res_name(atom)}', "
+        + f"'{sys.get_type(atom)}', {sys.get_charge(atom)}, {sys.get_mass(atom)}, "
+        + f"{sys.get_sc_lam(atom)}, {sys.get_sc_alpha(atom)})\n"
+        for atom in range(sys.num_atoms())
+    )
 
     handle.write("\n")
     handle.write("Forces\n")
@@ -28,8 +28,10 @@ def write_frame(handle: TextIO, sim: Simulation) -> None:
         if len([force.iterate_bonds()]) == 0:
             continue
         handle.write(f"Force:{force.get_name()}\n")
-        for _, (members, params) in force.iterate_bonds():
-            handle.write("(" + ", ".join(str(x) for x in members + params) + ")\n")
+        handle.writelines(
+            "(" + ", ".join(str(x) for x in members + params) + ")\n"
+            for _, (members, params) in force.iterate_bonds()
+        )
 
     handle.write("End Frame\n\n")
 
@@ -54,7 +56,6 @@ class SystemDump(Reporter):
         Due to the debug-oriented nature of this format, it will not be truncated when continuing simulations
         from an older frame.
         """
-        pass
 
     def on_simulation_start(self, simulation: Simulation, continue_sim: bool) -> None:
         self.handle = open(  # noqa: SIM115

@@ -22,9 +22,7 @@ class FragsFrame:
         res = []
         res.append(
             f"Step:{self.step},"
-            + ",".join(
-                [f"{k}:{v}" for k, v in self.counts.items()]
-            )
+            + ",".join([f"{k}:{v}" for k, v in self.counts.items()])
         )
         if self.detailed:
             assert self.frame_index is not None and self.time_ps is not None
@@ -40,7 +38,6 @@ class FragsFrame:
                 )
 
         return "\n".join(res) + "\n"
-        
 
 
 class FragmentReporter(Reporter):
@@ -117,10 +114,10 @@ class FragmentReporter(Reporter):
             self.detailed_frames,
             simulation.trajectory_frame,
             simulation.time_ps,
-            frags
+            frags,
         )
         self.handle.write(frame.serialize())
-        
+
         # self.handle.write(
         #     f"Step:{simulation.current_step},"
         #     + ",".join(
@@ -151,13 +148,13 @@ class FragmentReporter(Reporter):
     def interactive_line(self, simulation: Simulation) -> str:
         return f"fragments: {simulation.top.frag_list.num_fragments()}"
 
-
     @classmethod
     def iter_fragments(cls, path: str) -> Iterator[FragsFrame]:
         """Read a .frags file frame by frame."""
+
         class FragsFrameIterator:
             def __init__(self, path: str) -> None:
-                self.__handle = open(path) # noqa: SIM115
+                self.__handle = open(path)  # noqa: SIM115
                 self.__next: str | None = None
 
             def __advance(self) -> str | None:
@@ -186,12 +183,12 @@ class FragmentReporter(Reporter):
                 while line := self.__advance():
                     if line is None:
                         break
-                        
+
                     if len(line) > 0 and line[0] != "#":
                         # first content line
                         self.__backtrack(line)
                         break
-            
+
             def __next__(self) -> FragsFrame:
                 self.__skip_whitespace()
                 header = self.__advance()
@@ -208,7 +205,7 @@ class FragmentReporter(Reporter):
                     assert k.strip() not in counts
                     counts[k.strip()] = int(v.strip())
                 res = FragsFrame(step, counts, False)
-                
+
                 # detailed mode stuff
                 while line := self.__advance():
                     if line is None:
@@ -258,6 +255,7 @@ class FragmentReporter(Reporter):
         will not load the entire file into memory.
         """
         return list(cls.iter_fragments(path))
+
 
 class FragCountReporter(FragmentReporter):
     def __init__(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003

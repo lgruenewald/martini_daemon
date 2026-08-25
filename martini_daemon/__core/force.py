@@ -143,7 +143,6 @@ class Force(metaclass=ABCMeta):
 
         Note: you should check if self.force exists first, before doing anything to it.
         """
-        pass
 
     def flag_atom_add(self) -> None:
         """
@@ -155,4 +154,3 @@ class Force(metaclass=ABCMeta):
 
         Note: if you inherit this, you should check if self.force exists, before doing anything to it.
         """
-        pass
