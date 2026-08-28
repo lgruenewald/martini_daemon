@@ -114,10 +114,13 @@ def test_replay(x: str, rootdir: str) -> None:
     )
 
     # cleanup
+    for filename in glob.glob("./run*"):
+        os.remove(filename)
     for filename in glob.glob("./out*"):
         os.remove(filename)
     for filename in glob.glob("./#*"):
         os.remove(filename)
+    os.remove("mdout.mdp")
     os.remove("energy.xvg")
     os.remove("forces.xvg")
     os.remove("stdout.txt")
