@@ -310,6 +310,33 @@ class System:
         for f in self.__forces.values():
             f.flag_atom_add()
 
+    # ==== global exclusion sync ====
+    def flag_remove_exclusion(self) -> None:
+        """
+        Tell all forces that an exclusion was removed.
+
+        Called by Exclusion Helper.
+        """
+        for f in self.__forces.values():
+            f.flag_remove_exclusion()
+
+    def flag_add_exclusion(self, i: int, j: int) -> None:
+        """
+        Tell all forces that an exclusion was added.
+
+        Called by Exclusion Helper.
+        """
+        for f in self.__forces.values():
+            f.flag_add_exclusion(i, j)
+
+    def iterate_exclusions(self) -> Iterable[tuple[int, int]]:
+        excl = self.get_force("exclusion")
+        assert excl is not None
+        assert isinstance(excl, BondedForce)
+        # FIXME: don't assume exclusion like this
+        return ((m[0], m[1]) for (_, (m, _)) in excl.iterate_bonds())
+            
+
     # ==== API old_helpers ====
 
     # PROTECTED API for __core and Forces

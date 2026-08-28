@@ -154,3 +154,21 @@ class Force(metaclass=ABCMeta):
 
         Note: if you inherit this, you should check if self.force exists, before doing anything to it.
         """
+
+    def flag_add_exclusion(self, i: int, j: int) -> None:
+        """
+        Let the force object know, that a new exclusion was added to the system.
+
+        Called by system, but child classes can override.
+
+        If implementing a non bonded force, all nonbonded forces must have
+        the same set of exclusions globally, due to OpenMM limitations.
+        """
+
+    def flag_remove_exclusion(self) -> None:
+        """
+        Let the force object know, that an exclusion was removed from the system.
+
+        See flag_add_exclusion for further notes.
+        """
+        

@@ -10,7 +10,7 @@ class NonbondParams(Directive):
         type1 = tokens.unwrap(0, "word")
         type2 = tokens.unwrap(1, "word")
         funct = tokens.unwrap(2, "int")
-        if funct != 1:
+        if funct not in {1}:
             raise TokenParseException(tokens[2], f"Unsupported function type {type}.")
         sigma = tokens.unwrap(3, "float")
         epsilon = tokens.unwrap(4, "float")

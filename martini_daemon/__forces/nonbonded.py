@@ -65,7 +65,7 @@ class NonBonded(Force):
     def flag_atom_add(self) -> None:
         self._destroy()
 
-    def add_exclusion(self, i: int, j: int) -> None:
+    def flag_add_exclusion(self, i: int, j: int) -> None:
         if self._force is not None:
             assert isinstance(self._force, mm.CustomNonbondedForce)
             self._force.addExclusion(i, j)
@@ -114,6 +114,7 @@ class NonBonded(Force):
             sc_lam, sc_alpha = self.system.get_sc(atom_id)
             force.addParticle([type_, charge, sc_lam, sc_alpha])
 
+        # FIXME: use system.iterate_exclusions()
         for _, (members, _) in self.__exclusions.iterate_bonds():
             force.addExclusion(*members)
 
@@ -213,12 +214,12 @@ class ExclusionHelper(BondedForce):
         self.cutoff_nm = system.additional_data.get("cutoff")
 
     def _add_bond(self, members: list[int], params: list[float]) -> int:
-        self.__nb.add_exclusion(*members)
+        self.system.flag_add_exclusion(*members)
         return super()._add_bond(members, params)
 
     def _remove_bond(self, bond_id: int) -> None:
         super()._remove_bond(bond_id)
-        self.__nb.flag_remove_exclusion()
+        self.system.flag_remove_exclusion()
 
     def flag_atom_add(self) -> None:
         self._destroy()

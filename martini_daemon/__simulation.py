@@ -167,7 +167,7 @@ class Simulation:
             and center of mass motion removal will be employed.
         :param integrator: Base integrator to use during the simulation. Note: a compound integrator will be set up
             based on it. Depending on the reporters, local minimization or other integrators can be configured alongside.
-            If None, LangevinMiddleIntegrator will be used, at 300 kelvin, 1 ps-1 collision frequency and 0.02 ps dt.
+            If None, LangevinMiddleIntegrator will be used, at 298 kelvin, 1 ps-1 collision frequency and 0.02 ps dt.
         :param options: Additional data to pass to the system. Example keys available are "epsilon_r" (default 15),
             "cutoff" (default 1.1, in nanometers) to control the nonbonded force, as well as "respos",
             which can be set as a f64 (n_atoms, 3) shaped numpy array for position restraint reference coordinates
