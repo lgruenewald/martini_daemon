@@ -5,16 +5,27 @@ use flate2::Compression;
 use flate2::Crc;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
-use pyo3::types::PyList;
+use pyo3::exceptions::PyOSError;
+use pyo3::exceptions::PyValueError;
+use pyo3::ffi::PyExc_ZeroDivisionError;
+use pyo3::types::PyFloat;
+use pyo3::types::PyInt;
+use pyo3::types::PyIterator;
+use pyo3::types::PyString;
+use pyo3::types::{PyAny, PyList, PySequence, PyType};
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::sync::mpsc::RecvTimeoutError;
 use std::u32;
 
 use pyo3::{exceptions::PyException, prelude::*};
 
+use crate::bond_graph::BondGraph;
+
 const MAGIC: [u8; 8] = [0xc0, b'T', b'O', b'P', b'T', b'R', 1, 0];
 
+#[derive(Debug, Copy, Clone)]
 enum BufferState {
     Empty,
     HeaderWritten,
@@ -131,6 +142,9 @@ impl<'a> ChunkReader<'a> {
     }
 }
 
+/// Seek file to start + compressed len, read crc32 from file and compare with passed crc32, if provided.
+///
+/// Note: the seeking happens, so we don't make assumptions on how much the uncompressing algo read
 fn seek_to_chunk_end(
     start: u64,
     comp_len: u64,
@@ -232,6 +246,41 @@ fn get_chunk_reader<'a>(reader: &'a mut std::fs::File) -> std::io::Result<ChunkR
     })
 }
 
+// helpers
+impl TopTrajWriter {
+    fn write_frame_bonds_bond_list(&mut self, bonds: Vec<(u32, u32)>) -> PyResult<()> {
+        // FIXME optimize
+        let mut bond_graph = BondGraph::new(self.n_atoms);
+
+        for (i, j) in bonds {
+            bond_graph.add_bond(i as usize, j as usize);
+        }
+        self.write_frame_bonds_bond_graph(&bond_graph)
+    }
+
+    fn write_frame_bonds_bond_graph<'py>(&mut self, bonds: &BondGraph) -> PyResult<()> {
+        match self.buffer_state {
+            BufferState::AtomsWritten => (),
+            _ => {
+                return Err(PyException::new_err(
+                    "write_frame_bonds() must be only called after calling write_frame_atoms().",
+                ));
+            }
+        }
+        let bonds = bonds.to_list();
+        self.buffer.write_u64(bonds.len() as u64);
+
+        for (i, j) in bonds {
+            self.buffer.write_u32(i as u32);
+            self.buffer.write_u32(j as u32);
+        }
+        self.buffer_state = BufferState::BondsWritten;
+
+        Ok(())
+    }
+}
+
+// python API
 #[pymethods]
 impl TopTrajWriter {
     /// Create a Topology Trajectory Writer.
@@ -247,6 +296,7 @@ impl TopTrajWriter {
     /// :param truncate: If appending, the writer can optionally truncate the pre-existing
     ///   file. Specify the last MD step to keep.
     #[new]
+    #[pyo3(signature=(path, title, initial_molecules, res_names, res_ids, /, append=false, truncate=None))]
     fn new(
         path: &str,
         title: &str,
@@ -254,7 +304,7 @@ impl TopTrajWriter {
         res_names: Vec<String>,
         res_ids: Vec<usize>,
         append: bool,
-        truncate: usize,
+        truncate: Option<usize>,
     ) -> PyResult<Self> {
         let n_atoms = res_names.len();
         if res_names.len() != res_ids.len() {
@@ -314,6 +364,203 @@ impl TopTrajWriter {
             handle: Some(handle),
         })
     }
+
+    fn __enter__(self_: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        self_
+    }
+
+    fn __exit__(
+        &mut self,
+        _exc_type: Option<&Bound<'_, PyType>>,
+        _exc_val: Option<&Bound<'_, PyAny>>,
+        _exc_tb: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<bool> {
+        self.finish()?;
+        // do not suppress exceptions
+        Ok(false)
+    }
+
+    fn finish(&mut self) -> PyResult<()> {
+        self.handle = None;
+        Ok(())
+    }
+
+    // FIXME: in the future a Frame Builder would be nicer, but I don't want any breaking changes atm
+
+    /// Write the frame header to the writer buffer.
+    ///
+    /// Frames should be written by subsequent calls to the Writer in this
+    /// order:
+    ///
+    /// * new_frame()
+    /// * write_frame_atoms()
+    /// * write_frame_bonds()
+    /// * write_frame()
+    ///
+    /// :param frame_num: The current frame number. Must be one larger than the previous frame.
+    /// :param sim_step: The simulation step.
+    /// :param time_ps: The simulation time in picoseconds.
+    /// :param n_atoms: The number of atoms in this frame.
+    fn new_frame(
+        &mut self,
+        frame_num: u32,
+        sim_step: u64,
+        time_ps: f64,
+        n_atoms: u32,
+    ) -> PyResult<()> {
+        match self.buffer_state {
+            BufferState::Empty => (),
+            _ => {
+                return Err(PyException::new_err(
+                    "new_frame() must be only called after creating a new writer, or after write_frame().",
+                ));
+            }
+        }
+
+        if self.next_frame != frame_num as usize {
+            return Err(PyValueError::new_err(
+                "Specified frame_num must be 1 larger than the previous frame.",
+            ));
+        }
+
+        if self.n_atoms != n_atoms as usize {
+            return Err(PyValueError::new_err(
+                "n_atoms in frame and on Writer construction not identical.",
+            ));
+        }
+
+        assert!(self.buffer.len() == 0);
+
+        self.buffer.write_u32(frame_num)?;
+        self.buffer.write_u32(n_atoms)?;
+        self.buffer.write_u64(sim_step)?;
+        self.buffer.write_f64(time_ps)?;
+        self.buffer_state = BufferState::HeaderWritten;
+
+        Ok(())
+    }
+
+    /// Write the current frame atom information to disk.
+    ///
+    /// The number of atoms must be the same as n_atoms specified in new_frame().
+    /// new_frame() must be called first. register_frame_atoms() must be called exactly once per frame.
+    ///
+    /// :param names: The names of the atoms.
+    /// :param atom_types: The Non-Bonded force atom types, per atom.
+    /// :param charges: The charges of the atoms, per atom.
+    /// :param masses: The masses of the atoms, per atom.
+    fn write_frame_atoms<'py>(
+        &mut self,
+        names: Bound<'py, PySequence>,
+        atom_types: Bound<'py, PySequence>,
+        charges: Bound<'py, PySequence>,
+        masses: Bound<'py, PySequence>,
+    ) -> PyResult<()> {
+        match self.buffer_state {
+            BufferState::HeaderWritten => (),
+            _ => {
+                return Err(PyException::new_err(
+                    "write_frame_atoms() must be only called after calling new_frame().",
+                ));
+            }
+        }
+        let n_atoms = self.n_atoms;
+        if names.len()? != n_atoms
+            || atom_types.len()? != n_atoms
+            || charges.len()? != n_atoms
+            || masses.len()? != n_atoms
+        {
+            return Err(PyValueError::new_err(
+                "All arguments to write_frame_atoms must have length n_atoms",
+            ));
+        }
+
+        for i in 0..n_atoms {
+            let Ok(name) = names.get_item(i)?.cast_into::<PyString>() else {
+                return Err(PyValueError::new_err("All names must be of type str."));
+            };
+            let name: String = name.extract()?;
+            self.buffer.write_str(&name);
+        }
+        for i in 0..n_atoms {
+            let Ok(atom_type) = atom_types.get_item(i)?.cast_into::<PyString>() else {
+                return Err(PyValueError::new_err("All atom types must be of type str."));
+            };
+            let atom_type: String = atom_type.extract()?;
+            self.buffer.write_str(&atom_type);
+        }
+        for i in 0..n_atoms {
+            let Ok(charge) = charges.get_item(i)?.cast_into::<PyFloat>() else {
+                return Err(PyValueError::new_err("All charges must be of type float."));
+            };
+            let charge: f32 = charge.extract()?;
+            self.buffer.write_f32(charge);
+        }
+        for i in 0..n_atoms {
+            let Ok(mass) = masses.get_item(i)?.cast_into::<PyFloat>() else {
+                return Err(PyValueError::new_err("All masses must be of type float."));
+            };
+            let mass: f32 = mass.extract()?;
+            self.buffer.write_f32(mass);
+        }
+        self.buffer_state = BufferState::AtomsWritten;
+        Ok(())
+    }
+
+    /// Write the bonds for the current frame to disk.
+    ///
+    /// Note: will automatically remove duplicates, self-bonds
+    ///       and will re-order bonds to have smaller first in each entry.
+    ///
+    /// :param bonds: The bonds to write, as a BondGraph object or as list of (i, j) tuples.
+    fn write_frame_bonds<'py>(&mut self, bonds: Bound<'py, PyAny>) -> PyResult<()> {
+        if let Ok(bond_list) = bonds.extract::<Vec<(u32, u32)>>() {
+            self.write_frame_bonds(bonds)
+        } else if let Ok(bond_graph) = bonds.extract::<Bound<'py, BondGraph>>() {
+            self.write_frame_bonds_bond_graph(&*bond_graph.borrow())
+        } else {
+            Err(PyValueError::new_err(
+                "Bond list must be provided as a list of (i, j) tuples or a BondGraph object.",
+            ))
+        }
+    }
+
+    /// Finish writing the current frame to disk.
+    ///
+    /// Must call register_frame_atoms and register_frame_bonds exactly once first.
+    ///
+    /// Note: will automatically flush after finishing the frame.
+    fn write_frame(&mut self) -> PyResult<()> {
+        match self.buffer_state {
+            BufferState::BondsWritten => (),
+            _ => {
+                return Err(PyException::new_err(
+                    "write_frame() must be only called after calling write_frame_bonds().",
+                ));
+            }
+        }
+
+        let Some(handle) = &mut self.handle else {
+            return Err(PyOSError::new_err("Writer is already closed."));
+        };
+
+        handle.write_chunk(&self.buffer);
+        handle.flush();
+
+        self.buffer.clear();
+        self.buffer_state = BufferState::Empty;
+        Ok(())
+    }
+
+    fn debug_print(&self) {
+        println!("TopTrajWriter debugprint");
+        println!("buffer: {:?}", self.buffer);
+        println!("buffer state: {:?}", self.buffer_state);
+        println!(
+            "next_frame: {:?} n_atoms: {:?} handle: {:?}",
+            self.next_frame, self.n_atoms, self.handle
+        );
+    }
 }
 
 #[pyclass]
@@ -331,7 +578,7 @@ pub struct TopTrajFrame {
     // during initial decompression, only the non-py versions are filled
     // on first python access, python-owned obj's are constructed and the former is dropped
     // this should save a bit of memory and time, as often one or two fields only are ever read.
-    // FIXME: more lazy access
+    // FIXME: more lazy access, numpy access, bond graph access
     names_py: Option<Py<PyList>>,
     names: Option<Vec<String>>,
     types_py: Option<Py<PyList>>,
@@ -342,7 +589,6 @@ pub struct TopTrajFrame {
     masses: Option<Vec<f32>>,
     bonds_py: Option<Py<PyList>>,
     bonds: Option<Vec<(u32, u32)>>,
-    // TODO continue here
 }
 
 #[pyclass]
@@ -365,6 +611,21 @@ pub struct TopTrajReader {
     res_names: Py<PyList>,
     #[pyo3(get)]
     res_ids: Py<PyList>,
+
+    /// Offsets of the starts of all frames + the end of the file
+    #[pyo3(get)]
+    frame_offsets: Vec<u64>,
+
+    handle: Option<std::fs::File>,
+}
+
+impl TopTrajReader {
+    fn handle(&mut self) -> PyResult<&mut File> {
+        match &mut self.handle {
+            Some(handle) => Ok(handle),
+            None => Err(PyOSError::new_err("Reader is closed.")),
+        }
+    }
 }
 
 #[pymethods]
@@ -373,13 +634,13 @@ impl TopTrajReader {
     fn new(path: String, py: Python<'_>) -> PyResult<Self> {
         let mut handle = std::fs::File::open(path.clone())?;
 
+        let file_end = handle.seek(SeekFrom::End(0))?;
+
         handle.seek(SeekFrom::Start(0))?;
         let mut magic = [0u8; 8];
         handle.read_exact(&mut magic)?;
         if magic != MAGIC {
-            return Err(PyException::new_err(
-                "Magic number mismatch. Can't append to a different file format.",
-            ));
+            return Err(PyException::new_err("Magic number mismatch."));
         }
 
         let mut chunk = get_chunk_reader(&mut handle)?;
@@ -416,9 +677,26 @@ impl TopTrajReader {
         }
 
         let expected_crc = chunk.get_crc()?;
-        let start = chunk.start;
-        let comp_len = chunk.comp_len;
-        seek_to_chunk_end(start, comp_len, Some(expected_crc), &mut handle)?;
+        seek_to_chunk_end(chunk.start, chunk.comp_len, Some(expected_crc), &mut handle)?;
+
+        let mut offsets: Vec<u64> = Vec::new();
+
+        // precalculate offsets for fast reading in the future
+        loop {
+            let start = handle.seek(SeekFrom::Current(0))?;
+
+            if start >= file_end {
+                break;
+            }
+
+            let mut chunk = get_chunk_reader(&mut handle)?;
+            seek_to_chunk_end(chunk.start, chunk.comp_len, None, &mut handle)?;
+            offsets.push(start);
+        }
+
+        assert!(handle.seek(SeekFrom::Current(0))? == file_end);
+
+        offsets.push(file_end);
 
         Ok(Self {
             path,
@@ -430,6 +708,43 @@ impl TopTrajReader {
             n_atoms,
             res_names: PyList::new(py, res_names)?.unbind(),
             res_ids: PyList::new(py, res_ids)?.unbind(),
+            frame_offsets: offsets,
+            handle: Some(handle),
         })
+    }
+
+    /// Return the current position in the file.
+    ///
+    /// :param frame_index: If specified, return the position of this frame in the file.
+    fn tell(&mut self, frame_index: Option<usize>) -> PyResult<u64> {
+        match frame_index {
+            None => Ok(self.handle()?.seek(SeekFrom::Current(0))?),
+            Some(index) => {
+                if self.frame_offsets.len() <= index {
+                    return Err(PyValueError::new_err("Index out of range."));
+                }
+                Ok(self.frame_offsets[index])
+            }
+        }
+    }
+
+    // FIXME: change with seek_to(frame_index) instead, once I want breaking changes
+    /// Set the reader to position, as returned by tell().
+    fn seek(&mut self, pos: u64) -> PyResult<()> {
+        self.handle()?.seek(SeekFrom::Start(pos))?;
+        Ok(())
+    }
+
+    /// Read a frame from the toptraj file.
+    ///
+    /// :return: A toptraj frame, or None if finished.
+    fn read_frame(&mut self) -> PyResult<Option<TopTrajFrame>> {
+        if self.handle()?.seek(SeekFrom::Current(0))? >= *self.frame_offsets.last().unwrap() {
+            return Ok(None);
+        }
+        let mut chunk = get_chunk_reader(&mut *self.handle()?)?;
+
+        todo!()
+        // TODO continue here
     }
 }

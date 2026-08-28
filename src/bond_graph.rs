@@ -9,8 +9,8 @@ use crate::periodic_box::PeriodicBox;
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct BondGraph {
-    n_atoms: usize,
-    bonds: Vec<HashSet<usize>>,
+    pub n_atoms: usize,
+    pub bonds: Vec<HashSet<usize>>,
 }
 
 #[gen_stub_pymethods]
