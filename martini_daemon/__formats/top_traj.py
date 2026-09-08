@@ -6,7 +6,7 @@ from collections.abc import Collection
 from dataclasses import dataclass
 from io import SEEK_CUR, SEEK_SET
 from types import TracebackType
-from typing import Any
+from typing import Any, Self
 
 from ..__rust import BondGraph
 
@@ -24,6 +24,8 @@ class TopTrajWriter:
     ) -> None:
         """
         Create a Topology Trajectory writer.
+
+        This class is the old python implementation.
 
         Note: this class owns a file handle. If using it directly, call .finish() manually when done!
 
@@ -92,7 +94,7 @@ class TopTrajWriter:
                     (chunk_size,) = struct.unpack("<Q", chunk_header)
                     self.__handle.seek(8, SEEK_CUR)
                     content = zlib.decompress(self.__handle.read(chunk_size))
-                    frame, n_atoms, sim_step, sim_time = struct.unpack(
+                    frame, _n_atoms, sim_step, _sim_time = struct.unpack(
                         "<IIQd", content[0:24]
                     )
                     assert frame == self.__last_frame + 1
@@ -107,7 +109,7 @@ class TopTrajWriter:
             self.__handle.close()
             self.__handle = open(path, "ab")  # noqa: SIM115
 
-    def __enter__(self) -> TopTrajWriter:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(
@@ -299,7 +301,11 @@ class TopTrajFrame:
 
 class TopTrajReader:
     def __init__(self, path: str) -> None:
-        """Create a ``.toptraj`` file reader."""
+        """
+        Create a ``.toptraj`` file reader.
+
+        This class is the old, python implementation.
+        """
         self.path = path
         self.__handle = open(path, "rb")  # noqa: SIM115
         self.header = self.__handle.read(8)
@@ -338,7 +344,7 @@ class TopTrajReader:
         del header
         self.frame = 0
 
-    def __enter__(self) -> TopTrajReader:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(

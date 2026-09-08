@@ -17,7 +17,7 @@ def read_geometry(
     :param path: path to file
     :return: periodic box (PeriodicBox), positions (numpy float64 array), velocities (numpy float64 array or None).
     """
-    prefix, ext = splitext(path)
+    _prefix, ext = splitext(path)
     match ext:
         case ".gro":
             return read_gro(path)
@@ -49,7 +49,7 @@ def write_geometry(
     :param pos: positions
     :param vel: velocities or None
     """
-    prefix, ext = splitext(path)
+    _prefix, ext = splitext(path)
     match ext:
         case ".gro":
             return write_gro(path, title, atom_names, res_names, res_ids, box, pos, vel)

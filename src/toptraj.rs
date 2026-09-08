@@ -5,6 +5,7 @@ use flate2::Compression;
 use flate2::Crc;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
+use pyo3::exceptions::PyAssertionError;
 use pyo3::exceptions::PyOSError;
 use pyo3::exceptions::PyValueError;
 use pyo3::ffi::PyExc_ZeroDivisionError;
@@ -13,6 +14,8 @@ use pyo3::types::PyInt;
 use pyo3::types::PyIterator;
 use pyo3::types::PyString;
 use pyo3::types::{PyAny, PyList, PySequence, PyType};
+use pyo3_stub_gen::derive::gen_stub_pyfunction;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -33,6 +36,7 @@ enum BufferState {
     BondsWritten,
 }
 
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct TopTrajWriter {
     buffer: Vec<u8>,
@@ -88,6 +92,7 @@ where
         let mut comp_buf = Vec::<u8>::new();
         let mut z = ZlibEncoder::new(&mut comp_buf, Compression::new(6));
         z.write(raw)?;
+        z.try_finish()?;
         z.finish()?;
         self.write_u64(comp_buf.len() as u64)?;
         self.write_u64(raw.len() as u64)?;
@@ -281,6 +286,7 @@ impl TopTrajWriter {
 }
 
 // python API
+#[gen_stub_pymethods]
 #[pymethods]
 impl TopTrajWriter {
     /// Create a Topology Trajectory Writer.
@@ -304,7 +310,7 @@ impl TopTrajWriter {
         res_names: Vec<String>,
         res_ids: Vec<usize>,
         append: bool,
-        truncate: Option<usize>,
+        truncate: Option<u64>,
     ) -> PyResult<Self> {
         let n_atoms = res_names.len();
         if res_names.len() != res_ids.len() {
@@ -343,6 +349,7 @@ impl TopTrajWriter {
             (handle, 0)
         } else {
             let mut handle = OpenOptions::new().read(true).write(true).open(path)?;
+            let file_end = handle.seek(SeekFrom::End(0))?;
             handle.seek(SeekFrom::Start(0))?;
             let mut magic = [0u8; 8];
             handle.read_exact(&mut magic)?;
@@ -352,9 +359,44 @@ impl TopTrajWriter {
                 ));
             }
 
-            // verify header
             // truncate if needed
-            todo!()
+            let chunk = get_chunk_reader(&mut handle)?;
+            let mut n_frames = 0;
+            // FIXME do more header verifications
+            seek_to_chunk_end(chunk.start, chunk.comp_len, None, &mut handle);
+
+            loop {
+                let start = handle.seek(SeekFrom::Current(0))?;
+
+                if start >= file_end {
+                    // EOF -> break
+                    break;
+                }
+
+                // decompress chunk header
+                let mut chunk = get_chunk_reader(&mut handle)?;
+                let frame_index = chunk.read_u32()?;
+                let n_atoms = chunk.read_u32()?;
+                let sim_step = chunk.read_u64()?;
+                let sim_time = chunk.read_f64()?;
+
+                if let Some(truncate) = truncate
+                    && truncate > sim_step
+                {
+                    // ignore frame, go back to before
+                    handle.seek(SeekFrom::Start(start));
+                    break;
+                } else {
+                    // accept frame, go to the end
+                    n_frames += 1;
+                    seek_to_chunk_end(chunk.start, chunk.comp_len, None, &mut handle);
+                }
+            }
+
+            let curr = handle.seek(SeekFrom::Current(0))?;
+            handle.set_len(curr)?;
+
+            (handle, n_frames)
         };
         Ok(Self {
             buffer: Vec::new(),
@@ -380,6 +422,14 @@ impl TopTrajWriter {
         Ok(false)
     }
 
+    /// Close the writer.
+    ///
+    /// Identical to finish().
+    fn close(&mut self) -> PyResult<()> {
+        self.finish()
+    }
+
+    /// Close the writer.
     fn finish(&mut self) -> PyResult<()> {
         self.handle = None;
         Ok(())
@@ -451,10 +501,10 @@ impl TopTrajWriter {
     /// :param masses: The masses of the atoms, per atom.
     fn write_frame_atoms<'py>(
         &mut self,
-        names: Bound<'py, PySequence>,
-        atom_types: Bound<'py, PySequence>,
-        charges: Bound<'py, PySequence>,
-        masses: Bound<'py, PySequence>,
+        #[gen_stub(override_type(type_repr = "list[str]"))] names: Bound<'py, PySequence>,
+        #[gen_stub(override_type(type_repr = "list[str]"))] atom_types: Bound<'py, PySequence>,
+        #[gen_stub(override_type(type_repr = "list[float]"))] charges: Bound<'py, PySequence>,
+        #[gen_stub(override_type(type_repr = "list[float]"))] masses: Bound<'py, PySequence>,
     ) -> PyResult<()> {
         match self.buffer_state {
             BufferState::HeaderWritten => (),
@@ -549,6 +599,7 @@ impl TopTrajWriter {
 
         self.buffer.clear();
         self.buffer_state = BufferState::Empty;
+        self.next_frame += 1;
         Ok(())
     }
 
@@ -563,15 +614,15 @@ impl TopTrajWriter {
     }
 }
 
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct TopTrajFrame {
-    content: Vec<u8>,
     #[pyo3(get)]
     frame_index: u32,
     #[pyo3(get)]
     sim_step: u64,
     #[pyo3(get)]
-    sim_time: f32,
+    sim_time: f64,
     #[pyo3(get)]
     n_atoms: u32,
 
@@ -581,8 +632,8 @@ pub struct TopTrajFrame {
     // FIXME: more lazy access, numpy access, bond graph access
     names_py: Option<Py<PyList>>,
     names: Option<Vec<String>>,
-    types_py: Option<Py<PyList>>,
-    types: Option<Vec<String>>,
+    atom_types_py: Option<Py<PyList>>,
+    atom_types: Option<Vec<String>>,
     charges_py: Option<Py<PyList>>,
     charges: Option<Vec<f32>>,
     masses_py: Option<Py<PyList>>,
@@ -591,6 +642,112 @@ pub struct TopTrajFrame {
     bonds: Option<Vec<(u32, u32)>>,
 }
 
+#[gen_stub_pymethods]
+#[pymethods]
+impl TopTrajFrame {
+    #[getter]
+    fn names(&mut self, py: Python<'_>) -> PyResult<Py<PyList>> {
+        match &mut self.names_py {
+            Some(list) => {
+                assert!(self.names == None);
+                Ok(list.clone_ref(py))
+            }
+            None => {
+                if let Some(names) = std::mem::take(&mut self.names) {
+                    assert!(self.names == None);
+                    self.names_py = Some(PyList::new(py, names)?.unbind());
+                    Ok(self.names_py.as_mut().unwrap().clone_ref(py))
+                } else {
+                    Err(PyAssertionError::new_err(
+                        "Internal error: no names in frame.",
+                    ))
+                }
+            }
+        }
+    }
+    #[getter]
+    fn atom_types(&mut self, py: Python<'_>) -> PyResult<Py<PyList>> {
+        match &mut self.atom_types_py {
+            Some(list) => {
+                assert!(self.atom_types == None);
+                Ok(list.clone_ref(py))
+            }
+            None => {
+                if let Some(types) = std::mem::take(&mut self.atom_types) {
+                    assert!(self.atom_types == None);
+                    self.atom_types_py = Some(PyList::new(py, types)?.unbind());
+                    Ok(self.atom_types_py.as_mut().unwrap().clone_ref(py))
+                } else {
+                    Err(PyAssertionError::new_err(
+                        "Internal error: no types in frame.",
+                    ))
+                }
+            }
+        }
+    }
+    #[getter]
+    fn charges(&mut self, py: Python<'_>) -> PyResult<Py<PyList>> {
+        match &mut self.charges_py {
+            Some(list) => {
+                assert!(self.charges == None);
+                Ok(list.clone_ref(py))
+            }
+            None => {
+                if let Some(charges) = std::mem::take(&mut self.charges) {
+                    assert!(self.charges == None);
+                    self.charges_py = Some(PyList::new(py, charges)?.unbind());
+                    Ok(self.charges_py.as_mut().unwrap().clone_ref(py))
+                } else {
+                    Err(PyAssertionError::new_err(
+                        "Internal error: no charges in frame.",
+                    ))
+                }
+            }
+        }
+    }
+    #[getter]
+    fn masses(&mut self, py: Python<'_>) -> PyResult<Py<PyList>> {
+        match &mut self.masses_py {
+            Some(list) => {
+                assert!(self.masses == None);
+                Ok(list.clone_ref(py))
+            }
+            None => {
+                if let Some(masses) = std::mem::take(&mut self.masses) {
+                    assert!(self.masses == None);
+                    self.masses_py = Some(PyList::new(py, masses)?.unbind());
+                    Ok(self.masses_py.as_mut().unwrap().clone_ref(py))
+                } else {
+                    Err(PyAssertionError::new_err(
+                        "Internal error: no masses in frame.",
+                    ))
+                }
+            }
+        }
+    }
+    #[getter]
+    fn bonds(&mut self, py: Python<'_>) -> PyResult<Py<PyList>> {
+        match &mut self.bonds_py {
+            Some(list) => {
+                assert!(self.bonds == None);
+                Ok(list.clone_ref(py))
+            }
+            None => {
+                if let Some(bonds) = std::mem::take(&mut self.bonds) {
+                    assert!(self.bonds == None);
+                    self.bonds_py = Some(PyList::new(py, bonds)?.unbind());
+                    Ok(self.bonds_py.as_mut().unwrap().clone_ref(py))
+                } else {
+                    Err(PyAssertionError::new_err(
+                        "Internal error: no bonds in frame.",
+                    ))
+                }
+            }
+        }
+    }
+}
+
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct TopTrajReader {
     #[pyo3(get)]
@@ -628,9 +785,11 @@ impl TopTrajReader {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TopTrajReader {
     #[new]
+    /// Create a new TopTrajReader.
     fn new(path: String, py: Python<'_>) -> PyResult<Self> {
         let mut handle = std::fs::File::open(path.clone())?;
 
@@ -695,6 +854,7 @@ impl TopTrajReader {
         }
 
         assert!(handle.seek(SeekFrom::Current(0))? == file_end);
+        handle.seek(SeekFrom::Start(offsets[0]));
 
         offsets.push(file_end);
 
@@ -716,6 +876,7 @@ impl TopTrajReader {
     /// Return the current position in the file.
     ///
     /// :param frame_index: If specified, return the position of this frame in the file.
+    #[pyo3(signature=(frame_index=None))]
     fn tell(&mut self, frame_index: Option<usize>) -> PyResult<u64> {
         match frame_index {
             None => Ok(self.handle()?.seek(SeekFrom::Current(0))?),
@@ -744,7 +905,100 @@ impl TopTrajReader {
         }
         let mut chunk = get_chunk_reader(&mut *self.handle()?)?;
 
-        todo!()
-        // TODO continue here
+        let frame_index = chunk.read_u32()?;
+        let n_atoms = chunk.read_u32()?;
+        let sim_step = chunk.read_u64()?;
+        let sim_time = chunk.read_f64()?;
+
+        let names = (0..n_atoms)
+            .map(|_| chunk.read_str())
+            .collect::<Result<Vec<String>, std::io::Error>>()?;
+        let types = (0..n_atoms)
+            .map(|_| chunk.read_str())
+            .collect::<Result<Vec<String>, std::io::Error>>()?;
+        let charges = (0..n_atoms)
+            .map(|_| chunk.read_f32())
+            .collect::<Result<Vec<f32>, std::io::Error>>()?;
+        let masses = (0..n_atoms)
+            .map(|_| chunk.read_f32())
+            .collect::<Result<Vec<f32>, std::io::Error>>()?;
+        let n_bonds = chunk.read_u64()?;
+        let mut bonds = Vec::with_capacity(n_bonds as usize);
+
+        for i in 0..n_bonds {
+            bonds.push((chunk.read_u32()?, chunk.read_u32()?));
+        }
+
+        let mut frame = TopTrajFrame {
+            frame_index,
+            sim_step,
+            sim_time,
+            n_atoms,
+            names: Some(names),
+            names_py: None,
+            atom_types: Some(types),
+            atom_types_py: None,
+            charges: Some(charges),
+            charges_py: None,
+            masses: Some(masses),
+            masses_py: None,
+            bonds: Some(bonds),
+            bonds_py: None,
+        };
+
+        seek_to_chunk_end(
+            chunk.start,
+            chunk.comp_len,
+            None,
+            self.handle.as_mut().unwrap(),
+        )?;
+
+        Ok(Some(frame))
+    }
+
+    /// Skip a frame.
+    ///
+    /// If a frame was skipped, return True.
+    /// If the reader is already at EOF, return False.
+    fn skip_frame(&mut self) -> PyResult<bool> {
+        if self.handle()?.seek(SeekFrom::Current(0))? >= *self.frame_offsets.last().unwrap() {
+            return Ok(false);
+        }
+        let chunk = get_chunk_reader(&mut *self.handle()?)?;
+        seek_to_chunk_end(
+            chunk.start,
+            chunk.comp_len,
+            None,
+            self.handle.as_mut().unwrap(),
+        )?;
+        Ok(true)
+    }
+
+    /// Close the reader.
+    fn finish(&mut self) -> PyResult<()> {
+        self.handle = None;
+        Ok(())
+    }
+
+    /// Close the reader.
+    ///
+    /// Identical to finish().
+    fn close(&mut self) -> PyResult<()> {
+        self.finish()
+    }
+
+    fn __enter__(self_: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        self_
+    }
+
+    fn __exit__(
+        &mut self,
+        _exc_type: Option<&Bound<'_, PyType>>,
+        _exc_val: Option<&Bound<'_, PyAny>>,
+        _exc_tb: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<bool> {
+        self.finish()?;
+        // do not suppress exceptions
+        Ok(false)
     }
 }

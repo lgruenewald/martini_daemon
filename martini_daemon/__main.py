@@ -7,14 +7,13 @@ from warnings import warn
 import numpy as np
 
 from .__formats import (
-    TopTrajReader,
     TopTrajWriter,
     TrajectoryReader,
     TrajectoryWriter,
     read_checkpoint,
 )
 from .__reporters import FragmentReporter
-from .__rust import BondGraph, build_version
+from .__rust import BondGraph, build_version, TopTrajReader
 from .__simulation import Simulation
 from .extra import logo, logo_small
 
@@ -86,7 +85,7 @@ def info(args: list[str]) -> int:
     if not os.path.isfile(path):
         print(f"File {path} does not exist.")
         return 2
-    base, ext = os.path.splitext(path)
+    _base, ext = os.path.splitext(path)
     print(f"path:                     {path}")
     match ext:
         case ".chk" | ".chk2" | ".chk3":
@@ -160,24 +159,17 @@ def whole(args: list[str]) -> int:
         print(f"{toptraj} does not exist, or is not a file.")
         return 1
 
-    r = TopTrajReader(toptraj)
-    bonds = []
-    i = 0
-    while f := r.read_frame():
-        i += 1
-        bonds.append(f.bonds)
-        sys.stdout.write(f"\033[2K\rReading bonds: {i}")
-    print()
-
-    n_frames = len(bonds)
-    n_atoms = r.n_atoms
-    r.close()
-    print(f"Read {n_frames} frames from {toptraj}.")
+    top = TopTrajReader(toptraj)
+    start = top.tell()
+    n_frames = 0
+    while top.skip_frame():
+        n_frames += 1
+    n_atoms = top.n_atoms
 
     r = TrajectoryReader(inp)
     w = TrajectoryWriter(oup)
+    top.seek(start)
 
-    print()
     for i in range(n_frames):
         sys.stdout.write(f"\033[2K\rProcessing frame: {i + 1}/{n_frames + 1}")
         frame = r.read_frame()
@@ -191,7 +183,9 @@ def whole(args: list[str]) -> int:
         pos = np.array(pos, dtype=np.float64)
 
         graph = BondGraph(n_atoms)
-        for a, b in bonds[i]:
+        toptraj_frame = top.read_frame()
+        assert toptraj_frame is not None
+        for a, b in toptraj_frame.bonds:
             graph.add_bond(a, b)
         graph.make_whole(pbc, pos)
 
@@ -199,6 +193,7 @@ def whole(args: list[str]) -> int:
 
     r.close()
     w.close()
+    top.close()
     print()
     return 0
 
@@ -272,7 +267,7 @@ def dist(args: list[str]) -> int:
                     f"Trajectory {parsed_args.input} does not have enough frames in comparison with {parsed_args.frags}."
                 )
                 return 2
-            step, time, box, pos, vel = traj_frame
+            step, time, box, pos, _vel = traj_frame
             f.write(
                 f"# Frame {frame.frame_index}, Step {frame.step}, Box {box.to_lattice()}\n"
             )

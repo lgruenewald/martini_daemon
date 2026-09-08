@@ -8,6 +8,14 @@ from .__core import *
 from .__formats import *
 from .__parser import *
 from .__reporters import *
-from .__rust import BondGraph, FragList, Fragment, PeriodicBox, build_version
+from .__rust import (
+    BondGraph,
+    FragList,
+    Fragment,
+    PeriodicBox,
+    TopTrajFrame,
+    TopTrajReader,
+    build_version,
+)
 from .__simulation import Reporter, Simulation
 from .__topstar import *

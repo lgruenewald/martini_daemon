@@ -8,7 +8,8 @@ from math import isclose
 import numpy as np
 import pytest
 
-from martini_daemon import BondGraph, TopTrajReader, TopTrajWriter
+from martini_daemon import BondGraph, TopTrajReaderPy, TopTrajWriter
+from martini_daemon.__rust import TopTrajReader
 
 
 def get_random_name() -> str:
@@ -22,7 +23,9 @@ def rootdir(request: pytest.FixtureRequest) -> str:
     return os.path.dirname(request.path)
 
 
-def test_toptraj_writer(rootdir: str) -> None:
+@pytest.mark.parametrize("reader", [TopTrajReader, TopTrajReaderPy])
+@pytest.mark.parametrize("writer", [TopTrajWriter])
+def test_toptraj_writer(rootdir: str, reader, writer) -> None:  # noqa: ANN001
     """Write a .toptraj file with random data and read it back to compare."""
     os.chdir(rootdir)
 
@@ -39,21 +42,27 @@ def test_toptraj_writer(rootdir: str) -> None:
         frame["n_atoms"] = n_atoms
         frame["names"] = [get_random_name() for _ in range(n_atoms)]
         frame["types"] = [get_random_name() for _ in range(n_atoms)]
-        frame["charges"] = np.random.rand(n_atoms) * 2.0 - 1.0
-        frame["masses"] = np.random.rand(n_atoms) * 50.0
+        frame["charges"] = list(np.random.rand(n_atoms) * 2.0 - 1.0)
+        frame["masses"] = list(np.random.rand(n_atoms) * 50.0)
         n_bonds = np.random.randint(1000, 5000)
+        if frame_num == 1:
+            print(
+                f"atom #0: {frame['names'][0]} {frame['types'][0]} {frame['masses'][0]}"
+            )
         bonds = BondGraph(n_atoms)
         for _ in range(n_bonds):
             i = np.random.randint(0, n_atoms)
             j = np.random.randint(0, n_atoms)
             # BondGraph ignores it if i==j
             bonds.add_bond(i, j)
+        if frame_num == 1:
+            print("nbonds", len(bonds.to_list()))
         frame["bonds"] = bonds
         # and write it to file
 
     print("writing it to file")
     tmp_file = ".out.toptraj"
-    with TopTrajWriter(
+    with writer(
         tmp_file,
         "example title",
         [("a", 1, 1), ("b", 2, 1), ("c", n_atoms - 3, 1)],
@@ -77,7 +86,7 @@ def test_toptraj_writer(rootdir: str) -> None:
             w.write_frame()
 
     print("reading from file and verifying")
-    with TopTrajReader(tmp_file) as r:
+    with reader(tmp_file) as r:
         assert r.title == "example title"
         assert r.initial_molecules[0] == ("a", 1, 1)
         assert r.initial_molecules[1] == ("b", 2, 1)

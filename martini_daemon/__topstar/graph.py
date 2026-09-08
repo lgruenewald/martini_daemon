@@ -352,7 +352,7 @@ def match_atoms(graph: Graph, atoms: set[int], system: System) -> list[GraphMatc
                 # already filled, skip
                 continue
             # corresponds to a inter in the graph (e.g. connection cc1 cc2)
-            inter_filter, inter_atoms = graph.interactions[inter_id]
+            _inter_filter, inter_atoms = graph.interactions[inter_id]
             # find one of the atoms in the interaction
             missing: list[str] = []  # <- holes in the graph (graph atom names)
             len_filled = 0  # <- # of filled atoms

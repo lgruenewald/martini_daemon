@@ -171,4 +171,3 @@ class Force(metaclass=ABCMeta):
 
         See flag_add_exclusion for further notes.
         """
-        

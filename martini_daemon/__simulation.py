@@ -13,7 +13,7 @@ from datetime import datetime
 from importlib.metadata import version
 from time import time
 from types import TracebackType
-from typing import Any
+from typing import Any, Self
 
 import numpy as np
 import numpy.typing as npt
@@ -383,7 +383,7 @@ class Simulation:
         for r in self.__reporters:
             r.on_simulation_start(self, self.continue_sim)
 
-    def __enter__(self) -> Simulation:
+    def __enter__(self) -> Self:
         """Enter a Context Manager for simulation."""
         return self
 
@@ -548,7 +548,7 @@ class Simulation:
             print()
         except Exception as e:
             self.error(f"Unexpected Exception: {e}")
-            raise e
+            raise
 
     def __do_traj_frame(self) -> None:
         """Write a frame to all trajectory files."""

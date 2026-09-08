@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from os.path import splitext
 from types import TracebackType
+from typing import Self
 
 import numpy as np
 import numpy.typing as npt
@@ -105,7 +106,7 @@ class TrajectoryWriter:
             case _:
                 assert False
 
-    def __enter__(self) -> TrajectoryWriter:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(
@@ -227,7 +228,7 @@ class TrajectoryReader:
             case _:
                 assert False
 
-    def __enter__(self) -> TrajectoryReader:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(
@@ -271,7 +272,7 @@ class TrajectoryReader:
                     assert vel is not None
                 except RuntimeError:
                     # no velocities in file
-                    xyz, time, step, box, lambd, vel, force = self.__reader_trr._read(
+                    xyz, time, step, box, _lambd, vel, _force = self.__reader_trr._read(
                         1, None
                     )
                     assert vel is None

@@ -1,3 +1,4 @@
+import itertools
 from collections import OrderedDict
 from collections.abc import Iterable
 from typing import Any
@@ -335,7 +336,6 @@ class System:
         assert isinstance(excl, BondedForce)
         # FIXME: don't assume exclusion like this
         return ((m[0], m[1]) for (_, (m, _)) in excl.iterate_bonds())
-            
 
     # ==== API old_helpers ====
 
@@ -671,7 +671,7 @@ class System:
                         bonds.add_bond(i, j)
                 else:
                     # modeled as each particle bonded to the next one
-                    for i, j in zip(members[:-1], members[1:]):
+                    for i, j in itertools.pairwise(members):
                         if i == j:
                             continue
                         bonds.add_bond(i, j)

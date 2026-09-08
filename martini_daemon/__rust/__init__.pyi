@@ -13,6 +13,9 @@ __all__ = [
     "FragList",
     "Fragment",
     "PeriodicBox",
+    "TopTrajFrame",
+    "TopTrajReader",
+    "TopTrajWriter",
     "build_version",
     "detection",
     "tokenize",
@@ -179,7 +182,9 @@ class DetectionTemplateList:
 
         Will build and cache additional information about it, so should be already in a fully parsed state.
         """
-    def get_detection_template(self, name: builtins.str) -> DetectionTemplate | None:
+    def get_detection_template(
+        self, name: builtins.str
+    ) -> DetectionTemplate | None:
         r"""
         Get a mutable copy of detection template.
 
@@ -518,6 +523,172 @@ class PeriodicBox:
 
         This returns the same point in a different copy of the periodic box, but the same location in periodic space.
         """
+
+@typing.final
+class TopTrajFrame:
+    @property
+    def frame_index(self) -> builtins.int: ...
+    @property
+    def sim_step(self) -> builtins.int: ...
+    @property
+    def sim_time(self) -> builtins.float: ...
+    @property
+    def n_atoms(self) -> builtins.int: ...
+    @property
+    def names(self) -> list: ...
+    @property
+    def atom_types(self) -> list: ...
+    @property
+    def charges(self) -> list: ...
+    @property
+    def masses(self) -> list: ...
+    @property
+    def bonds(self) -> list: ...
+
+@typing.final
+class TopTrajReader:
+    @property
+    def path(self) -> builtins.str: ...
+    @property
+    def major_version(self) -> builtins.int: ...
+    @property
+    def minor_version(self) -> builtins.int: ...
+    @property
+    def header(self) -> builtins.list[builtins.int]: ...
+    @property
+    def title(self) -> builtins.str: ...
+    @property
+    def initial_molecules(self) -> list: ...
+    @property
+    def n_atoms(self) -> builtins.int: ...
+    @property
+    def res_names(self) -> list: ...
+    @property
+    def res_ids(self) -> list: ...
+    @property
+    def frame_offsets(self) -> builtins.list[builtins.int]:
+        r"""Offsets of the starts of all frames + the end of the file."""
+    def __new__(cls, path: builtins.str) -> TopTrajReader: ...
+    def tell(self, frame_index: builtins.int | None) -> builtins.int:
+        r"""
+        Return the current position in the file.
+
+        :param frame_index: If specified, return the position of this frame in the file.
+        """
+    def seek(self, pos: builtins.int) -> None:
+        r"""Set the reader to position, as returned by tell()."""
+    def read_frame(self) -> TopTrajFrame | None:
+        r"""
+        Read a frame from the toptraj file.
+
+        :return: A toptraj frame, or None if finished.
+        """
+    def skip_frame(self) -> builtins.bool: ...
+    def finish(self) -> None: ...
+    def __enter__(self) -> TopTrajReader: ...
+    def __exit__(
+        self,
+        _exc_type: type | None,
+        _exc_val: typing.Any | None,
+        _exc_tb: typing.Any | None,
+    ) -> builtins.bool: ...
+
+@typing.final
+class TopTrajWriter:
+    def __new__(
+        cls,
+        path: builtins.str,
+        title: builtins.str,
+        initial_molecules: typing.Sequence[
+            tuple[builtins.str, builtins.int, builtins.int]
+        ],
+        res_names: typing.Sequence[builtins.str],
+        res_ids: typing.Sequence[builtins.int],
+        /,
+        append: builtins.bool = False,
+        truncate: builtins.int | None = None,
+    ) -> TopTrajWriter:
+        r"""
+        Create a Topology Trajectory Writer.
+
+        Note: this class owns a file handle. Call .finish() or use a context manager!
+
+        :param path: The path to write to.
+        :param title: The simulation title to write.
+        :param initial_molecules: List of (name, count, atoms_per_mol) tuples.
+        :param res_names: List of n_atoms residue names.
+        :param res_ids: List of n_atoms residue IDs.
+        :param append: Whether to append to an existing .toptraj file.
+        :param truncate: If appending, the writer can optionally truncate the pre-existing
+          file. Specify the last MD step to keep.
+        """
+    def __enter__(self) -> TopTrajWriter: ...
+    def __exit__(
+        self,
+        _exc_type: type | None,
+        _exc_val: typing.Any | None,
+        _exc_tb: typing.Any | None,
+    ) -> builtins.bool: ...
+    def finish(self) -> None: ...
+    def new_frame(
+        self,
+        frame_num: builtins.int,
+        sim_step: builtins.int,
+        time_ps: builtins.float,
+        n_atoms: builtins.int,
+    ) -> None:
+        r"""
+        Write the frame header to the writer buffer.
+
+        Frames should be written by subsequent calls to the Writer in this
+        order:
+
+        * new_frame()
+        * write_frame_atoms()
+        * write_frame_bonds()
+        * write_frame()
+
+        :param frame_num: The current frame number. Must be one larger than the previous frame.
+        :param sim_step: The simulation step.
+        :param time_ps: The simulation time in picoseconds.
+        :param n_atoms: The number of atoms in this frame.
+        """
+    def write_frame_atoms(
+        self,
+        names: list[str],
+        atom_types: list[str],
+        charges: list[float],
+        masses: list[float],
+    ) -> None:
+        r"""
+        Write the current frame atom information to disk.
+
+        The number of atoms must be the same as n_atoms specified in new_frame().
+        new_frame() must be called first. register_frame_atoms() must be called exactly once per frame.
+
+        :param names: The names of the atoms.
+        :param atom_types: The Non-Bonded force atom types, per atom.
+        :param charges: The charges of the atoms, per atom.
+        :param masses: The masses of the atoms, per atom.
+        """
+    def write_frame_bonds(self, bonds: typing.Any) -> None:
+        r"""
+        Write the bonds for the current frame to disk.
+
+        Note: will automatically remove duplicates, self-bonds
+              and will re-order bonds to have smaller first in each entry.
+
+        :param bonds: The bonds to write, as a BondGraph object or as list of (i, j) tuples.
+        """
+    def write_frame(self) -> None:
+        r"""
+        Finish writing the current frame to disk.
+
+        Must call register_frame_atoms and register_frame_bonds exactly once first.
+
+        Note: will automatically flush after finishing the frame.
+        """
+    def debug_print(self) -> None: ...
 
 def build_version() -> builtins.str:
     r"""

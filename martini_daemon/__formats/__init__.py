@@ -8,7 +8,7 @@ from .top_traj import (
     TopTrajFrame as TopTrajFrame,
 )
 from .top_traj import (
-    TopTrajReader as TopTrajReader,
+    TopTrajReader as TopTrajReaderPy,
 )
 from .top_traj import (
     TopTrajWriter as TopTrajWriter,
