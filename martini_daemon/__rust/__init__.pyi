@@ -182,9 +182,7 @@ class DetectionTemplateList:
 
         Will build and cache additional information about it, so should be already in a fully parsed state.
         """
-    def get_detection_template(
-        self, name: builtins.str
-    ) -> DetectionTemplate | None:
+    def get_detection_template(self, name: builtins.str) -> DetectionTemplate | None:
         r"""
         Get a mutable copy of detection template.
 
@@ -567,24 +565,46 @@ class TopTrajReader:
     def res_ids(self) -> list: ...
     @property
     def frame_offsets(self) -> builtins.list[builtins.int]:
-        r"""Offsets of the starts of all frames + the end of the file."""
-    def __new__(cls, path: builtins.str) -> TopTrajReader: ...
-    def tell(self, frame_index: builtins.int | None) -> builtins.int:
+        r"""
+        Offsets of the starts of all frames + the end of the file
+        """
+    def __new__(cls, path: builtins.str) -> TopTrajReader:
+        r"""
+        Create a new TopTrajReader.
+        """
+    def tell(self, frame_index: builtins.int | None = None) -> builtins.int:
         r"""
         Return the current position in the file.
 
         :param frame_index: If specified, return the position of this frame in the file.
         """
     def seek(self, pos: builtins.int) -> None:
-        r"""Set the reader to position, as returned by tell()."""
+        r"""
+        Set the reader to position, as returned by tell().
+        """
     def read_frame(self) -> TopTrajFrame | None:
         r"""
         Read a frame from the toptraj file.
 
         :return: A toptraj frame, or None if finished.
         """
-    def skip_frame(self) -> builtins.bool: ...
-    def finish(self) -> None: ...
+    def skip_frame(self) -> builtins.bool:
+        r"""
+        Skip a frame.
+
+        If a frame was skipped, return True.
+        If the reader is already at EOF, return False.
+        """
+    def finish(self) -> None:
+        r"""
+        Close the reader.
+        """
+    def close(self) -> None:
+        r"""
+        Close the reader.
+
+        Identical to finish().
+        """
     def __enter__(self) -> TopTrajReader: ...
     def __exit__(
         self,
@@ -629,7 +649,16 @@ class TopTrajWriter:
         _exc_val: typing.Any | None,
         _exc_tb: typing.Any | None,
     ) -> builtins.bool: ...
-    def finish(self) -> None: ...
+    def close(self) -> None:
+        r"""
+        Close the writer.
+
+        Identical to finish().
+        """
+    def finish(self) -> None:
+        r"""
+        Close the writer.
+        """
     def new_frame(
         self,
         frame_num: builtins.int,

@@ -13,7 +13,7 @@ from .__formats import (
     read_checkpoint,
 )
 from .__reporters import FragmentReporter
-from .__rust import BondGraph, build_version, TopTrajReader
+from .__rust import BondGraph, TopTrajReader, build_version
 from .__simulation import Simulation
 from .extra import logo, logo_small
 
@@ -28,7 +28,7 @@ Subcommands:
 help - print this help message
 version - print version information
 info - print information about a .toptraj or .chk file
-whole - make a trajectory whole using a .toptraj file
+whole - make a trajectory whole using a .toptraj file or .top file
 select - select atoms and/or frames for .toptraj file
 
 Use `daemon help [SUBCOMMAND]` for more information about a subcommand.""")
@@ -159,21 +159,25 @@ def whole(args: list[str]) -> int:
         print(f"{toptraj} does not exist, or is not a file.")
         return 1
 
-    top = TopTrajReader(toptraj)
-    start = top.tell()
-    n_frames = 0
-    while top.skip_frame():
-        n_frames += 1
-    n_atoms = top.n_atoms
+    _, topext = os.path.splitext(toptraj)
+    if topext == ".toptraj":
+        top = TopTrajReader(toptraj)
+        n_atoms = top.n_atoms
+    elif topext == ".top":
+        top = Simulation(toptraj, None, 0, [], 0, 0, None)
+        graph = top.system.collect_bonds_for_whole()
+        n_atoms = top.system.num_atoms()
+        top.finish()
+    else:
+        print("The topology file should be a .toptraj or a .top file.")
+        return 1
 
     r = TrajectoryReader(inp)
     w = TrajectoryWriter(oup)
-    top.seek(start)
 
-    for i in range(n_frames):
-        sys.stdout.write(f"\033[2K\rProcessing frame: {i + 1}/{n_frames + 1}")
-        frame = r.read_frame()
-        assert frame is not None
+    i = 0
+    while (frame := r.read_frame()) is not None:
+        sys.stdout.write(f"\033[2K\rProcessing frame: {i + 1}")
         step, time, pbc, pos, _ = frame
         if len(pos) != n_atoms:
             print(
@@ -182,18 +186,28 @@ def whole(args: list[str]) -> int:
             return 1
         pos = np.array(pos, dtype=np.float64)
 
-        graph = BondGraph(n_atoms)
-        toptraj_frame = top.read_frame()
-        assert toptraj_frame is not None
-        for a, b in toptraj_frame.bonds:
-            graph.add_bond(a, b)
+        if topext == ".toptraj":
+            assert isinstance(top, TopTrajReader)
+            graph = BondGraph(n_atoms)
+            toptraj_frame = top.read_frame()
+            assert toptraj_frame is not None
+            for a, b in toptraj_frame.bonds:
+                graph.add_bond(a, b)
+        elif topext == ".top":
+            # graph already set above
+            pass
+        else:
+            assert False
         graph.make_whole(pbc, pos)
 
         w.write_frame(step, time, pbc, pos)
+        i += 1
 
     r.close()
     w.close()
-    top.close()
+    if topext == ".toptraj":
+        assert isinstance(top, TopTrajReader)
+        top.close()
     print()
     return 0
 
