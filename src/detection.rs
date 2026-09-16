@@ -1,5 +1,6 @@
 use kdtree::{KdTree, distance::squared_euclidean};
 use numpy::{Ix2, PyArray};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3_stub_gen::derive::gen_stub_pyfunction;
 use sortedlist_rs::SortedList;
@@ -49,6 +50,14 @@ pub fn detection<'py>(
                 continue;
             }
             let pos = pos.get_item(index as usize)?.extract::<[f64; 3]>()?;
+
+            if pos.iter().any(|x| !x.is_finite()) {
+                return Err(PyValueError::new_err(format!(
+                    "Non-finite coordinate for particle {}: [{:.2}, {:.2}, {:.2}].",
+                    index, pos[0], pos[1], pos[2]
+                )));
+            }
+
             // should be within the middle pbc copy
             let pos = pbc.move_within(pos);
 
@@ -130,7 +139,7 @@ pub fn detection<'py>(
             }
             let pos: [f64; 3] = pos.get_item(index as usize)?.extract::<[f64; 3]>()?;
             for (_, new_match) in tree
-                .within_unsorted(&pos, cutoff.powi(2), &squared_euclidean)
+                .iter_nearest_within_radius(&pos, Some(cutoff.powi(2)), &squared_euclidean)
                 .unwrap()
             {
                 if !matches.contains(new_match) {
@@ -212,7 +221,7 @@ pub fn detection<'py>(
                     }
                     let pos: [f64; 3] = pos.get_item(index as usize)?.extract::<[f64; 3]>()?;
                     for (_, new_match) in tree
-                        .within_unsorted(&pos, cutoff.powi(2), &squared_euclidean)
+                        .iter_nearest_within_radius(&pos, Some(cutoff.powi(2)), &squared_euclidean)
                         .unwrap()
                     {
                         if !tri_matches.contains(new_match) {

@@ -14,12 +14,13 @@ This is achieved by combining multiple components in one repo / one python packa
 - Install `git-lfs` (`sudo apt install git-lfs` on Ubuntu).
 - Install Cargo and Rust. Installation via [rustup](https://rustup.rs/) is recommended.
 - Clone the repository and switch to the desired branch, tag or commit. Enter the directory.
-- Make and activate a Python virtual environment. Python 3.13 is recommended.
+- Make and activate a Python virtual environment. Python 3.14 is recommended.
 - It's recommended to explicitly [install the right version of OpenMM](https://docs.openmm.org/latest/userguide/application/01_getting_started.html#installing-openmm) with support for your GPU.
    - e.g. `pip install openmm[cuda12]` or `pip install openmm[hip7]`
+   - GPU support with OpenCL is still available if this step is skipped
    - (optional) after installing, verify which platforms are available with `python -m openmm.testInstallation`
 - pip: Install using `pip install -e .`
-- uv: Install maturin using `uv tool install maturin` and then run `maturin develop -r`
+  - Alternatively, using uv+maturin: `uv tool install maturin` and then `maturin develop -r`
 
 # Optional dependencies
 
@@ -29,7 +30,7 @@ By default, Martini Daemon uses [molly](https://github.com/ma3ke/molly) as its X
 Optional dependencies can enable other trajectory backends.
 Here is a list of optional dependency tags, based on what's currently possible:
 
-- [trr] - Gromacs .trr files, uses [mdtraj](https://www.mdtraj.org). Full precision, stores velocities.
+- [trr] - Gromacs .trr files, uses [mdtraj](https://www.mdtraj.org). Full precision, stores velocities. There is no truncation support in mdtraj, therefore it can't be used for loading checkpoints.
 
 ## Docs
 
@@ -51,7 +52,7 @@ source /usr/local/gromacs-2026.1-double/bin/GMXRC
 # make sure additional test dependencies are installed
 pip install .[test]
 # make sure everything is recompiled
-maturin develop
+maturin develop -r
 # run the python tests
 pytest .
 ```
@@ -68,6 +69,7 @@ The python tests can be found in the `tests` folder in the repo, containing the 
   Does not automatically verify output at the moment, doing that is the job of the other tests.
 - `formats` - Runs tests for geometry, trajectory and topology trajectory formats.
 - `replay` - Test checkpoint loading, replaying reactions and comparing subsequent energies against GROMACS.
+- `cli` - Test the daemon cli.
 - `test_periodic_box` - Fuzz the PeriodicBox implementation against mdtraj.
 - `test_bond_graph` - Test the class `BondGraph`, which features things, such as pbc whole.
 

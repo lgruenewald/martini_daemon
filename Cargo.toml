@@ -12,13 +12,13 @@ path = "src/lib.rs"
 chrono = "0.4.44"
 
 [dependencies]
-glam = "0.32.1"
-pyo3 = "0.28.2"
-numpy = "0.28.0"
-rand = "0.10.0"
-kdtree = "0.8.0"
-ordermap = "1.1.0"
+glam = "0.33.7"
+pyo3 = "0.29.2"
+numpy = "0.29.0"
+rand = "0.10.2"
+kdtree = "0.8.1"
+ordermap = "1.2.2"
 sortedlist-rs = "0.2.5"
-pyo3-stub-gen = "0.21.1"
-flate2 = { version = "1.1.9", features = ["zlib-rs"] }
+pyo3-stub-gen = "0.23.0"
+flate2 = { version = "1.1.10", features = ["zlib-rs"] }
 logos = "0.16.1"

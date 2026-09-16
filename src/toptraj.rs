@@ -91,9 +91,30 @@ where
         // API change idea: return a Chunk Writer
         let mut comp_buf = Vec::<u8>::new();
         let mut z = ZlibEncoder::new(&mut comp_buf, Compression::new(6));
-        z.write(raw)?;
+        let mut written = 0;
+
+        while written < raw.len() {
+            match z.write(&raw[written..])? {
+                0 => {
+                    break;
+                }
+                n => {
+                    written += n;
+                }
+            }
+        }
         z.try_finish()?;
         z.finish()?;
+        if written != raw.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::WriteZero,
+                format!(
+                    "Error compressing: only {} bytes of {} were compressed.",
+                    written,
+                    raw.len()
+                ),
+            ));
+        }
         self.write_u64(comp_buf.len() as u64)?;
         self.write_u64(raw.len() as u64)?;
         self.write(&comp_buf)?;
@@ -381,7 +402,7 @@ impl TopTrajWriter {
                 let sim_time = chunk.read_f64()?;
 
                 if let Some(truncate) = truncate
-                    && truncate > sim_step
+                    && sim_step > truncate
                 {
                     // ignore frame, go back to before
                     handle.seek(SeekFrom::Start(start));
@@ -565,7 +586,7 @@ impl TopTrajWriter {
     /// :param bonds: The bonds to write, as a BondGraph object or as list of (i, j) tuples.
     fn write_frame_bonds<'py>(&mut self, bonds: Bound<'py, PyAny>) -> PyResult<()> {
         if let Ok(bond_list) = bonds.extract::<Vec<(u32, u32)>>() {
-            self.write_frame_bonds(bonds)
+            self.write_frame_bonds_bond_list(bond_list)
         } else if let Ok(bond_graph) = bonds.extract::<Bound<'py, BondGraph>>() {
             self.write_frame_bonds_bond_graph(&*bond_graph.borrow())
         } else {
@@ -843,6 +864,7 @@ impl TopTrajReader {
         // precalculate offsets for fast reading in the future
         loop {
             let start = handle.seek(SeekFrom::Current(0))?;
+            offsets.push(start);
 
             if start >= file_end {
                 break;
@@ -850,13 +872,10 @@ impl TopTrajReader {
 
             let mut chunk = get_chunk_reader(&mut handle)?;
             seek_to_chunk_end(chunk.start, chunk.comp_len, None, &mut handle)?;
-            offsets.push(start);
         }
 
         assert!(handle.seek(SeekFrom::Current(0))? == file_end);
         handle.seek(SeekFrom::Start(offsets[0]));
-
-        offsets.push(file_end);
 
         Ok(Self {
             path,

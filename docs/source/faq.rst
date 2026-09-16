@@ -182,7 +182,7 @@ Both. Depends on where:
 
 * GROMACS file formats, such as itp or gro are 1-indexed.
 
-* In .rx files, to mirror itp, reactants are 1-indexed.
+* In .rx files, to mirror the itp format, reactants are 1-indexed.
 
 * Internally in OpenMM, everything is 0-indexed.
 

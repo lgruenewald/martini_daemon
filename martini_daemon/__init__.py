@@ -5,6 +5,7 @@
 # private submodules that mutate global state when imported, but export no symbols
 from . import __forces, __vsites
 from .__core import *
+from .__forces import ExclusionHelper, NonBonded
 from .__formats import *
 from .__parser import *
 from .__reporters import *
@@ -15,6 +16,7 @@ from .__rust import (
     PeriodicBox,
     TopTrajFrame,
     TopTrajReader,
+    TopTrajWriter,
     build_version,
 )
 from .__simulation import Reporter, Simulation

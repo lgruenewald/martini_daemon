@@ -10,8 +10,8 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "Martini Daemon"
-copyright = "2026, "
-author = ""
+copyright = "2026, University of Groningen"
+author = "Aster Kovács, Linus Grünewald"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

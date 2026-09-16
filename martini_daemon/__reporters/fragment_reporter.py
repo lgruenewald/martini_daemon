@@ -4,7 +4,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import TextIO
 
-from ..__rust import Fragment
+from ..__rust import Fragment, build_version
 from ..__simulation import Reporter, Simulation
 
 
@@ -53,7 +53,8 @@ class FragmentReporter(Reporter):
         Without the detailed flag, only simulation steps and fragment counts are written, useful for rate checks.
 
         With the detailed_frames flag, additional frame metadata is written, alongside a full list of frags.
-        Useful for querying, but takes more disk space.
+        Useful for querying, but takes more disk space (it is uncompressed, plaintext),
+        so this is only recommended for short simulations and debugging.
 
         With the on_trajectory flag, fragment info is written on trajectory frames. By default, this is on.
 
@@ -87,6 +88,10 @@ class FragmentReporter(Reporter):
                 tell = self.handle.tell()
             self.handle.truncate(tell)
             self.handle.seek(0, os.SEEK_END)
+        else:
+            self.handle.write(
+                f"# Written by Martini Daemon {build_version()} FragmentReporter\n"
+            )
 
     def on_trajectory_frame(self, simulation: Simulation) -> None:
         if self.write_on_trajectory:
@@ -117,28 +122,6 @@ class FragmentReporter(Reporter):
             frags,
         )
         self.handle.write(frame.serialize())
-
-        # self.handle.write(
-        #     f"Step:{simulation.current_step},"
-        #     + ",".join(
-        #         [f"{k}:{v}" for k, v in simulation.top.frag_list.frag_counts.items()]
-        #     )
-        #     + "\n"
-        # )
-        # if self.detailed_frames:
-        #     self.handle.write(
-        #         f"Frame:{simulation.trajectory_frame},Time:{simulation.time_ps}\n"
-        #     )
-        #     # written in a way to reduce frag_list calls as those go through FFI
-        #     for frag_id in simulation.top.frag_list.get_all_frag_ids():
-        #         frag = simulation.top.frag_list.get_fragment(frag_id)
-        #         assert frag is not None
-        #         frag_name = frag.name
-        #         frag_atoms = frag.atoms
-        #         self.handle.write(
-        #             f"Name:{frag_name},Id:{frag_id},Atoms:[{' '.join(map(str, frag_atoms))}]\n"
-        #         )
-
         self.handle.flush()
 
     def on_simulation_finish(self, simulation: Simulation) -> None:

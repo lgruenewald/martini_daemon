@@ -5,13 +5,13 @@ from .geometry import read_geometry as read_geometry
 from .geometry import write_geometry as write_geometry
 from .log_extract import extract_timings_from_log as extract_timings_from_log
 from .top_traj import (
-    TopTrajFrame as TopTrajFrame,
+    TopTrajFrame as TopTrajFramePy,
 )
 from .top_traj import (
     TopTrajReader as TopTrajReaderPy,
 )
 from .top_traj import (
-    TopTrajWriter as TopTrajWriter,
+    TopTrajWriter as TopTrajWriterPy,
 )
 from .trajectory import (
     TrajectoryReader as TrajectoryReader,

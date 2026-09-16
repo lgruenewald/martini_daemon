@@ -58,7 +58,6 @@ class CheckpointReporter(Reporter):
             during trajectory frames if the number of frames since last checkpoint is larger than this.
         :param n_checkpoints: Number of checkpoint files to keep at a time. '.chk' is the newest,
             '.chk2' the one before, with increasing numbers representing older checkpoint files.
-
         """
         self.n_checkpoints = n_checkpoints
         self.paths: list[str] = []

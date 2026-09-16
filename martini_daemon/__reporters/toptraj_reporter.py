@@ -1,4 +1,4 @@
-from ..__formats import TopTrajWriter
+from ..__rust import TopTrajWriter
 from ..__simulation import Reporter, Simulation
 
 

@@ -91,6 +91,6 @@ class GromacsTopFile(Directive):
         raise NotImplementedError()
 
 
-def register_directive(class_: type[Directive]) -> type[Directive]:
+def register_directive[T: type[Directive]](class_: T) -> T:
     GromacsTopFile.add_top_directive(class_)
     return class_

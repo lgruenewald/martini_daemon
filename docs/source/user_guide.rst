@@ -17,9 +17,9 @@ below, which can be adjusted to meet various needs.
 
    with Simulation(
        # path to Gromacs Topology
-       top_path="system.top",
+       topology="system.top",
        # path to Starting geometry
-       geom_path="system.gro",
+       geometry="system.gro",
        # output filenames will be prefixed with this name
        sim_name="out",
        # total MD steps
@@ -294,9 +294,8 @@ Rules for optional beads:
 Debugging graphs
 ----------------
 
-The reporter :doc:`/autoapi/martini_daemon/FragmentsDump` is specifically designed to facilitate debugging
-the graph matching algorithm, by printing the list of matched fragments every time there was any recalculation
-of graph matches.
+The reporter :doc:`/autoapi/martini_daemon/FragmentReporter` has a detailed option, designed to facilitate debugging
+the graph matching algorithm, by printing the list of matched fragments.
 
 Graph syntax reference
 ----------------------
@@ -592,7 +591,7 @@ Optional beads are supported. A missing optional bead will:
 
 
 Debugging reaction templates
----------------------------
+----------------------------
 
 Reaction templates should be tested. It’s recommended to run reactive simulations with the
 :doc:`/autoapi/martini_daemon/ReactionReporter`, as it reports each reaction, along with the frame it happens,
@@ -616,16 +615,17 @@ Reporters can be broadly divided into distinct categories:
     * :doc:`/autoapi/martini_daemon/VariablesReporter` reports thermodynamic variables for each trajectory frame.
     * :doc:`/autoapi/martini_daemon/TrajectoryReporter` reports atom positions and the periodic box for each trajectory frame. The format is implied from the file extension.
     * :doc:`/autoapi/martini_daemon/TopTrajReporter` creates a "topology trajectory", reporting atom properties and bonds for each trajectory frame. See :doc:`/toptraj` for details.
-    * :doc:`/autoapi/martini_daemon/FragCountReporter` reports the number of fragments at each trajectory frame. It also adds the current total number of fragments to the interactive line on stdout.
+    * :doc:`/autoapi/martini_daemon/FragmentReporter` reports the number of fragments at each trajectory frame. It also adds the current total number of fragments to the interactive line on stdout.
 
 * Some perform reporting related to reactions happening in the system:
-    * :doc:`/autoapi/martini_daemon/LocalMinimizer` is not a traditional reporter. It locally minimizes the energy after reactions.
-    * :doc:`/autoapi/martini_daemon/ReactionReporter` logs all reactions and reactants to a file as they occur.
+    * :doc:`/autoapi/martini_daemon/LocalMinimizer` is not a traditional reporter. It locally (reacting atoms and their environment) minimizes the energy after reactions.
+	* :doc:`/autoapi/martini_daemon/GlobalMinimizer` is also a minimizer, but it runs OpenMM's minimization algorithm on the entire system. This should be considered experimental.
+	* :doc:`/autoapi/martini_daemon/GlobalIntegratorMinimizer` is a minimizer, which runs any OpenMM integrator for a few steps after each reaction. These extra steps are not counted toward simulation time. This should be considered experimental.
+    * :doc:`/autoapi/martini_daemon/ReactionReporter` logs all reactions and reactants to a file as they occur. 
     * :doc:`/autoapi/martini_daemon/ReactionEnergyReporter` reports thermodynamic variables before and after reactions. Optionally, it can write coordinates too, which can be helpful to debug local minimizations.
 
 * Some of the reporters are there to help debug reaction templates:
     * :doc:`/autoapi/martini_daemon/SystemDump` prints all atom properties and a list of bonded forces in the system at the simulation start and after each frame with reactions. It is advised to use this on small systems only.
-    * :doc:`/autoapi/martini_daemon/FragmentsDump` prints all fragments (successful graph matches).
 
 Note, technically a reporter can do something at both trajectory frames and when reactions happen,
 it is up to the implementation to choose which callbacks to hook onto.
@@ -677,14 +677,16 @@ checkpoint was made.
 
    #!/usr/bin/env python3
 
-   from martini_daemon import Simulation, VariablesReporter, TrajectoryReporter, ReactionReporter, TopTrajReporter
+   from martini_daemon import Simulation, VariablesReporter, TrajectoryReporter, ReactionReporter, TopTrajReporter, CheckpointLoader
    import openmm as mm
 
-   with Simulation(
+   with CheckpointLoader(
+       "out.chk",
        # path to Gromacs Topology
-       top_path="system.top",
+       topology="system.top",
        # path to Starting geometry
-       geom_path="system.gro",
+       geometry="system.gro",
+	   ...
 
 
 Energy minimization after reactions

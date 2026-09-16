@@ -6,7 +6,6 @@ import math
 import os
 import shutil
 import sys
-import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from datetime import datetime
@@ -27,7 +26,6 @@ from .__formats import Checkpoint, read_geometry, write_geometry
 from .__parser import GromacsTopFile, InvalidTopologyError
 from .__rust import Fragment, PeriodicBox, build_version
 from .__topstar import TopStar
-from .extra import set_process_title
 
 
 class Reporter(ABC):
@@ -141,6 +139,7 @@ class Simulation:
         platform: str | None | mm.Platform = None,
         context_parameters: None | dict[str, str] = None,
         nonbonded: Callable[[System], NonBonded] | type[NonBonded] | None = None,
+        detailed_log: bool = False,
         copy_on_continue: bool = False,
         checkpoint: Checkpoint | None = None,
     ) -> None:
@@ -168,7 +167,8 @@ class Simulation:
         :param integrator: Base integrator to use during the simulation. Note: a compound integrator will be set up
             based on it. Depending on the reporters, local minimization or other integrators can be configured alongside.
             If None, LangevinMiddleIntegrator will be used, at 298 kelvin, 1 ps-1 collision frequency and 0.02 ps dt.
-        :param options: Additional data to pass to the system. Example keys available are "epsilon_r" (default 15),
+        :param options: Additional data to pass to the system and its forces.
+            Example keys available are "epsilon_r" (default 15),
             "cutoff" (default 1.1, in nanometers) to control the nonbonded force, as well as "respos",
             which can be set as a f64 (n_atoms, 3) shaped numpy array for position restraint reference coordinates
             (default same as geom_path coordinates).
@@ -181,6 +181,7 @@ class Simulation:
         :param nonbonded: Nonbonded force to use, passed as a type or a function that returns the martini daemon Force
             when called with system as its argument. By default, the Martini compatible shifted Lennard-Jones
             and reaction-field electrostatics are used.
+        :param detailed_log: If True, will write extra info to log.
         :param copy_on_continue: If True, it will back up files when loading from checkpoints. This may take a while
             depending on I/O speed.
         :param checkpoint: Whether this is a continuation of a previous simulation. Do not use manually! Use
@@ -197,6 +198,7 @@ class Simulation:
         self.__reporters = reporters or []
         self.total_steps: int = md_steps
         self.__sim_name = sim_name
+        self.detailed_log = detailed_log
         # metadata
         self.continue_sim = checkpoint is not None
         self.copy_on_continue = copy_on_continue
@@ -308,7 +310,7 @@ class Simulation:
             options["respos"] = read_geometry(geometry)[1]
 
         # Parsing
-        self.info("Parsing start")
+        self.debug("Parsing start")
         self.system: System = System(options=options)
         try:
             GromacsTopFile(
@@ -322,14 +324,14 @@ class Simulation:
         self.system.add_force(nb)
         self.system.add_force(excl)
         self.system.build_initial_molecules()
-        self.info("Parsing finished")
+        self.debug("Parsing finished")
 
-        self.info("TopStar build start")
+        self.debug("TopStar build start")
         self.top: TopStar = TopStar(self.system)
-        self.info("TopStar build finished")
+        self.debug("TopStar build finished")
 
         self.info(
-            "setup integrator",
+            "Integrator",
             f"dt (ps): {self.dt_ps}",
             f"type: {type(md_integrator).__name__}",
         )
@@ -382,6 +384,7 @@ class Simulation:
 
         for r in self.__reporters:
             r.on_simulation_start(self, self.continue_sim)
+        self.info("End of Simulation.__init__")
 
     def __enter__(self) -> Self:
         """Enter a Context Manager for simulation."""
@@ -462,6 +465,10 @@ class Simulation:
                 + "\n"
             )
 
+    def debug(self, message: str) -> None:
+        if self.detailed_log:
+            self.info(message)
+
     def warn(self, message: str) -> None:
         """Write a warning to the log file and to stderr."""
         self.info("[WARNING] " + message)
@@ -473,11 +480,6 @@ class Simulation:
         print("[ERROR]", message, file=sys.stderr)
 
     # Friendly interface for setting up and running simulations
-    @classmethod
-    def set_process_title(cls, newname: bytes = b"daemon") -> None:
-        warnings.warn("Deprecated: Use martini_daemon.extra.set_process_title")
-        set_process_title(newname)
-
     @property
     def context(self) -> Context:
         if self.__context is None:
@@ -553,9 +555,9 @@ class Simulation:
     def __do_traj_frame(self) -> None:
         """Write a frame to all trajectory files."""
         for r in self.__reporters:
-            self.info(f"Trajectory {r.__class__.__name__} start")
+            self.debug(f"Trajectory {r.__class__.__name__} start")
             r.on_trajectory_frame(self)
-            self.info(f"Trajectory {r.__class__.__name__} finished")
+            self.debug(f"Trajectory {r.__class__.__name__} finished")
         self.trajectory_frame += 1
 
     def get_openmm_topology(self) -> mmapp.Topology:
@@ -652,22 +654,22 @@ class Simulation:
         if traj:
             self.__do_traj_frame()
 
-        self.info(f"doing md steps to go from {self.current_step} to")
+        self.debug(f"doing md steps to go from {self.current_step} to")
         self.current_step += n_steps
         percent = (
             self.current_step / self.total_steps * 100.0
             if self.total_steps > 0
             else 100.0
         )
-        self.info(f"step {self.current_step}")
+        self.debug(f"step {self.current_step}")
         if n_steps > 0:
-            self.info(f"md_steps {n_steps}")
-            self.info("Reinitialize start")
+            self.debug(f"md_steps {n_steps}")
+            self.debug("Reinitialize start")
             self.context.do_steps(0)
-            self.info("Reinitialize finished")
-            self.info("MD start")
+            self.debug("Reinitialize finished")
+            self.debug("MD start")
             self.context.do_steps(n_steps)
-            self.info("MD finished")
+            self.debug("MD finished")
         if self.total_steps > 0 and n_steps > 0 and not silent:
             self.time_ps += self.dt_ps * n_steps
             time_left = _format_time(
@@ -683,31 +685,31 @@ class Simulation:
                 f"{time_left} {reporter_data}"
             )
         if dm:
-            self.info("Detection start")
+            self.debug("Detection start")
             pos, box = self.context.get_positions()
             reactions: list[tuple[str, list[int]]] = self.top.detection(box, pos)
-            self.info(f"After detection there were {len(reactions)} reactions")
-            self.info("Detection finished")
+            self.debug(f"After detection there were {len(reactions)} reactions")
+            self.debug("Detection finished")
             if len(reactions) > 0:
                 for r in self.__reporters:
                     r.pre_modification(self)
                 # we now need copies of fragments, since they possibly got consumed in the reaction
-                self.info("Modification start")
+                self.debug("Modification start")
                 reactions: list[tuple[str, list[Fragment]]] = self.top.modification(
                     reactions
                 )
-                self.info(f"After modification there were {len(reactions)} reactions")
-                self.info("Modification finished")
+                self.debug(f"After modification there were {len(reactions)} reactions")
+                self.debug("Modification finished")
                 if len(reactions) > 0:
                     for r in self.__reporters:
-                        self.info(f"OnReaction {r.__class__.__name__} start")
+                        self.debug(f"OnReaction {r.__class__.__name__} start")
                         # local minimization happens here for example
                         r.on_reaction(self, reactions)
-                        self.info(f"OnReaction {r.__class__.__name__} finished")
+                        self.debug(f"OnReaction {r.__class__.__name__} finished")
                     for r in self.__reporters:
-                        self.info(f"PostReaction {r.__class__.__name__} start")
+                        self.debug(f"PostReaction {r.__class__.__name__} start")
                         r.post_reaction(self)
-                        self.info(f"PostReaction {r.__class__.__name__} finished")
+                        self.debug(f"PostReaction {r.__class__.__name__} finished")
                     self.reactions_so_far += len(reactions)
 
         end_time = time()

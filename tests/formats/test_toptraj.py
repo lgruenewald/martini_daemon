@@ -8,8 +8,8 @@ from math import isclose
 import numpy as np
 import pytest
 
-from martini_daemon import BondGraph, TopTrajReaderPy, TopTrajWriter
-from martini_daemon.__rust import TopTrajReader
+from martini_daemon import BondGraph, TopTrajReaderPy, TopTrajWriterPy
+from martini_daemon.__rust import TopTrajReader, TopTrajWriter
 
 
 def get_random_name() -> str:
@@ -24,7 +24,7 @@ def rootdir(request: pytest.FixtureRequest) -> str:
 
 
 @pytest.mark.parametrize("reader", [TopTrajReader, TopTrajReaderPy])
-@pytest.mark.parametrize("writer", [TopTrajWriter])
+@pytest.mark.parametrize("writer", [TopTrajWriter, TopTrajWriterPy])
 def test_toptraj_writer(rootdir: str, reader, writer) -> None:  # noqa: ANN001
     """Write a .toptraj file with random data and read it back to compare."""
     os.chdir(rootdir)

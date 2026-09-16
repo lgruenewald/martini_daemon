@@ -7,13 +7,12 @@ from warnings import warn
 import numpy as np
 
 from .__formats import (
-    TopTrajWriter,
     TrajectoryReader,
     TrajectoryWriter,
     read_checkpoint,
 )
 from .__reporters import FragmentReporter
-from .__rust import BondGraph, TopTrajReader, build_version
+from .__rust import BondGraph, TopTrajReader, TopTrajWriter, build_version
 from .__simulation import Simulation
 from .extra import logo, logo_small
 
@@ -112,20 +111,25 @@ def info(args: list[str]) -> int:
                 print(f"  {name} {count} ({atoms_per} atoms per molecule)")
             print(f"n_frames:                 {len(tells)}")
             print(f"n_atoms:                  {r.n_atoms}")
-            r.seek(tells[0])
-            first_frame = r.read_frame()
-            r.seek(tells[-1])
-            last_frame = r.read_frame()
-            first_step = f"{first_frame.sim_step}" if first_frame is not None else "n/a"
-            last_step = f"{last_frame.sim_step}" if last_frame is not None else "n/a"
-            first_time = (
-                f"{first_frame.sim_time:.0f}" if first_frame is not None else "n/a"
-            )
-            last_time = (
-                f"{last_frame.sim_time:.0f}" if last_frame is not None else "n/a"
-            )
-            print(f"step:                     {first_step}-{last_step}")
-            print(f"time:                     {first_time}-{last_time} ps")
+            if len(tells) > 0:
+                r.seek(tells[0])
+                first_frame = r.read_frame()
+                r.seek(tells[-1])
+                last_frame = r.read_frame()
+                first_step = (
+                    f"{first_frame.sim_step}" if first_frame is not None else "n/a"
+                )
+                last_step = (
+                    f"{last_frame.sim_step}" if last_frame is not None else "n/a"
+                )
+                first_time = (
+                    f"{first_frame.sim_time:.0f}" if first_frame is not None else "n/a"
+                )
+                last_time = (
+                    f"{last_frame.sim_time:.0f}" if last_frame is not None else "n/a"
+                )
+                print(f"step:                     {first_step}-{last_step}")
+                print(f"time:                     {first_time}-{last_time} ps")
         case _:
             print(f"No info for file extension: {ext}.")
             return 1

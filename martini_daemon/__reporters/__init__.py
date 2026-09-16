@@ -7,7 +7,6 @@ from .checkpoint_reporter import (
 from .fragment_reporter import FragCountReporter as FragCountReporter
 from .fragment_reporter import FragmentReporter as FragmentReporter
 from .fragment_reporter import FragsFrame as FragsFrame
-from .fragments_dump import FragmentsDump as FragmentsDump
 from .global_integrator_minimizer import (
     GlobalIntegratorMinimizer as GlobalIntegratorMinimizer,
 )

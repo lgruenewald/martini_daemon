@@ -733,7 +733,7 @@ class System:
         return res
 
 
-def register_available_force(cls: type[BondedForce]) -> type[BondedForce]:
+def register_available_force[T: type[BondedForce]](cls: T) -> T:
     """Add an available force to all System objects."""
     System.provide_force(cls)
     return cls
