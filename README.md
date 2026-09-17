@@ -9,9 +9,10 @@ This is achieved by combining multiple components in one repo / one python packa
 - User experience somewhere between GROMACS and OpenMM, to create a familiar workflow for running any Martini simulation with OpenMM.
 - Graph matching and detection/modification algorithms to facilitate template based reactions (`__topstar`).
 
+Documentation is available at [read the docs](https://martini-daemon.readthedocs.io/en/latest/index.html).
+
 ## Installation (from source)
 
-- Install `git-lfs` (`sudo apt install git-lfs` on Ubuntu).
 - Install Cargo and Rust. Installation via [rustup](https://rustup.rs/) is recommended.
 - Clone the repository and switch to the desired branch, tag or commit. Enter the directory.
 - Make and activate a Python virtual environment. Python 3.14 is recommended.
