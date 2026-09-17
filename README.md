@@ -35,6 +35,8 @@ Here is a list of optional dependency tags, based on what's currently possible:
 
 ## Docs
 
+View the pre-built documentation at [read the docs](https://martini-daemon.readthedocs.io/en/latest/index.html).
+
 Docs can be built using sphinx. Install additional dependencies with `pip install .[docs]` first.
 
 Run `make html` in the `docs/` folder in the
