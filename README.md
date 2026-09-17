@@ -2,24 +2,24 @@
 
 Martini Daemon is a tool facilitating template based chemical reactions in MD simulations with the [Martini force field](https://cgmartini.nl/) and the [OpenMM](https://openmm.org/) MD engine.
 
-This is achieved by combining multiple components in one repo / one python package:
+This is achieved by combining multiple components in a single repository and Python package:
 - Thin wrapper on top of OpenMM's API (`__core`)
 - Parser for GROMACS `.top` files (`__parser`, `__forces` and `__vsites`)
 - Friendly Python API for running MD simulations with reactions (`simulation.py`)
 - User experience somewhere between GROMACS and OpenMM, to create a familiar workflow for running any Martini simulation with OpenMM.
 - Graph matching and detection/modification algorithms to facilitate template based reactions (`__topstar`).
 
-Documentation is available at [read the docs](https://martini-daemon.readthedocs.io/en/latest/index.html).
+Documentation is available on [read the docs](https://martini-daemon.readthedocs.io/en/latest/index.html).
 
 ## Installation (from source)
 
 - Install Cargo and Rust. Installation via [rustup](https://rustup.rs/) is recommended.
 - Clone the repository and switch to the desired branch, tag or commit. Enter the directory.
-- Make and activate a Python virtual environment. Python 3.14 is recommended.
+- Create and activate a Python virtual environment. Python 3.14 is recommended.
 - It's recommended to explicitly [install the right version of OpenMM](https://docs.openmm.org/latest/userguide/application/01_getting_started.html#installing-openmm) with support for your GPU.
-   - e.g. `pip install openmm[cuda12]` or `pip install openmm[hip7]`
-   - GPU support with OpenCL is still available if this step is skipped
-   - (optional) after installing, verify which platforms are available with `python -m openmm.testInstallation`
+   - e.g. `pip install 'openmm[cuda12]'` or `pip install 'openmm[hip7]'`.
+   - GPU support with OpenCL is still available if this step is skipped.
+   - (optional) after installing, verify which platforms are available with `python -m openmm.testInstallation`.
 - pip: Install using `pip install -e .`
   - Alternatively, using uv+maturin: `uv tool install maturin` and then `maturin develop -r`
 
@@ -31,11 +31,11 @@ By default, Martini Daemon uses [molly](https://github.com/ma3ke/molly) as its X
 Optional dependencies can enable other trajectory backends.
 Here is a list of optional dependency tags, based on what's currently possible:
 
-- [trr] - Gromacs .trr files, uses [mdtraj](https://www.mdtraj.org). Full precision, stores velocities. There is no truncation support in mdtraj, therefore it can't be used for loading checkpoints.
+- [trr] - GROMACS `.trr` files, uses [mdtraj](https://www.mdtraj.org). Full precision, stores velocities. There is no truncation support in mdtraj, therefore it can't be used for loading checkpoints.
 
 ## Docs
 
-View the pre-built documentation at [read the docs](https://martini-daemon.readthedocs.io/en/latest/index.html).
+View the pre-built documentation on [read the docs](https://martini-daemon.readthedocs.io/en/latest/index.html).
 
 Docs can be built using sphinx. Install additional dependencies with `pip install .[docs]` first.
 
@@ -49,7 +49,7 @@ If any questions remain, feel free to open an Issue, so that we can help and als
 To run the test suite:
 
 ```
-# Gromacs in double precision is required, this should be installed first
+# Double precision GROMACS is required, this should be installed first
 source /usr/local/gromacs-2026.1-double/bin/GMXRC
 # (in the root of the repo)
 # make sure additional test dependencies are installed
@@ -98,11 +98,11 @@ linting, type checking and formatting can be done with a single command:
 ty check && ruff check --fix && ruff format
 ```
 
-To re-generate the type stubs for the rust parts, run `cargo run --bin stub_gen`.
-This only needs to be done when changing the rust part of the code, as the .pyi
-file (`martini_daemon/__rust/__init__.pyi`) is commited to the repository.
+To re-generate the type stubs for the Rust files, run `cargo run --bin stub_gen`.
+This only needs to be done when changing the Rust portion of the code, as the .pyi
+file (`martini_daemon/__rust/__init__.pyi`) is committed to the repository.
 
 # License
 
-Martini Daemon is licensed under the Apache 2.0 license.
+Martini Daemon is licensed under the Apache License 2.0.
 See `LICENSE.txt` for details.

@@ -4,7 +4,7 @@ User Guide
 Introduction to run scripts
 ---------------------------
 
-Simulations in Martini Daemon are run using python run scripts. These contain calls to Martini Daemon’s API,
+Simulations in Martini Daemon are run using Python scripts. These contain calls to Martini Daemon’s API,
 specifying simulation parameters and input files. A simple run script is provided
 below, which can be adjusted to meet various needs.
 
@@ -16,7 +16,7 @@ below, which can be adjusted to meet various needs.
    import openmm as mm
 
    with Simulation(
-       # path to Gromacs Topology
+       # path to GROMACS Topology
        topology="system.top",
        # path to Starting geometry
        geometry="system.gro",
@@ -36,7 +36,7 @@ below, which can be adjusted to meet various needs.
            ReactionReporter(),
            TopTrajReporter(),
        ],
-       # integrator+temperature coupling in one
+       # integrator with temperature coupling built-in
        integrator=mm.LangevinMiddleIntegrator(
            # temperature
            298 * mm.unit.kelvin,
@@ -76,8 +76,8 @@ calls if this is desired.
 
 Some notes regarding run.py files:
 
-* D/M frequency of 250 is recommended as default. Lower frequencies can create
-  a large performance overhead. Do note, that the D/M frequency will impact
+* D/M frequency of 250 is recommended by default. Lower frequencies can create
+  a large performance overhead. Do note that the D/M frequency will impact
   reaction rates to an extent, depending on the nature of the system,
   the reaction and the conditions used.
 
@@ -102,15 +102,15 @@ A typical workflow for adding a reaction consists of the following steps:
    Note, that the time scale of MD simulations may require compromises, such as unrealistically
    high rates. However, a detailed discussion of this is beyond the scope of this document.
 
-This User Guide focuses on steps 4 and 5. The end result of these steps is a reaction template (``.rx``) file, containing
+This user guide focuses on steps 4 and 5. The end result of these steps is a reaction template (``.rx``) file, containing
 graph definitions, reaction conditions and topology modifications.
 These files should be included using ``#include`` into a ``.top`` file, similar to ``.itp`` files.
 
 .top and .rx files
 ------------------
 
-Gromacs ``.top`` and ``.itp`` files are documented in GROMACS documentation.
-Martini Daemon's parser implements a large subset of them that is relevant for Martini Simulations.
+GROMACS ``.top`` and ``.itp`` files are documented in GROMACS documentation.
+Martini Daemon's parser implements a large subset of them that is relevant for Martini simulations.
 
 Some things to note about the preprocessor implementation:
 
@@ -127,7 +127,7 @@ Some things to note about the preprocessor implementation:
 A naming convention for Martini Daemon specific parts of topologies, is to put them in a file with the extension
 ``.rx``. These files should contain the ``[graph]`` and ``[reaction]`` directives for the system.
 The file extension is arbitrary, as ``#include`` emulates the C preprocessor behavior.
-The define ``DAEMON`` is always defined for Martini Daemon, so ``.rx`` files should be included as:
+``DAEMON`` is always defined for Martini Daemon, so ``.rx`` files should be included as:
 
 ::
 
@@ -158,14 +158,14 @@ followed by the graph node name, the name filter, and the type filter.
 The graph node name is the name that will be used to refer to that bead in ``.rx`` input files.
 The matched interactions (graph edges) can be generic (e.g. ``bond``),
 or specific (e.g. ``harmonic_bond`` or ``morse_bond``).
-All beads should be connected to each other with such interactions.
+All beads should be connected with such interactions to form a single connected graph.
 
-Below is a simple example, where a bead representing an alcohol (name: ROH, type: SP3) is matched.
+Below is a simple example, where a bead representing an alcohol group (name: ROH, type: SP3) is matched.
 Another bead is included for angle conditions and angle forces.
 Its graph node name is tail, with a name match pattern that matches any bead name starting with C and any type.
 A generic bond interaction is matched. Given this graph example, Martini Daemon would then find all beads with names
 ROH and type SP3, that are bonded to any bead with a name starting with C and any type.
-This bond can be any of the types in ``[bonds]``, or a constraint.
+This bond can be any bond type listed in ``[bonds]``, or a constraint.
 
 ::
 
@@ -268,7 +268,7 @@ neighbors. Therefore, graphs only need to be recalculated if their direct neighb
 prevent users from attempting to group forbidden beads, there is an error message raised if there is an interaction
 filter connecting a forbidden bead to another forbidden bead.
 
-Note, forbidden beads can show up as a ``-1`` in some reporter outputs, since they are represented with a -1
+Note that forbidden beads can show up as a ``-1`` in some reporter outputs, since they are represented with a -1
 internally in the fragment list.
 
 Optional beads
@@ -310,14 +310,14 @@ All lines in this directive should start with a keyword, followed by parameters.
 - ``atom? graph_node_name name_filter type_filter`` - optional beads
 - ``atom! graph_node_name name_filter type_filter`` - forbidden beads
 
-Graph Node Names can contain ASCII letters, numbers and underscores.
+Graph node names can contain ASCII letters, numbers and underscores.
 
 Name and type filters support the following characters or wildcards:
 
 * alphanumeric characters and underscores will match themselves only
 * ``*`` for any strings (including empty strings)
 * ``?`` for any single character
-* ``{123}`` braces will match one of the characters included within them.
+* ``{123}`` will match one of the characters included inside the braces.
 
 - ``equivalent graph_node_name1 graph_node_name2 ...`` - specify a group of beads, which when
   exchanged, do not represent a different graph match
@@ -391,11 +391,11 @@ Reaction names should only contain alphanumeric characters and underscores.
 
 
 
-The list of reactants should be given as a list of graph names in the ``[reactants]``directive.
+The list of reactants should be given as a list of graph names in the ``[reactants]`` directive.
 This directive must come first after each ``[reaction]`` directive. This directive is mandatory for each reaction.
 It must contain a single line, with space separated graph names.
 The fragments in the fragment list with this name will be considered during the detection algorithm.
-Up to three reactants are supported. All reactant graphs must be defined before in the input file.
+Up to three reactants are supported. All reactant graphs must be defined earlier in the input file.
 
 ::
 
@@ -432,17 +432,17 @@ The possible reaction conditions are:
 
 * ``r_max bead1 bead2 distance``
 
-    * reactions above the maximum distance (in nm) will be rejected
+    * reactions above the specified maximum distance (in nanometers) will be rejected
 
 * ``r_min bead1 bead2 distance``
 
-    * reactions below the minimum distance (in nm) will be rejected
+    * reactions below the specified minimum distance (in nanometers) will be rejected
 
 * ``angle bead1 bead2 bead3 min to max or min2 to max2``
 
-    * Only angles between min and max are allowed.
+    * Only angles between ``min`` and ``max`` are allowed.
 
-    * Min and max should be in degrees, and must be between 0 and 180 (inclusive).
+    * ``min`` and ``max`` should be in degrees, and must be between 0 and 180 (inclusive).
 
     * Multiple allowed ranges can be specified using the ``or`` keyword between them.
 
@@ -466,13 +466,26 @@ The possible reaction conditions are:
     * adds a random probability of accepting the reaction, which is evaluated after all other checks
       have been met. Should be between 0 and 1.
 
-A maximum distance condition is required to "connect" all reactants, if there are multiple.
+	* This probability condition is rolled independently at each attempt independently. Reaction rates will still
+	  be affected by the Detection/Modification frequency and geometry conditions.
 
-Each condition is evaluated separately. A single failing condition will reject the reaction.
+All geometry conditions take the periodic boundary condition into account,
+calculating them based on minimum-distance images.
 
-Note, that a reaction can also be rejected for other reasons. Overlapping (that is they share a bead) fragments
-cannot react. During the modification algorithm, if one reaction invalidates the fragment of another reaction,
-the other reaction will also be rejected.
+A maximum distance condition ``r_max`` is required to "connect" all reactants, if there are multiple.
+
+Arbitrary reactant orientation conditions can be constructed from a combination of these rules.
+The following rule should be kept in mind when designing them:
+each condition is evaluated separately, and a single failing condition will reject the reaction.
+
+Note that a reaction can also be rejected for other reasons. Overlapping (that is they share a bead) fragments
+cannot react with eachother. During the modification algorithm, all overlapping fragments will get invalidated as part
+of the modification algorithm, before running the graph matching again.
+This invalidation means that overlapping fragments cannot participate in separate reactions in a single D/M step,
+nor can a single fragment participate in two different reactions. This is intentional, so that each reaction guarantees
+that the contract (graph) of its reactants was upheld and had no undesired changes introduced in the same D/M step.
+
+Note that there are no guarantees made for the order in which reactions are checked, neither of determinism, nor of randomness.
 
 The following aspects should be considered when making reaction conditions:
 
@@ -493,6 +506,8 @@ The following aspects should be considered when making reaction conditions:
   must be present to "connect" them. This is because the detection algorithm constructs a KdTree of all fragment
   locations in space, which is used to accelerate it. Without a maximum distance condition, all combinations
   of reactants would need to be considered.
+
+Note that new reaction conditions can be added to this package in the future. Please open an Issue on Github.
 
 Reaction rates
 --------------
@@ -516,7 +531,8 @@ When tuning the reaction rates, be aware that:
 Modification templates
 ----------------------
 
-The list of changes to topology during a reaction should be specified. Currently, this is a manual
+Reactions should contain a list of changes needed to be made to the topology after such a reaction occurs.
+Currently, this is a manual
 process. Users should first write down the difference between the reactant and product topologies, in terms of
 bead types changed, old interactions broken, and new interactions formed. Updating existing interactions is
 not possible, they have to be broken and re-created.
@@ -539,14 +555,19 @@ The important differences are:
    1:tail 1:oh 2:oh 1 85 100
    2:tail 2:oh 1:oh 1 85 100
 
+A note on exclusions.
+Bonds added during reactions will also generate exclusions, just like in ``[moleculetype]``.
+Exclusions can also be added manually using the ``[exclusions]``.
+Currently ``nrexcl`` other than 1 is not supported in Martini Daemon.
+
 Redefine
 --------
 
 Bead properties can be changed using the ``[redefine]`` directive.
-Each line in the redefine directive starts with specifying which bead to change, specified using the
+Each line in the ``[redefine]`` directive starts with specifying which bead to change, specified using the
 ``reactant_index:graph_node_name`` syntax.
-The rest of the line contains pairs of keywords followed by the new value are expected.
-The keywords ``name``, ``type``, ``charge`` and ``mass`` are supported.
+The rest of the line contains key value pairs, separated by whitespace.
+The keys ``name``, ``type``, ``charge`` and ``mass`` are supported.
 
 Changing the type alone will not affect the charge or mass! Even if the default charge/mass of the original
 type was used. Mass and charge need to be explicitly changed, if changing them is desired.
@@ -579,7 +600,7 @@ interactions:
 
 The naming is based on their intended use case:
 
-* break is intended to be used to completely disconnect a set of particles (usually a set of 2). All bonds, angles,
+* break is intended to be used to completely disconnect a set of particles (usually a set of 2). All bonds, angles and
   dihedrals will be broken. Note, that it doesn't traverse the whole interaction graph, so the two sides of
   the molecule can still remain connected through other beads not included in the break group.
 * update is intended to be used to change interactions between a set of beads. If two beads are specified, it will
@@ -595,7 +616,7 @@ Optional beads are supported. A missing optional bead will:
 Debugging reaction templates
 ----------------------------
 
-Reaction templates should be tested. It’s recommended to run reactive simulations with the
+Reaction templates should be tested. It is recommended to run reactive simulations with the
 :doc:`/autoapi/martini_daemon/ReactionReporter`, as it reports each reaction, along with the frame it happens,
 the internal fragment ID of reactants, and a list of atoms within the fragment.
 For simple setups, modification templates can be debugged using :doc:`/autoapi/martini_daemon/SystemDump`. It is
@@ -610,7 +631,7 @@ Reporters are Python class instances that inherit the ``Reporter`` base class, a
 
 Reporters can be broadly divided into distinct categories:
 
-* Some perform reporting at a pre-defined trajectory frequency:
+* Some perform reporting at a predefined trajectory frequency:
     * This frequency is the ``traj_frequency`` argument to the constructor of ``Simulation``.
     * This frequency is the same per-simulation to make analysis easier -- frame indices are synchronized across reporters.
     * For a successful simulation, frames are written at the start, when the current MD step modulo frequency is 0, and at the very end of the simulation.
@@ -684,7 +705,7 @@ checkpoint was made.
 
    with CheckpointLoader(
        "out.chk",
-       # path to Gromacs Topology
+       # path to GROMACS Topology
        topology="system.top",
        # path to Starting geometry
        geometry="system.gro",

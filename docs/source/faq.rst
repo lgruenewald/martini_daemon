@@ -4,12 +4,12 @@ Frequently Asked Questions
 Which Martini .top files are supported?
 ---------------------------------------
 
-More than other OpenMM implementations of ``.top`` (Gromacs Topology format) parsing to date,
-but there are some things still missing.
+Martini Daemon supports a large subset of the GROMACS ``.top`` (topology) format,
+more than some other parsers, but there are some things still missing.
 
 Unsupported features include:
 
-* nrexcl != 1 (number relative exclusions, used to generate exclusions for second or third indirect neighbors, not used in Martini)
+* ``nrexcl`` values other than 1 (number relative exclusions, used to generate exclusions for second or third indirect neighbors, not used in Martini)
 * LJ fudge in ``[defaults]`` (not present in Martini's force field itp)
 * ``[bondtypes]``, ``[angletypes]``, ``[dihedraltypes]``, ``[constrainttypes]`` (uncommon in Martini)
 * Tabulated bonds (uncommon)
@@ -90,7 +90,7 @@ Martini Daemon handles the periodic boundary condition:
       are in the same copy of the periodic box.
       Bonds, angles, etc. all have the usesPeriodicBoundaryCondition set to True, so this is not a problem.
 
-    * :doc:`/autoapi/martini_daemon/Context` has methods get_position, which puts the particles back into a single
+    * :doc:`/autoapi/martini_daemon/Context` provides the method get_position, which puts the particles back into a single
       copy of the periodic box, before returning the positions. This is the method that the Trajectory reporter
       also uses, so trajectories will also have positions within a single copy of the periodic box.
 
@@ -120,13 +120,13 @@ Current Limitations
 
 * Constraints and virtual sites cannot be created or removed during reactions.
 
-    * Would need a new layer of bookkeeping that was not implemented yet, due to internal indices of them changing
-      each time one is removed.
+    * Supporting their removal would need a new layer of bookkeeping that was not implemented yet,
+      due to internal indices of them changing each time one is removed.
 
     * Constraints and virtual sites are usually used in Martini for strong interactions, such as ring structures,
       which are unlikely to be changed in reactions, so this was not a priority yet.
 
-* Center of mass virtual sites will not change their parameters if the mass of its constructing particles changes
+* Center of mass virtual sites will not automatically change their parameters if the mass of its constructing particles changes
   during a reaction. Center of mass virtual sites that are constructed from other virtual sites (with mass 0) are
   also not supported.
 
@@ -153,7 +153,7 @@ this, and when you will get a duplicate exclusion error.
   exclusion will be added to any pair of atoms which have exclusions defined for them in a reaction template.
 
 * If a reaction template instructs two particles to be excluded, that are already excluded, Martini Daemon will
-  not stop it, and OpenMM will raise a duplicate exclusion error. Since this represents an operation which can
+  not stop this attempt, and OpenMM will raise a duplicate exclusion error. Since this represents an operation which can
   be seen as a common bug in reaction templates (adding a new bond between two beads already bonded), this is
   currently left as is, until a better design is created.
 
@@ -175,10 +175,10 @@ the following things can be done:
 * If this fails, try :doc:`/autoapi/martini_daemon/LocalMinimizer`, it may help in some cases.
 
 
-Are atoms 0-indexed or 1-indexed?
----------------------------------
+Do atom indices start at 0 or 1?
+--------------------------------
 
-Both. Depends on where:
+Both. Depends on the file format:
 
 * GROMACS file formats, such as itp or gro are 1-indexed.
 

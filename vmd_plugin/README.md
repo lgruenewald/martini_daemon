@@ -7,7 +7,7 @@ variable storing the VMD frame information to execute an efficient loader every 
 
 ### Building
 
-* Install dependencies dependencies (Ubuntu package names):
+* Install dependencies (Ubuntu package names):
    - a C compiler and GNU Make (`build-essential`)
    - `pkg-config`
    - Tcl headers, same version as your VMD was compiled with (`tcl8.6-dev`)
