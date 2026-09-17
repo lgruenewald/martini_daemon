@@ -42,3 +42,4 @@ dist
 docs/build/*
 docs/source/martini_daemon/*
 target/*
+!.readthedocs.yaml
