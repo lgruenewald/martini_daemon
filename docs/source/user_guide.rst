@@ -252,18 +252,19 @@ Here is a list of general strategies for achieving this:
   subsection will give an introduction to them.
 
 Forbidden beads are specified similarly to regular beads, but they start with the `atom!` keyword. These beads
-function identically to regular beads, with one difference. With only regular beads, a graph match is complete if
-all beads and interactions were matched. If a forbidden beads is included, the interactions to the forbidden bead
-only specify how to find it. If such a forbidden bead is matched, the graph match is considered invalid. If such a
-forbidden bead cannot be matched, the graph match remains valid. This is enabled by the eagerness of the
+function identically to regular beads, with one difference -- how to find out if a potential match is valid.
+Regular beads must be matched. Forbidden beads must not be matched.
+Consequently, interaction filters including forbidden beads are only a recipe on how to look for them.
+Likewise, if a forbidden bead cannot be matched, the graph match remains valid.
+Forbidden beads are enabled by the eagerness of the
 graph matching algorithm. The graph matching algorithm only considers whether a partial match is valid or not, once no
 more beads can be added to it based on the filters.
 
 Note that there is no way to group forbidden beads together -- that is, rules such as "it is forbidden to have a
 bead of this name and type that is bonded to this other bead with this name and type" are not possible. Another
 way to think about this restriction is that forbidden beads can only represent a "one deep" layer around the normal
-beads. This is important, as this means, that a graph can only become forbidden if a change occurred to its direct
-neighbors. This means, that graphs only need to be recalculated if their direct neighbors change. In order to
+beads. This is important, so a graph can only become forbidden if a change occurred to its direct
+neighbors. Therefore, graphs only need to be recalculated if their direct neighbors change. In order to
 prevent users from attempting to group forbidden beads, there is an error message raised if there is an interaction
 filter connecting a forbidden bead to another forbidden bead.
 
@@ -282,7 +283,8 @@ Rules for optional beads:
 * Missing optional beads appear as ``-1`` in some reporter outputs, as they are represented with a -1 internally.
 * If a reaction condition references a missing optional bead, the condition is ignored.
 * If a modification template entry references a missing optional bead, the whole entry is ignored.
-  An exception to this is ``[update]``, as the semantics of that specifically make more sense that way.
+  An exception to this is ``[update]``, which will proceed with the rest of the specified beads
+  (this makes more sense for that specifically).
 * Due to the eagerness of the graph matching algorithm, if an optional bead can be matched, only the graph match
   including the optional bead is added to the fragment list.
 * Optional beads cannot be "grouped", that is interaction filters within the graph can only contain at most one
@@ -435,7 +437,7 @@ The possible reaction conditions are:
 * ``r_min bead1 bead2 distance``
 
     * reactions below the minimum distance (in nm) will be rejected
-	
+
 * ``angle bead1 bead2 bead3 min to max or min2 to max2``
 
     * Only angles between min and max are allowed.
@@ -619,8 +621,8 @@ Reporters can be broadly divided into distinct categories:
 
 * Some perform reporting related to reactions happening in the system:
     * :doc:`/autoapi/martini_daemon/LocalMinimizer` is not a traditional reporter. It locally (reacting atoms and their environment) minimizes the energy after reactions.
-	* :doc:`/autoapi/martini_daemon/GlobalMinimizer` is also a minimizer, but it runs OpenMM's minimization algorithm on the entire system. This should be considered experimental.
-	* :doc:`/autoapi/martini_daemon/GlobalIntegratorMinimizer` is a minimizer, which runs any OpenMM integrator for a few steps after each reaction. These extra steps are not counted toward simulation time. This should be considered experimental.
+    * :doc:`/autoapi/martini_daemon/GlobalMinimizer` is also a minimizer, but it runs OpenMM's minimization algorithm on the entire system. This should be considered experimental.
+    * :doc:`/autoapi/martini_daemon/GlobalIntegratorMinimizer` is a minimizer, which runs any OpenMM integrator for a few steps after each reaction. These extra steps are not counted toward simulation time. This should be considered experimental.
     * :doc:`/autoapi/martini_daemon/ReactionReporter` logs all reactions and reactants to a file as they occur. 
     * :doc:`/autoapi/martini_daemon/ReactionEnergyReporter` reports thermodynamic variables before and after reactions. Optionally, it can write coordinates too, which can be helpful to debug local minimizations.
 
@@ -686,7 +688,7 @@ checkpoint was made.
        topology="system.top",
        # path to Starting geometry
        geometry="system.gro",
-	   ...
+       ...
 
 
 Energy minimization after reactions

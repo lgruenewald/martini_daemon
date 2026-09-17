@@ -34,9 +34,9 @@ meaning CPU consumption is typically not high when running simulations.
 Can I use Martini Daemon as only a ``.top`` file parser for OpenMM?
 -------------------------------------------------------------------
 
-Since Martini Daemon implements a large superset of the ``.top`` format, and allows the user to extend it
+Since Martini Daemon implements a large subset of the ``.top`` format, and allows the user to extend it
 with custom bond types (see :doc:`/extending`),
-there is reasons to try using Martini Daemon even for simulations containing no reactions.
+one may want to try using Martini Daemon even for simulations containing no reactions.
 If you would like to use the OpenMM Simulation object and OpenMM Reporters, it is possible to export
 the OpenMM System and Topology objects. Here is a quick script template doing that:
 
@@ -97,7 +97,7 @@ Martini Daemon handles the periodic boundary condition:
     * Constraints and virtual sites are not PBC aware in OpenMM. This is handled by Martini Daemon by making these
       constructs whole first. This is implemented in :doc:`/autoapi/martini_daemon/Context` method set_positions,
       so this is well encapsulated. Therefore, input geometries with constraints or virtual sites broken across the
-      periodic box are supported. Constraints and virtual sites, however, are not allowed
+      periodic box are supported. Constraints and virtual sites are also currently not allowed
       to be modified during reactions.
 
 
@@ -113,7 +113,7 @@ Current Limitations
       are ill-suited for a variable amount of particles, adding more burden to re-create those tools.
 
     * While adding new particles is more likely in a coarse grained setting, it still is not a common requirement,
-      due to the conservation of mass.
+      due to the conservation of mass and the possibility to change bead mapping.
 
     * This limitation can be bypassed with some creativity, such as converting to/from solvent molecules.
       Note: Beads with no interaction with anything else in the system do not currently work.
@@ -133,8 +133,8 @@ Current Limitations
 * Pairs, CMAPs will not change parameters automatically if the type of constructing particles changes.
   This can be done manually by removing and re-adding it.
 
-* The charge and mass of beads, if implied from atom type, will not automatically change if the type changes.
-  This should be done manually, if it is desired.
+* The charge and mass of beads, even if the default one was used based on atom type,
+  will not automatically change if the type changes. This should be done manually, if it is desired.
 
 * Position restraints are implemented, however they might only work well for orthogonal boxes that do not shrink/grow.
 
