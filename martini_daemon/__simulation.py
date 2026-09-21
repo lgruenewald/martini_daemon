@@ -146,20 +146,31 @@ class Simulation:
         """
         Create a simulation.
 
-        * Provides a friendly interface for reporters requesting output files. Contains default values for Martini simulations.
-        * Holds simulation metadata, such as current step, simulation name.
-        * Owns all reporters and the log file handle.
-        * Is passed around to all reporters to provide the required data for reporting.
-        * Is the required glue between all components, also only uses the public interface of different components.
-        * Provides access to the system, context, topstar instance to all reporters and the user.
+        Using the constructor arguments and methods on this class, a variety of MD
+        simulations can be orchestrated. Here is a list of things this class does:
+
+        * Initial system setup
+            * Constructs System, calls its methods to instantiate molecules.
+            * Constructs Context.
+            * Has default values for Martini simulations (coupling, timestep, ...) if not specified by user.
+            * Is passed around to all reporters to provide the required data for reporting.
+
+        * Reporting
+            * Provides a friendly interface for reporters requesting output files.
+            * Owns all reporters and the log file handle.
+            * Holds simulation metadata, such as current step, simulation name, available for all reporters.
+
+        * Somewhat monolithic glue code
+            * Is the required glue between all components, also only uses the public interface of different components.
+            * Provides access to the system, context, topstar instance to all reporters and the user, feel free to call methods directly on these fields.
 
         :param topology: Path to the Martini .top file.
         :param geometry: Path to the geometry file (.gro, .xyz). Alternatively, a tuple of PeriodicBox, positions
             (numpy array) and velocities (numpy array, optional, can be None) is also accepted.
-        :param md_steps: Number of MD steps.
+        :param md_steps: Number of MD steps (integer).
         :param reporters: List of reporters to use during simulation.
-        :param dm_frequency: Frequency of the Detection/Modification algorithm.
-        :param traj_frequency: Frequency of Trajectory frames.
+        :param dm_frequency: Frequency of the Detection/Modification algorithm (in number of MD steps, integer).
+        :param traj_frequency: Frequency of Trajectory frames (in number of MD steps, integer).
         :param sim_name: Short name of the simulation. All output files will be prefixed by this name. If None, no
             output files are written at all, but no reporters can be used.
         :param coupling: List of OpenMM coupling forces to use. If None, pressure coupling at 1 bar and 300 kelvin,
