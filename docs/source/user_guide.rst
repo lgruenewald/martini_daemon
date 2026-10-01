@@ -5,8 +5,29 @@ Introduction to run scripts
 ---------------------------
 
 Simulations in Martini Daemon are run using Python scripts. These contain calls to Martini Daemon’s API,
-specifying simulation parameters and input files. A simple run script is provided
-below, which can be adjusted to meet various needs.
+specifying simulation parameters and input files.
+
+Here is a simple run script.
+
+::
+	#!/usr/bin/env python3
+	from martini_daemon import Simulation, TrajectoryReporter, ReactionReporter
+	
+	sim = Simulation(
+		topology="topol.top",
+		geometry="input.gro",
+		sim_name="out",
+		md_steps=1000000,
+		traj_frequency=1000,
+		dm_frequency=250,
+		reporters = [
+			TrajectoryReporter(),
+			ReactionReporter()
+		]
+	)
+	sim.simulate()
+
+A more complicated run script is provided below with explanations, which can be adjusted to meet various needs.
 
 ::
 
@@ -66,7 +87,7 @@ below, which can be adjusted to meet various needs.
        # write final coordinates, velocities and box to a .gro file
        sim.save_geometry("out.gro")
 
-See :doc:`/autoapi/martini_daemon/Simulation` for all available arguments, attributes, and methods.
+*See :doc:`/autoapi/martini_daemon/Simulation` for all available arguments, attributes, and methods.*
 
 Output files are written by Reporters. These reporters will own output handles. These are closed automatically
 if using the ``with Simulation(...) as sim:`` syntax, or manually by calling ``Simulation.finish()``.
@@ -166,6 +187,15 @@ Its graph node name is tail, with a name match pattern that matches any bead nam
 A generic bond interaction is matched. Given this graph example, Martini Daemon would then find all beads with names
 ROH and type SP3, that are bonded to any bead with a name starting with C and any type.
 This bond can be any bond type listed in ``[bonds]``, or a constraint.
+
+::
+	[graph]
+	name alc
+	atom 1 ROH SP3
+	atom 2 C*  *
+	bond 1 2
+
+Note that instead of numbers, names can also be used. Martini Daemon converts them internally to indices, so there is no extra performance cost to using names.
 
 ::
 
