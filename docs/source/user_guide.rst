@@ -27,6 +27,7 @@ Here is a simple run script.
 		]
 	)
 	sim.simulate()
+	sim.finish()
 
 A more complicated run script is provided below with explanations, which can be adjusted to meet various needs.
 
@@ -108,6 +109,11 @@ Some notes regarding run.py files:
 * It is possible to do minimization and equilibration using Martini Daemon as well.
   A separate ``min+eq.py`` can be made for this purpose, and dm_frequency can be
   set to 0 to disable reactions.
+
+* If using the ``with Simulation(...) as sim:`` context manager, output files are closed
+  automatically when the block ends.
+
+* If constructing a Simulation object manually, calling ``.finish`` will close the output files.
 
 Including reactions
 -------------------
