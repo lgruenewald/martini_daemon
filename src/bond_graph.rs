@@ -66,6 +66,7 @@ impl BondGraph {
 
             let mut stack: Vec<(usize, [f64; 3])> = Vec::new();
             stack.push((i, [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]]));
+            let mut all: Vec<usize> = Vec::new();
 
             while let Some((c, reference)) = stack.pop() {
                 if visited[c] {
@@ -73,11 +74,31 @@ impl BondGraph {
                 }
                 let cpos: [f64; 3] = pos[c * 3..(c + 1) * 3].try_into()?;
                 pos[c * 3..(c + 1) * 3].copy_from_slice(&pbc.move_to(reference, cpos));
+                all.push(c);
 
                 visited[c] = true;
 
                 for j in self.bonds[c].iter() {
                     stack.push((*j, pos[c * 3..(c + 1) * 3].try_into()?));
+                }
+            }
+
+            // center each molecule in the box. now that they are whole - can use arithmetic average position.
+            let mut center_of_pos = [0., 0., 0.];
+            for c in all.iter() {
+                for i in 0..3 {
+                    center_of_pos[i] += pos[c * 3 + i];
+                }
+            }
+
+            center_of_pos[0] /= all.len() as f64;
+            center_of_pos[1] /= all.len() as f64;
+            center_of_pos[2] /= all.len() as f64;
+
+            let new_center = &pbc.move_within(center_of_pos);
+            for c in all.iter() {
+                for i in 0..3 {
+                    pos[c * 3 + i] += new_center[i] - center_of_pos[i];
                 }
             }
         }

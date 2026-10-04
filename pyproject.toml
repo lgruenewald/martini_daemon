@@ -35,7 +35,7 @@ classifiers = [
 ]
 dependencies = [
   "numpy>=2.4,<3",
-  "openmm>=8.5.2,<9",
+  "openmm>=8.5,<9",
   "molly@git+https://github.com/ma3ke/molly#egg=molly&subdirectory=bindings/python",
 ]
 dynamic = ["version"]

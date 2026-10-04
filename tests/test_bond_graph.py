@@ -57,7 +57,11 @@ def test_make_whole(box: PeriodicBox) -> None:
             f"Bond {i} to {j}\n pos {pos[i]}, {pos[j]};\n pos_within {pos_within[i]}, {pos_within[j]};\n pos_whole {pos_whole[i]}, {pos_whole[j]};"
         )
 
-    assert np.allclose(pos_whole, pos)
+    before = pos_whole.copy()
+    after = pos.copy()
+    box.move_all_within(before)
+    box.move_all_within(after)
+    assert np.allclose(before, after)
 
 
 @pytest.mark.parametrize("bonds_per_mol", [250, 500, 1500])
