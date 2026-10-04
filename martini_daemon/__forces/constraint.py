@@ -23,6 +23,14 @@ class Constraint(BondedForce):
             for index, (members, params) in self.iterate_bonds():
                 self.system._add_constraint(*members, *params)
 
+    def _add_bond(self, members: list[int], params: list[float]) -> int:
+        if self.__built:
+            raise ValueError("Attempt to add constraint after simulation has started.")
+        return super()._add_bond(members, params)
+
+    def _remove_bond(self, bond_id: int) -> None:
+        raise ValueError("Attempt to remove constraints.")
+
     @classmethod
     def uses_pbc(cls) -> bool:
         return False

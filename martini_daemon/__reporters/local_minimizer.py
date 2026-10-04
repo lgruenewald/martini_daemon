@@ -245,7 +245,7 @@ class LocalGradientDescent:
 
         # Take step, re-constraint positions.
         self.integrator.addComputePerDof("est_grad", "(1-eta)*est_grad + eta*f")
-        self.integrator.addComputeSum("fnorm2", "est_grad^2")
+        self.integrator.addComputeSum("fnorm2", "movable*est_grad^2")
         self.integrator.addComputePerDof(
             "x", "x+movable*step_size*est_grad/sqrt(fnorm2 + delta(fnorm2))"
         )

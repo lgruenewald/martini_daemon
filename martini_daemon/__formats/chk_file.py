@@ -105,7 +105,7 @@ def read_checkpoint(path: str) -> Checkpoint:
             .copy()
         )
 
-        ref_crc = struct.unpack("<I", f.read(8))[0]
+        ref_crc = struct.unpack("<I", f.read(4))[0]
         if crc != ref_crc:
             raise ValueError(f"CRC mismatch, {path} is corrupt.")
 

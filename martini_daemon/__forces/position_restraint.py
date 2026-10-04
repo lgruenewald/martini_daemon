@@ -117,8 +117,7 @@ class PositionRestraint(BondedForce):
 
     @classmethod
     def uses_pbc(cls) -> bool:
-        # FIXME: WHY DOES THIS WORK
-        return True
+        return False
 
     def delta_degrees_of_freedom(self) -> int:
         return 0

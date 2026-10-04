@@ -104,6 +104,7 @@ class Context:
             raise ValueError(
                 f"Positions must have shape ({self.N}, 3), got {positions.shape}."
             )
+        positions = positions.copy()
         bonds = self.system.collect_bonds_for_whole()
         bonds.make_whole(box, positions)
         self.__context.setPositions(positions)

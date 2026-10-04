@@ -417,9 +417,12 @@ class RedefineDirective(Directive):
                         (atom_index, tokens.unwrap(i + 1, "word"))
                     )
                 case "type":
-                    self.parent.molecule_type.retypes.append(
-                        (atom_index, tokens.unwrap(i + 1, "word"))
-                    )
+                    new_type = tokens.unwrap(i + 1, "word")
+                    if self.parent.system.get_atom_type(new_type) is None:
+                        raise TokenParseException(
+                            tokens[i + 1], f"Invalid type: {new_type}."
+                        )
+                    self.parent.molecule_type.retypes.append((atom_index, new_type))
                 case "charge":
                     self.parent.molecule_type.recharges.append(
                         (atom_index, tokens.unwrap(i + 1, "float"))
@@ -430,7 +433,7 @@ class RedefineDirective(Directive):
                     )
                 case _:
                     raise TokenParseException(
-                        tokens[1 + i * 2], f"Unknown atom property {word}."
+                        tokens[i], f"Unknown atom property {word}."
                     )
             i += 2
 

@@ -25,7 +25,7 @@ def write_frame(handle: TextIO, sim: Simulation) -> None:
     for force in sys.get_forces():
         if not isinstance(force, BondedForce):
             continue
-        if len([force.iterate_bonds()]) == 0:
+        if len(list(force.iterate_bonds())) == 0:
             continue
         handle.write(f"Force:{force.get_name()}\n")
         handle.writelines(

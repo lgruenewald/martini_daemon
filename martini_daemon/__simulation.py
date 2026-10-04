@@ -673,6 +673,7 @@ class Simulation:
             else 100.0
         )
         self.debug(f"step {self.current_step}")
+        self.time_ps += self.dt_ps * n_steps
         if n_steps > 0:
             self.debug(f"md_steps {n_steps}")
             self.debug("Reinitialize start")
@@ -682,7 +683,6 @@ class Simulation:
             self.context.do_steps(n_steps)
             self.debug("MD finished")
         if self.total_steps > 0 and n_steps > 0 and not silent:
-            self.time_ps += self.dt_ps * n_steps
             time_left = _format_time(
                 self.__last_step_time * (self.total_steps - self.current_step)
             )
@@ -731,7 +731,11 @@ class Simulation:
             elif self.__first_step_time > 0.0:
                 # step 0 tends to have both xtc and dm as True, and is
                 # usually unrepresentatively slow
-                scale = self.dm_frequency / self.traj_frequency
+                scale = (
+                    self.dm_frequency / self.traj_frequency
+                    if self.traj_frequency > 0
+                    else 0.0
+                )
                 if scale > 1.0:
                     scale = 1.0 / scale
                 self.__last_step_time = (

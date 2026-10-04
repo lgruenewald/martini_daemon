@@ -38,7 +38,4 @@ Force:exclusion
 Force:harmonic_bond
 (0, 1, 0.5, 1000.0)
 (2, 3, 0.5, 1000.0)
-Force:harmonic_angle
-Force:proper_dihedral
 End Frame
-

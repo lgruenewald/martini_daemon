@@ -50,6 +50,15 @@ class PairTypes(Directive):
 
 @register_directive
 class PairsDirective(InteractionDirective):
+    def read_params(self, tokens: TokenList, type_: int) -> list[float]:
+        n_params = len(tokens) - self.get_number_members() - 1
+        if n_params not in (0, 2):
+            raise TokenParseException(
+                tokens[-1],
+                "[pairs] takes either no params, or both sigma and epsilon."
+            )
+        return super().read_params(tokens, type_)
+
     @classmethod
     def get_number_members(cls) -> int:
         return 2

@@ -80,9 +80,11 @@ class NonBonded(Force):
         assert isinstance(self.__exclusions, ExclusionHelper)
         force = mm.CustomNonbondedForce(
             "(LJ - corr + ES);"
-            "LJ = (1 - sc_lambda1) * (C12 / rA^2 - C6 / rA) + sc_lambda1 * (C12 / rB^2 - C6 / rB);"
-            "rA = (sc_alpha1 * sigma(type1, type2)^6 * sc_lambda1 + r^6);"
-            "rB = (sc_alpha1 * sigma(type1, type2)^6 * (1 - sc_lambda1) + r^6);"
+            "LJ = (1 - sc_lambda) * (C12 / rA^2 - C6 / rA) + sc_lambda * (C12 / rB^2 - C6 / rB);"
+            "rA = (sc_alpha * sigma(type1, type2)^6 * sc_lambda + r^6);"
+            "rB = (sc_alpha * sigma(type1, type2)^6 * (1 - sc_lambda) + r^6);"
+            "sc_lambda=min(sc_lambda1, sc_lambda2);"
+            "sc_alpha=max(sc_alpha1, sc_alpha2);"
             "corr = (C12 / rcut^12 - C6 / rcut^6);"
             "C6 = 4 * epsilon(type1, type2) * sigma(type1, type2)^6;"
             "C12 = 4 * epsilon(type1, type2) * sigma(type1, type2)^12;"

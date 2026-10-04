@@ -43,6 +43,4 @@ Force:harmonic_bond
 Force:harmonic_angle
 (0, 1, 2, 1.0471975511965974, 100.0)
 (1, 2, 3, 1.0471975511965974, 100.0)
-Force:proper_dihedral
 End Frame
-

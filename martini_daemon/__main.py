@@ -21,7 +21,7 @@ def print_help(topic: None | str = None) -> int:
     match topic:
         case None | "help":
             print("""Martini Daemon CLI
-    
+
 Usage: daemon [SUBCOMMAND] [OPTIONS]
 Subcommands:
 help - print this help message
@@ -29,6 +29,7 @@ version - print version information
 info - print information about a .toptraj or .chk file
 whole - make a trajectory whole using a .toptraj file or .top file
 select - select atoms and/or frames for .toptraj file
+dist - get distances, angles, dihedrals for a detailed .frags and trajectory file
 
 Use `daemon help [SUBCOMMAND]` for more information about a subcommand.""")
         case "version":
@@ -43,11 +44,11 @@ Takes one positional argument -- the path to the file to provide more info about
         case "whole":
             print("""daemon whole
 
-Make a trajectory whole using a .toptraj file.
+Make a trajectory whole using a .toptraj or .top file.
 Takes the following arguments:
 -i input trajectory file
 -o output trajectory file
--s toptraj file""")
+-s toptraj file or .top file""")
         case "select":
             print("""daemon select
 
@@ -195,6 +196,9 @@ def whole(args: list[str]) -> int:
             graph = BondGraph(n_atoms)
             toptraj_frame = top.read_frame()
             assert toptraj_frame is not None
+            assert np.isclose(toptraj_frame.sim_time, time), (
+                "Time in trajectory and .toptraj mismatched."
+            )
             for a, b in toptraj_frame.bonds:
                 graph.add_bond(a, b)
         elif topext == ".top":
@@ -265,7 +269,9 @@ def dist(args: list[str]) -> int:
         print(
             "Specify 2 (distance), 3 (angle) or 4 (dihedral) nodes to write to output file."
         )
+        return 1
 
+    n_written = 0
     with open(parsed_args.output, "w") as f:
         f.write(f"# Written by daemon dist with arguments {args}\n")
         n_tot = 0
@@ -273,12 +279,6 @@ def dist(args: list[str]) -> int:
             sys.stdout.write(
                 f"\033[2K\rAnalyzing frame: {frame.frame_index} out of {len(frag_frames)}"
             )
-            if frame.fragments is None:
-                warn(f"Frame {frame.frame_index} has no fragments.")
-                continue
-            if frame.time_ps is None:
-                warn(f"Frame {frame.frame_index} has no simulation time.")
-                continue
             traj_frame = inp.read_frame()
             if traj_frame is None:
                 print(
@@ -286,6 +286,13 @@ def dist(args: list[str]) -> int:
                 )
                 return 2
             step, time, box, pos, _vel = traj_frame
+
+            if frame.fragments is None:
+                warn(f"Frame {frame.frame_index} has no fragments.")
+                continue
+            if frame.time_ps is None:
+                warn(f"Frame {frame.frame_index} has no simulation time.")
+                continue
             f.write(
                 f"# Frame {frame.frame_index}, Step {frame.step}, Box {box.to_lattice()}\n"
             )
@@ -302,6 +309,7 @@ def dist(args: list[str]) -> int:
                 idx = [frag.atoms[x] for x in nodes]
                 if any(x == -1 for x in idx):
                     continue
+                n_written += 1
                 match idx:
                     case i1, i2:
                         f.write(f"{box.distance(pos[i1], pos[i2])}\n")
@@ -310,32 +318,27 @@ def dist(args: list[str]) -> int:
                     case i1, i2, i3, i4:
                         f.write(f"{box.dihedral(pos[i1], pos[i2], pos[i3], pos[i4])}\n")
         sys.stdout.write(
-            f"\033[2K\rAnalyzed {len(frag_frames)} frames, wrote a total of {n_tot} entries.\n"
+            f"\033[2K\rAnalyzed {len(frag_frames)} frames, wrote a total of {n_written} entries.\n"
         )
 
     return 0
 
 
 def parse_slice(slice_: str, n: int) -> tuple[int, int, int]:
-    """Parse a slice string into start, end and step slice."""
-    assert n > 0, "n_frames must be positive"
-    if len(slice_) == 0:
-        return 0, n, 1
+    """Parse a slice string into start, end and step, with Python slice semantics."""
     toks = slice_.split(":")
-    if len(toks) == 1:
-        i = int(slice_)
+    if len(toks) > 3:
+        raise ValueError("Too many ':' in slice, up to 2 expected.")
+    if len(toks) == 1 and toks[0] != "":
+        i = int(toks[0])
+        if i < 0:
+            i += n
+        if not 0 <= i < n:
+            raise ValueError(f"Index {toks[0]} is out of range for {n} entries.")
         return i, i + 1, 1
-    if 2 <= len(toks) <= 3:
-        start = int(toks[0]) if toks[0] != "" else 0
-        if start < 0:
-            start += n
-        end = int(toks[1]) if toks[1] != "" else n
-        if end < 0:
-            end += n
-        step = int(toks[2]) if len(toks) == 3 else 1
-        return start, end, step
-    raise ValueError("Too many ':' in slice, up to 2 expected.")
-
+    parts = [int(t) if t != "" else None for t in toks]
+    parts += [None] * (3 - len(parts))
+    return slice(*parts).indices(n)
 
 def select(args: list[str]) -> int:
     """Select frames or atoms using the `daemon select` CLI."""
@@ -461,17 +464,17 @@ def select(args: list[str]) -> int:
                 frame_start, frame_end, frame_step = parse_slice(
                     parsed_args.frames or "", n_frames
                 )
-                last_written = -1
+                last_processed = -1
                 for frame in FragmentReporter.iter_fragments(inp):
+                    last_processed += 1
                     if frame.frame_index is None:
                         # detailed mode is off, best guess
-                        frame.frame_index = last_written + 1
+                        frame.frame_index = last_processed
                     if frame.frame_index < frame_start:
                         continue
                     if frame.frame_index >= frame_end:
                         break
-                    last_written += 1
-                    if last_written % frame_step != 0:
+                    if (frame.frame_index - frame_start) % frame_step != 0:
                         continue
                     f_out.write(frame.serialize())
 

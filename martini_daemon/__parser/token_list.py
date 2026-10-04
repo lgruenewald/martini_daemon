@@ -58,7 +58,7 @@ class TokenList:
     def assert_at_least(self, count: int) -> None:
         if len(self.__tokens) < count:
             raise TokenParseException(
-                self.__tokens[count],
+                self.__tokens[-1],
                 f"Minimum number of tokens on this line is {count}.",
             )
 

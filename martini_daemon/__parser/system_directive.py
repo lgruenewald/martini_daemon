@@ -8,7 +8,7 @@ from .token_list import TokenList
 class SystemDirective(Directive):
     def line(self, tokens: TokenList) -> None:
         assert isinstance(self.parent, GromacsTopFile)
-        if title := self.parent.system.additional_data.get("title") is not None:
+        if (title := self.parent.system.additional_data.get("title")) is not None:
             raise ParseException(
                 f"Double title definition, title was already defined to be {title}"
             )

@@ -129,7 +129,6 @@ class CheckpointLoader(Simulation):
                 f"{rx_path} does not exist, but reactions need to be replayed."
             )
             reactions = ReactionReporter.read_reactions(rx_path)
-        assert "checkpoint" not in kwargs, "Use chk_path, not checkpoint."
         super().__init__(*args, checkpoint=chk, **kwargs)
         # REPLAY
         print()

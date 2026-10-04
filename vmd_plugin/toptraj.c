@@ -9,6 +9,7 @@ TODO:
 - everything here is prototype quality, fix that
     - use the Obj interface instead of string for tcl
     - non orthogonal pbc
+- may crash on truncated files while mmap'd
 */
 
 #define PKG_NAME "toptraj"
@@ -103,13 +104,14 @@ static void decompress(
         data->is_err = true;
         return;
     }
-    
+
     for (;;) {
         const int ret = inflate(&stream, Z_NO_FLUSH);
         switch (ret) {
             case Z_NEED_DICT:
             case Z_DATA_ERROR:
             case Z_STREAM_ERROR:
+            case Z_BUF_ERROR:
                 data->error_msg = "Couldn't decompress. Incomplete or corrupt zlib compressed data.";
                 data->is_err = true;
                 goto finish;
@@ -181,7 +183,7 @@ static char *read_s(Chunk *chunk) {
 
 #define READ_X(fname, f, type, fmt) \
 static char *fname(Chunk *chunk, size_t n, long lim) { \
-    type nums[n]; \
+    type *nums = malloc(sizeof(type) * n); \
     size_t len = 0; \
     for (size_t i = 0; i < n; i++) { \
         nums[i] = f(chunk); \
@@ -195,6 +197,7 @@ static char *fname(Chunk *chunk, size_t n, long lim) { \
     assert(c == len); \
     assert(res[len] == 0); \
     FREE \
+    free(nums); \
     return res; \
 }
 
@@ -229,13 +232,13 @@ static bool sorted_list_insert(Bond *sorted_bonds, size_t *sorted_len, Bond b) {
             // bond is smaller than guess
             // move most down
             most = guess_idx;
-            
+
         } else {
             // duplicate bond entry
             // forbidden by the file format, but we silently ignore it
             return false;
         }
-        
+
     }
 
     // insert into the sorted list
@@ -246,7 +249,7 @@ static bool sorted_list_insert(Bond *sorted_bonds, size_t *sorted_len, Bond b) {
     sorted_bonds[least] = b;
     (*sorted_len)++;
     return true;
-    
+
 }
 
 static char *read_bonds(Chunk *chunk, size_t n_atoms, long lim, int pbc, Vec3 box, Vec3 *coords) {
@@ -255,7 +258,7 @@ static char *read_bonds(Chunk *chunk, size_t n_atoms, long lim, int pbc, Vec3 bo
     // sorted list of bonds
     size_t sorted_len = 0;
     Bond *sorted_bonds = calloc(2 * n_bonds, sizeof(struct bond));
-    
+
     for (size_t i = 0; i < n_bonds; i++)
     {
         Bond b = { parse_I(chunk), parse_I(chunk) };
@@ -322,7 +325,7 @@ static char *read_bonds(Chunk *chunk, size_t n_atoms, long lim, int pbc, Vec3 bo
             len += extra;
             bond_idx++;
         }
-        
+
         ACCOMODATE(2);
         res[len] = '}';
         len++;
@@ -342,7 +345,7 @@ static char *read_bonds(Chunk *chunk, size_t n_atoms, long lim, int pbc, Vec3 bo
 
 static Chunk *read_chunk(TopTrajData *data, Chunk *main) {
     /// Decompress a single chunk and return its contents.
-    
+
     if (main->index >= main->len) {
         return NULL;
     }
@@ -352,14 +355,14 @@ static Chunk *read_chunk(TopTrajData *data, Chunk *main) {
         data->is_err = true;
         return NULL;
     }
-    
+
     size_t len_comp = parse_Q(main);
     size_t len_decomp = parse_Q(main);
     char *content = malloc(len_decomp);
     char *comp = &main->content[main->index];
     main->index += len_comp;
     uint32_t crc32 = parse_I(main);
-    
+
     decompress(
         data,
         comp, len_comp,
@@ -385,7 +388,7 @@ static void skip_chunk(TopTrajData *data, Chunk *main) {
         data->is_err = true;
         return;
     }
-    
+
     size_t len_comp = parse_Q(main);
     parse_Q(main); //len_decomp
 
@@ -421,7 +424,7 @@ static TopTrajData *load_toptraj(Tcl_Interp *interp, const char *path, int molid
     /// Reads .toptraj file at path and loads it into a dynamically allocated
     /// object, which it returns.
     /// While doing so, prints a progress bar on STDOUT.
-    /// 
+    ///
     /// Prints error message to STDERR and returns NULL if there is any error.
     TopTrajData *res = (TopTrajData *)calloc(1, sizeof(TopTrajData));
     res->is_err = false;
@@ -432,13 +435,25 @@ static TopTrajData *load_toptraj(Tcl_Interp *interp, const char *path, int molid
     res->path = strdup(path);
 
     res->fd = open(path, O_RDONLY);
+    if (res->fd < 0) {
+        res->is_err = true;
+        res->error_msg = "Could not open the .toptraj file.";
+        return res;
+    }
     struct stat sb;
-    fstat(res->fd, &sb);
+    if (fstat(res->fd, &sb) != 0) {
+        close(res->fd);
+        res->is_err = true;
+        res->error_msg = "Could not stat the .toptraj file.";
+        return res;
+    }
     res->fsize = sb.st_size;
     res->content = mmap(
         NULL, res->fsize, PROT_READ, MAP_SHARED, res->fd, 0
     );
+    close(res->fd);
     if (res->content == MAP_FAILED) {
+        res->content = NULL;
         res->is_err = true;
         res->error_msg = "Mapping the file into memory failed.";
         return res;
@@ -574,7 +589,7 @@ static char *on_frame_change(
     char *bonds = NULL;
     char *sel = NULL;
     Vec3 *coords = NULL;
-    
+
     TopTrajData *toptraj = (TopTrajData *)data;
 
     // GET CURRENT FRAME
@@ -706,7 +721,7 @@ static char *on_frame_change(
         free(zs);
     }
     // READ BONDS
-            
+
     bonds = read_bonds(
         chunk, n_atoms, sel_atoms,
         toptraj->remove_pbc_crossing, box, coords

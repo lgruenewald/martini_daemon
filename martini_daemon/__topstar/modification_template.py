@@ -74,4 +74,4 @@ class ModificationTemplate(MoleculeType):
                 if on:
                     system.update_sc(atom_indices[i], sc_lam, sc_alpha)
                 else:
-                    system.update_sc(atom_indices[i], 1.0, 0.5)
+                    system.update_sc(atom_indices[i], 1.0, 0.0)

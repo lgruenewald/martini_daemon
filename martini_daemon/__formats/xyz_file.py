@@ -39,7 +39,7 @@ def read_xyz(
             )
         lattice = title_line[match.start() + 9 : match.end() - 1]
         try:
-            box_floats = [float(x) for x in lattice.split()]
+            box_floats = [float(x) / 10.0 for x in lattice.split()]
         except ValueError:
             raise ValueError(
                 "Error parsing xyz file, the Lattice description must be only numbers."
@@ -111,7 +111,8 @@ def write_xyz(
         assert len(pos) == len(vel)
     with open(path, "w") as file:
         file.write(f"{len(atoms)}\n")
-        file.write(f'Lattice="{box.to_lattice()}"\n')
+        lattice = " ".join([f"{10.0 * float(x)}" for x in box.to_lattice().split()])
+        file.write(f'Lattice="{lattice}"\n')
         for i in range(n_atoms):
             cpos = pos[i] * 10.0
             name = atoms[i]

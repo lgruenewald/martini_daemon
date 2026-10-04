@@ -3,6 +3,7 @@ import re
 from typing import NamedTuple, TextIO
 
 from ..__formats import TrajectoryWriter
+from ..__formats.trajectory import TrajectoryReader
 from ..__rust import Fragment
 from ..__simulation import Reporter, Simulation
 
@@ -90,14 +91,25 @@ class ReactionReporter(Reporter):
             self.traj_path = simulation.request_path(
                 f"_reactions{self.traj_format}", continue_sim=continue_sim
             )
+            keep_n = None
             append = continue_sim and os.path.exists(self.traj_path)
+            if append:
+                # we need to know how many frames to keep, for this we need to read this file
+                # FIXME: extend trajectory reader with a read header-only method to speed this up
+                r = TrajectoryReader(self.traj_path)
+                keep_n = 0
+                while True:
+                    res = r.read_frame()
+                    if res is None:
+                        break
+                    step, *_ = res
+                    if step > simulation.current_step:
+                        break
+                    keep_n += 1
+                r.close()
+
             self.traj_writer = TrajectoryWriter(
-                self.traj_path,
-                append=append,
-                # formats have varying metadata on sim time / step, so truncate based on the # of frames written before
-                # sim.trajectory_frame is the number of frames that were finished writing
-                # (or during trajectory frame also the index of the frame currently being written)
-                keep_n_frames=simulation.trajectory_frame if append else None,
+                self.traj_path, append=append, keep_n_frames=keep_n
             )
 
     def on_simulation_finish(self, simulation: Simulation) -> None:
@@ -158,7 +170,7 @@ class ReactionReporter(Reporter):
         with open(path) as f:
             lines = f.read().splitlines()
             for line in lines:
-                if line[0] == "#" or len(line) == 0:
+                if len(line) == 0 or line[0] == "#":
                     continue
                 # we don't care about resids for this
                 line, _ = re.subn(r"\([^)]*\)", "", line)

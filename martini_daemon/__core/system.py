@@ -108,7 +108,7 @@ class System:
         self.__charges.append(charge)
         self.__masses.append(mass)
         self.__system.addParticle(mass)
-        self.__softcore.append((1.0, 0.5))
+        self.__softcore.append((1.0, 0.0))
         self.__interactions_by_atom.append([])
         assert (
             len(self.__names)
@@ -461,6 +461,9 @@ class System:
             return
         assert isinstance(constraints, BondedForce)
         if harmonic:
+            assert self.__harmonic_constraints is None, (
+                "toggle_constraints_as_harmonic_bonds(True) called when harmonic constraints are already there."
+            )
             self.__harmonic_constraints = mm.HarmonicBondForce()
             self.__harmonic_constraints.setName("harmonic_replacement_for_constraints")
             self.__del_all_constraints()

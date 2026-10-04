@@ -123,9 +123,9 @@ class Cmap(BondedForce):
         assert len(params) == 0
         types = tuple(self.system.get_type(member) for member in members)
         cmap = self.system.additional_data["cmap_types"].get(types)
-        assert type(cmap) is int
         if cmap is None:
             raise ValueError(f"Unknown CMAP type for {types}.")
+        assert type(cmap) is int
         return [cmap]
 
     @classmethod

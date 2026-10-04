@@ -282,7 +282,7 @@ class TrajectoryReader:
                 self.__last_step = step
                 return (
                     step,
-                    time,
+                    time[0],
                     PeriodicBox(box[0, 0], box[0, 1], box[0, 2]),
                     xyz[0],
                     vel[0] if vel is not None else None,

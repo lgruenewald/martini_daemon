@@ -1,6 +1,3 @@
-// WIP - this file is currently not used, martini_daemon/__formats/top_traj.py is used
-
-#![allow(dead_code, unused)]
 use flate2::Compression;
 use flate2::Crc;
 use flate2::read::ZlibDecoder;
@@ -8,18 +5,13 @@ use flate2::write::ZlibEncoder;
 use pyo3::exceptions::PyAssertionError;
 use pyo3::exceptions::PyOSError;
 use pyo3::exceptions::PyValueError;
-use pyo3::ffi::PyExc_ZeroDivisionError;
 use pyo3::types::PyFloat;
-use pyo3::types::PyInt;
-use pyo3::types::PyIterator;
 use pyo3::types::PyString;
 use pyo3::types::{PyAny, PyList, PySequence, PyType};
-use pyo3_stub_gen::derive::gen_stub_pyfunction;
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::sync::mpsc::RecvTimeoutError;
 use std::u32;
 
 use pyo3::{exceptions::PyException, prelude::*};
@@ -50,37 +42,37 @@ impl<T> WriteExt for T
 where
     T: Write,
 {
-    fn write_str(&mut self, value: &str) -> std::io::Result<usize> {
+    fn write_str(&mut self, value: &str) -> std::io::Result<()> {
         let val_bytes = value.as_bytes();
         if val_bytes.len() <= 255 {
-            self.write(&[val_bytes.len() as u8])?;
-            self.write(val_bytes)
+            self.write_all(&[val_bytes.len() as u8])?;
+            self.write_all(val_bytes)
         } else {
             // number of bytes we can write
             let trunc = value.floor_char_boundary(255);
             assert!(trunc <= 255);
-            self.write(&[trunc as u8])?;
-            self.write(&val_bytes[0..trunc])
+            self.write_all(&[trunc as u8])?;
+            self.write_all(&val_bytes[0..trunc])
         }
     }
 
-    fn write_u32(&mut self, value: u32) -> std::io::Result<usize> {
-        self.write(&u32::to_le_bytes(value))
+    fn write_u32(&mut self, value: u32) -> std::io::Result<()> {
+        self.write_all(&u32::to_le_bytes(value))
     }
 
-    fn write_u64(&mut self, value: u64) -> std::io::Result<usize> {
-        self.write(&u64::to_le_bytes(value))
+    fn write_u64(&mut self, value: u64) -> std::io::Result<()> {
+        self.write_all(&u64::to_le_bytes(value))
     }
 
-    fn write_f32(&mut self, value: f32) -> std::io::Result<usize> {
-        self.write(&f32::to_le_bytes(value))
+    fn write_f32(&mut self, value: f32) -> std::io::Result<()> {
+        self.write_all(&f32::to_le_bytes(value))
     }
 
-    fn write_f64(&mut self, value: f64) -> std::io::Result<usize> {
-        self.write(&f64::to_le_bytes(value))
+    fn write_f64(&mut self, value: f64) -> std::io::Result<()> {
+        self.write_all(&f64::to_le_bytes(value))
     }
 
-    fn write_chunk(&mut self, raw: &[u8]) -> std::io::Result<usize> {
+    fn write_chunk(&mut self, raw: &[u8]) -> std::io::Result<()> {
         let mut crc = Crc::new();
         crc.update(raw);
         let amount = crc.amount();
@@ -117,7 +109,7 @@ where
         }
         self.write_u64(comp_buf.len() as u64)?;
         self.write_u64(raw.len() as u64)?;
-        self.write(&comp_buf)?;
+        self.write_all(&comp_buf)?;
         assert!(raw.len() > u32::MAX as usize || amount == raw.len() as u32);
         self.write_u32(crc)
     }
@@ -125,17 +117,17 @@ where
 
 trait WriteExt: Write {
     /// Write a string, with a single byte length prefix.
-    fn write_str(&mut self, value: &str) -> std::io::Result<usize>;
+    fn write_str(&mut self, value: &str) -> std::io::Result<()>;
     /// Write a little endian u32.
-    fn write_u32(&mut self, value: u32) -> std::io::Result<usize>;
+    fn write_u32(&mut self, value: u32) -> std::io::Result<()>;
     /// Write a little endian u64.
-    fn write_u64(&mut self, value: u64) -> std::io::Result<usize>;
+    fn write_u64(&mut self, value: u64) -> std::io::Result<()>;
     /// Write a little endian f32.
-    fn write_f32(&mut self, value: f32) -> std::io::Result<usize>;
+    fn write_f32(&mut self, value: f32) -> std::io::Result<()>;
     /// Write a little endian f64.
-    fn write_f64(&mut self, value: f64) -> std::io::Result<usize>;
+    fn write_f64(&mut self, value: f64) -> std::io::Result<()>;
     /// Write a compressed chunk.
-    fn write_chunk(&mut self, raw: &[u8]) -> std::io::Result<usize>;
+    fn write_chunk(&mut self, raw: &[u8]) -> std::io::Result<()>;
 }
 
 struct ChunkReader<'a> {
@@ -147,14 +139,6 @@ struct ChunkReader<'a> {
 }
 
 impl<'a> ChunkReader<'a> {
-    fn get_content(&mut self) -> std::io::Result<Vec<u8>> {
-        let mut res: Vec<u8> = (0..self.raw_len).map(|_| 0u8).collect();
-
-        self.inner.read_exact(&mut res)?;
-
-        Ok(res)
-    }
-
     fn get_crc(&mut self) -> std::io::Result<u32> {
         if self.inner.total_out() != self.raw_len || self.inner.total_in() != self.comp_len {
             return Err(std::io::Error::new(
@@ -294,11 +278,11 @@ impl TopTrajWriter {
             }
         }
         let bonds = bonds.to_list();
-        self.buffer.write_u64(bonds.len() as u64);
+        self.buffer.write_u64(bonds.len() as u64)?;
 
         for (i, j) in bonds {
-            self.buffer.write_u32(i as u32);
-            self.buffer.write_u32(j as u32);
+            self.buffer.write_u32(i as u32)?;
+            self.buffer.write_u32(j as u32)?;
         }
         self.buffer_state = BufferState::BondsWritten;
 
@@ -342,7 +326,7 @@ impl TopTrajWriter {
             let mut handle = std::fs::File::create(path)?;
             let mut buf = Vec::<u8>::new();
             // write header
-            handle.write(&MAGIC)?;
+            handle.write_all(&MAGIC)?;
 
             buf.write_str(title)?;
 
@@ -384,7 +368,7 @@ impl TopTrajWriter {
             let chunk = get_chunk_reader(&mut handle)?;
             let mut n_frames = 0;
             // FIXME do more header verifications
-            seek_to_chunk_end(chunk.start, chunk.comp_len, None, &mut handle);
+            seek_to_chunk_end(chunk.start, chunk.comp_len, None, &mut handle)?;
 
             loop {
                 let start = handle.seek(SeekFrom::Current(0))?;
@@ -396,21 +380,21 @@ impl TopTrajWriter {
 
                 // decompress chunk header
                 let mut chunk = get_chunk_reader(&mut handle)?;
-                let frame_index = chunk.read_u32()?;
-                let n_atoms = chunk.read_u32()?;
+                let _frame_index = chunk.read_u32()?;
+                let _n_atoms = chunk.read_u32()?;
                 let sim_step = chunk.read_u64()?;
-                let sim_time = chunk.read_f64()?;
+                let _sim_time = chunk.read_f64()?;
 
                 if let Some(truncate) = truncate
                     && sim_step > truncate
                 {
                     // ignore frame, go back to before
-                    handle.seek(SeekFrom::Start(start));
+                    handle.seek(SeekFrom::Start(start))?;
                     break;
                 } else {
                     // accept frame, go to the end
                     n_frames += 1;
-                    seek_to_chunk_end(chunk.start, chunk.comp_len, None, &mut handle);
+                    seek_to_chunk_end(chunk.start, chunk.comp_len, None, &mut handle)?;
                 }
             }
 
@@ -551,28 +535,28 @@ impl TopTrajWriter {
                 return Err(PyValueError::new_err("All names must be of type str."));
             };
             let name: String = name.extract()?;
-            self.buffer.write_str(&name);
+            self.buffer.write_str(&name)?;
         }
         for i in 0..n_atoms {
             let Ok(atom_type) = atom_types.get_item(i)?.cast_into::<PyString>() else {
                 return Err(PyValueError::new_err("All atom types must be of type str."));
             };
             let atom_type: String = atom_type.extract()?;
-            self.buffer.write_str(&atom_type);
+            self.buffer.write_str(&atom_type)?;
         }
         for i in 0..n_atoms {
             let Ok(charge) = charges.get_item(i)?.cast_into::<PyFloat>() else {
                 return Err(PyValueError::new_err("All charges must be of type float."));
             };
             let charge: f32 = charge.extract()?;
-            self.buffer.write_f32(charge);
+            self.buffer.write_f32(charge)?;
         }
         for i in 0..n_atoms {
             let Ok(mass) = masses.get_item(i)?.cast_into::<PyFloat>() else {
                 return Err(PyValueError::new_err("All masses must be of type float."));
             };
             let mass: f32 = mass.extract()?;
-            self.buffer.write_f32(mass);
+            self.buffer.write_f32(mass)?;
         }
         self.buffer_state = BufferState::AtomsWritten;
         Ok(())
@@ -615,8 +599,8 @@ impl TopTrajWriter {
             return Err(PyOSError::new_err("Writer is already closed."));
         };
 
-        handle.write_chunk(&self.buffer);
-        handle.flush();
+        handle.write_chunk(&self.buffer)?;
+        handle.flush()?;
 
         self.buffer.clear();
         self.buffer_state = BufferState::Empty;
@@ -870,12 +854,12 @@ impl TopTrajReader {
                 break;
             }
 
-            let mut chunk = get_chunk_reader(&mut handle)?;
+            let chunk = get_chunk_reader(&mut handle)?;
             seek_to_chunk_end(chunk.start, chunk.comp_len, None, &mut handle)?;
         }
 
         assert!(handle.seek(SeekFrom::Current(0))? == file_end);
-        handle.seek(SeekFrom::Start(offsets[0]));
+        handle.seek(SeekFrom::Start(offsets[0]))?;
 
         Ok(Self {
             path,
@@ -944,11 +928,11 @@ impl TopTrajReader {
         let n_bonds = chunk.read_u64()?;
         let mut bonds = Vec::with_capacity(n_bonds as usize);
 
-        for i in 0..n_bonds {
+        for _ in 0..n_bonds {
             bonds.push((chunk.read_u32()?, chunk.read_u32()?));
         }
 
-        let mut frame = TopTrajFrame {
+        let frame = TopTrajFrame {
             frame_index,
             sim_step,
             sim_time,
