@@ -1,7 +1,6 @@
 import difflib
 from math import cos, pi
 
-from ..__rust import TokenList, TokenParseException
 from ..__parser import (
     Directive,
     GromacsTopFile,
@@ -9,7 +8,7 @@ from ..__parser import (
     ParseException,
     register_directive,
 )
-from ..__rust import DetectionTemplate
+from ..__rust import DetectionTemplate, TokenList, TokenParseException
 from .graph import GraphAtomType
 from .modification_template import ModificationTemplate
 

@@ -1,8 +1,10 @@
 from collections.abc import Callable
 
 from ..__core import Force
-from .gromacs_top_file import register_directive
+from ..__rust import Token
+from .gromacs_top_file import GromacsTopFile, register_directive
 from .interaction_directive import InteractionDirective
+from .molecule_type_directive import MoleculeTypeDirective
 
 
 @register_directive
@@ -32,6 +34,11 @@ class AnglesDirective(InteractionDirective):
     @classmethod
     def get_name(cls) -> str:
         return "angles"
+
+    def get_types(self) -> dict[tuple, list[Token]]:
+        assert isinstance(self.parent, MoleculeTypeDirective)
+        assert isinstance(self.parent.parent, GromacsTopFile)
+        return self.parent.parent.system.angle_types
 
     @classmethod
     def get_number_params(cls, type_: int) -> tuple[int, int]:

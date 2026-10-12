@@ -340,6 +340,7 @@ def parse_slice(slice_: str, n: int) -> tuple[int, int, int]:
     parts += [None] * (3 - len(parts))
     return slice(*parts).indices(n)
 
+
 def select(args: list[str]) -> int:
     """Select frames or atoms using the `daemon select` CLI."""
     parser = ArgumentParser(

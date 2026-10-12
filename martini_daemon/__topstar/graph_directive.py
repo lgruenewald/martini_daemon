@@ -1,12 +1,12 @@
 import difflib
 
 from ..__core import System
-from ..__rust import TokenList, TokenParseException
 from ..__parser import (
     Directive,
     GromacsTopFile,
     register_directive,
 )
+from ..__rust import TokenList, TokenParseException
 from .graph import Graph, GraphAtomType
 
 keyword_to_GraphAtomType = {

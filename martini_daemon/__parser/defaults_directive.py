@@ -1,6 +1,6 @@
+from ..__rust import TokenList, TokenParseException
 from .directive import Directive
 from .gromacs_top_file import GromacsTopFile, register_directive
-from ..__rust import TokenList, TokenParseException
 
 
 @register_directive

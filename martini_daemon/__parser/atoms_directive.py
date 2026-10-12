@@ -1,7 +1,7 @@
+from ..__rust import TokenList, TokenParseException
 from .directive import Directive
 from .gromacs_top_file import register_directive
 from .molecule_type_directive import MoleculeTypeDirective
-from ..__rust import TokenList, TokenParseException
 
 
 @register_directive

@@ -1,8 +1,11 @@
 # importing these only to run @register_directive in them, NOT a public interface
 # sphinx seems to not document them because they are modules(?), so that's nice
+from . import angle_types_directive as angle_types_directive
 from . import atom_types_directive as atom_types_directive
 from . import atoms_directive as atoms_directive
+from . import bond_types_directive as bond_types_directive
 from . import defaults_directive as defaults_directive
+from . import dihedral_types_directive as dihedral_types_directive
 from . import exclusions_directive as exclusions_directive
 from . import molecules_directive as molecules_directive
 from . import nonbond_params as nonbond_params

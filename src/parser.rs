@@ -89,6 +89,111 @@ pub struct Token {
     pub end: usize,
 }
 
+#[gen_stub_pymethods]
+#[pymethods]
+impl Token {
+    pub fn unwrap(self_: Bound<'_, Self>, type_filter: &str) -> PyResult<Py<PyAny>> {
+        let py = self_.py();
+        let token = self_.borrow();
+        let content = &token.content;
+
+        return match type_filter {
+            "int" => match content.parse::<i64>() {
+                Ok(i) => i.into_py_any(py),
+                _ => Err(PyErr::new::<TokenParseException, _>((
+                    Some(self_.unbind().clone_ref(py)),
+                    format!("Expected number, got {}.", content),
+                ))),
+            },
+            "index" => match content.parse::<u64>() {
+                Ok(i) if i > 0 => (i - 1).into_py_any(py),
+                _ => Err(PyErr::new::<TokenParseException, _>((
+                    Some(self_.unbind().clone_ref(py)),
+                    format!("Expected index, got {}.", content),
+                ))),
+            },
+            "float" => match content.parse::<f64>() {
+                Ok(f) => f.into_py_any(py),
+                _ => Err(PyErr::new::<TokenParseException, _>((
+                    Some(self_.unbind().clone_ref(py)),
+                    format!("Expected float, got {}.", content),
+                ))),
+            },
+            "positive" => match content.parse::<f64>() {
+                Ok(f) if f > 0.0 => f.into_py_any(py),
+                _ => Err(PyErr::new::<TokenParseException, _>((
+                    Some(self_.unbind().clone_ref(py)),
+                    format!("Expected positive non-zero number, got {}.", content),
+                ))),
+            },
+            "degree" => match content.parse::<f64>() {
+                Ok(degrees) => {
+                    let mut radians = f64::to_radians(degrees);
+                    while radians < -f64::consts::PI {
+                        radians += f64::consts::TAU;
+                    }
+                    while radians > f64::consts::PI {
+                        radians -= f64::consts::TAU;
+                    }
+                    radians.into_py_any(py)
+                }
+                _ => Err(PyErr::new::<TokenParseException, _>((
+                    Some(self_.unbind().clone_ref(py)),
+                    format!("Expected float (in degrees), got {}.", content),
+                ))),
+            },
+            "word" | "raw" => content.into_py_any(py),
+            "pattern" => content.replace("{", "[").replace("}", "]").into_py_any(py),
+            "pair" => {
+                let parts = content.split(":").collect::<Vec<_>>();
+                if parts.len() != 2 {
+                    return Err(PyErr::new::<TokenParseException, _>((
+                        Some(self_.unbind().clone_ref(py)),
+                        format!("Expected a pair (index:name), got {}.", content),
+                    )));
+                }
+                let Ok(index) = parts[0].parse::<usize>() else {
+                    return Err(PyErr::new::<TokenParseException, _>((
+                        Some(self_.unbind().clone_ref(py)),
+                        format!(
+                            "Expected an index before ':', got {} (in {}).",
+                            parts[0], content
+                        ),
+                    )));
+                };
+                if index == 0 {
+                    return Err(PyErr::new::<TokenParseException, _>((
+                        Some(self_.unbind().clone_ref(py)),
+                        "Indexing reactants starts at 1.",
+                    )));
+                }
+                if parts[1].len() == 0 {
+                    return Err(PyErr::new::<TokenParseException, _>((
+                        Some(self_.unbind().clone_ref(py)),
+                        "Missing name from pair (index:name).",
+                    )));
+                }
+                (index - 1, parts[1]).into_py_any(py)
+            }
+            "string" => {
+                if content.len() < 2
+                    || !(content.starts_with('"') && content.ends_with('"')
+                        || content.starts_with('<') && content.ends_with('>'))
+                {
+                    return Err(PyErr::new::<TokenParseException, _>((
+                        Some(self_.unbind().clone_ref(py)),
+                        format!("Expected token of type string, got {}.", content),
+                    )));
+                }
+
+                let len = content.len();
+                content[1..len - 1].into_py_any(py)
+            }
+            _ => Err(PyValueError::new_err("Unknown type filter.")),
+        };
+    }
+}
+
 #[gen_stub_pyclass]
 #[derive(Debug)]
 #[pyclass(skip_from_py_object)]
@@ -199,103 +304,10 @@ impl TokenList {
             }
         };
 
-        let token = &self_.tokens[index];
-        let content = &token.borrow(self_.py()).content;
-
-        return match type_filter {
-            "int" => match content.parse::<i64>() {
-                Ok(i) => i.into_py_any(py),
-                _ => Err(PyErr::new::<TokenParseException, _>((
-                    Some(token.clone_ref(py)),
-                    format!("Expected number, got {}.", content),
-                ))),
-            },
-            "index" => match content.parse::<u64>() {
-                Ok(i) if i > 0 => (i - 1).into_py_any(py),
-                _ => Err(PyErr::new::<TokenParseException, _>((
-                    Some(token.clone_ref(py)),
-                    format!("Expected index, got {}.", content),
-                ))),
-            },
-            "float" => match content.parse::<f64>() {
-                Ok(f) => f.into_py_any(py),
-                _ => Err(PyErr::new::<TokenParseException, _>((
-                    Some(token.clone_ref(py)),
-                    format!("Expected float, got {}.", content),
-                ))),
-            },
-            "positive" => match content.parse::<f64>() {
-                Ok(f) if f > 0.0 => f.into_py_any(py),
-                _ => Err(PyErr::new::<TokenParseException, _>((
-                    Some(token.clone_ref(py)),
-                    format!("Expected positive non-zero number, got {}.", content),
-                ))),
-            },
-            "degree" => match content.parse::<f64>() {
-                Ok(degrees) => {
-                    let mut radians = f64::to_radians(degrees);
-                    while radians < -f64::consts::PI {
-                        radians += f64::consts::TAU;
-                    }
-                    while radians > f64::consts::PI {
-                        radians -= f64::consts::TAU;
-                    }
-                    radians.into_py_any(py)
-                }
-                _ => Err(PyErr::new::<TokenParseException, _>((
-                    Some(token.clone_ref(py)),
-                    format!("Expected float (in degrees), got {}.", content),
-                ))),
-            },
-            "word" | "raw" => content.into_py_any(py),
-            "pattern" => content.replace("{", "[").replace("}", "]").into_py_any(py),
-            "pair" => {
-                let parts = content.split(":").collect::<Vec<_>>();
-                if parts.len() != 2 {
-                    return Err(PyErr::new::<TokenParseException, _>((
-                        Some(token.clone_ref(py)),
-                        format!("Expected a pair (index:name), got {}.", content),
-                    )));
-                }
-                let Ok(index) = parts[0].parse::<usize>() else {
-                    return Err(PyErr::new::<TokenParseException, _>((
-                        Some(token.clone_ref(py)),
-                        format!(
-                            "Expected an index before ':', got {} (in {}).",
-                            parts[0], content
-                        ),
-                    )));
-                };
-                if index == 0 {
-                    return Err(PyErr::new::<TokenParseException, _>((
-                        Some(token.clone_ref(py)),
-                        "Indexing reactants starts at 1.",
-                    )));
-                }
-                if parts[1].len() == 0 {
-                    return Err(PyErr::new::<TokenParseException, _>((
-                        Some(token.clone_ref(py)),
-                        "Missing name from pair (index:name).",
-                    )));
-                }
-                (index - 1, parts[1]).into_py_any(py)
-            }
-            "string" => {
-                if content.len() < 2
-                    || !(content.starts_with('"') && content.ends_with('"')
-                        || content.starts_with('<') && content.ends_with('>'))
-                {
-                    return Err(PyErr::new::<TokenParseException, _>((
-                        Some(token.clone_ref(py)),
-                        format!("Expected token of type string, got {}.", content),
-                    )));
-                }
-
-                let len = content.len();
-                content[1..len - 1].into_py_any(py)
-            }
-            _ => Err(PyValueError::new_err("Unknown type filter.")),
-        };
+        Token::unwrap(
+            (&self_.tokens[index]).clone_ref(py).into_bound(py),
+            type_filter,
+        )
     }
 
     pub fn assert_at_least(&self, i: usize, py: Python<'_>) -> PyResult<()> {
@@ -323,6 +335,11 @@ impl TokenList {
                 ),
             )));
         }
+        Ok(())
+    }
+
+    pub fn append(&mut self, tok: Bound<'_, Token>) -> PyResult<()> {
+        self.tokens.push(tok.unbind());
         Ok(())
     }
 }

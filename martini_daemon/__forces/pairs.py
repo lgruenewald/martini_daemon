@@ -1,13 +1,13 @@
 import openmm as mm
 
 from ..__core import BondedForce, System, register_available_force
-from ..__rust import TokenList, TokenParseException
 from ..__parser import (
     Directive,
     GromacsTopFile,
     InteractionDirective,
     register_directive,
 )
+from ..__rust import TokenList, TokenParseException
 
 
 @register_directive
@@ -53,8 +53,7 @@ class PairsDirective(InteractionDirective):
         n_params = len(tokens) - self.get_number_members() - 1
         if n_params not in (0, 2):
             raise TokenParseException(
-                tokens[-1],
-                "[pairs] takes either no params, or both sigma and epsilon."
+                tokens[-1], "[pairs] takes either no params, or both sigma and epsilon."
             )
         return super().read_params(tokens, type_)
 

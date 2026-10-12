@@ -1,10 +1,10 @@
 from collections.abc import Callable
 
 from ..__core import Force
+from ..__rust import TokenList
 from .gromacs_top_file import register_directive
 from .interaction_directive import InteractionDirective
 from .molecule_type_directive import MoleculeTypeDirective
-from ..__rust import TokenList
 
 
 @register_directive

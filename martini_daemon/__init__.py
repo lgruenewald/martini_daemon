@@ -14,12 +14,12 @@ from .__rust import (
     FragList,
     Fragment,
     PeriodicBox,
-    TopTrajFrame,
-    TopTrajReader,
-    TopTrajWriter,
     Token,
     TokenList,
     TokenParseException,
+    TopTrajFrame,
+    TopTrajReader,
+    TopTrajWriter,
     build_version,
 )
 from .__simulation import Reporter, Simulation

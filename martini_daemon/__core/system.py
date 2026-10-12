@@ -5,7 +5,7 @@ from typing import Any
 
 import openmm as mm
 
-from ..__rust import BondGraph, PeriodicBox
+from ..__rust import BondGraph, PeriodicBox, Token
 from .bonded_force import BondedForce
 from .force import Force
 from .molecule_type import MoleculeType
@@ -50,6 +50,11 @@ class System:
         self.molecule_types: dict[str, MoleculeType] = {}
         self.initial_molecules: list[tuple[str, int]] = []
         self.additional_data: dict[str, Any] = options or {}
+
+        # hacky [bondtypes], ... impl, storing unparsed token content
+        self.bond_types: dict[tuple[str, str, int], list[Token]] = {}
+        self.angle_types: dict[tuple[str, str, str, int], list[Token]] = {}
+        self.dihedral_types: dict[tuple[str, str, str, str, int], list[Token]] = {}
 
     def __assert_no_context(self) -> None:
         if self.__context is not None:
@@ -271,6 +276,53 @@ class System:
         """
         self.__assert_no_context()
         self.__atom_types[atom_type] = (charge, mass)
+
+    def __add_bonded_type(
+        self, table: dict, members: tuple[str, ...], type_: int, params: list[Token]
+    ) -> None:
+        # stored under both the forward and the reversed key, so lookups need only one get
+        keys = {(*members, type_), (*members[::-1], type_)}
+        if any(key in table for key in keys):
+            raise ValueError(f"Duplicate entry for {' '.join(members)} (func {type_}).")
+        for key in keys:
+            table[key] = params
+
+    def add_bond_type(self, a: str, b: str, type_: int, params: list[Token]) -> None:
+        """
+        Add a [bondtypes] entry. It also applies to the reversed order b a.
+
+        :param a, b: The bonded atom types, X being a wildcard.
+        :param type_: The function type.
+        :param params: The unparsed parameter tokens.
+        :raises ValueError: If an entry for these types and function type already exists.
+        """
+        self.__add_bonded_type(self.bond_types, (a, b), type_, params)
+
+    def add_angle_type(
+        self, a: str, b: str, c: str, type_: int, params: list[Token]
+    ) -> None:
+        """
+        Add an [angletypes] entry. It also applies to the reversed order c b a.
+
+        :param a, b, c: The bonded atom types, X being a wildcard.
+        :param type_: The function type.
+        :param params: The unparsed parameter tokens.
+        :raises ValueError: If an entry for these types and function type already exists.
+        """
+        self.__add_bonded_type(self.angle_types, (a, b, c), type_, params)
+
+    def add_dihedral_type(
+        self, a: str, b: str, c: str, d: str, type_: int, params: list[Token]
+    ) -> None:
+        """
+        Add a [dihedraltypes] entry. It also applies to the reversed order d c b a.
+
+        :param a, b, c, d: The bonded atom types, X being a wildcard.
+        :param type_: The function type.
+        :param params: The unparsed parameter tokens.
+        :raises ValueError: If an entry for these types and function type already exists.
+        """
+        self.__add_bonded_type(self.dihedral_types, (a, b, c, d), type_, params)
 
     def iterate_atom_types(self) -> Iterable[tuple[str, tuple[float, float]]]:
         """

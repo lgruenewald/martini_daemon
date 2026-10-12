@@ -4,7 +4,7 @@ import traceback
 from enum import Enum
 from sys import stderr
 
-from ..__rust import Token, TokenList, Lexer, TokenParseException
+from ..__rust import Lexer, TokenList, TokenParseException
 from .directive import Directive
 
 
@@ -288,9 +288,7 @@ class Parser:
         # if stack is per file, but this is not a problem in most .top files
         if_stack = [IfStackElem.Root]
 
-        lines: list[TokenList] = self.__lexer.tokenize_file(
-            path
-        )
+        lines: list[TokenList] = self.__lexer.tokenize_file(path)
 
         for token_list in lines:
             self.__line_num = token_list.line_num
@@ -340,9 +338,7 @@ class Parser:
                             case IfStackElem.SkippedIf:
                                 pass
                             case IfStackElem.Root:
-                                raise TokenParseException(
-                                    token0, "#else unmatched."
-                                )
+                                raise TokenParseException(token0, "#else unmatched.")
                         continue
                     case "#endif":
                         if token1 is not None:
@@ -422,11 +418,12 @@ class Parser:
                     case "#define":
                         if token1 is None or len(token_list) < 2:
                             raise TokenParseException(
-                                token0,
-                                "#define takes an argument."
+                                token0, "#define takes an argument."
                             )
                         key = token1.content
-                        value = " ".join([token_list[i].content for i in range(2, len(token_list))])
+                        value = " ".join(
+                            [token_list[i].content for i in range(2, len(token_list))]
+                        )
                         self.__lexer.add_define(key, value)
                     case "#undef":
                         if token1 is None or len(token_list) != 2:

@@ -1,7 +1,7 @@
 from ..__core import System
+from ..__rust import TokenList, TokenParseException
 from .directive import Directive
 from .parser import Parser
-from ..__rust import TokenList, TokenParseException
 
 
 class InvalidTopologyError(Exception):
