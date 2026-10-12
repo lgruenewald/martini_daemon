@@ -1,7 +1,7 @@
 from .directive import Directive
 from .gromacs_top_file import register_directive
 from .molecule_type_directive import MoleculeTypeDirective
-from .token_list import TokenList, TokenParseException
+from ..__rust import TokenList, TokenParseException
 
 
 @register_directive
@@ -14,8 +14,8 @@ class AtomsDirective(Directive):
         res_name = tokens.unwrap(3, "word")
         atom_name = tokens.unwrap(4, "word")
         _ = tokens.unwrap(5, "int")  # charge group number
-        charge = tokens.unwrap(6, "float", None)
-        mass = tokens.unwrap(7, "float", None)
+        charge = tokens.unwrap(6, "float", False, None)
+        mass = tokens.unwrap(7, "float", False, None)
         if index != len(self.parent.molecule_type.atoms):
             raise TokenParseException(
                 tokens[0],

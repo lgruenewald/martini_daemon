@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from .token_list import TokenList
+from ..__rust import TokenList
 
 
 class Directive(ABC):

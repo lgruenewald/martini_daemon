@@ -17,6 +17,9 @@ from .__rust import (
     TopTrajFrame,
     TopTrajReader,
     TopTrajWriter,
+    Token,
+    TokenList,
+    TokenParseException,
     build_version,
 )
 from .__simulation import Reporter, Simulation

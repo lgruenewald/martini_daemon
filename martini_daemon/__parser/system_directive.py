@@ -1,7 +1,7 @@
 from .directive import Directive
 from .gromacs_top_file import GromacsTopFile, register_directive
 from .parser import ParseException
-from .token_list import TokenList
+from ..__rust import TokenList
 
 
 @register_directive

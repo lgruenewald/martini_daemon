@@ -1,13 +1,12 @@
 import difflib
 from math import cos, pi
 
+from ..__rust import TokenList, TokenParseException
 from ..__parser import (
     Directive,
     GromacsTopFile,
     MoleculeTypeDirective,
     ParseException,
-    TokenList,
-    TokenParseException,
     register_directive,
 )
 from ..__rust import DetectionTemplate

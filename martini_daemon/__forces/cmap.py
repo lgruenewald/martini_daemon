@@ -1,12 +1,11 @@
 import openmm as mm
 
 from ..__core import BondedForce, register_available_force
+from ..__rust import TokenList, TokenParseException
 from ..__parser import (
     Directive,
     GromacsTopFile,
     InteractionDirective,
-    TokenList,
-    TokenParseException,
     register_directive,
 )
 

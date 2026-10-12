@@ -2,7 +2,7 @@ from abc import ABCMeta, abstractmethod
 
 from .directive import Directive
 from .molecule_type_directive import MoleculeTypeDirective
-from .token_list import TokenList, TokenParseException
+from ..__rust import TokenList, TokenParseException
 
 
 class InteractionDirective(Directive, metaclass=ABCMeta):

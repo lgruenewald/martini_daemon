@@ -2,7 +2,7 @@ from ..__core import MoleculeType
 from .directive import Directive
 from .gromacs_top_file import GromacsTopFile, register_directive
 from .parser import ParseException
-from .token_list import TokenList, TokenParseException
+from ..__rust import TokenList, TokenParseException
 
 
 @register_directive

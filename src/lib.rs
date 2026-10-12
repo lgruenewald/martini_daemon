@@ -34,9 +34,16 @@ fn rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<toptraj::TopTrajFrame>()?;
     m.add_class::<toptraj::TopTrajReader>()?;
     m.add_class::<toptraj::TopTrajWriter>()?;
+    m.add_class::<parser::Lexer>()?;
+    m.add_class::<parser::Token>()?;
+    m.add_class::<parser::TokenParseException>()?;
+    // m.add(
+    //     "TokenParseException",
+    //     m.py().get_type::<parser::TokenParseException>(),
+    // )?;
+    m.add_class::<parser::TokenList>()?;
     m.add_function(wrap_pyfunction!(detection::detection, m)?)?;
     m.add_function(wrap_pyfunction!(build_version, m)?)?;
-    m.add_function(wrap_pyfunction!(parser::tokenize, m)?)?;
     Ok(())
 }
 

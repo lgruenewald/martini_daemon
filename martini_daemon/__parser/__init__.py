@@ -34,8 +34,6 @@ from .parser import (
 from .parser import (
     TokenParseException as TokenParseException,
 )
-from .token import Token as Token
-from .token_list import TokenList as TokenList
 from .virtual_sites1 import register_vsite1_type as register_vsite1_type
 from .virtual_sites2 import register_vsite2_type as register_vsite2_type
 from .virtual_sites3 import register_vsite3_type as register_vsite3_type

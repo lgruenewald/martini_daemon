@@ -21,20 +21,7 @@ def test_parse_angle_conditions() -> None:
         (True, "170 to -170", [(-170, 170)]),
     ]
     for wrap, line, exp in lines:
-        pat = re.compile(r'\[|]|"[^"]*"|<[^>]*>|[^ \t\n\r\f\v\[\]"<>]+')
-
-        tokens = [
-            Token(
-                content=line[match.start() : match.end()],
-                line_num=0,
-                path="",
-                start=match.start(),
-                end=match.end(),
-            )
-            for match in pat.finditer(line)
-        ]
-        tl = TokenList(line, tokens, {})
-
+        tl = TokenList(line, "test", 1)
         res = _parse_angle_conditions(tl, 0, wrap)
         for (res_s, res_e), (exp_s, exp_e) in zip(res, exp):
             exp_s *= math.pi / 180.0

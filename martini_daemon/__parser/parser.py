@@ -4,10 +4,8 @@ import traceback
 from enum import Enum
 from sys import stderr
 
-from ..__rust import tokenize
+from ..__rust import Token, TokenList, Lexer, TokenParseException
 from .directive import Directive
-from .token import Token
-from .token_list import TokenList, TokenParseException
 
 
 class ParseException(Exception):
@@ -75,9 +73,12 @@ class Parser:
         """
         # stores types, not instances
         self.__directives: dict[str, type[Directive]] = {}
-        self.__line_num: int = 0
         self.__path: str = path
-        self.__defines: dict[str, str] = defines or {}
+        self.__lexer: Lexer = Lexer()
+        self.__line_num: int = 0
+        if defines is not None:
+            for k, v in defines.items():
+                self.__lexer.add_define(k, v)
         self.__include_dirs: list[str] = include_dirs or []
         self.__included: set[str] = set()
         self.__past_directives_at_root: set[str] = set()
@@ -228,28 +229,6 @@ class Parser:
     # contiguous array of characters that is not ASCII whitespace, [, ], ", < or >
     __token_pat = re.compile(r'\[|]|"[^"]*"|<[^>]*>|[^ \t\n\r\f\v\[\]"<>]+')
 
-    def __tokenize(self, line: str) -> TokenList:
-        """
-        Split a line-up into a list of tokens.
-
-        * Assumes lines have been made whole already, and that comments were removed.
-        * Separates based on whitespace.
-        * Sets up #define replacements (they happen lazily in TokenList.unwrap()).
-        """
-        tokens = [
-            Token(
-                content=line[start:end],
-                line_num=self.__line_num,
-                path=self.__path,
-                start=start,
-                end=end,
-            )
-            for start, end in tokenize(line)
-            # ignore comments for now
-            if line[start] != ";"
-        ]
-        return TokenList(line, tokens, self.__defines)
-
     def __start_directive(self, dirname: str) -> None:
         directive_type = self.__directives.get(dirname)
         if directive_type is None:
@@ -309,181 +288,161 @@ class Parser:
         # if stack is per file, but this is not a problem in most .top files
         if_stack = [IfStackElem.Root]
 
-        with open(path) as f:
-            # make lines whole through \
-            cumulative = ""
-            for i, line in enumerate(f):
-                line = line.strip("\r\n")
-                self.__line_num = i
-                # ignore comments first to enable
-                # blah blah \; comment
-                # handle ignoring line endings
-                if len(line) > 0 and line[-1] == "\\":
-                    # note this will have implications for comments ending lines with '\'
+        lines: list[TokenList] = self.__lexer.tokenize_file(
+            path
+        )
 
-                    # must maintain some whitespace
-                    cumulative += line[:-1] + "\n"
-                    continue
-                if len(cumulative) > 0:
-                    line = cumulative + line
-                    cumulative = ""
-
-                token_list = self.__tokenize(line)
-
-                # ignore empty lines
-                # only after checking for \ -- means that empty lines
-                # also need \ to keep continuing one long line
-                if len(token_list) == 0:
-                    continue
-
-                # handle if/else logic before other things
-                token0 = token_list[0]
-                token1 = token_list[1] if len(token_list) > 1 else None
-                if token0.content[0] == "#":
-                    match token0.content:
-                        case "#ifdef":
-                            if token1 is None or len(token_list) > 2:
-                                raise TokenParseException(
-                                    token0, "#ifdef takes one argument."
-                                )
-                            if if_stack[-1] in {IfStackElem.DoBranch, IfStackElem.Root}:
-                                if token1.content in self.__defines:
-                                    if_stack.append(IfStackElem.DoBranch)
-                                else:
-                                    if_stack.append(IfStackElem.SkipBranch)
+        for token_list in lines:
+            self.__line_num = token_list.line_num
+            if len(token_list) == 0:
+                continue
+            # handle if/else logic before other things
+            token0 = token_list[0]
+            token1 = token_list[1] if len(token_list) > 1 else None
+            if token0.content[0] == "#":
+                match token0.content:
+                    case "#ifdef":
+                        if token1 is None or len(token_list) > 2:
+                            raise TokenParseException(
+                                token0, "#ifdef takes one argument."
+                            )
+                        if if_stack[-1] in {IfStackElem.DoBranch, IfStackElem.Root}:
+                            if self.__lexer.get_define(token1.content) is not None:
+                                if_stack.append(IfStackElem.DoBranch)
                             else:
-                                if_stack.append(IfStackElem.SkippedIf)
-                            continue
-                        case "#ifndef":
-                            if token1 is None or len(token_list) > 2:
-                                raise TokenParseException(
-                                    token0, "#ifndef takes one argument."
-                                )
-                            if if_stack[-1] in {IfStackElem.DoBranch, IfStackElem.Root}:
-                                if token1.content in self.__defines:
-                                    if_stack.append(IfStackElem.SkipBranch)
-                                else:
-                                    if_stack.append(IfStackElem.DoBranch)
+                                if_stack.append(IfStackElem.SkipBranch)
+                        else:
+                            if_stack.append(IfStackElem.SkippedIf)
+                        continue
+                    case "#ifndef":
+                        if token1 is None or len(token_list) > 2:
+                            raise TokenParseException(
+                                token0, "#ifndef takes one argument."
+                            )
+                        if if_stack[-1] in {IfStackElem.DoBranch, IfStackElem.Root}:
+                            if self.__lexer.get_define(token1.content) is not None:
+                                if_stack.append(IfStackElem.SkipBranch)
                             else:
-                                if_stack.append(IfStackElem.SkippedIf)
-                            continue
-                        case "#else":
-                            if token1 is not None:
+                                if_stack.append(IfStackElem.DoBranch)
+                        else:
+                            if_stack.append(IfStackElem.SkippedIf)
+                        continue
+                    case "#else":
+                        if token1 is not None:
+                            raise TokenParseException(
+                                token0, "#else takes no argument."
+                            )
+                        match if_stack[-1]:
+                            case IfStackElem.DoBranch:
+                                if_stack[-1] = IfStackElem.SkipBranch
+                            case IfStackElem.SkipBranch:
+                                if_stack[-1] = IfStackElem.DoBranch
+                            case IfStackElem.SkippedIf:
+                                pass
+                            case IfStackElem.Root:
                                 raise TokenParseException(
-                                    token0, "#else takes no argument."
+                                    token0, "#else unmatched."
                                 )
-                            match if_stack[-1]:
-                                case IfStackElem.DoBranch:
-                                    if_stack[-1] = IfStackElem.SkipBranch
-                                case IfStackElem.SkipBranch:
-                                    if_stack[-1] = IfStackElem.DoBranch
-                                case IfStackElem.SkippedIf:
-                                    pass
-                                case IfStackElem.Root:
+                        continue
+                    case "#endif":
+                        if token1 is not None:
+                            raise TokenParseException(
+                                token0, "#endif takes no argument."
+                            )
+                        if if_stack[-1] == IfStackElem.Root:
+                            raise TokenParseException(token0, "#endif unmatched.")
+                        if_stack.pop()
+                        continue
+                    case "#end":
+                        # possibly common mistake?
+                        raise TokenParseException(token0, "Please use #endif.")
+                    case "#if" | "#elif":
+                        raise TokenParseException(
+                            token0, "Only #ifdef is implemented. #if, #elif is not."
+                        )
+                    case "#include" | "#define" | "#undef":
+                        # preprocessor directives that are conditional
+                        pass
+                    case _:
+                        # error at unknown macros
+                        raise TokenParseException(
+                            token0, "Unknown preprocessor directive."
+                        )
+
+            # everything below this only happens if the #ifdef/#else
+            # says it should happen
+            if if_stack[-1] in {IfStackElem.SkipBranch, IfStackElem.SkippedIf}:
+                continue
+
+            if token0.content == "[":
+                # directives
+                if token_list[-1].content != "]":
+                    raise TokenParseException(
+                        token_list[-1], "Invalid directive, not closed by ']'."
+                    )
+                if len(token_list) != 3:
+                    raise TokenParseException(
+                        token_list[-1],
+                        "Invalid directive, three tokens expected: '[', directive name, ']'.",
+                    )
+
+                self.__start_directive(token_list.unwrap(1, "word"))
+            elif token0.content[0] == "#":
+                match token0.content:
+                    case "#include":
+                        # #include actually supports preprocessor replacements, unlike #ifdef or #define
+                        self.__lexer.do_replacements(token_list)
+                        if len(token_list) != 2:
+                            raise TokenParseException(
+                                token0, "#include takes one argument."
+                            )
+                        name = token_list.unwrap(
+                            1,
+                            "string",
+                        )
+                        search_dirs = [
+                            os.path.dirname(path),
+                        ] + self.__include_dirs
+
+                        found = False
+                        for cdir in search_dirs:
+                            new_path = os.path.join(cdir, name)
+                            if os.path.isfile(new_path):
+                                if new_path in self.__included:
                                     raise TokenParseException(
-                                        token0, "#else unmatched."
+                                        token1, f"Double inclusion of {new_path}."
                                     )
-                            continue
-                        case "#endif":
-                            if token1 is not None:
-                                raise TokenParseException(
-                                    token0, "#endif takes no argument."
-                                )
-                            if if_stack[-1] == IfStackElem.Root:
-                                raise TokenParseException(token0, "#endif unmatched.")
-                            if_stack.pop()
-                            continue
-                        case "#end":
-                            # possibly common mistake?
-                            raise TokenParseException(token0, "Please use #endif.")
-                        case "#if" | "#elif":
+                                self.__parse(new_path)
+                                found = True
+                                break
+                        if not found:
                             raise TokenParseException(
-                                token0, "Only #ifdef is implemented. #if, #elif is not."
+                                token1, f"File not found: {name}."
                             )
-                        case "#include" | "#define" | "#undef":
-                            # preprocessor directives that are conditional
-                            pass
-                        case _:
-                            # error at unknown macros
+                    case "#define":
+                        if token1 is None or len(token_list) < 2:
                             raise TokenParseException(
-                                token0, "Unknown preprocessor directive."
+                                token0,
+                                "#define takes an argument."
                             )
-
-                # everything below this only happens if the #ifdef/#else
-                # says it should happen
-                if if_stack[-1] in {IfStackElem.SkipBranch, IfStackElem.SkippedIf}:
-                    continue
-
-                if token0.content == "[":
-                    # directives
-                    if token_list[-1].content != "]":
-                        raise TokenParseException(
-                            token_list[-1], "Invalid directive, not closed by ']'."
-                        )
-                    if len(token_list) != 3:
-                        raise TokenParseException(
-                            token_list[-1],
-                            "Invalid directive, three tokens expected: '[', directive name, ']'.",
-                        )
-
-                    self.__start_directive(token_list.unwrap(1, "word"))
-                elif token0.content[0] == "#":
-                    match token0.content:
-                        case "#include":
-                            if token1 is None or len(token_list) != 2:
-                                raise TokenParseException(
-                                    token0, "#include takes one argument."
-                                )
-                            name = token_list.unwrap(
-                                1,
-                                "string",
-                                error_msg="#include argument should be inside quotation marks or <>.",
+                        key = token1.content
+                        value = " ".join([token_list[i].content for i in range(2, len(token_list))])
+                        self.__lexer.add_define(key, value)
+                    case "#undef":
+                        if token1 is None or len(token_list) != 2:
+                            raise TokenParseException(
+                                token0, "#undef takes one argument."
                             )
-                            search_dirs = [
-                                os.path.dirname(path),
-                            ] + self.__include_dirs
-
-                            found = False
-                            for cdir in search_dirs:
-                                new_path = os.path.join(cdir, name)
-                                if os.path.isfile(new_path):
-                                    if new_path in self.__included:
-                                        raise TokenParseException(
-                                            token1, f"Double inclusion of {new_path}."
-                                        )
-                                    self.__parse(new_path)
-                                    found = True
-                                    break
-                            if not found:
-                                raise TokenParseException(
-                                    token1, f"File not found: {name}."
-                                )
-                        case "#define":
-                            if token1 is None or len(token_list) not in {2, 3}:
-                                raise TokenParseException(
-                                    token0,
-                                    "#define takes one or two tokens arguments. "
-                                    "Note: Only single token -> single token mappings are supported. "
-                                    "Preprocessor macros are not supported.",
-                                )
-                            key = token1.content
-                            # now we can actually use an empty line, as long as it is in the dict #ifdef supports it
-                            value = (
-                                token_list[2].content if len(token_list) >= 3 else ""
-                            )
-                            self.__defines[key] = value
-                        case "#undef":
-                            if token1 is None or len(token_list) != 2:
-                                raise TokenParseException(
-                                    token0, "#undef takes one argument."
-                                )
-                            key = token1.content
-                            self.__defines.pop(key, None)
-                        case _:
-                            # unreachable
-                            assert False
-                else:
-                    # data lines
+                        key = token1.content
+                        self.__lexer.rm_define(key)
+                    case _:
+                        # unreachable
+                        assert False
+            else:
+                # data lines
+                self.__lexer.do_replacements(token_list)
+                # #defines could have made this line empty
+                if len(token_list) > 0:
                     self.__directive_stack[-1].line(token_list)
 
         if len(if_stack) > 1:
