@@ -25,6 +25,7 @@ The following Python-accessible classes are defined:
 
 use logos::Logos;
 use pyo3::IntoPyObjectExt;
+use pyo3::exceptions::PyIndexError;
 use pyo3::types::{PyAny, PyNone};
 use pyo3::{
     exceptions::{PyException, PyValueError},
@@ -144,10 +145,10 @@ impl TokenList {
     pub fn __getitem__(&mut self, index: isize, py: Python<'_>) -> PyResult<Py<Token>> {
         let len = self.tokens.len() as isize;
         let index = match index {
-            k if k < 0 && k > -len => (len + k) as usize,
-            k if k < len => k as usize,
+            k if k < 0 && k >= -len => (len + k) as usize,
+            k if k >= 0 && k < len => k as usize,
             _ => {
-                return Err(PyValueError::new_err(format!(
+                return Err(PyIndexError::new_err(format!(
                     "Token index to getitem is out of range. Index is {index}, len is {len}."
                 )));
             }
@@ -180,7 +181,7 @@ impl TokenList {
         let self_ = self_.borrow();
         let len = self_.tokens.len() as isize;
         let index = match index {
-            k if k < 0 && k > -len => (len - k) as usize,
+            k if k < 0 && k >= -len => (len + k) as usize,
             k if k >= 0 && k < len => k as usize,
             _ => {
                 if !mandatory {
@@ -265,6 +266,18 @@ impl TokenList {
                         ),
                     )));
                 };
+                if index == 0 {
+                    return Err(PyErr::new::<TokenParseException, _>((
+                        Some(token.clone_ref(py)),
+                        "Indexing reactants starts at 1.",
+                    )));
+                }
+                if parts[1].len() == 0 {
+                    return Err(PyErr::new::<TokenParseException, _>((
+                        Some(token.clone_ref(py)),
+                        "Missing name from pair (index:name).",
+                    )));
+                }
                 (index - 1, parts[1]).into_py_any(py)
             }
             "string" => {
@@ -339,23 +352,22 @@ impl Lexer {
         let mut res = Vec::<Py<TokenList>>::new();
         for (linenum, line) in f.lines().enumerate() {
             let line = line.trim_start().trim_end();
-            if line.len() == 0 {
-                continue;
-            }
             if let Some(no_backspace) = line.strip_suffix("\\") {
                 cumulative.push_str(no_backspace);
                 cumulative.push_str("\n");
             } else {
                 cumulative.push_str(line);
-                res.push(Py::new(
-                    py,
-                    TokenList::new(
-                        std::mem::take(&mut cumulative),
-                        path.to_string(),
-                        linenum,
+                if cumulative.len() > 0 {
+                    res.push(Py::new(
                         py,
-                    )?,
-                )?);
+                        TokenList::new(
+                            std::mem::take(&mut cumulative),
+                            path.to_string(),
+                            linenum,
+                            py,
+                        )?,
+                    )?);
+                }
 
                 cumulative = "".to_string();
             }
@@ -395,8 +407,13 @@ impl Lexer {
                 let start = old_tok_ref.start;
                 let end = old_tok_ref.end;
                 let mut n = 0;
-                for new_tok in val.split_ascii_whitespace() {
+                let mut lex = TokenKind::lexer(&val);
+                while let Some(_) = lex.next() {
+                    let new_tok = val[lex.span().start..lex.span().end].to_string();
                     if new_tok.len() == 0 {
+                        continue;
+                    }
+                    if new_tok.starts_with(";") {
                         continue;
                     }
                     let element = Token {
