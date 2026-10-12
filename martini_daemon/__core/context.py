@@ -123,6 +123,7 @@ class Context:
         self.__context.setVelocities(velocities)
 
     def generate_velocities(self, temp: float) -> None:
+        self.__reinitialize()
         self.__context.setVelocitiesToTemperature(temp)
 
     def minimize_energy(self, tolerance: float = 10.0, max_steps: int = 0) -> None:

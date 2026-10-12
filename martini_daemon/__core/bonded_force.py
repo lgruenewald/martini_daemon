@@ -125,7 +125,7 @@ class BondedForce(Force, metaclass=ABCMeta):
         self.__entries[self.__next_entry_id] = (members, params)
         if self._force is not None:
             self._add_to_force(self._force, members, params)
-            self.system.flag_reinitialize()
+        self.system.flag_reinitialize()
         self.__next_entry_id += 1
         return self.__next_entry_id - 1
 
