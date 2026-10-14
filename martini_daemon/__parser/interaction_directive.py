@@ -87,7 +87,7 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
             else:
                 raise TokenParseException(
                     tokens[-1],
-                    f"No [bond/angle/dihedraltypes] were specified for {atom_types}.",
+                    f"No [bond/angle/dihedral/pairtypes] were specified for {atom_types}.",
                 )
         tokens.assert_no_more_than(n_members + 1 + max_params)
         tokens.assert_at_least(n_members + 1 + min_params)

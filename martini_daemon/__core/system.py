@@ -55,6 +55,7 @@ class System:
         self.bond_types: dict[tuple[str, str, int], list[Token]] = {}
         self.angle_types: dict[tuple[str, str, str, int], list[Token]] = {}
         self.dihedral_types: dict[tuple[str, str, str, str, int], list[Token]] = {}
+        self.pair_types: dict[tuple[str, str, int], list[Token]] = {}
 
     def __assert_no_context(self) -> None:
         if self.__context is not None:
@@ -280,7 +281,7 @@ class System:
     def __add_bonded_type(
         self, table: dict, members: tuple[str, ...], type_: int, params: list[Token]
     ) -> None:
-        # stored under both the forward and the reversed key, so lookups need only one get
+        self.__assert_no_context()
         keys = {(*members, type_), (*members[::-1], type_)}
         if any(key in table for key in keys):
             raise ValueError(f"Duplicate entry for {' '.join(members)} (func {type_}).")
@@ -323,6 +324,17 @@ class System:
         :raises ValueError: If an entry for these types and function type already exists.
         """
         self.__add_bonded_type(self.dihedral_types, (a, b, c, d), type_, params)
+
+    def add_pair_type(self, a: str, b: str, type_: int, params: list[Token]) -> None:
+        """
+        Add a [pairtypes] entry. It also applies to the reversed order b a.
+
+        :param a, b: The atom types, X being a wildcard.
+        :param type_: The function type.
+        :param params: The unparsed parameter tokens.
+        :raises ValueError: If an entry for these types and function type already exists.
+        """
+        self.__add_bonded_type(self.pair_types, (a, b), type_, params)
 
     def iterate_atom_types(self) -> Iterable[tuple[str, tuple[float, float]]]:
         """

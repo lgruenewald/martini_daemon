@@ -8,6 +8,7 @@ from . import defaults_directive as defaults_directive
 from . import dihedral_types_directive as dihedral_types_directive
 from . import exclusions_directive as exclusions_directive
 from . import molecules_directive as molecules_directive
+from . import pair_types_directive as pair_types_directive
 from . import nonbond_params as nonbond_params
 from . import system_directive as system_directive
 
@@ -28,6 +29,7 @@ from .gromacs_top_file import (
 )
 from .interaction_directive import InteractionDirective as InteractionDirective
 from .molecule_type_directive import MoleculeTypeDirective as MoleculeTypeDirective
+from .pairs_directive import register_pair_type as register_pair_type
 from .parser import (
     ParseException as ParseException,
 )

@@ -1,85 +1,10 @@
 import openmm as mm
 
 from ..__core import BondedForce, System, register_available_force
-from ..__parser import (
-    Directive,
-    GromacsTopFile,
-    InteractionDirective,
-    register_directive,
-)
-from ..__rust import TokenList, TokenParseException
+from ..__parser import register_pair_type
 
 
-@register_directive
-class PairTypes(Directive):
-    def line(self, tokens: TokenList) -> None:
-        assert isinstance(self.parent, GromacsTopFile)
-        pair_types = self.parent.system.additional_data.get("pairtypes")
-        if pair_types is None:
-            pair_types = {}
-            self.parent.system.additional_data["pairtypes"] = pair_types
-        t1 = self.parent.unwrap_atom_type(tokens, 0)
-        t2 = self.parent.unwrap_atom_type(tokens, 1)
-        type_ = tokens.unwrap(2, "int")
-        if type_ != 1:
-            raise TokenParseException(tokens[2], f"Unsupported pair type {type_}.")
-        sigma = tokens.unwrap(3, "float")
-        epsilon = tokens.unwrap(4, "float")
-        pair_types[(t1, t2)] = (sigma, epsilon)
-
-    def finish(self) -> None:
-        pass
-
-    @classmethod
-    def is_mandatory(cls) -> bool:
-        return False
-
-    @classmethod
-    def is_unique(cls) -> bool:
-        return False
-
-    @classmethod
-    def is_valid_parent(cls, parent: Directive) -> bool:
-        return isinstance(parent, GromacsTopFile)
-
-    @classmethod
-    def get_name(cls) -> str:
-        return "pairtypes"
-
-
-@register_directive
-class PairsDirective(InteractionDirective):
-    def read_params(self, tokens: TokenList, type_: int) -> list[float]:
-        n_params = len(tokens) - self.get_number_members() - 1
-        if n_params not in (0, 2):
-            raise TokenParseException(
-                tokens[-1], "[pairs] takes either no params, or both sigma and epsilon."
-            )
-        return super().read_params(tokens, type_)
-
-    @classmethod
-    def get_number_members(cls) -> int:
-        return 2
-
-    @classmethod
-    def get_number_params(cls, type_: int) -> tuple[int, int]:
-        return 0, 2
-
-    @classmethod
-    def get_type(cls, type_int: int) -> str | None:
-        if type_int != 1:
-            return None
-        return "pair"
-
-    @classmethod
-    def get_type_args(cls, type_int: int) -> list[str]:
-        return ["float", "float"]
-
-    @classmethod
-    def get_name(cls) -> str:
-        return "pairs"
-
-
+@register_pair_type(type_=1, args=["float", "float"])
 @register_available_force
 class Pairs(BondedForce):
     def __init__(self, system: System) -> None:
@@ -97,19 +22,6 @@ class Pairs(BondedForce):
         q1 = self.system.get_charge(members[0])
         q2 = self.system.get_charge(members[1])
         q_prod = q1 * q2
-
-        if len(params) == 0:
-            pair_types = self.system.additional_data.get("pairtypes")
-            if pair_types is None:
-                raise ValueError("No pair types were defined.")
-            t1 = self.system.get_type(members[0])
-            t2 = self.system.get_type(members[1])
-            params = pair_types.get((t1, t2)) or pair_types.get((t2, t1))
-            if params is None:
-                raise ValueError(
-                    f"Unknown pair type ({t1}, {t2})."
-                    f" Valid types are: {pair_types.keys()}."
-                )
 
         sigma, epsilon = params
 

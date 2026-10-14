@@ -32,8 +32,8 @@ class BondedForce(Force, metaclass=ABCMeta):
 
         """
         super().__init__(system)
-        self.__entries: dict[int, tuple[list[int], list[float]]] = {}
-        self.__next_entry_id = 0
+        self._entries: dict[int, tuple[list[int], list[float]]] = {}
+        self._next_entry_id = 0
 
     def _prepare_force_obj(self) -> None:
         """
@@ -52,7 +52,7 @@ class BondedForce(Force, metaclass=ABCMeta):
         if self.uses_pbc():
             # uses_pbc is used for exactly this...
             self._force.setUsesPeriodicBoundaryConditions(True)  # ty: ignore[unresolved-attribute]
-        for members, params in self.__entries.values():
+        for members, params in self._entries.values():
             self._add_to_force(self._force, members, params)
 
     @classmethod
@@ -79,7 +79,7 @@ class BondedForce(Force, metaclass=ABCMeta):
         By default, this happens if there are any entries and there is no force.
         To trigger a rebuild, you generally therefore want to call _destroy().
         """
-        return len(self.__entries) > 0 and self._force is None
+        return len(self._entries) > 0 and self._force is None
 
     @abstractmethod
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
@@ -122,12 +122,12 @@ class BondedForce(Force, metaclass=ABCMeta):
         Protected because only System should call this.
         """
         params = self._parse(members, params)
-        self.__entries[self.__next_entry_id] = (members, params)
+        self._entries[self._next_entry_id] = (members, params)
         if self._force is not None:
             self._add_to_force(self._force, members, params)
         self.system.flag_reinitialize()
-        self.__next_entry_id += 1
-        return self.__next_entry_id - 1
+        self._next_entry_id += 1
+        return self._next_entry_id - 1
 
     def _remove_bond(self, bond_id: int) -> None:
         """
@@ -135,7 +135,7 @@ class BondedForce(Force, metaclass=ABCMeta):
 
         Protected because only System should call this.
         """
-        del self.__entries[bond_id]
+        del self._entries[bond_id]
         if self._force is not None:
             self._destroy()
 
@@ -145,14 +145,14 @@ class BondedForce(Force, metaclass=ABCMeta):
 
         WARNING! Do not edit the bonds given by this function!
         """
-        return self.__entries.items()
+        return self._entries.items()
 
     def num_bonds(self) -> int:
-        return len(self.__entries)
+        return len(self._entries)
 
     def get_members(self, bond_id: int) -> list[int]:
         """Given a bond_id, return which atoms are part of it."""
-        members, _ = self.__entries[bond_id]
+        members, _ = self._entries[bond_id]
         return members
 
     @classmethod

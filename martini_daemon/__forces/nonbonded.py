@@ -37,8 +37,8 @@ class NonBonded(Force):
         super().__init__(system)
         self.epsilon_r = system.additional_data.get("epsilon_r")
         self.cutoff_nm = system.additional_data.get("cutoff")
-        self.__atom_types: OrderedDict[str, int] = OrderedDict()
-        self.__exclusions: None | ExclusionHelper = None
+        self._atom_types: OrderedDict[str, int] = OrderedDict()
+        self._exclusions: None | ExclusionHelper = None
 
     def get_exclusion_helper(self) -> ExclusionHelper:
         """
@@ -49,13 +49,13 @@ class NonBonded(Force):
         ExclusionHelper is responsible for:
         - adding and removing exclusions from NonBonded and flagging reinitialize when that happens.
         """
-        self.__exclusions = ExclusionHelper(self.system, self)
-        return self.__exclusions
+        self._exclusions = ExclusionHelper(self.system, self)
+        return self._exclusions
 
     def flag_atom_change(self, atom_id: int, change_charge: bool = False) -> None:
         if self._force is None:
             return
-        type_ = self.__atom_types[self.system.get_type(atom_id)]
+        type_ = self._atom_types[self.system.get_type(atom_id)]
         charge = self.system.get_charge(atom_id)
         sc_lam, sc_alpha = self.system.get_sc(atom_id)
         assert isinstance(self._force, mm.CustomNonbondedForce)
@@ -75,9 +75,9 @@ class NonBonded(Force):
         self._destroy()
 
     def _set_force_obj(self) -> mm.Force:
-        if self.__exclusions is None:
+        if self._exclusions is None:
             raise AssertionError("Must call get_exclusion_helper() first!")
-        assert isinstance(self.__exclusions, ExclusionHelper)
+        assert isinstance(self._exclusions, ExclusionHelper)
         force = mm.CustomNonbondedForce(
             "(LJ - corr + ES);"
             "LJ = (1 - sc_lambda) * (C12 / rA^2 - C6 / rA) + sc_lambda * (C12 / rB^2 - C6 / rB);"
@@ -103,33 +103,33 @@ class NonBonded(Force):
         force.setCutoffDistance(self.cutoff_nm)
 
         for i, (type_name, _) in enumerate(self.system.iterate_atom_types()):
-            if self.__atom_types.get(type_name) is not None:
+            if self._atom_types.get(type_name) is not None:
                 # this shouldn't happen
-                assert i == self.__atom_types[type_name], (
+                assert i == self._atom_types[type_name], (
                     "Internal error: atom types changed"
                 )
-            self.__atom_types[type_name] = i
+            self._atom_types[type_name] = i
 
         for atom_id in range(self.system.num_atoms()):
-            type_ = self.__atom_types[self.system.get_type(atom_id)]
+            type_ = self._atom_types[self.system.get_type(atom_id)]
             charge = self.system.get_charge(atom_id)
             sc_lam, sc_alpha = self.system.get_sc(atom_id)
             force.addParticle([type_, charge, sc_lam, sc_alpha])
 
         # FIXME: use system.iterate_exclusions()
-        for _, (members, _) in self.__exclusions.iterate_bonds():
+        for _, (members, _) in self._exclusions.iterate_bonds():
             force.addExclusion(*members)
 
         # add LJ parameters to the system
         sigmas = []
         epsilons = []
         # i,j => type index; t1,t2 => type names
-        n = len(self.__atom_types)
+        n = len(self._atom_types)
         nb_types: dict[tuple[str, str], tuple[float, float]] = (
             self.system.additional_data.get("nb_types")
         )
-        for t1 in self.__atom_types:
-            for t2 in self.__atom_types:
+        for t1 in self._atom_types:
+            for t2 in self._atom_types:
                 sigma, epsilon = (
                     nb_types.get((t1, t2)) or nb_types.get((t2, t1)) or (0.0, 0.0)
                 )
