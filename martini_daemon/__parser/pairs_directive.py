@@ -1,6 +1,6 @@
 from collections.abc import Callable
 
-from ..__core import Force
+from ..__core import Force, sigma_epsilon_to_c6_c12
 from ..__rust import Token
 from .gromacs_top_file import register_directive
 from .interaction_directive import InteractionDirective
@@ -50,11 +50,14 @@ class PairsDirective(InteractionDirective):
         assert isinstance(self.parent, MoleculeTypeDirective)
         if not self.parent.system.additional_data.get("gen_pairs"):
             return None
-        fudgeLJ = self.parent.system.additional_data.get("fudgeLJ") or 1.0
+        fudgeLJ = self.parent.system.additional_data.get("fudgeLJ")
         assert len(types) == 2
         # nonbond params, or applies combination rule if needed
         sigma, epsilon = self.parent.system.get_sigma_epsilon(*types)
-        return [sigma, epsilon * fudgeLJ]
+        if self.parent.system.additional_data.get("combination_rule") == 1:
+            return [*sigma_epsilon_to_c6_c12(sigma, epsilon * fudgeLJ)]
+        else:
+            return [sigma, epsilon * fudgeLJ]
 
 
 def register_pair_type(

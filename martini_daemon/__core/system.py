@@ -27,8 +27,8 @@ def c6_c12_to_sigma_epsilon(c6: float, c12: float) -> tuple[float, float]:
         case 0.0, 0.0:
             return (0.0, 0.0)
         case 0.0, x:
-            # no attractive -> arbitrarily epsilon = 4
-            return (-((x / 4) ** (1 / 12)), 0.0)
+            # no attractive -> arbitrarily epsilon = 1
+            return (-((x / 4) ** (1 / 12)), 1.0)
         case _, 0.0:
             raise ValueError(
                 "C6 non-zero while C12 is zero: attractive-only LJ is not supported."
