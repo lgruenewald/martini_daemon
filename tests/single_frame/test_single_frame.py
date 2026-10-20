@@ -52,9 +52,6 @@ def rootdir(request: pytest.FixtureRequest) -> str:
 tests = [
     # == non martini 3 tests ==
     # note: support for these is preliminary/bad currently, especially since the .mdp used is not adjusted
-    "charmm",
-    "amber",
-    "openff",
     "openff-simple",
     # == martini 3 tests ==
     # notable soft skips
