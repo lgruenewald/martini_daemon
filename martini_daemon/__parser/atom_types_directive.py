@@ -8,28 +8,32 @@ from .parser import ParseException
 class AtomTypesDirective(Directive):
     def line(self, tokens: TokenList) -> None:
         assert isinstance(self.parent, GromacsTopFile)
-        if len(tokens) != 6:
+        if len(tokens) == 6:
+            type = tokens.unwrap(0, "word")
+            mass = tokens.unwrap(1, "float")
+            charge = tokens.unwrap(2, "float")
+            atom_type = tokens.unwrap(3, "word")
+            if atom_type != "A":
+                raise TokenParseException(tokens[3], "Only 'A' atom type supported.")
+            sigma = tokens.unwrap(4, "float")
+            epsilon = tokens.unwrap(5, "float")
+        elif len(tokens) == 7:
+            type = tokens.unwrap(0, "word")
+            _Z = tokens.unwrap(1, "float")
+            mass = tokens.unwrap(2, "float")
+            charge = tokens.unwrap(3, "float")
+            atom_type = tokens.unwrap(4, "word")
+            if atom_type != "A":
+                raise TokenParseException(tokens[4], "Only 'A' atom type supported.")
+            sigma = tokens.unwrap(5, "float")
+            epsilon = tokens.unwrap(6, "float")
+        # FIXME: bond_type column support
+        else:
             raise ParseException(
-                "Only atomtypes lines formatted as type, m, q,"
+                "Only atomtypes lines formatted as type, [Z], m, q,"
                 "atom_type, sigma, epsilon are supported."
             )
-        type = tokens.unwrap(0, "word")
-        mass = tokens.unwrap(1, "float")
-        charge = tokens.unwrap(2, "float")
-        atom_type = tokens.unwrap(3, "word")
-        if atom_type != "A":
-            raise TokenParseException(tokens[3], "Only 'A' atom type supported.")
-        sigma = tokens.unwrap(4, "float")
-        epsilon = tokens.unwrap(5, "float")
-        if sigma != 0.0:
-            raise TokenParseException(
-                tokens[4], "Only sigma=0 is supported in [atomtypes]."
-            )
-        if epsilon != 0.0:
-            raise TokenParseException(
-                tokens[5], "Only epsilon=0 is supported in [atomtypes]."
-            )
-        self.parent.system.add_atom_type(type, charge, mass)
+        self.parent.system.add_atom_type(type, charge, mass, sigma, epsilon)
 
     def finish(self) -> None:
         pass

@@ -10,7 +10,17 @@ class AtomsDirective(Directive):
         assert isinstance(self.parent, MoleculeTypeDirective)
         index = tokens.unwrap(0, "index")
         type_ = tokens.unwrap(1, "word")
-        res_num = tokens.unwrap(2, "int")
+        resid = tokens.unwrap(2, "word")
+        # FIXME: better resid handling -> don't just drop the A
+        if resid[-1] == "A":
+            resid = resid[:-1]
+        try:
+            res_num = int(resid)
+        except ValueError:
+            raise TokenParseException(
+                tokens[2],
+                f"Residue ID should be a number, optionally followed by 'A'. Got: '{resid}'.",
+            )
         res_name = tokens.unwrap(3, "word")
         atom_name = tokens.unwrap(4, "word")
         _ = tokens.unwrap(5, "int")  # charge group number

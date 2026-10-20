@@ -1,6 +1,11 @@
 import openmm as mm
 
-from ..__core import BondedForce, System, register_available_force
+from ..__core import (
+    BondedForce,
+    System,
+    register_available_force,
+    sigma_epsilon_to_c6_c12,
+)
 from ..__parser import register_pair_type
 
 
@@ -21,12 +26,10 @@ class Pairs(BondedForce):
     def _parse(self, members: list[int], params: list[float]) -> list[float]:
         q1 = self.system.get_charge(members[0])
         q2 = self.system.get_charge(members[1])
-        q_prod = q1 * q2
+        fudgeQQ = self.system.additional_data.get("fudgeQQ") or 1.0
+        q_prod = q1 * q2 * fudgeQQ
 
-        sigma, epsilon = params
-
-        c6 = 4 * epsilon * (sigma**6)
-        c12 = 4 * epsilon * (sigma**12)
+        c6, c12 = sigma_epsilon_to_c6_c12(*params)
 
         return [q_prod, c6, c12]
 

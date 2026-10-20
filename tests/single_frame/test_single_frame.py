@@ -15,6 +15,7 @@ from martini_daemon import Simulation, read_geometry
 # == CONFIG ==
 e_tol = 1e-5  # energy relative tolerance
 f_tol = 1e-5  # force relative tolerance
+f_tol_abs = 1e-5  # force absolute tolerance
 r_tol = 2e-3  # distance tolerance
 
 # == Soft-skip some tests ==
@@ -35,18 +36,9 @@ r_tol = 2e-3  # distance tolerance
 # cutoff_LJ:
 # if there is a pair of atoms exactly at the LJ cutoff,
 # forces can be 0 or not differently in GROMACS and OpenMM
-#
-# pairs:
-# only slightly raised the tolerance because forces still
-# seem *slightly* off for a few atoms
-#
-# polyply-ps:
-# forces different by 0.01%, abs difference of 2.249e-06
-# soft skipping because this could be just a case of low
-# absolute value combined with using relative-only tolerances
-#
+
 etol_override = {"CNAP": 3e-5}
-ftol_override = {"cmap": 1e-2, "cutoff_LJ": 0, "pairs": 5e-5, "polyply-ps": 2e-4}
+ftol_override = {"cmap": 1e-2, "cutoff_LJ": 0}
 
 cutoff_nm = 1.1
 
@@ -58,6 +50,13 @@ def rootdir(request: pytest.FixtureRequest) -> str:
 
 
 tests = [
+    # == non martini 3 tests ==
+    # note: support for these is preliminary/bad currently, especially since the .mdp used is not adjusted
+    "charmm",
+    "amber",
+    "openff",
+    "openff-simple",
+    # == martini 3 tests ==
     # notable soft skips
     "CNAP",
     "cutoff_LJ",
@@ -220,7 +219,7 @@ class TestSingleFrame:
                     f"Atoms {atom_index + 1} and {other_atom}+1 are exactly cutoff apart!"
                 )
                 print("This can cause artifacts in forces.")
-        assert np.allclose(self.gmx_forces, forces, c_ftol, 0), (
+        assert np.allclose(self.gmx_forces, forces, c_ftol, f_tol_abs), (
             f"Gmx and daemon forces different by {f_percent:.2f} %.\n"
             f"Particle {atom_index + 1} (<-- indexes start from 1) "
             f"dimension {atom_dim}\n"

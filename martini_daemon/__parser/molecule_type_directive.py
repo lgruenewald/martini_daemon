@@ -15,8 +15,10 @@ class MoleculeTypeDirective(Directive):
     def line(self, tokens: TokenList) -> None:
         self.molecule_type.name = tokens.unwrap(0, "word")
         self.molecule_type.nrexcl = tokens.unwrap(1, "int")
-        if self.molecule_type.nrexcl != 1:
-            raise TokenParseException(tokens[1], "Only nr. excl. == 1 is supported.")
+        if self.molecule_type.nrexcl < 1 or self.molecule_type.nrexcl > 3:
+            raise TokenParseException(
+                tokens[1], "Only nr. excl. of 1, 2 or 3 is supported."
+            )
         tokens.assert_no_more_than(2)
 
     def finish(self) -> None:

@@ -1,3 +1,6 @@
+from collections import deque
+
+
 class MoleculeType:
     def __init__(self) -> None:
         """
@@ -12,6 +15,9 @@ class MoleculeType:
         self.nrexcl: int | None = None
 
         # type, res num, res name, atomname, charge, mass
+        # Note: for ReactionDirective, it's filled with
+        # graphatomtype, reactant id, reactant name, graph atom name, None, None
+        # for the purposes of n_atoms
         self.atoms: list[tuple[str, int, str, str, float | None, float | None]] = []
         self.exclusions: set[tuple[int, int]] = set()
         # name, members, params, generates_excl?
@@ -42,10 +48,27 @@ class MoleculeType:
         Called after parsing. It looks at self.interactions to see which bonds generate exclusions, and then
         it adds the generated exclusions to it based on the nr_excl argument in [moleculetype].
         """
+        n_atoms = len(self.atoms)
+        adjacency = [set() for _ in range(n_atoms)]
         for _, members, _, is_excl in self.interactions:
             if is_excl:
                 assert len(members) == 2
-                self.exclusions.add((members[0], members[1]))
+                i, j = members
+                adjacency[i].add(j)
+                adjacency[j].add(i)
+                # self.exclusions.add((members[0], members[1]))
+
+        for start in range(n_atoms):
+            q = deque([(start, 0)])
+            while q:
+                a, dist = q.popleft()
+                assert self.nrexcl is not None
+                if dist > self.nrexcl:
+                    continue
+                if a != start:
+                    self.exclusions.add((start, a))
+                for b in adjacency[a]:
+                    q.append((b, dist + 1))
 
     # typing missing to avoid circular dependencies
     def instantiate(self, system, atom_indices: list[int]) -> None:  # noqa: ANN001

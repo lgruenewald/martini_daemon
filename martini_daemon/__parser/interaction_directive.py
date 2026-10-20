@@ -37,15 +37,13 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
     def line(self, tokens: TokenList) -> None:
         assert isinstance(self.parent, MoleculeTypeDirective)
         type_num, type_name = self.read_type(tokens)
+        members = self.read_members(tokens)
+        is_excl = self.is_exclusion(type_name)
 
-        self.parent.molecule_type.interactions.append(
-            (
-                type_name,
-                self.read_members(tokens),
-                self.read_params(tokens, type_num),
-                self.is_exclusion(type_name),
+        for params in self.read_params(tokens, type_num):
+            self.parent.molecule_type.interactions.append(
+                (type_name, members, params, is_excl)
             )
-        )
 
     # reasonable defaults that still can be overridden for e.g. virtual_sitesn
     def read_members(self, tokens: TokenList) -> list[int]:
@@ -56,15 +54,25 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
             for i in range(self.get_number_members())
         ]
 
-    def read_params(self, tokens: TokenList, type_: int) -> list[float]:
+    def read_params(self, tokens: TokenList, type_: int) -> list[list[float]]:
         n_members = self.get_number_members()
         min_params, max_params = self.get_number_params(type_)
-        # function types without parameters (e.g. bond type 5) never need a lookup
+        # tokens are appended to `tokens` in the argument as it's being resolved
+        # since multiple dihedral types occur when using [dihedraltypes]
+        # each is parsed separately. lines = [] has ranges (start, end)
+        # which specify the parser to parse those ranges each as its own
+        # interaction
+        lines = []
         if (
+            # no parameters
             len(tokens) == n_members + 1
+            # but function types without parameters (e.g. bond type 5) never need a lookup
             and max_params > 0
+            # and we have a corresponding table for types
             and (all_types := self.get_types()) is not None
         ):
+            # we don't have parameters
+            # bondtypes, anglestypes, dihedraltypes, pairtypes handling
             assert isinstance(self.parent, MoleculeTypeDirective)
             atom_types = tuple(
                 [
@@ -75,36 +83,63 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
             candidates = product(*[(t, "X") for t in atom_types])
             best_count = 999
             best = None
+            # appends tokens so the various angle/dihedral types degree -> radian conversion triggers properly
             for candidate in candidates:
+                # FIXME better verify that this multi-behavior is consistent with GROMACS
                 if (
-                    ntokens := all_types.get((*candidate, type_))
+                    new_inters := all_types.get((*candidate, type_))
                 ) is not None and best_count > candidate.count("X"):
-                    best = ntokens
+                    best = new_inters
                     best_count = candidate.count("X")
             if best is not None:
-                for ntoken in best:
-                    tokens.append(ntoken)
+                for ntokens in best:
+                    lines.append((len(tokens), len(tokens) + len(ntokens)))
+                    for ntoken in ntokens:
+                        tokens.append(ntoken)
+            # FIXME: unify fallback handling
+            # FIXME fallback params only triggers if a table is present
+            elif (params := self.fallback_params(type_, list(atom_types))) is not None:
+                # currently only used by pair type 1.
+                return [params]
             else:
                 raise TokenParseException(
                     tokens[-1],
                     f"No [bond/angle/dihedral/pairtypes] were specified for {atom_types}.",
                 )
-        tokens.assert_no_more_than(n_members + 1 + max_params)
-        tokens.assert_at_least(n_members + 1 + min_params)
-        params_start = n_members + 1
-        params = []
-        for j, filter_ in enumerate(self.get_type_args(type_)):
-            # ignore optional params
-            if params_start + j >= len(tokens):
-                break
-            params.append(
-                tokens.unwrap(
-                    params_start + j,
-                    filter_,
-                )
-            )
+        else:
+            # we have parameters
+            tokens.assert_no_more_than(n_members + 1 + max_params)
+            tokens.assert_at_least(n_members + 1 + min_params)
+            lines.append((n_members + 1, len(tokens)))
 
-        return params
+        # parse each range
+        all_params = []
+        for params_start, params_end in lines:
+            params = []
+            for j, filter_ in enumerate(self.get_type_args(type_)):
+                # ignore optional params
+                if params_start + j >= params_end:
+                    break
+                params.append(
+                    tokens.unwrap(
+                        params_start + j,
+                        filter_,
+                    )
+                )
+            all_params.append(params)
+
+        return all_params
+
+    def fallback_params(self, type_: int, types: list[str]) -> list[float] | None:
+        """
+        Handle lines with no parameters and no xtypes.
+
+        Currently only used by pairs with gen-pairs=yes.
+
+        :param type_: The integer type specified on the line.
+        :param types: The atom types involved in the line.
+        """
+        return None
 
     def read_type(self, tokens: TokenList) -> tuple[int, str]:
         type_num = tokens.unwrap(
@@ -119,7 +154,7 @@ class InteractionDirective(Directive, metaclass=ABCMeta):
             )
         return type_num, type_
 
-    def get_types(self) -> dict[tuple, list[Token]] | None:
+    def get_types(self) -> dict[tuple, list[list[Token]]] | None:
         return None
 
     # for most child classes, number of members leads to a good default impl of read_type, read_members, read_params

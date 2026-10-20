@@ -115,36 +115,10 @@ def test_parameterless_type_needs_no_lookup(tmp_path: Path) -> None:
     assert params(got) == [[]]
 
 
-def test_missing_type_fails(tmp_path: Path) -> None:
-    with pytest.raises(InvalidTopologyError):
-        parse(tmp_path, "[ bondtypes ]\nP1 P2 1 0.47 1250\n", "[ bonds ]\n3 4 1\n")
-
-
 def test_function_type_must_match(tmp_path: Path) -> None:
     """A func 1 entry must not be used for a func 2 bond."""
     with pytest.raises(InvalidTopologyError):
         parse(tmp_path, "[ bondtypes ]\nP1 P2 1 0.47 1250\n", "[ bonds ]\n1 2 2\n")
-
-
-@pytest.mark.parametrize("second", ["P1 P2", "P2 P1"])
-def test_duplicate_fails(tmp_path, second) -> None:
-    """Defining the same entry twice (in either order) is an error."""
-    with pytest.raises(InvalidTopologyError):
-        parse(
-            tmp_path,
-            f"[ bondtypes ]\nP1 P2 1 0.1 100\n{second} 1 0.2 200\n",
-            "[ bonds ]\n1 2 1\n",
-        )
-
-
-def test_duplicate_other_func_ok(tmp_path: Path) -> None:
-    """The same atom types with a different function type are not duplicates."""
-    got = parse(
-        tmp_path,
-        "[ bondtypes ]\nP1 P2 1 0.1 100\nP1 P2 2 0.2 200\n",
-        "[ bonds ]\n1 2 2\n",
-    )
-    assert params(got) == [[0.2, 200.0]]
 
 
 def test_symmetric_entry_is_not_a_duplicate(tmp_path: Path) -> None:
@@ -167,8 +141,6 @@ def test_define_in_type_params(tmp_path: Path) -> None:
 
 
 # === angles ===
-
-
 def test_angle_lookup(tmp_path: Path) -> None:
     got = parse(
         tmp_path,

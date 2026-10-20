@@ -1,9 +1,8 @@
 """Test the internal function _parse_angle_conditions."""
 
 import math
-import re
 
-from martini_daemon import Token, TokenList
+from martini_daemon import TokenList
 from martini_daemon.__topstar.reaction_directives import _parse_angle_conditions
 
 

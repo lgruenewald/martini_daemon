@@ -55,7 +55,7 @@ class VirtualSitesN(InteractionDirective):
             self.parent.parse_index(tokens, i) for i in range(start, end, step)
         ]
 
-    def read_params(self, tokens: TokenList, type_: int) -> list[float]:
+    def read_params(self, tokens: TokenList, type_: int) -> list[list[float]]:
         n_params = self.get_number_params(type_)[0]
         start = 2
         end = len(tokens) - n_params
@@ -70,7 +70,7 @@ class VirtualSitesN(InteractionDirective):
                     )
                 )
 
-        return params
+        return [params]
 
     def read_type(self, tokens: TokenList) -> tuple[int, str]:
         # vid type constructing...

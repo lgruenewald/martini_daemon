@@ -35,7 +35,7 @@ class AnglesDirective(InteractionDirective):
     def get_name(cls) -> str:
         return "angles"
 
-    def get_types(self) -> dict[tuple, list[Token]]:
+    def get_types(self) -> dict[tuple, list[list[Token]]]:
         assert isinstance(self.parent, MoleculeTypeDirective)
         assert isinstance(self.parent.parent, GromacsTopFile)
         return self.parent.parent.system.angle_types

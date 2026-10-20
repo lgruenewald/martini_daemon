@@ -2,7 +2,7 @@ from collections.abc import Callable
 
 from ..__core import Force
 from ..__rust import Token
-from .gromacs_top_file import GromacsTopFile, register_directive
+from .gromacs_top_file import register_directive
 from .interaction_directive import InteractionDirective
 from .molecule_type_directive import MoleculeTypeDirective
 
@@ -35,15 +35,26 @@ class PairsDirective(InteractionDirective):
     def get_name(cls) -> str:
         return "pairs"
 
-    def get_types(self) -> dict[tuple, list[Token]]:
+    def get_types(self) -> dict[tuple, list[list[Token]]]:
         assert isinstance(self.parent, MoleculeTypeDirective)
-        assert isinstance(self.parent.parent, GromacsTopFile)
-        return self.parent.parent.system.pair_types
+        return self.parent.system.pair_types
 
     @classmethod
     def get_number_params(cls, type_: int) -> tuple[int, int]:
         _, args = cls.__type_data[type_]
         return len(args), len(args)
+
+    def fallback_params(self, type_: int, types: list[str]) -> list[float] | None:
+        if type_ != 1:
+            return None
+        assert isinstance(self.parent, MoleculeTypeDirective)
+        if not self.parent.system.additional_data.get("gen_pairs"):
+            return None
+        fudgeLJ = self.parent.system.additional_data.get("fudgeLJ") or 1.0
+        assert len(types) == 2
+        # nonbond params, or applies combination rule if needed
+        sigma, epsilon = self.parent.system.get_sigma_epsilon(*types)
+        return [sigma, epsilon * fudgeLJ]
 
 
 def register_pair_type(

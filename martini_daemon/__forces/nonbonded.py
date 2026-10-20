@@ -86,7 +86,7 @@ class NonBonded(Force):
             "sc_lambda=min(sc_lambda1, sc_lambda2);"
             "sc_alpha=max(sc_alpha1, sc_alpha2);"
             "corr = (C12 / rcut^12 - C6 / rcut^6);"
-            "C6 = 4 * epsilon(type1, type2) * sigma(type1, type2)^6;"
+            "C6 = step(sigma(type1, type2)) * 4 * epsilon(type1, type2) * sigma(type1, type2)^6;"
             "C12 = 4 * epsilon(type1, type2) * sigma(type1, type2)^12;"
             "ES = f/epsilon_r*q1*q2 * (1/r + krf * r^2 - crf);"
             "crf = 1 / rcut + krf * rcut^2;"
@@ -125,14 +125,9 @@ class NonBonded(Force):
         epsilons = []
         # i,j => type index; t1,t2 => type names
         n = len(self._atom_types)
-        nb_types: dict[tuple[str, str], tuple[float, float]] = (
-            self.system.additional_data.get("nb_types")
-        )
         for t1 in self._atom_types:
             for t2 in self._atom_types:
-                sigma, epsilon = (
-                    nb_types.get((t1, t2)) or nb_types.get((t2, t1)) or (0.0, 0.0)
-                )
+                sigma, epsilon = self.system.get_sigma_epsilon(t1, t2)
                 sigmas.append(sigma)
                 epsilons.append(epsilon)
         force.addTabulatedFunction("sigma", mm.Discrete2DFunction(n, n, sigmas))

@@ -8,8 +8,9 @@ from . import defaults_directive as defaults_directive
 from . import dihedral_types_directive as dihedral_types_directive
 from . import exclusions_directive as exclusions_directive
 from . import molecules_directive as molecules_directive
-from . import pair_types_directive as pair_types_directive
 from . import nonbond_params as nonbond_params
+from . import pair_types_directive as pair_types_directive
+from . import settle_directive as settle_directive
 from . import system_directive as system_directive
 
 # symbols exported / public interface

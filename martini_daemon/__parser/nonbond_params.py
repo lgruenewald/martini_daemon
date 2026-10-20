@@ -24,7 +24,7 @@ class NonbondParams(Directive):
 
     @classmethod
     def is_mandatory(cls) -> bool:
-        return True
+        return False
 
     @classmethod
     def is_unique(cls) -> bool:

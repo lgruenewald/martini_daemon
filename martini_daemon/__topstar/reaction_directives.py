@@ -9,7 +9,7 @@ from ..__parser import (
     register_directive,
 )
 from ..__rust import DetectionTemplate, TokenList, TokenParseException
-from .graph import GraphAtomType
+from .graph import Graph, GraphAtomType
 from .modification_template import ModificationTemplate
 
 
@@ -120,6 +120,9 @@ class ReactantsDirective(Directive):
                 tokens[0], "Only one line containing all reactants per reaction."
             )
         reactants = [tokens.unwrap(i, "word") for i in range(len(tokens))]
+        # construct metadata to put in molecule_type.atoms
+        # (graphatomtype, reactant id, reactant name, graph atom name)
+        metadata = []
         for i, r in enumerate(reactants):
             if (
                 self.parent.system.additional_data.get("graphs") is None
@@ -129,7 +132,21 @@ class ReactantsDirective(Directive):
                     tokens[i],
                     f"Undefined reactant graph name {r}. Please put the required [graph] directive first.",
                 )
+            graph: Graph = self.parent.system.additional_data["graphs"][r]
+            for name, _, _, type_ in graph.atoms:
+                match type_:
+                    # intentionally chosen symbols to make it obvious that
+                    # this is metadata
+                    case GraphAtomType.NORMAL:
+                        code = "_"
+                    case GraphAtomType.NOT:
+                        code = "!"
+                    case GraphAtomType.OPT:
+                        code = "?"
+                metadata.append((code, i, r, name, None, None))
+
         self.parent.molecule_type.reactants = reactants
+        self.parent.molecule_type.atoms = metadata
         self.parent.d_template.reactants = reactants
 
     def finish(self) -> None:

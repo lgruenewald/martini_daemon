@@ -11,6 +11,51 @@ from .force import Force
 from .molecule_type import MoleculeType
 
 
+def c6_c12_to_sigma_epsilon(c6: float, c12: float) -> tuple[float, float]:
+    """
+    Convert a C6/C12 pair to sigma and epsilon.
+
+    C6 = 4 epsilon sigma**6
+    C12 = 4 epsilon sigma**12
+
+    Special cases:
+    * 0, 0 -> 0, 0
+    * 0, x -> -sigma, epsilon (convention for repulsive only)
+    * x, 0 -> ValueError
+    """
+    match c6, c12:
+        case 0.0, 0.0:
+            return (0.0, 0.0)
+        case 0.0, x:
+            # no attractive -> arbitrarily epsilon = 4
+            return (-((x / 4) ** (1 / 12)), 0.0)
+        case _, 0.0:
+            raise ValueError(
+                "C6 non-zero while C12 is zero: attractive-only LJ is not supported."
+            )
+        case v, w:
+            sigma = (w / v) ** (1 / 6)
+            epsilon = v / 4 / sigma**6
+            return (sigma, epsilon)
+
+
+def sigma_epsilon_to_c6_c12(sigma: float, epsilon: float) -> tuple[float, float]:
+    """
+    Convert a sigma/epsilon pair to C6 and C12.
+
+    C6 = 4 epsilon sigma**6
+    C12 = 4 epsilon sigma**12
+
+    Special cases:
+    * negative sigma = C6 set to 0
+    """
+    c6 = 4 * epsilon * sigma**6
+    c12 = 4 * epsilon * sigma**12
+    if sigma < 0.0:
+        c6 = 0.0
+    return (c6, c12)
+
+
 class System:
     __available_forces: dict[str, type[BondedForce]] = {}
 
@@ -34,7 +79,9 @@ class System:
         self.__softcore: list[tuple[float, float]] = []
 
         # default charge, mass
-        self.__atom_types: OrderedDict[str, tuple[float, float]] = OrderedDict()
+        self.__atom_types: OrderedDict[str, tuple[float, float, float, float]] = (
+            OrderedDict()
+        )
 
         self.__context = None
         self.__system: mm.System = mm.System()
@@ -49,13 +96,16 @@ class System:
 
         self.molecule_types: dict[str, MoleculeType] = {}
         self.initial_molecules: list[tuple[str, int]] = []
+        # FIXME: move things out of this
         self.additional_data: dict[str, Any] = options or {}
 
         # hacky [bondtypes], ... impl, storing unparsed token content
-        self.bond_types: dict[tuple[str, str, int], list[Token]] = {}
-        self.angle_types: dict[tuple[str, str, str, int], list[Token]] = {}
-        self.dihedral_types: dict[tuple[str, str, str, str, int], list[Token]] = {}
-        self.pair_types: dict[tuple[str, str, int], list[Token]] = {}
+        self.bond_types: dict[tuple[str, str, int], list[list[Token]]] = {}
+        self.angle_types: dict[tuple[str, str, str, int], list[list[Token]]] = {}
+        self.dihedral_types: dict[
+            tuple[str, str, str, str, int], list[list[Token]]
+        ] = {}
+        self.pair_types: dict[tuple[str, str, int], list[list[Token]]] = {}
 
     def __assert_no_context(self) -> None:
         if self.__context is not None:
@@ -73,7 +123,7 @@ class System:
         """
         for name, n in self.initial_molecules:
             mol = self.molecule_types[name]
-            for i in range(n):
+            for _ in range(n):
                 atoms = mol.add_atoms_to_system(self)
                 mol.instantiate(self, atoms)
 
@@ -267,7 +317,9 @@ class System:
 
     # ==== ATOM TYPE HANDLING ====
 
-    def add_atom_type(self, atom_type: str, charge: float, mass: float) -> None:
+    def add_atom_type(
+        self, atom_type: str, charge: float, mass: float, sigma: float, epsilon: float
+    ) -> None:
         """
         Add a new atom type to the system.
 
@@ -276,17 +328,17 @@ class System:
         :param mass: The default mass for this type.
         """
         self.__assert_no_context()
-        self.__atom_types[atom_type] = (charge, mass)
+        self.__atom_types[atom_type] = (charge, mass, sigma, epsilon)
 
     def __add_bonded_type(
         self, table: dict, members: tuple[str, ...], type_: int, params: list[Token]
     ) -> None:
         self.__assert_no_context()
         keys = {(*members, type_), (*members[::-1], type_)}
-        if any(key in table for key in keys):
-            raise ValueError(f"Duplicate entry for {' '.join(members)} (func {type_}).")
         for key in keys:
-            table[key] = params
+            if table.get(key) is None:
+                table[key] = []
+            table[key].append(params)
 
     def add_bond_type(self, a: str, b: str, type_: int, params: list[Token]) -> None:
         """
@@ -295,7 +347,6 @@ class System:
         :param a, b: The bonded atom types, X being a wildcard.
         :param type_: The function type.
         :param params: The unparsed parameter tokens.
-        :raises ValueError: If an entry for these types and function type already exists.
         """
         self.__add_bonded_type(self.bond_types, (a, b), type_, params)
 
@@ -308,7 +359,6 @@ class System:
         :param a, b, c: The bonded atom types, X being a wildcard.
         :param type_: The function type.
         :param params: The unparsed parameter tokens.
-        :raises ValueError: If an entry for these types and function type already exists.
         """
         self.__add_bonded_type(self.angle_types, (a, b, c), type_, params)
 
@@ -321,7 +371,6 @@ class System:
         :param a, b, c, d: The bonded atom types, X being a wildcard.
         :param type_: The function type.
         :param params: The unparsed parameter tokens.
-        :raises ValueError: If an entry for these types and function type already exists.
         """
         self.__add_bonded_type(self.dihedral_types, (a, b, c, d), type_, params)
 
@@ -332,7 +381,6 @@ class System:
         :param a, b: The atom types, X being a wildcard.
         :param type_: The function type.
         :param params: The unparsed parameter tokens.
-        :raises ValueError: If an entry for these types and function type already exists.
         """
         self.__add_bonded_type(self.pair_types, (a, b), type_, params)
 
@@ -342,7 +390,10 @@ class System:
 
         :return: An iterator over tuples of (atom_type, tuples of (charge, mass)).
         """
-        return self.__atom_types.items()
+        return (
+            (key, (charge, mass))
+            for key, (charge, mass, _sigma, _epsilon) in self.__atom_types.items()
+        )
 
     def get_atom_type(self, atom_type: str) -> None | tuple[float, float]:
         """
@@ -351,7 +402,76 @@ class System:
         :param atom_type: The atom type.
         :return: The default charge and mass for atom type as a tuple.
         """
-        return self.__atom_types.get(atom_type)
+        if (res := self.__atom_types.get(atom_type)) is not None:
+            charge, mass, _sigma, _epsilon = res
+            return charge, mass
+        return None
+
+    def get_atom_type_sigma_epsilon(self, atom_type: str) -> None | tuple[float, float]:
+        """
+        Get the default sigma and epsilon for atom type.
+
+        :param atom_type: The atom type.
+        :return: The default sigma and epsilon values, as a tuple.
+        """
+        if (res := self.__atom_types.get(atom_type)) is not None:
+            _charge, _mass, sigma, epsilon = res
+            return sigma, epsilon
+        return None
+
+    def get_sigma_epsilon(self, t1: str, t2: str) -> tuple[float, float]:
+        """
+        Return a sigma, epsilon pair based on system.
+
+        Read system's nonbonded types and atom types + combination rule.
+
+        Returns a negative sigma if C6 = 0 (repulsive only).
+        """
+        # FIXME: nb_types, combination_rule must be promoted to full attributes
+        nb_types = self.additional_data.get("nb_types", {})
+        params = nb_types.get((t1, t2)) or nb_types.get((t2, t1)) or None
+        params1 = self.get_atom_type_sigma_epsilon(t1)
+        params2 = self.get_atom_type_sigma_epsilon(t2)
+        assert params1 is not None
+        assert params2 is not None
+        combrule = self.additional_data["combination_rule"]
+        match combrule:
+            case 1:
+                # format: C6, C12
+                # combrule (c6_1 * c6_2) ** 1/2, (c12_1 * c12_2) ** 1/2
+                # output: sigma, epsilon. -sigma if c6=0
+                if params is None:
+                    c6_1, c12_1 = params1
+                    c6_2, c12_2 = params2
+                    params = ((c6_1 * c6_2) ** (1 / 2), (c12_1 * c12_2) ** (1 / 2))
+                sigma, epsilon = c6_c12_to_sigma_epsilon(*params)
+            case 2:
+                # format: sigma, epsilon
+                # combrule (s1+s2)/2, (e1*e2)**(1/2)
+                # output: sigma, epsilon
+                if params is None:
+                    s1, e1 = params1
+                    s2, e2 = params2
+                    sigma, epsilon = ((abs(s1) + abs(s2)) / 2, (e1 * e2) ** (1 / 2))
+                    # negative sigma = repulsive only
+                    s_sign = -1 if s1 < 0 or s2 < 0 else 1
+                    sigma *= s_sign
+                else:
+                    sigma, epsilon = params
+            case 3:
+                # format: sigma, epsilon
+                # combrule (c6_1 * c6_2) ** 1/2, (c12_1 * c12_2) ** 1/2
+                # output: sigma, epsilon. -sigma if c6=0
+                if params is None:
+                    s1, e1 = params1
+                    s2, e2 = params2
+                    c6_1, c12_1 = sigma_epsilon_to_c6_c12(s1, e1)
+                    c6_2, c12_2 = sigma_epsilon_to_c6_c12(s2, e2)
+                    c6, c12 = ((c6_1 * c6_2) ** (1 / 2), (c12_1 * c12_2) ** (1 / 2))
+                    sigma, epsilon = c6_c12_to_sigma_epsilon(c6, c12)
+                else:
+                    sigma, epsilon = params
+        return sigma, epsilon
 
     # ==== STATE SYNCHRONIZATION ====
 
@@ -604,7 +724,7 @@ class System:
                     f"Provided force {name} is not an interaction that is in System, nor is it available."
                 )
         if not isinstance(f, BondedForce):
-            raise ValueError(
+            raise TypeError(
                 f"Provided force {name} does not correspond to a bonded force."
             )
         bond_id = f._add_bond(members, params)
@@ -644,7 +764,7 @@ class System:
         if f is None:
             raise ValueError(f"No force was found with name {force_name}.")
         if not isinstance(f, BondedForce):
-            raise ValueError(f"Force with name {force_name} is not a bonded force.")
+            raise TypeError(f"Force with name {force_name} is not a bonded force.")
         return f.get_members(bond_id)
 
     def get_filters(self) -> set[str]:
