@@ -1,0 +1,35 @@
+[ defaults ]
+; nbfunc comb-rule gen-pairs fudgeLJ fudgeQQ
+1 2 yes 1.0 0.5
+
+[ atomtypes ]
+; name mass charge ptype sigma epsilon
+A 60.0 0.0 A 0.30 0.5
+B 60.0 0.0 A 0.30 0.5
+C 60.0 0.0 A 0.30 0.5
+D 60.0 0.0 A 0.30 0.5
+E 60.0 0.0 A 0.30 0.5
+
+
+[ moleculetype ]
+XX 3
+
+[ atoms ]
+  1 A   1 XX XX1    1 0.5  60.0
+  2 A   1 XX XX2    2 0  60.0
+  3 A   1 XX XX3    3 0  60.0
+  4 A   1 XX XX4    4 -0.5  60.0
+
+[ bonds ]
+  1 2 1 0.2 1000
+  2 3 1 0.2 1000
+  3 4 1 0.2 1000
+
+[ pairs ]
+  1 4 1
+
+[ system ]
+test
+
+[ molecules ]
+XX 1

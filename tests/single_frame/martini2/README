@@ -1,0 +1,3 @@
+Martini 2.2 WALP23 (ideal helix, martinize2 -ff martini22) in a POPC:DOPC:CHOL 4:4:2
+bilayer (insane) in W. CHOL is the virtual site version from martini_openmm.
+Energy minimized and equilibrated for 110 ps NVT.

@@ -1,0 +1,29 @@
+[ defaults ]
+; nbfunc comb-rule
+1 1
+
+[ atomtypes ]
+; name mass charge ptype C6 C12
+A 60.0 0.0 A 0.15091 0.16267e-02
+B 60.0 0.0 A 0.21558 0.23238e-02
+
+
+[ moleculetype ]
+XX 1
+
+[ atoms ]
+  1 A   1 XX XX1    1 0  60.0
+  2 B   1 XX XX2    2 0  60.0
+  3 A   1 XX XX3    3 0  60.0
+  4 B   1 XX XX4    4 0  60.0
+
+[ bonds ]
+  1 2 1 0.2 1000
+  2 3 1 0.2 1000
+  3 4 1 0.2 1000
+
+[ system ]
+test
+
+[ molecules ]
+XX 1

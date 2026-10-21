@@ -1,0 +1,20 @@
+#include "martini_v2.2.itp"
+#include "martini_v2.0_POPC_02.itp"
+#include "martini_v2.0_DOPC_02.itp"
+#include "martini_v2.0_CHOL_openmm.itp"
+#include "walp23.itp"
+[ system ]
+; name
+Protein in INSANE! Membrane UpperLeaflet>POPC:DOPC:CHOL=4.0:4.0:2.0 LowerLeaflet>POPC:DOPC:CHOL=4.0:4.0:2.0
+
+
+[ molecules ]
+; name  number
+Protein          1
+POPC            23
+DOPC            23
+CHOL            11
+POPC            23
+DOPC            23
+CHOL            11
+W             1495

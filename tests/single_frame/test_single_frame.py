@@ -51,8 +51,17 @@ def rootdir(request: pytest.FixtureRequest) -> str:
 
 tests = [
     # == non martini 3 tests ==
-    # note: support for these is preliminary/bad currently, especially since the .mdp used is not adjusted
+    # note: support for these may be preliminary - an entry here alone does not mean full support.
     "openff-simple",
+    "martini2",
+    "comb_rule_1",
+    "comb_rule_3",
+    "fudgeQQ",
+    "gen_pairs",
+    "C6_zero",
+    "negative_sigma",
+    "dihedraltypes_X",
+    "multi_dihedraltypes",
     # == martini 3 tests ==
     # notable soft skips
     "CNAP",

@@ -1,0 +1,2 @@
+Dihedrals parameterized from [ dihedraltypes ]: exact match taking precedence over
+X wildcard, outer X wildcards (type 9), and inner X wildcards (type 4 improper).
