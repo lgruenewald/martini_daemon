@@ -10,6 +10,7 @@ path = "src/lib.rs"
 
 [build-dependencies]
 chrono = "0.4.44"
+cc = "1.9.0"
 
 [dependencies]
 glam = "0.33.7"

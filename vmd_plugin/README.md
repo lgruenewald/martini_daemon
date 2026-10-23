@@ -5,18 +5,24 @@ This VMD plugin facilitates the visualization of dynamic bond networks, as well 
 different frames can have different values for it. This is achieved by setting a Tcl trace on the global
 variable storing the VMD frame information to execute an efficient loader every time the frame is switched.
 
-### Building
+### Automatic installation
 
-* Install dependencies (Ubuntu package names):
+`build.rs` already attempts to build the plugin, and puts it in martini_daemon's
+wheel. If you call the CLI `daemon install` it will attempt to install it
+to DATA_DIR/vmd/plugins/martini_daemon, and append to your .vmdrc, so that
+it will be loaded automatically. If this process fails, see manual installation
+below.
+
+### Building Manually
+
+* Install dependencies (Ubuntu package names are in parentheses):
    - a C compiler and GNU Make (`build-essential`)
-   - `pkg-config`
-   - Tcl headers, same version as your VMD was compiled with (`tcl8.6-dev`)
    - 1g or ng-compat zlib headers (`zlib1g-dev`)
 * Adjust Makefile if needed
 * Run `make`
 * Copy `toptraj.so` to a suitable location
 
-### Usage
+### Manual Usage
 
 Load toptraj.so with the `load /path/to/toptraj.so` command in the Tcl console or script.
 Loading it makes toptraj-specific Tcl commands available.

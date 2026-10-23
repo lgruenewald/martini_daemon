@@ -16,6 +16,10 @@ from .__rust import BondGraph, TopTrajReader, TopTrajWriter, build_version
 from .__simulation import Simulation
 from .extra import logo, logo_small
 
+from importlib.resources import files, as_file
+from pathlib import Path
+import shutil
+
 
 def print_help(topic: None | str = None) -> int:
     match topic:
@@ -30,6 +34,7 @@ info - print information about a .toptraj or .chk file
 whole - make a trajectory whole using a .toptraj file or .top file
 select - select atoms and/or frames for .toptraj file
 dist - get distances, angles, dihedrals for a detailed .frags and trajectory file
+install - install additional components (VMD plugin)
 
 Use `daemon help [SUBCOMMAND]` for more information about a subcommand.""")
         case "version":
@@ -69,6 +74,14 @@ Takes the following arguments:
 -f, --frags '.frags' file with detailed fragment listing enabled
 -p, --topology topology .top file with graph information #included
 -s, --selection Selection pattern, e.g. "monomer:r-s" for a distance between nodes r and s in graph monomer.
+""")
+        case "install":
+            print("""daemon install
+
+Installs additional components to the user's home directory.
+
+This is currently just a vmd plugin, which is installed by appending to
+.vmdrc and putting files to DATA_DIR/vmd/plugins/martini_daemon.
 """)
         case _:
             print(f"Unknown subcommand: {topic}.")
@@ -483,6 +496,52 @@ def select(args: list[str]) -> int:
             print(f"File type {ext} not supported, only .toptraj and .frags is.")
     return 0
 
+def install(args: list[str]) -> None:
+    """Install pkgIndex.tcl and toptraj.so to DATA_DIR/vmd/plugins/toptraj."""
+    home = Path.home()
+    if sys.platform.startswith("win"):
+        # Windows
+        base = os.environ.get("APPDATA") or home / "AppData" / "Roaming"
+        vmdrc = Path(base) / "vmd.rc"
+    elif sys.platform == "darwin":
+        # Mac OS
+        base = home / "Library" / "Application Support"
+        vmdrc = home / ".vmdrc"
+    else:
+        # Linux, BSD
+        base = os.environ.get("XDG_DATA_HOME", "") or home / ".local" / "share"
+        vmdrc = home / ".vmdrc"
+    plugin_dir = Path(base) / "vmd" / "plugins"
+    target = plugin_dir / "martini_daemon"
+    target.mkdir(parents=True, exist_ok=True)
+    print("Plugin dir:", plugin_dir)
+    print("vmdrc path:", vmdrc)
+
+    if not vmdrc.exists():
+        # without this, the main menu would suddenly be disabled once a
+        # vmdrc is written
+        vmdrc.write_text("menu main on\n")
+
+    src = files("martini_daemon")
+    for name in ["toptraj.so", "pkgIndex.tcl"]:
+        with as_file(src / name) as p:
+            print("Installing", target / name)
+            shutil.copy2(p, target / name)
+
+    if "martini_daemon" not in vmdrc.read_text():
+        print("Appending to .vmdrc")
+        with open(vmdrc, "a") as f:
+            f.write(
+                ("""
+# VMD plugin path (added by martini_daemon)
+set _plugindir {@PLUGIN_DIR@}; list
+if {[lsearch -exact $auto_path $_plugindir] < 0} {
+    lappend auto_path $_plugindir; list
+}
+# toptraj plugin
+package require toptraj; list"""
+                ).replace("@PLUGIN_DIR@", str(plugin_dir.absolute()))
+            )
 
 def main() -> None:
     """Parse arguments and run the right subcommand of the `daemon` CLI."""
@@ -506,6 +565,8 @@ def main() -> None:
             sys.exit(select(args))
         case "dist":
             sys.exit(dist(args))
+        case "install":
+            sys.exit(install(args))
         case "logo":
             if random() > 0.5:
                 print(logo())

@@ -13,7 +13,7 @@ TODO:
 */
 
 #define PKG_NAME "toptraj"
-#define VERSION "0.1"
+#define VERSION "0.2"
 
 #include <assert.h>
 #include <fcntl.h>
@@ -26,10 +26,11 @@ TODO:
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <tcl.h>
-#include <tclDecls.h>
 #include <zconf.h>
 #include <zlib.h>
+
+#include <tcl.h>
+#include <tclDecls.h>
 
 /* TYPES */
 
@@ -189,7 +190,7 @@ static char *fname(Chunk *chunk, size_t n, long lim) { \
         nums[i] = f(chunk); \
         if (lim <= 0 || i < (size_t)lim) len += snprintf(NULL, 0, fmt, nums[i]); \
     } \
-    char *res = malloc(len + 1); \
+    char *res = calloc(len + 1, sizeof(char)); \
     size_t c = 0; \
     for (size_t i = 0; i < n; i++) { \
         if (lim <= 0 || i < (size_t)lim) c += sprintf(&res[c], fmt, nums[i]); \

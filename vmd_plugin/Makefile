@@ -1,18 +1,23 @@
-CC = gcc
-TCL_VERSION := 8.6
-CFLAGS := -shared $(shell pkg-config --cflags "tcl$(TCL_VERSION)") -fPIC -g -O1 -Wall -Wextra -Werror -Wpedantic
-LDFLAGS := $(shell pkg-config --libs "tcl$(TCL_VERSION)")
-LIB := toptraj.so
+CC ?= cc
+LIB ?= toptraj.so
+WARN := -Wall -Wextra -Werror -Wpedantic
+CFLAGS += -fPIC -g -O2 -Itcl8.5
+UNAME := $(shell uname -s)
+
+LDFLAGS += -shared
+ifeq ($(UNAME),Darwin)
+LDFLAGS += -undefined dynamic_lookup
+else
+LDFLAGS += -Wl,-z,undefs
+endif
+LDLIBS += -lm
 
 SRC := $(wildcard *.c)
 HEADERS := $(wildcard *.h)
 
-.PHONY: all
-all: lib
-
-.PHONY: lib
-lib: $(SRC) $(HEADERS)
-	$(CC) $(CFLAGS) $(SRC) -o $(LIB) $(LDFLAGS)
+$(LIB): $(SRC) $(HEADERS)
+	mkdir -p $(dir $@)
+	$(CC) $(WARN) $(CFLAGS) $(SRC) -o $@ $(LDFLAGS) $(LDLIBS)
 
 .PHONY: clean
 clean:

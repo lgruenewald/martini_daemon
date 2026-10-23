@@ -1,5 +1,8 @@
 // Modified based on https://github.com/frobware/build-rs-example distributed under
 // the MIT License.
+//
+// Note Oct 23 2026 - Added Makefile hook. The below copyright notice is about
+// the build information hook.
 
 // Copyright (c) 2025 Andrew McDermott
 
@@ -35,13 +38,14 @@
 //! - If Git is unavailable (e.g., tarball builds), Git info is omitted.
 //! - The build date and Rust version are always included.
 
-use std::{env, process::Command};
-
+use cc;
 use chrono::Utc;
+use std::{env, path::PathBuf, process::Command};
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     set_build_version();
+    try_compile_vmd_plugin();
 }
 
 /// Gets the Git commit hash and dirty status.
@@ -85,4 +89,29 @@ fn set_build_version() {
     full_version.push_str(&format!("{build_date})"));
 
     println!("cargo:rustc-env=BUILD_VERSION={}", full_version);
+}
+
+/// Attempts to run `make` in `./vmd_plugin` and puts all `.so` into the tree.
+fn try_compile_vmd_plugin() {
+    let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    println!("cargo:rerun-if-changed=vmd_plugin");
+    println!("cargo:rerun-if-changed=Makefile");
+
+    let cc = cc::Build::new().get_compiler();
+    let result = Command::new("make")
+        .current_dir(root.join("vmd_plugin"))
+        .arg(format!("CC={}", cc.path().display()))
+        .arg(format!(
+            "LIB={}",
+            root.join("martini_daemon/toptraj.so").display()
+        ))
+        .output();
+
+    let message = match result {
+        Ok(o) if o.status.success() => return,
+        Ok(o) => String::from_utf8_lossy(&o.stderr).into_owned(),
+        Err(e) => format!("Couldn't run make: {e}"),
+    };
+    println!("cargo:warning={message}");
+    println!("cargo:warning=VMD plugin build failed.")
 }
