@@ -393,6 +393,28 @@ class Simulation:
         # it's owned by context now
         self.integrator = None
 
+        # Sanity check warnings
+        # Warning 1: total charge != 0
+        if not np.isclose((total_charge := sum(self.system.get_charges())), 0, atol=1e-2):
+            self.warn(
+                f"The system is not neutral. The total charge of the system is: `{total_charge:.2f}`."
+            )
+        # Warning 2: name mismatch against gro
+        if type(geometry) is str and geometry[-4:] == ".gro":
+            # FIXME: clean up by changing the format of read_geometry to return some topology
+            with open(geometry) as f:
+                lines = f.read().splitlines()
+                n = int(lines[1].strip())
+                for i in range(2, n+2):
+                    name = lines[i][10:15].strip()
+                    sys_name = self.system.get_name(i-2)[:5]
+                    if name != sys_name:
+                        self.warn(
+                            f"Atom name mismatch. First offender: atom {i-2} (0 indexed), name in .gro: {name}, name in system: {sys_name}."
+                        )
+                        break
+            
+
         for r in self.__reporters:
             r.on_simulation_start(self, self.continue_sim)
         self.info("End of Simulation.__init__")
